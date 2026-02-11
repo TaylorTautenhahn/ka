@@ -24,17 +24,25 @@ const interestHints = document.getElementById("interestHints");
 const pnmForm = document.getElementById("pnmForm");
 const lunchForm = document.getElementById("lunchForm");
 const ratingForm = document.getElementById("ratingForm");
+const photoForm = document.getElementById("photoForm");
+const pnmPhotoInput = document.getElementById("pnmPhoto");
+const selectedPnmPhotoFile = document.getElementById("selectedPnmPhotoFile");
+const selectedPnmPhoto = document.getElementById("selectedPnmPhoto");
+const selectedPnmPhotoPlaceholder = document.getElementById("selectedPnmPhotoPlaceholder");
 
 const pnmTable = document.getElementById("pnmTable");
 const memberTable = document.getElementById("memberTable");
 const ratingList = document.getElementById("ratingList");
 const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
+const meetingView = document.getElementById("meetingView");
 const ratingPnm = document.getElementById("ratingPnm");
 const lunchPnm = document.getElementById("lunchPnm");
 
 const approvalsPanel = document.getElementById("approvalsPanel");
 const pendingList = document.getElementById("pendingList");
+const adminPanel = document.getElementById("adminPanel");
+const adminPnmTable = document.getElementById("adminPnmTable");
 
 const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
@@ -133,13 +141,18 @@ function spawnSuccessBurst() {
 }
 
 async function api(path, options = {}) {
+  const isFormData = options.body instanceof FormData;
   const response = await fetch(path, {
     method: options.method || "GET",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: isFormData
+      ? {
+          ...(options.headers || {}),
+        }
+      : {
+          "Content-Type": "application/json",
+          ...(options.headers || {}),
+        },
+    body: options.body ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
   });
 
   let payload = null;
@@ -205,6 +218,34 @@ function roleCanSeeRaters() {
   return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
 }
 
+function roleCanManagePhotos() {
+  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
+function roleCanUseAdminPanel() {
+  return state.user && state.user.role === "Head Rush Officer";
+}
+
+function renderSelectedPnmPhoto(pnm) {
+  if (!pnm || !pnm.photo_url) {
+    selectedPnmPhoto.classList.add("hidden");
+    selectedPnmPhoto.removeAttribute("src");
+    selectedPnmPhotoPlaceholder.classList.remove("hidden");
+    return;
+  }
+  selectedPnmPhoto.src = pnm.photo_url;
+  selectedPnmPhoto.alt = `${pnm.first_name} ${pnm.last_name}`;
+  selectedPnmPhoto.classList.remove("hidden");
+  selectedPnmPhotoPlaceholder.classList.add("hidden");
+}
+
+function smallPhotoCell(pnm) {
+  if (!pnm.photo_url) {
+    return '<div class="mini-photo empty">No photo</div>';
+  }
+  return `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)}" class="mini-photo" loading="lazy" />`;
+}
+
 function toQuery(params) {
   const q = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -267,6 +308,7 @@ function renderPnmTable() {
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
       return `
         <tr class="${selectedClass}">
+          <td>${smallPhotoCell(pnm)}</td>
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
           <td>${escapeHtml(pnm.class_year)}</td>
@@ -298,6 +340,7 @@ function renderPnmTable() {
     <table>
       <thead>
         <tr>
+          <th>Photo</th>
           <th>Code</th>
           <th>Name</th>
           <th>Class</th>
@@ -470,14 +513,63 @@ function renderPendingApprovals(data) {
   `;
 }
 
+function renderAdminPanel() {
+  if (!roleCanUseAdminPanel()) {
+    adminPanel.classList.add("hidden");
+    adminPnmTable.innerHTML = "";
+    return;
+  }
+
+  adminPanel.classList.remove("hidden");
+  if (!state.pnms.length) {
+    adminPnmTable.innerHTML = '<p class="muted">No PNMs to manage.</p>';
+    return;
+  }
+
+  const rows = state.pnms
+    .map(
+      (pnm) => `
+      <tr>
+        <td>${smallPhotoCell(pnm)}</td>
+        <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
+        <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+        <td>${pnm.weighted_total.toFixed(2)}</td>
+        <td>${pnm.rating_count}</td>
+        <td><button type="button" class="delete-pnm" data-pnm-id="${pnm.pnm_id}">Remove Rushee</button></td>
+      </tr>
+    `
+    )
+    .join("");
+
+  adminPnmTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Photo</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Weighted Total</th>
+          <th>Ratings</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
 function applyRatingFormForSelected() {
   if (!state.selectedPnmId) {
     ratingForm.reset();
+    renderSelectedPnmPhoto(null);
+    photoForm.classList.toggle("hidden", !roleCanManagePhotos());
     return;
   }
 
   const selected = state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId);
   if (!selected) {
+    renderSelectedPnmPhoto(null);
+    photoForm.classList.toggle("hidden", !roleCanManagePhotos());
     return;
   }
 
@@ -492,6 +584,8 @@ function applyRatingFormForSelected() {
   document.getElementById("rateAlcohol").value = own ? own.alcohol_control : 0;
   document.getElementById("rateIg").value = own ? own.instagram_marketability : 0;
   document.getElementById("rateComment").value = own ? own.comment || "" : "";
+  renderSelectedPnmPhoto(selected);
+  photoForm.classList.toggle("hidden", !roleCanManagePhotos());
 }
 
 function renderRatingEntries(data) {
@@ -561,10 +655,96 @@ function renderLunchEntries(data) {
     .join("");
 }
 
+function renderMeetingView(payload) {
+  const { pnm, summary, ratings, lunches, matches, can_view_rater_identity: canSeeRaters } = payload;
+  const photoMarkup = pnm.photo_url
+    ? `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}" class="meeting-photo large" loading="lazy" />`
+    : '<div class="photo-placeholder large">No photo uploaded.</div>';
+
+  const ratingsMarkup =
+    ratings
+      .slice(0, 8)
+      .map((row) => {
+        const who = canSeeRaters
+          ? `${escapeHtml(row.rater.username)} (${escapeHtml(row.rater.role)})`
+          : row.from_me
+            ? "Your rating"
+            : "Member rating";
+        const delta =
+          row.last_change && typeof row.last_change.delta_total === "number"
+            ? ` | Delta ${row.last_change.delta_total > 0 ? "+" : ""}${row.last_change.delta_total}`
+            : "";
+        return `<li><strong>${who}</strong>: ${row.total_score}/45${delta}</li>`;
+      })
+      .join("") || "<li>No ratings yet.</li>";
+
+  const lunchMarkup =
+    lunches
+      .slice(0, 8)
+      .map((row) => `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})</li>`)
+      .join("") || "<li>No lunch logs yet.</li>";
+
+  const matchMarkup =
+    matches
+      .slice(0, 8)
+      .map((row) => {
+        const shared = row.shared_interests.length ? row.shared_interests.map((x) => escapeHtml(x)).join(", ") : "None";
+        return `<li><strong>${escapeHtml(row.username)}</strong> (${escapeHtml(row.role)}) | Fit ${row.fit_score} | Shared: ${shared}</li>`;
+      })
+      .join("") || "<li>No fit matches yet.</li>";
+
+  meetingView.innerHTML = `
+    <div class="meeting-header">
+      ${photoMarkup}
+      <div>
+        <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
+        <p class="muted">${escapeHtml(pnm.hometown)} | ${escapeHtml(pnm.class_year)} | ${escapeHtml(pnm.instagram_handle)}</p>
+        <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
+      </div>
+    </div>
+    <div class="meeting-metrics">
+      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / 45</p></article>
+      <article class="card"><strong>Ratings Count</strong><p>${summary.ratings_count}</p></article>
+      <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
+      <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>
+    </div>
+    <div class="grid-two">
+      <article class="list-column">
+        <h3>Top Ratings</h3>
+        <ul class="meeting-list">${ratingsMarkup}</ul>
+      </article>
+      <article class="list-column">
+        <h3>Recent Lunches</h3>
+        <ul class="meeting-list">${lunchMarkup}</ul>
+      </article>
+    </div>
+    <article class="list-column">
+      <h3>Best Member Matches</h3>
+      <ul class="meeting-list">${matchMarkup}</ul>
+    </article>
+  `;
+}
+
+async function loadMeetingView(pnmId) {
+  if (!pnmId) {
+    meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
+    return;
+  }
+  try {
+    const payload = await api(`/api/pnms/${pnmId}/meeting`);
+    renderMeetingView(payload);
+  } catch (error) {
+    meetingView.innerHTML = '<p class="muted">Unable to load meeting view.</p>';
+    showToast(error.message || "Unable to load meeting view.");
+  }
+}
+
 async function loadPnmDetail(pnmId) {
   if (!pnmId) {
     ratingList.innerHTML = '<p class="muted">Select a PNM to view rating entries.</p>';
     lunchHistory.innerHTML = '<p class="muted">Select a PNM to view lunch logs.</p>';
+    meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
+    renderSelectedPnmPhoto(null);
     return;
   }
 
@@ -575,6 +755,7 @@ async function loadPnmDetail(pnmId) {
     ]);
     renderRatingEntries(ratings);
     renderLunchEntries(lunches);
+    await loadMeetingView(pnmId);
   } catch (error) {
     showToast(error.message || "Unable to load selected PNM details.");
   }
@@ -601,6 +782,7 @@ async function loadPnms() {
   }
 
   renderPnmTable();
+  renderAdminPanel();
   applyRatingFormForSelected();
   await loadPnmDetail(state.selectedPnmId);
 }
@@ -726,6 +908,9 @@ async function handleLogout() {
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
   animateCounter(heroLunchCount, 0);
+  meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
+  renderSelectedPnmPhoto(null);
+  renderAdminPanel();
   stopLiveRefresh();
   setAuthView(false);
   showToast("Logged out.");
@@ -769,6 +954,16 @@ async function handlePnmCreate(event) {
       body,
     });
     pnmForm.reset();
+    const photoFile = pnmPhotoInput.files && pnmPhotoInput.files.length ? pnmPhotoInput.files[0] : null;
+    if (photoFile) {
+      const formData = new FormData();
+      formData.append("photo", photoFile);
+      await api(`/api/pnms/${payload.pnm.pnm_id}/photo`, {
+        method: "POST",
+        body: formData,
+      });
+    }
+    pnmPhotoInput.value = "";
     setDefaultDates();
     showToast(`PNM added: ${payload.pnm.pnm_code}`);
     await refreshAll();
@@ -777,6 +972,39 @@ async function handlePnmCreate(event) {
     await loadPnmDetail(state.selectedPnmId);
   } catch (error) {
     showToast(error.message || "Unable to create PNM.");
+  }
+}
+
+async function handlePhotoUpload(event) {
+  event.preventDefault();
+  const selectedId = Number(state.selectedPnmId || ratingPnm.value || 0);
+  if (!selectedId) {
+    showToast("Select a PNM before uploading a photo.");
+    return;
+  }
+  if (!roleCanManagePhotos()) {
+    showToast("Only Rush Officers and Head Rush Officer can upload photos.");
+    return;
+  }
+  const file = selectedPnmPhotoFile.files && selectedPnmPhotoFile.files.length ? selectedPnmPhotoFile.files[0] : null;
+  if (!file) {
+    showToast("Choose an image file first.");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("photo", file);
+  try {
+    await api(`/api/pnms/${selectedId}/photo`, {
+      method: "POST",
+      body: formData,
+    });
+    selectedPnmPhotoFile.value = "";
+    await loadPnms();
+    await loadPnmDetail(selectedId);
+    showToast("Photo uploaded.");
+  } catch (error) {
+    showToast(error.message || "Unable to upload photo.");
   }
 }
 
@@ -888,6 +1116,39 @@ async function handlePendingClick(event) {
   }
 }
 
+async function handleAdminPanelClick(event) {
+  const button = event.target.closest("button.delete-pnm");
+  if (!button) {
+    return;
+  }
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+
+  const pnmId = Number(button.dataset.pnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  const pnm = state.pnms.find((item) => item.pnm_id === pnmId);
+  const name = pnm ? `${pnm.first_name} ${pnm.last_name}` : "this rushee";
+  const confirmed = window.confirm(`Remove ${name}? This will also remove associated ratings and lunches.`);
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await api(`/api/pnms/${pnmId}`, { method: "DELETE" });
+    if (state.selectedPnmId === pnmId) {
+      state.selectedPnmId = null;
+    }
+    await refreshAll();
+    showToast("Rushee removed.");
+  } catch (error) {
+    showToast(error.message || "Unable to remove rushee.");
+  }
+}
+
 function setupPwaInstall() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/service-worker.js").catch(() => {
@@ -923,9 +1184,11 @@ function attachEvents() {
   pnmForm.addEventListener("submit", handlePnmCreate);
   ratingForm.addEventListener("submit", handleRatingSave);
   lunchForm.addEventListener("submit", handleLunchLog);
+  photoForm.addEventListener("submit", handlePhotoUpload);
 
   pnmTable.addEventListener("click", handlePnmTableClick);
   pendingList.addEventListener("click", handlePendingClick);
+  adminPnmTable.addEventListener("click", handleAdminPanelClick);
 
   ratingPnm.addEventListener("change", async (event) => {
     const selectedId = Number(event.target.value || 0);

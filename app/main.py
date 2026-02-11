@@ -14,7 +14,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
@@ -25,6 +25,10 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "recruitment.db")))
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(BASE_DIR / "uploads")))
+PNM_UPLOADS_DIR = UPLOADS_DIR / "pnms"
+MAX_PNM_PHOTO_BYTES = int(os.getenv("MAX_PNM_PHOTO_BYTES", str(4 * 1024 * 1024)))
+PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 SESSION_COOKIE = "rush_session"
 PASSWORD_SCHEME = "pbkdf2_sha256"
 PASSWORD_ITERATIONS = int(os.getenv("PASSWORD_ITERATIONS", "260000"))
@@ -53,6 +57,11 @@ RATING_FIELDS = [
     "alcohol_control",
     "instagram_marketability",
 ]
+ALLOWED_PHOTO_TYPES = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+}
 
 app = FastAPI(
     title="KA Recruitment Evaluation",
@@ -63,6 +72,7 @@ app.add_middleware(GZipMiddleware, minimum_size=512)
 if ALLOWED_HOSTS != ["*"]:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 _LOGIN_GUARD = Lock()
@@ -330,6 +340,33 @@ def normalize_instagram_handle(value: str) -> str:
     return handle
 
 
+def public_photo_url(photo_path: str | None) -> str | None:
+    if not photo_path:
+        return None
+    if photo_path.startswith("/uploads/"):
+        return photo_path
+    return None
+
+
+def photo_fs_path(photo_path: str | None) -> Path | None:
+    if not photo_path or not photo_path.startswith("/uploads/pnms/"):
+        return None
+    name = Path(photo_path).name
+    if not name:
+        return None
+    return PNM_UPLOADS_DIR / name
+
+
+def remove_photo_if_present(photo_path: str | None) -> None:
+    target = photo_fs_path(photo_path)
+    if target and target.exists() and target.is_file():
+        target.unlink(missing_ok=True)
+
+
+def split_normalized_csv(value: str) -> set[str]:
+    return {token for token in value.split(",") if token}
+
+
 def recalc_member_rating_stats(conn: sqlite3.Connection, user_id: int) -> None:
     stats = conn.execute(
         "SELECT COUNT(*) AS c, COALESCE(AVG(total_score), 0) AS avg_total FROM ratings WHERE user_id = ?",
@@ -499,6 +536,9 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             interests TEXT NOT NULL,
             interests_norm TEXT NOT NULL,
             stereotype TEXT NOT NULL,
+            photo_path TEXT,
+            photo_uploaded_at TEXT,
+            photo_uploaded_by INTEGER REFERENCES users(id),
             lunch_stats TEXT NOT NULL DEFAULT '',
             total_lunches INTEGER NOT NULL DEFAULT 0,
             rating_count INTEGER NOT NULL DEFAULT 0,
@@ -570,6 +610,16 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
         """
     )
+
+
+def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
+    pnm_columns = {row["name"] for row in conn.execute("PRAGMA table_info(pnms)").fetchall()}
+    if "photo_path" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN photo_path TEXT")
+    if "photo_uploaded_at" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN photo_uploaded_at TEXT")
+    if "photo_uploaded_by" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN photo_uploaded_by INTEGER REFERENCES users(id)")
 
 
 def ensure_seed_data(conn: sqlite3.Connection) -> None:
@@ -684,6 +734,8 @@ def pnm_payload(row: sqlite3.Row, own_rating: dict[str, Any] | None) -> dict[str
         "days_since_first_event": days_since_event,
         "interests": decode_interests(row["interests"]),
         "stereotype": row["stereotype"],
+        "photo_url": public_photo_url(row["photo_path"]),
+        "photo_uploaded_at": row["photo_uploaded_at"],
         "lunch_stats": row["lunch_stats"],
         "total_lunches": int(row["total_lunches"]),
         "rating_count": int(row["rating_count"]),
@@ -758,6 +810,12 @@ def current_user(request: Request) -> sqlite3.Row:
 def require_head(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
     if user["role"] != ROLE_HEAD:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Head Rush Officer permission required.")
+    return user
+
+
+def require_officer(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
+    if user["role"] not in {ROLE_HEAD, ROLE_RUSH_OFFICER}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Rush Officer permission required.")
     return user
 
 
@@ -847,8 +905,10 @@ class LunchCreateRequest(BaseModel):
 @app.on_event("startup")
 def startup() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     with db_session() as conn:
         setup_schema(conn)
+        ensure_schema_upgrades(conn)
         ensure_seed_data(conn)
 
 
@@ -1233,6 +1293,229 @@ def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str,
             raise HTTPException(status_code=404, detail="PNM not found.")
         own = fetch_own_rating(conn, pnm_id, user["id"])
     return {"pnm": pnm_payload(row, own)}
+
+
+@app.post("/api/pnms/{pnm_id}/photo")
+async def upload_pnm_photo(
+    pnm_id: int,
+    photo: UploadFile = File(...),
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    content_type = (photo.content_type or "").lower().strip()
+    extension = ALLOWED_PHOTO_TYPES.get(content_type)
+    if extension is None:
+        raise HTTPException(status_code=400, detail="Unsupported image type. Use JPG, PNG, or WEBP.")
+
+    content = await photo.read(MAX_PNM_PHOTO_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Image file cannot be empty.")
+    if len(content) > MAX_PNM_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail=f"Image too large. Max size is {MAX_PNM_PHOTO_BYTES // (1024 * 1024)} MB.")
+
+    filename = f"pnm-{pnm_id}-{secrets.token_hex(10)}{extension}"
+    target_path = PNM_UPLOADS_DIR / filename
+    public_path = f"/uploads/pnms/{filename}"
+    old_photo_path: str | None = None
+
+    try:
+        target_path.write_bytes(content)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Unable to save photo: {exc}") from exc
+
+    try:
+        with db_session() as conn:
+            row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="PNM not found.")
+            old_photo_path = row["photo_path"]
+
+            now = now_iso()
+            conn.execute(
+                """
+                UPDATE pnms
+                SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (public_path, now, user["id"], now, pnm_id),
+            )
+
+            refreshed = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+            own = fetch_own_rating(conn, pnm_id, user["id"])
+    except Exception:
+        target_path.unlink(missing_ok=True)
+        raise
+
+    if old_photo_path and old_photo_path != public_path:
+        remove_photo_if_present(old_photo_path)
+
+    return {
+        "message": "PNM photo uploaded.",
+        "pnm": pnm_payload(refreshed, own),
+    }
+
+
+@app.get("/api/pnms/{pnm_id}/meeting")
+def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not pnm_row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        own = fetch_own_rating(conn, pnm_id, user["id"])
+        rating_rows = conn.execute(
+            """
+            SELECT
+                r.*,
+                u.username,
+                u.role,
+                u.emoji,
+                rc.old_total,
+                rc.new_total,
+                rc.delta_total,
+                rc.comment AS delta_comment,
+                rc.changed_at
+            FROM ratings r
+            JOIN users u ON u.id = r.user_id
+            LEFT JOIN rating_changes rc ON rc.rating_id = r.id
+            WHERE r.pnm_id = ?
+            ORDER BY r.total_score DESC, r.updated_at DESC
+            """,
+            (pnm_id,),
+        ).fetchall()
+
+        lunch_rows = conn.execute(
+            """
+            SELECT l.lunch_date, l.notes, l.created_at, u.username, u.role
+            FROM lunches l
+            JOIN users u ON u.id = l.user_id
+            WHERE l.pnm_id = ?
+            ORDER BY l.lunch_date DESC, l.created_at DESC
+            LIMIT 40
+            """,
+            (pnm_id,),
+        ).fetchall()
+
+        members = conn.execute(
+            """
+            SELECT id, username, role, emoji, stereotype, interests, interests_norm, total_lunches, lunches_per_week
+            FROM users
+            WHERE is_approved = 1
+            ORDER BY username ASC
+            """
+        ).fetchall()
+
+    can_view_identity = user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
+    ratings: list[dict[str, Any]] = []
+    score_values: list[int] = []
+    for row in rating_rows:
+        entry = {
+            "rating_id": row["id"],
+            "from_me": row["user_id"] == user["id"],
+            "total_score": int(row["total_score"]),
+            "good_with_girls": int(row["good_with_girls"]),
+            "will_make_it": int(row["will_make_it"]),
+            "personable": int(row["personable"]),
+            "alcohol_control": int(row["alcohol_control"]),
+            "instagram_marketability": int(row["instagram_marketability"]),
+            "updated_at": row["updated_at"],
+            "last_change": (
+                {
+                    "old_total": row["old_total"],
+                    "new_total": row["new_total"],
+                    "delta_total": row["delta_total"],
+                    "comment": row["delta_comment"],
+                    "changed_at": row["changed_at"],
+                }
+                if row["changed_at"]
+                else None
+            ),
+        }
+        if can_view_identity:
+            entry["rater"] = {"username": row["username"], "role": row["role"], "emoji": row["emoji"]}
+            entry["comment"] = row["comment"]
+        elif row["user_id"] == user["id"]:
+            entry["comment"] = row["comment"]
+        ratings.append(entry)
+        score_values.append(int(row["total_score"]))
+
+    pnm_interest_norm = split_normalized_csv(pnm_row["interests_norm"])
+    pnm_stereotype_norm = pnm_row["stereotype"].strip().lower()
+    matches: list[dict[str, Any]] = []
+    for member in members:
+        member_interest_norm = split_normalized_csv(member["interests_norm"])
+        shared_norm = sorted(pnm_interest_norm & member_interest_norm)
+        stereotype_match = member["stereotype"].strip().lower() == pnm_stereotype_norm
+        fit_score = len(shared_norm) * 2 + (1 if stereotype_match else 0)
+        if fit_score <= 0:
+            continue
+        shared_display = []
+        member_interests_display = decode_interests(member["interests"])
+        for interest in member_interests_display:
+            if interest.lower() in shared_norm:
+                shared_display.append(interest)
+
+        matches.append(
+            {
+                "user_id": member["id"],
+                "username": member["username"],
+                "role": member["role"],
+                "emoji": member["emoji"] if member["role"] == ROLE_RUSH_OFFICER else None,
+                "stereotype": member["stereotype"],
+                "shared_interests": shared_display,
+                "stereotype_match": stereotype_match,
+                "fit_score": fit_score,
+                "lunches_per_week": round(float(member["lunches_per_week"]), 2),
+            }
+        )
+
+    matches.sort(key=lambda item: (item["fit_score"], item["lunches_per_week"]), reverse=True)
+    summary = {
+        "ratings_count": len(score_values),
+        "highest_rating_total": max(score_values) if score_values else None,
+        "lowest_rating_total": min(score_values) if score_values else None,
+        "weighted_total": round(float(pnm_row["weighted_total"]), 2),
+        "total_lunches": int(pnm_row["total_lunches"]),
+    }
+
+    return {
+        "pnm": pnm_payload(pnm_row, own),
+        "can_view_rater_identity": can_view_identity,
+        "summary": summary,
+        "ratings": ratings,
+        "lunches": [
+            {
+                "lunch_date": row["lunch_date"],
+                "notes": row["notes"],
+                "created_at": row["created_at"],
+                "username": row["username"],
+                "role": row["role"],
+            }
+            for row in lunch_rows
+        ],
+        "matches": matches[:10],
+    }
+
+
+@app.delete("/api/pnms/{pnm_id}")
+def delete_pnm(pnm_id: int, _: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
+    with db_session() as conn:
+        row = conn.execute("SELECT id, pnm_code, first_name, last_name, photo_path FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        rating_users = conn.execute("SELECT DISTINCT user_id FROM ratings WHERE pnm_id = ?", (pnm_id,)).fetchall()
+        lunch_users = conn.execute("SELECT DISTINCT user_id FROM lunches WHERE pnm_id = ?", (pnm_id,)).fetchall()
+        affected_users = {int(item["user_id"]) for item in rating_users + lunch_users}
+        photo_path = row["photo_path"]
+        display_name = f"{row['first_name']} {row['last_name']}"
+
+        conn.execute("DELETE FROM pnms WHERE id = ?", (pnm_id,))
+        for user_id in affected_users:
+            recalc_member_rating_stats(conn, user_id)
+            recalc_member_lunch_stats(conn, user_id)
+
+    remove_photo_if_present(photo_path)
+    return {"message": f"Deleted PNM {display_name} ({row['pnm_code']})."}
 
 
 @app.post("/api/ratings")

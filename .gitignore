@@ -21,3 +21,4 @@ env/
 
 # App data
 app/recruitment.db
+app/uploads/

@@ -190,6 +190,10 @@
                 Lunch stats (optional)
                 <input id="pnmLunchStats" type="text" placeholder="3 lunches this week" />
               </label>
+              <label>
+                PNM photo (optional)
+                <input id="pnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+              </label>
               <button type="submit">Add PNM</button>
             </form>
           </section>
@@ -262,6 +266,18 @@
             </article>
 
             <article>
+              <h3>PNM Photo</h3>
+              <div class="meeting-photo-wrap">
+                <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected PNM" />
+                <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
+              </div>
+              <form id="photoForm" class="stack compact-upload">
+                <label>
+                  Update photo
+                  <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+                </label>
+                <button type="submit" class="secondary">Upload Photo</button>
+              </form>
               <h3>Ratings View</h3>
               <div id="ratingList" class="list-box muted">Select a PNM to view rating entries.</div>
               <h3>Lunch History</h3>
@@ -288,6 +304,24 @@
               <div id="matchingMembers" class="list-box"></div>
             </div>
           </div>
+        </section>
+
+        <section class="panel reveal delay-6">
+          <div class="section-head">
+            <h2>Meeting View</h2>
+            <p class="muted">Pull a single rushee profile with meeting-ready context.</p>
+          </div>
+          <div id="meetingView" class="meeting-view">
+            <p class="muted">Select a PNM to load the meeting packet.</p>
+          </div>
+        </section>
+
+        <section id="adminPanel" class="panel hidden reveal delay-6">
+          <div class="section-head">
+            <h2>Admin Panel</h2>
+            <p class="muted">Head Rush Officer actions for roster cleanup.</p>
+          </div>
+          <div id="adminPnmTable" class="table-wrap"></div>
         </section>
       </section>
     </main>

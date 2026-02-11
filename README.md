@@ -35,6 +35,16 @@ This app replaces spreadsheet workflows with role-based visibility, accountabili
   - Interest (ANY)
   - Stereotype
   - Combined
+- PNM photo uploads (JPG/PNG/WEBP) with secure size/type validation
+- Meeting View packet for any single rushee:
+  - Profile + photo
+  - Weighted snapshot
+  - Ratings summary/history
+  - Lunch timeline
+  - Best member-fit matches by shared interests/stereotype
+- Admin panel (Head Rush Officer): remove rushees safely
+  - Cascades ratings/lunches for deleted rushees
+  - Recalculates impacted member stats automatically
 - Interest validation:
   - One word
   - No spaces
@@ -125,6 +135,8 @@ Open `http://127.0.0.1:8000`.
 
 ## Environment Variables
 - `DB_PATH` (default `app/recruitment.db` locally; Docker default `/data/recruitment.db`)
+- `UPLOADS_DIR` (default `app/uploads` locally)
+- `MAX_PNM_PHOTO_BYTES` (default `4194304` = 4MB)
 - `SESSION_TTL_SECONDS` (default `43200`)
 - `SESSION_COOKIE_SECURE` (`1` in production HTTPS)
 - `SESSION_COOKIE_SAMESITE` (`strict`, `lax`, or `none`)
@@ -149,6 +161,9 @@ Open `http://127.0.0.1:8000`.
 - `GET /api/users/pending` (Head only)
 - `POST /api/users/pending/{user_id}/approve` (Head only)
 - `POST /api/pnms`
+- `POST /api/pnms/{pnm_id}/photo` (Officer+)
+- `GET /api/pnms/{pnm_id}/meeting`
+- `DELETE /api/pnms/{pnm_id}` (Head only)
 - `GET /api/pnms`
 - `GET /api/pnms/{pnm_id}`
 - `POST /api/ratings`

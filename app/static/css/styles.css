@@ -316,6 +316,25 @@ button:disabled {
   font-size: 0.85rem;
 }
 
+.mini-photo {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  object-fit: cover;
+  display: inline-block;
+  border: 1px solid rgba(21, 51, 40, 0.16);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.mini-photo.empty {
+  width: auto;
+  height: auto;
+  font-size: 0.7rem;
+  color: var(--ink-soft);
+  padding: 0.24rem 0.42rem;
+  border-radius: 8px;
+}
+
 .table-wrap {
   overflow-x: auto;
 }
@@ -366,6 +385,79 @@ td strong {
   min-height: 120px;
   max-height: 240px;
   overflow: auto;
+}
+
+.meeting-photo-wrap {
+  margin-bottom: 0.65rem;
+}
+
+.meeting-photo {
+  width: 100%;
+  max-width: 240px;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  border-radius: 14px;
+  border: 1px solid rgba(21, 51, 40, 0.18);
+}
+
+.meeting-photo.large {
+  max-width: 200px;
+}
+
+.photo-placeholder {
+  width: 100%;
+  max-width: 240px;
+  min-height: 140px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 0.9rem;
+  border: 1px dashed rgba(21, 51, 40, 0.3);
+  border-radius: 12px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.photo-placeholder.large {
+  max-width: 200px;
+  min-height: 220px;
+}
+
+.compact-upload {
+  margin-bottom: 0.95rem;
+}
+
+.meeting-view {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.meeting-header {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: 1fr;
+}
+
+.meeting-metrics {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.list-column {
+  border: 1px solid rgba(21, 51, 40, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 0.65rem;
+}
+
+.meeting-list {
+  margin: 0.45rem 0 0;
+  padding-left: 1rem;
+  display: grid;
+  gap: 0.35rem;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
 }
 
 .entry {
@@ -661,6 +753,15 @@ td strong {
 
   .hero-stats {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .meeting-header {
+    grid-template-columns: 220px 1fr;
+    align-items: start;
+  }
+
+  .meeting-metrics {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

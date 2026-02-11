@@ -1,50 +1,74 @@
-# KAO Rush Evaluation App
+# KAO Rush Evaluation Web App
 
-Connected recruitment evaluation web app for Kappa Alpha Order. This replaces spreadsheet workflows with role-based visibility, accountability, and linked real-time scoring/lunch analytics.
+Production-oriented recruitment evaluation platform for Kappa Alpha Order.
 
-## Stack
-- FastAPI backend
-- SQLite relational database
-- HTML/CSS/JavaScript frontend
-- PWA support (manifest + service worker)
+This app replaces spreadsheet workflows with role-based visibility, accountability, and connected real-time updates across PNMs, members, ratings, and lunches.
 
-## Core Behaviors Implemented
-- Individual login with approved username format: `First Last - PledgeClass`
-- Role model:
-  - `Head Rush Officer`
-  - `Rush Officer`
-  - `Rusher`
-- Head-only username approval queue
-- Strict self-edit boundaries (no editing/deleting other users' or ratings data)
-- PNM model with system `PNM_ID` and generated `PNM_Code`
-- Dynamic `days_since_first_event`
-- Rating categories and bounds:
-  - Good with girls (0-10)
-  - Will make it through process (0-10)
-  - Personable (0-10)
-  - Alcohol control (0-10)
-  - Instagram marketability (0-5)
-- One active rating per member/PNM
-- Rating update rule: changed rating requires comment longer than 5 words
-- Last-change tracking (`rating_changes` stores only most recent delta)
-- Weighted aggregation (Rush Officer/Head = 0.6, Rusher = 0.4)
-- Connected updates on rating write:
-  - PNM category averages
-  - PNM weighted total
-  - Member average rating given
-- Lunch logging with dedupe (`member + pnm + date` unique)
-- Connected lunch updates:
-  - Member total lunches + lunches/week
-  - PNM total lunches
-- Filtering/matching by interest, stereotype, or both
+## What You Asked For
+- Website-first architecture
+- Easy deployment
+- Mobile-friendly PWA installability
+- Strong security defaults
+- High-quality design and animation
+- Real-time linked data behavior
+
+## Implemented Capabilities
+- Individual authentication with session cookies
+- Head Rush Officer approval flow for new usernames
+- Seeded Head Rush Officer account:
+  - Username: `taylortaut`
+  - Password: `Ttest123`
+  - Configurable through environment variables
+- Role visibility rules:
+  - Head Rush Officer / Rush Officer can see who rated PNMs, comments, and deltas
+  - Rushers can see PNM averages and only their own rating averages
+- Data constraints:
+  - One active rating per member per PNM
+  - Rating updates require comment > 5 words
+  - Last-change-only tracking (`rating_changes`)
+  - Duplicate lunch prevention by `(member, pnm, date)`
+- Auto-propagated updates on writes:
+  - PNM weighted and category averages
+  - Member rating averages
+  - Member and PNM lunch stats
+- Filtering and matching for PNMs + members:
+  - Interest (ANY)
+  - Stereotype
+  - Combined
 - Interest validation:
-  - one word
-  - first letter uppercase
-  - no spaces
-  - case-normalized matching
-- Mobile-friendly and installable PWA-style frontend
+  - One word
+  - No spaces
+  - First letter uppercase (stored canonical + normalized)
+- PNM code generation + dynamic days-since-first-event
+- Installable PWA (manifest + service worker)
+- Refined UI with animated counters, score bars, reveal transitions, selection states, and positive-delta celebration animation
 
-## Data Tables
+## Security Hardening Included
+- Password hashing: PBKDF2-SHA256 with per-user random salt
+- Legacy hash upgrade on successful login (for compatibility)
+- Login rate limiting by IP with temporary block window
+- Session expiration enforcement with idle timeout (`SESSION_TTL_SECONDS`)
+- HttpOnly cookie sessions
+- Optional secure cookies via env (`SESSION_COOKIE_SECURE=1`)
+- Strict/controlled SameSite cookie setting
+- Response security headers:
+  - Content-Security-Policy
+  - HSTS (on HTTPS)
+  - X-Frame-Options
+  - X-Content-Type-Options
+  - Referrer-Policy
+  - Permissions-Policy
+- Trusted host middleware support via `ALLOWED_HOSTS`
+- Service worker bypasses `/api/*` caching to preserve data freshness
+
+## Tech Stack
+- FastAPI
+- SQLite
+- Vanilla HTML/CSS/JavaScript
+- PWA manifest + service worker
+- Docker-ready
+
+## Data Model
 - `users`
 - `pnms`
 - `ratings`
@@ -52,13 +76,8 @@ Connected recruitment evaluation web app for Kappa Alpha Order. This replaces sp
 - `lunches`
 - `sessions`
 
-## Seed Account
-On first boot, the app seeds a Head Rush Officer account:
-- Username: `Head Officer - Admin`
-- Access code: `KAO2026`
-
-## Run Locally
-1. Create and activate virtualenv:
+## Local Run
+1. Create and activate venv:
 
 ```bash
 python3 -m venv .venv
@@ -71,7 +90,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-3. Start the app:
+3. Run app:
 
 ```bash
 uvicorn app.main:app --reload
@@ -83,7 +102,44 @@ uvicorn app.main:app --reload
 http://127.0.0.1:8000
 ```
 
-## API Surface (High-Level)
+## Docker Deploy (Recommended)
+
+Build and run:
+
+```bash
+docker build -t kao-rush-app .
+docker run -p 8000:8000 \
+  -e SESSION_COOKIE_SECURE=1 \
+  -e SESSION_COOKIE_SAMESITE=strict \
+  -e HEAD_SEED_USERNAME=taylortaut \
+  -e HEAD_SEED_ACCESS_CODE=Ttest123 \
+  -v $(pwd)/data:/data \
+  kao-rush-app
+```
+
+Open `http://127.0.0.1:8000`.
+
+## One-Click Style Platform Deploy
+- `render.yaml` is included for Render deployment.
+- `Procfile` is included for platforms that detect process commands.
+
+## Environment Variables
+- `DB_PATH` (default `app/recruitment.db` locally; Docker default `/data/recruitment.db`)
+- `SESSION_TTL_SECONDS` (default `43200`)
+- `SESSION_COOKIE_SECURE` (`1` in production HTTPS)
+- `SESSION_COOKIE_SAMESITE` (`strict`, `lax`, or `none`)
+- `ALLOWED_HOSTS` (comma-separated hosts, default `*`)
+- `PASSWORD_ITERATIONS` (default `260000`)
+- `LOGIN_WINDOW_SECONDS` (default `300`)
+- `LOGIN_MAX_FAILURES` (default `8`)
+- `LOGIN_BLOCK_SECONDS` (default `600`)
+- `HEAD_SEED_USERNAME` (default `taylortaut`)
+- `HEAD_SEED_ACCESS_CODE` (default `Ttest123`)
+- `HEAD_SEED_FIRST_NAME` (default `Taylor`)
+- `HEAD_SEED_LAST_NAME` (default `Taut`)
+- `HEAD_SEED_PLEDGE_CLASS` (default `Admin`)
+
+## API Endpoints (High-Level)
 - `POST /api/auth/register`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
@@ -103,7 +159,3 @@ http://127.0.0.1:8000
 - `GET /api/analytics/overview`
 - `GET /api/interests`
 - `GET /health`
-
-## Notes
-- Database file: `app/recruitment.db` (created automatically on startup).
-- Excel is treated as seed input only; operational data is in SQLite.

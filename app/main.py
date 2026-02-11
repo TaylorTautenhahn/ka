@@ -36,7 +36,11 @@ ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
 LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
-HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "KAO2026")
+HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "Ttest123")
+HEAD_SEED_USERNAME = os.getenv("HEAD_SEED_USERNAME", "taylortaut").strip()
+HEAD_SEED_FIRST_NAME = os.getenv("HEAD_SEED_FIRST_NAME", "Taylor").strip() or "Taylor"
+HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Taut").strip() or "Taut"
+HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or "Admin"
 
 ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
@@ -569,16 +573,44 @@ def setup_schema(conn: sqlite3.Connection) -> None:
 
 
 def ensure_seed_data(conn: sqlite3.Connection) -> None:
-    count_row = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()
-    if int(count_row["c"]) > 0:
-        return
-
     interests, interests_norm = encode_interests(["Leadership", "Recruitment"])
     created_at = now_iso()
-    first_name = "Head"
-    last_name = "Officer"
-    pledge_class = "Admin"
-    username = f"{first_name} {last_name} - {pledge_class}"
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (HEAD_SEED_USERNAME,)).fetchone()
+    if existing:
+        conn.execute(
+            """
+            UPDATE users
+            SET
+                role = ?,
+                first_name = ?,
+                last_name = ?,
+                pledge_class = ?,
+                emoji = NULL,
+                stereotype = ?,
+                interests = ?,
+                interests_norm = ?,
+                access_code_hash = ?,
+                is_approved = 1,
+                approved_at = COALESCE(approved_at, ?),
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                ROLE_HEAD,
+                HEAD_SEED_FIRST_NAME,
+                HEAD_SEED_LAST_NAME,
+                HEAD_SEED_PLEDGE_CLASS,
+                "Strategist",
+                interests,
+                interests_norm,
+                hash_access_code(HEAD_SEED_ACCESS_CODE),
+                created_at,
+                created_at,
+                existing["id"],
+            ),
+        )
+        return
+
     conn.execute(
         """
         INSERT INTO users (
@@ -600,10 +632,10 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
         VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1, ?, ?, ?)
         """,
         (
-            username,
-            first_name,
-            last_name,
-            pledge_class,
+            HEAD_SEED_USERNAME,
+            HEAD_SEED_FIRST_NAME,
+            HEAD_SEED_LAST_NAME,
+            HEAD_SEED_PLEDGE_CLASS,
             ROLE_HEAD,
             "Strategist",
             interests,

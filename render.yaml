@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: kao-rush-evaluation
+    env: docker
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: SESSION_COOKIE_SECURE
+        value: "1"
+      - key: SESSION_COOKIE_SAMESITE
+        value: strict
+      - key: ALLOWED_HOSTS
+        value: "*"
+      - key: HEAD_SEED_USERNAME
+        value: taylortaut
+      - key: HEAD_SEED_ACCESS_CODE
+        sync: false
+      - key: HEAD_SEED_FIRST_NAME
+        value: Taylor
+      - key: HEAD_SEED_LAST_NAME
+        value: Taut

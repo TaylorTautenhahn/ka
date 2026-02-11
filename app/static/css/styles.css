@@ -482,17 +482,96 @@ td strong {
 .score-bar {
   width: 58px;
   height: 7px;
-  border-radius: 999px;
-  background: rgba(21, 51, 40, 0.14);
-  overflow: hidden;
+  display: block;
 }
 
-.score-fill {
-  display: block;
-  height: 100%;
-  width: var(--score-width, 0%);
-  background: linear-gradient(90deg, #2b7b61 0%, #d0a34b 100%);
-  border-radius: 999px;
+.score-bar-track {
+  fill: rgba(21, 51, 40, 0.16);
+}
+
+.score-bar-fill {
+  fill: #2f8167;
+}
+
+.burst-wrap {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 150px;
+  height: 150px;
+  pointer-events: none;
+  z-index: 11;
+}
+
+.burst-spark {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  margin-top: -4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #ebca67, #258362);
+  animation: sparkFly 0.62s ease forwards;
+}
+
+.burst-spark:nth-child(1) {
+  --dx: 0px;
+  --dy: -46px;
+}
+.burst-spark:nth-child(2) {
+  --dx: 22px;
+  --dy: -38px;
+}
+.burst-spark:nth-child(3) {
+  --dx: 36px;
+  --dy: -20px;
+}
+.burst-spark:nth-child(4) {
+  --dx: 44px;
+  --dy: 2px;
+}
+.burst-spark:nth-child(5) {
+  --dx: 36px;
+  --dy: 24px;
+}
+.burst-spark:nth-child(6) {
+  --dx: 20px;
+  --dy: 38px;
+}
+.burst-spark:nth-child(7) {
+  --dx: 0px;
+  --dy: 45px;
+}
+.burst-spark:nth-child(8) {
+  --dx: -22px;
+  --dy: 38px;
+}
+.burst-spark:nth-child(9) {
+  --dx: -37px;
+  --dy: 22px;
+}
+.burst-spark:nth-child(10) {
+  --dx: -45px;
+  --dy: 0px;
+}
+.burst-spark:nth-child(11) {
+  --dx: -36px;
+  --dy: -21px;
+}
+.burst-spark:nth-child(12) {
+  --dx: -22px;
+  --dy: -38px;
+}
+.burst-spark:nth-child(13) {
+  --dx: 14px;
+  --dy: -44px;
+}
+.burst-spark:nth-child(14) {
+  --dx: 42px;
+  --dy: -8px;
 }
 
 .delay-1 {
@@ -548,6 +627,17 @@ td strong {
   }
   to {
     transform: translate(14px, 8px);
+  }
+}
+
+@keyframes sparkFly {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.9;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.2);
+    opacity: 0;
   }
 }
 

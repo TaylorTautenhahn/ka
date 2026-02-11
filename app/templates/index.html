@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#8a1538" />
-    <title>KAO Rush Evaluation</title>
+    <meta name="theme-color" content="{{ app_config.theme_primary if app_config else '#8a1538' }}" />
+    <title>{{ app_config.tenant_name if app_config else 'KAO' }} Rush Evaluation</title>
     <link rel="manifest" href="/static/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -16,14 +16,17 @@
     <link rel="stylesheet" href="/static/css/styles.css" />
     <script src="/static/js/app.js" defer></script>
   </head>
-  <body>
+  <body{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
     <div class="noise"></div>
 
     <main class="shell">
       <header class="hero reveal">
-        <p class="eyebrow">Kappa Alpha Order</p>
+        {% if app_config.logo_path %}
+        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+        {% endif %}
+        <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
         <h1>Connected Rush Evaluation</h1>
         <p>
           Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.
@@ -100,10 +103,11 @@
         </div>
 
         <nav class="panel quick-nav reveal delay-1" aria-label="App sections">
+          <a href="{{ app_config.base_path if app_config else '/' }}" class="quick-nav-link">Dashboard</a>
+          <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
           <a href="#createSection" class="quick-nav-link">Add Rushee</a>
           <a href="#pnmSection" class="quick-nav-link">PNMs</a>
           <a href="#detailSection" class="quick-nav-link">Rate & Notes</a>
-          <a href="#meetingSection" class="quick-nav-link">Meeting View</a>
           <a href="#membersSection" class="quick-nav-link">Members</a>
           <a id="adminNavLink" href="#adminPanel" class="quick-nav-link">Admin</a>
         </nav>
@@ -176,6 +180,10 @@
               <label>
                 Hometown
                 <input id="pnmHometown" type="text" required />
+              </label>
+              <label>
+                Phone number (optional)
+                <input id="pnmPhone" type="text" placeholder="+1 555 123 4567" />
               </label>
               <label>
                 Instagram handle
@@ -285,6 +293,17 @@
               <div id="ratingList" class="list-box muted">Select a PNM to view rating entries.</div>
               <h3>Lunch History</h3>
               <div id="lunchHistory" class="list-box muted">Select a PNM to view lunch logs.</div>
+              <div id="assignPanel" class="stack hidden">
+                <h3>Assign Rush Officer (Head Only)</h3>
+                <label>
+                  Assigned officer
+                  <select id="assignOfficerSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="assignOfficerBtn" type="button">Assign</button>
+                  <button id="clearAssignBtn" type="button" class="secondary">Clear</button>
+                </div>
+              </div>
             </article>
           </div>
         </section>
@@ -311,12 +330,11 @@
 
         <section id="meetingSection" class="panel reveal delay-6">
           <div class="section-head">
-            <h2>Meeting View</h2>
-            <p class="muted">Pull a single rushee profile with meeting-ready context.</p>
+            <h2>Meeting Packets</h2>
+            <p class="muted">Open the dedicated Meeting page for full packet view and PDF export.</p>
           </div>
-          <div id="meetingView" class="meeting-view">
-            <p class="muted">Select a PNM to load the meeting packet.</p>
-          </div>
+          <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Page</a>
+          <div id="meetingView" class="meeting-view hidden"></div>
         </section>
 
         <section id="adminPanel" class="panel hidden reveal delay-6">

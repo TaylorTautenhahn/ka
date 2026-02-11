@@ -3,6 +3,8 @@ const APP_SHELL = [
   "/",
   "/static/css/styles.css",
   "/static/js/app.js",
+  "/static/js/meeting.js",
+  "/static/js/platform_admin.js",
   "/static/manifest.webmanifest",
   "/static/icons/icon-192.png",
   "/static/icons/icon-512.png"

@@ -10,7 +10,9 @@ import secrets
 import sqlite3
 import time
 import zipfile
+import contextvars
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from pathlib import Path
 from threading import Lock
@@ -29,28 +31,39 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 BASE_DIR = Path(__file__).resolve().parent
 DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "recruitment.db")))
 UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(BASE_DIR / "uploads")))
-PNM_UPLOADS_DIR = UPLOADS_DIR / "pnms"
+TENANT_UPLOADS_ROOT = UPLOADS_DIR / "tenants"
+TENANTS_DB_DIR = Path(os.getenv("TENANTS_DB_DIR", str(DB_PATH.parent / "tenants")))
 MAX_PNM_PHOTO_BYTES = int(os.getenv("MAX_PNM_PHOTO_BYTES", str(4 * 1024 * 1024)))
-PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(UPLOADS_DIR / "backups")))
 MAX_BACKUP_FILES = int(os.getenv("MAX_BACKUP_FILES", "30"))
 SESSION_COOKIE = "rush_session"
+PLATFORM_SESSION_COOKIE = "platform_session"
 HASH_SCHEME = os.getenv("HASH_SCHEME", "pbkdf2_sha256")
 PASSWORD_ITERATIONS = int(os.getenv("PASSWORD_ITERATIONS", "260000"))
 LEGACY_AUTH_SALT = os.getenv("LEGACY_AUTH_SALT", "kao-rush-v1")
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "43200"))
+PLATFORM_SESSION_TTL_SECONDS = int(os.getenv("PLATFORM_SESSION_TTL_SECONDS", str(SESSION_TTL_SECONDS)))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "strict").strip().lower()
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
 LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
+PLATFORM_DB_PATH = Path(os.getenv("PLATFORM_DB_PATH", str(DB_PATH.parent / "platform.db")))
+DEFAULT_TENANT_SLUG = os.getenv("DEFAULT_TENANT_SLUG", "kappaalphaorder").strip().lower() or "kappaalphaorder"
+DEFAULT_TENANT_NAME = os.getenv("DEFAULT_TENANT_NAME", "Kappa Alpha Order").strip() or "Kappa Alpha Order"
+PLATFORM_ADMIN_USERNAME = os.getenv("PLATFORM_ADMIN_USERNAME", "taylortaut").strip() or "taylortaut"
+PLATFORM_ADMIN_ACCESS_CODE = os.getenv("PLATFORM_ADMIN_ACCESS_CODE", "").strip()
 HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "").strip()
 HEAD_SEED_USERNAME = os.getenv("HEAD_SEED_USERNAME", "head.rush.officer").strip() or "head.rush.officer"
 HEAD_SEED_FIRST_NAME = os.getenv("HEAD_SEED_FIRST_NAME", "Head").strip() or "Head"
 HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Officer").strip() or "Officer"
 HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or "Admin"
 AUTO_CREATE_HEAD_SEED = os.getenv("AUTO_CREATE_HEAD_SEED", "1").strip().lower() in {"1", "true", "yes"}
+
+UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+TENANT_UPLOADS_ROOT.mkdir(parents=True, exist_ok=True)
+TENANTS_DB_DIR.mkdir(parents=True, exist_ok=True)
 
 ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
@@ -85,6 +98,23 @@ _LOGIN_GUARD = Lock()
 _LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 _LOGIN_BLOCKED_UNTIL: dict[str, float] = {}
 GENERATED_HEAD_ACCESS_CODE: str | None = None
+GENERATED_PLATFORM_ADMIN_ACCESS_CODE: str | None = None
+
+
+@dataclass(frozen=True)
+class TenantContext:
+    slug: str
+    display_name: str
+    chapter_name: str
+    logo_path: str | None
+    theme_primary: str
+    theme_secondary: str
+    db_path: Path
+    pnm_uploads_dir: Path
+    backup_dir: Path
+
+
+CURRENT_TENANT: contextvars.ContextVar[TenantContext | None] = contextvars.ContextVar("current_tenant", default=None)
 
 
 def now_iso() -> str:
@@ -99,6 +129,163 @@ def normalize_samesite(value: str) -> str:
     if value in {"lax", "strict", "none"}:
         return value
     return "strict"
+
+
+def normalize_slug(value: str) -> str:
+    slug = value.strip().lower()
+    if not re.fullmatch(r"[a-z0-9-]{3,64}", slug):
+        raise ValueError("Slug must use lowercase letters, numbers, and hyphens only.")
+    return slug
+
+
+def normalize_theme_color(value: str, fallback: str) -> str:
+    raw = value.strip() if value else fallback
+    if not re.fullmatch(r"#[0-9a-fA-F]{6}", raw):
+        return fallback
+    return raw.lower()
+
+
+def default_tenant_db_path(slug: str) -> Path:
+    if slug == DEFAULT_TENANT_SLUG:
+        return DB_PATH
+    return TENANTS_DB_DIR / f"{slug}.db"
+
+
+@contextmanager
+def platform_db_session() -> sqlite3.Connection:
+    PLATFORM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(PLATFORM_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def current_tenant() -> TenantContext:
+    tenant = CURRENT_TENANT.get()
+    if not tenant:
+        raise HTTPException(status_code=400, detail="Tenant context missing.")
+    return tenant
+
+
+def active_db_path() -> Path:
+    tenant = CURRENT_TENANT.get()
+    if tenant:
+        return tenant.db_path
+    return DB_PATH
+
+
+def active_backup_dir() -> Path:
+    tenant = CURRENT_TENANT.get()
+    if tenant:
+        return tenant.backup_dir
+    return BACKUP_DIR
+
+
+def active_pnm_uploads_dir() -> Path:
+    tenant = CURRENT_TENANT.get()
+    if tenant:
+        return tenant.pnm_uploads_dir
+    return UPLOADS_DIR / "pnms"
+
+
+def tenant_logo_public_path(slug: str, extension: str) -> str:
+    return f"/uploads/tenants/{slug}/branding/logo{extension}"
+
+
+def tenant_logo_fs_dir(slug: str) -> Path:
+    return TENANT_UPLOADS_ROOT / slug / "branding"
+
+
+def tenant_context_from_row(row: sqlite3.Row) -> TenantContext:
+    slug = row["slug"]
+    db_path = Path(row["db_path"])
+    return TenantContext(
+        slug=slug,
+        display_name=row["display_name"],
+        chapter_name=row["chapter_name"] or "",
+        logo_path=row["logo_path"],
+        theme_primary=normalize_theme_color(row["theme_primary"] or "", "#8a1538"),
+        theme_secondary=normalize_theme_color(row["theme_secondary"] or "", "#c99a2b"),
+        db_path=db_path,
+        pnm_uploads_dir=TENANT_UPLOADS_ROOT / slug / "pnms",
+        backup_dir=TENANT_UPLOADS_ROOT / slug / "backups",
+    )
+
+
+def platform_user_payload(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "username": row["username"],
+        "last_login_at": row["last_login_at"],
+        "created_at": row["created_at"],
+    }
+
+
+def list_tenants_rows() -> list[sqlite3.Row]:
+    with platform_db_session() as conn:
+        return conn.execute(
+            """
+            SELECT *
+            FROM tenants
+            WHERE is_active = 1
+            ORDER BY display_name ASC
+            """
+        ).fetchall()
+
+
+def fetch_tenant_row(slug: str) -> sqlite3.Row | None:
+    with platform_db_session() as conn:
+        return conn.execute(
+            "SELECT * FROM tenants WHERE slug = ? AND is_active = 1",
+            (slug,),
+        ).fetchone()
+
+
+def require_tenant_exists(slug: str) -> sqlite3.Row:
+    row = fetch_tenant_row(slug)
+    if not row:
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    return row
+
+
+def current_platform_admin(request: Request) -> sqlite3.Row:
+    token = request.cookies.get(PLATFORM_SESSION_COOKIE)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
+
+    with platform_db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT pa.*, ps.last_seen_at
+            FROM platform_sessions ps
+            JOIN platform_admins pa ON pa.id = ps.admin_id
+            WHERE ps.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > PLATFORM_SESSION_TTL_SECONDS:
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+
+        conn.execute("UPDATE platform_sessions SET last_seen_at = ? WHERE token = ?", (now_iso(), token))
+        return row
 
 
 @app.middleware("http")
@@ -125,9 +312,50 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
     return response
 
 
+@app.middleware("http")
+async def tenant_resolution(request: Request, call_next):  # type: ignore[no-untyped-def]
+    path = request.scope.get("path", "/")
+    bypass_prefixes = ("/static", "/uploads", "/platform", "/health")
+    if path == "/" or path.startswith(bypass_prefixes):
+        return await call_next(request)
+
+    token = None
+    resolved_row: sqlite3.Row | None = None
+    rewritten_path = path
+
+    if path.startswith("/api/") or path == "/api":
+        resolved_row = fetch_tenant_row(DEFAULT_TENANT_SLUG)
+    else:
+        trimmed = path.strip("/")
+        first = trimmed.split("/", 1)[0].lower() if trimmed else ""
+        if first:
+            candidate = fetch_tenant_row(first)
+            if candidate:
+                resolved_row = candidate
+                remainder = trimmed[len(first):].lstrip("/")
+                rewritten_path = f"/{remainder}" if remainder else "/"
+
+    if not resolved_row:
+        return await call_next(request)
+
+    tenant = tenant_context_from_row(resolved_row)
+    request.state.tenant = tenant
+    token = CURRENT_TENANT.set(tenant)
+    original_path = request.scope.get("path", "/")
+    request.scope["path"] = rewritten_path
+    try:
+        return await call_next(request)
+    finally:
+        request.scope["path"] = original_path
+        if token is not None:
+            CURRENT_TENANT.reset(token)
+
+
 @contextmanager
-def db_session() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+def db_session(db_path: Path | None = None) -> sqlite3.Connection:
+    target = db_path if db_path else active_db_path()
+    target.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(target)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")
@@ -350,6 +578,18 @@ def normalize_instagram_handle(value: str) -> str:
     return handle
 
 
+def normalize_phone_number(value: str) -> str:
+    raw = value.strip()
+    if not raw:
+        return ""
+    if not re.fullmatch(r"[0-9+(). -]{7,22}", raw):
+        raise ValueError("Phone number contains invalid characters.")
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 7:
+        raise ValueError("Phone number must include at least 7 digits.")
+    return raw
+
+
 def public_photo_url(photo_path: str | None) -> str | None:
     if not photo_path:
         return None
@@ -359,12 +599,17 @@ def public_photo_url(photo_path: str | None) -> str | None:
 
 
 def photo_fs_path(photo_path: str | None) -> Path | None:
-    if not photo_path or not photo_path.startswith("/uploads/pnms/"):
+    tenant = CURRENT_TENANT.get()
+    if not photo_path:
         return None
     name = Path(photo_path).name
     if not name:
         return None
-    return PNM_UPLOADS_DIR / name
+    if tenant and photo_path.startswith(f"/uploads/tenants/{tenant.slug}/pnms/"):
+        return active_pnm_uploads_dir() / name
+    if photo_path.startswith("/uploads/pnms/"):
+        return UPLOADS_DIR / "pnms" / name
+    return None
 
 
 def remove_photo_if_present(photo_path: str | None) -> None:
@@ -382,17 +627,19 @@ def timestamp_slug() -> str:
 
 
 def prune_backup_files(prefix: str) -> None:
-    if not BACKUP_DIR.exists():
+    backup_dir = active_backup_dir()
+    if not backup_dir.exists():
         return
-    files = sorted(BACKUP_DIR.glob(f"{prefix}-*.sqlite"), key=lambda path: path.stat().st_mtime, reverse=True)
+    files = sorted(backup_dir.glob(f"{prefix}-*.sqlite"), key=lambda path: path.stat().st_mtime, reverse=True)
     for stale in files[MAX_BACKUP_FILES:]:
         stale.unlink(missing_ok=True)
 
 
 def create_sqlite_snapshot(prefix: str = "snapshot") -> Path:
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    backup_path = BACKUP_DIR / f"{prefix}-{timestamp_slug()}.sqlite"
-    source = sqlite3.connect(DB_PATH)
+    backup_dir = active_backup_dir()
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    backup_path = backup_dir / f"{prefix}-{timestamp_slug()}.sqlite"
+    source = sqlite3.connect(active_db_path())
     destination = sqlite3.connect(backup_path)
     try:
         with destination:
@@ -414,6 +661,7 @@ def csv_bytes_from_rows(columns: list[str], rows: list[dict[str, Any]]) -> bytes
 
 
 def build_csv_backup_archive() -> tuple[bytes, str]:
+    db_path = active_db_path()
     with db_session() as conn:
         users_rows = [dict(row) for row in conn.execute(
             """
@@ -538,7 +786,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
         readme = (
             "KAO Rush Backup Export\n"
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
-            f"Database path: {DB_PATH}\n"
+            f"Database path: {db_path}\n"
             "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, lunches.csv\n"
             "Access code hashes are intentionally excluded from users.csv for security.\n"
         )
@@ -726,6 +974,7 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             last_name TEXT NOT NULL,
             class_year TEXT NOT NULL CHECK (class_year IN ('F', 'S', 'J')),
             hometown TEXT NOT NULL,
+            phone_number TEXT NOT NULL DEFAULT '',
             instagram_handle TEXT NOT NULL,
             first_event_date TEXT NOT NULL,
             interests TEXT NOT NULL,
@@ -743,6 +992,9 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             avg_alcohol_control REAL NOT NULL DEFAULT 0,
             avg_instagram_marketability REAL NOT NULL DEFAULT 0,
             weighted_total REAL NOT NULL DEFAULT 0,
+            assigned_officer_id INTEGER REFERENCES users(id),
+            assigned_by INTEGER REFERENCES users(id),
+            assigned_at TEXT,
             created_by INTEGER NOT NULL REFERENCES users(id),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -803,27 +1055,51 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
+        CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id);
         """
     )
 
 
 def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     pnm_columns = {row["name"] for row in conn.execute("PRAGMA table_info(pnms)").fetchall()}
+    if "phone_number" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN phone_number TEXT NOT NULL DEFAULT ''")
     if "photo_path" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN photo_path TEXT")
     if "photo_uploaded_at" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN photo_uploaded_at TEXT")
     if "photo_uploaded_by" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN photo_uploaded_by INTEGER REFERENCES users(id)")
+    if "assigned_officer_id" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assigned_officer_id INTEGER REFERENCES users(id)")
+    if "assigned_by" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assigned_by INTEGER REFERENCES users(id)")
+    if "assigned_at" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assigned_at TEXT")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id)")
 
 
-def ensure_seed_data(conn: sqlite3.Connection) -> None:
+def ensure_seed_data(
+    conn: sqlite3.Connection,
+    *,
+    seed_username: str | None = None,
+    seed_access_code: str | None = None,
+    seed_first_name: str | None = None,
+    seed_last_name: str | None = None,
+    seed_pledge_class: str | None = None,
+) -> None:
     if not AUTO_CREATE_HEAD_SEED:
         return
 
+    username = (seed_username or HEAD_SEED_USERNAME).strip() or HEAD_SEED_USERNAME
+    first_name = (seed_first_name or HEAD_SEED_FIRST_NAME).strip() or HEAD_SEED_FIRST_NAME
+    last_name = (seed_last_name or HEAD_SEED_LAST_NAME).strip() or HEAD_SEED_LAST_NAME
+    pledge_class = (seed_pledge_class or HEAD_SEED_PLEDGE_CLASS).strip() or HEAD_SEED_PLEDGE_CLASS
+    access_code = seed_access_code if seed_access_code is not None else HEAD_SEED_ACCESS_CODE
+
     interests, interests_norm = encode_interests(["Leadership", "Recruitment"])
     created_at = now_iso()
-    existing = conn.execute("SELECT id FROM users WHERE username = ?", (HEAD_SEED_USERNAME,)).fetchone()
+    existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
     if existing:
         conn.execute(
             """
@@ -842,14 +1118,14 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
                 existing["id"],
             ),
         )
-        if HEAD_SEED_ACCESS_CODE:
+        if access_code:
             conn.execute(
                 "UPDATE users SET access_code_hash = ?, updated_at = ? WHERE id = ?",
-                (hash_access_code(HEAD_SEED_ACCESS_CODE), now_iso(), existing["id"]),
+                (hash_access_code(access_code), now_iso(), existing["id"]),
             )
         return
 
-    seed_access_code = resolve_seed_access_code()
+    seed_access_code = access_code if access_code else resolve_seed_access_code()
     conn.execute(
         """
         INSERT INTO users (
@@ -871,10 +1147,10 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
         VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1, ?, ?, ?)
         """,
         (
-            HEAD_SEED_USERNAME,
-            HEAD_SEED_FIRST_NAME,
-            HEAD_SEED_LAST_NAME,
-            HEAD_SEED_PLEDGE_CLASS,
+            username,
+            first_name,
+            last_name,
+            pledge_class,
             ROLE_HEAD,
             "Strategist",
             interests,
@@ -885,6 +1161,188 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
             created_at,
         ),
     )
+
+
+def resolve_platform_admin_access_code() -> str:
+    global GENERATED_PLATFORM_ADMIN_ACCESS_CODE
+    if PLATFORM_ADMIN_ACCESS_CODE:
+        return PLATFORM_ADMIN_ACCESS_CODE
+    if GENERATED_PLATFORM_ADMIN_ACCESS_CODE:
+        return GENERATED_PLATFORM_ADMIN_ACCESS_CODE
+    GENERATED_PLATFORM_ADMIN_ACCESS_CODE = secrets.token_urlsafe(16)
+    print(
+        "[startup] PLATFORM_ADMIN_ACCESS_CODE not provided. Generated bootstrap platform admin credentials:\n"
+        f"          username={PLATFORM_ADMIN_USERNAME}\n"
+        f"          access_code={GENERATED_PLATFORM_ADMIN_ACCESS_CODE}\n"
+        "          Set PLATFORM_ADMIN_ACCESS_CODE in production to disable random generation."
+    )
+    return GENERATED_PLATFORM_ADMIN_ACCESS_CODE
+
+
+def setup_platform_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS platform_admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            access_code_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS platform_sessions (
+            token TEXT PRIMARY KEY,
+            admin_id INTEGER NOT NULL REFERENCES platform_admins(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS tenants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            slug TEXT NOT NULL UNIQUE,
+            display_name TEXT NOT NULL,
+            chapter_name TEXT NOT NULL DEFAULT '',
+            logo_path TEXT,
+            theme_primary TEXT NOT NULL DEFAULT '#8a1538',
+            theme_secondary TEXT NOT NULL DEFAULT '#c99a2b',
+            db_path TEXT NOT NULL,
+            head_seed_username TEXT NOT NULL,
+            head_seed_first_name TEXT NOT NULL,
+            head_seed_last_name TEXT NOT NULL,
+            head_seed_pledge_class TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            is_active INTEGER NOT NULL DEFAULT 1
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
+        """
+    )
+
+
+def ensure_platform_admin_seed(conn: sqlite3.Connection) -> None:
+    created_at = now_iso()
+    seed_access_code = resolve_platform_admin_access_code()
+    existing = conn.execute("SELECT id FROM platform_admins WHERE username = ?", (PLATFORM_ADMIN_USERNAME,)).fetchone()
+    if existing:
+        if PLATFORM_ADMIN_ACCESS_CODE:
+            conn.execute(
+                "UPDATE platform_admins SET access_code_hash = ?, updated_at = ? WHERE id = ?",
+                (hash_access_code(seed_access_code), created_at, existing["id"]),
+            )
+        return
+
+    conn.execute(
+        """
+        INSERT INTO platform_admins (username, access_code_hash, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+        """,
+        (PLATFORM_ADMIN_USERNAME, hash_access_code(seed_access_code), created_at, created_at),
+    )
+
+
+def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
+    created_at = now_iso()
+    default_db_path = default_tenant_db_path(DEFAULT_TENANT_SLUG)
+    row = conn.execute("SELECT * FROM tenants WHERE slug = ?", (DEFAULT_TENANT_SLUG,)).fetchone()
+    if row:
+        conn.execute(
+            """
+            UPDATE tenants
+            SET
+                display_name = ?,
+                db_path = ?,
+                head_seed_username = ?,
+                head_seed_first_name = ?,
+                head_seed_last_name = ?,
+                head_seed_pledge_class = ?,
+                is_active = 1,
+                updated_at = ?
+            WHERE slug = ?
+            """,
+            (
+                DEFAULT_TENANT_NAME,
+                str(default_db_path),
+                HEAD_SEED_USERNAME,
+                HEAD_SEED_FIRST_NAME,
+                HEAD_SEED_LAST_NAME,
+                HEAD_SEED_PLEDGE_CLASS,
+                created_at,
+                DEFAULT_TENANT_SLUG,
+            ),
+        )
+        return conn.execute("SELECT * FROM tenants WHERE slug = ?", (DEFAULT_TENANT_SLUG,)).fetchone()
+
+    conn.execute(
+        """
+        INSERT INTO tenants (
+            slug,
+            display_name,
+            chapter_name,
+            logo_path,
+            theme_primary,
+            theme_secondary,
+            db_path,
+            head_seed_username,
+            head_seed_first_name,
+            head_seed_last_name,
+            head_seed_pledge_class,
+            created_at,
+            updated_at,
+            is_active
+        )
+        VALUES (?, ?, ?, NULL, '#8a1538', '#c99a2b', ?, ?, ?, ?, ?, ?, ?, 1)
+        """,
+        (
+            DEFAULT_TENANT_SLUG,
+            DEFAULT_TENANT_NAME,
+            "KAO",
+            str(default_db_path),
+            HEAD_SEED_USERNAME,
+            HEAD_SEED_FIRST_NAME,
+            HEAD_SEED_LAST_NAME,
+            HEAD_SEED_PLEDGE_CLASS,
+            created_at,
+            created_at,
+        ),
+    )
+    return conn.execute("SELECT * FROM tenants WHERE slug = ?", (DEFAULT_TENANT_SLUG,)).fetchone()
+
+
+def initialize_tenant_datastore(row: sqlite3.Row, seed_access_code: str | None = None) -> None:
+    ctx = tenant_context_from_row(row)
+    ctx.pnm_uploads_dir.mkdir(parents=True, exist_ok=True)
+    ctx.backup_dir.mkdir(parents=True, exist_ok=True)
+    with db_session(ctx.db_path) as tenant_conn:
+        setup_schema(tenant_conn)
+        ensure_schema_upgrades(tenant_conn)
+        ensure_seed_data(
+            tenant_conn,
+            seed_username=row["head_seed_username"],
+            seed_access_code=seed_access_code,
+            seed_first_name=row["head_seed_first_name"],
+            seed_last_name=row["head_seed_last_name"],
+            seed_pledge_class=row["head_seed_pledge_class"],
+        )
+
+
+def bootstrap_platform_and_tenants() -> None:
+    PLATFORM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    TENANTS_DB_DIR.mkdir(parents=True, exist_ok=True)
+    TENANT_UPLOADS_ROOT.mkdir(parents=True, exist_ok=True)
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+
+    with platform_db_session() as conn:
+        setup_platform_schema(conn)
+        ensure_platform_admin_seed(conn)
+        ensure_default_tenant_record(conn)
+        tenant_rows = conn.execute("SELECT * FROM tenants WHERE is_active = 1").fetchall()
+
+    for row in tenant_rows:
+        seed_access = HEAD_SEED_ACCESS_CODE if row["slug"] == DEFAULT_TENANT_SLUG else None
+        initialize_tenant_datastore(row, seed_access_code=seed_access)
 
 
 def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str, Any]:
@@ -909,7 +1367,11 @@ def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str
     return payload
 
 
-def pnm_payload(row: sqlite3.Row, own_rating: dict[str, Any] | None) -> dict[str, Any]:
+def pnm_payload(
+    row: sqlite3.Row,
+    own_rating: dict[str, Any] | None,
+    assigned_officer: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
     return {
         "pnm_id": row["id"],
@@ -918,6 +1380,7 @@ def pnm_payload(row: sqlite3.Row, own_rating: dict[str, Any] | None) -> dict[str
         "last_name": row["last_name"],
         "class_year": row["class_year"],
         "hometown": row["hometown"],
+        "phone_number": row["phone_number"] if "phone_number" in row.keys() else "",
         "instagram_handle": row["instagram_handle"],
         "first_event_date": row["first_event_date"],
         "days_since_first_event": days_since_event,
@@ -934,6 +1397,8 @@ def pnm_payload(row: sqlite3.Row, own_rating: dict[str, Any] | None) -> dict[str
         "avg_alcohol_control": round(float(row["avg_alcohol_control"]), 2),
         "avg_instagram_marketability": round(float(row["avg_instagram_marketability"]), 2),
         "weighted_total": round(float(row["weighted_total"]), 2),
+        "assigned_officer_id": row["assigned_officer_id"] if "assigned_officer_id" in row.keys() else None,
+        "assigned_officer": assigned_officer,
         "own_rating": own_rating,
     }
 
@@ -952,6 +1417,21 @@ def rating_payload(row: sqlite3.Row) -> dict[str, Any]:
         "comment": row["comment"],
         "updated_at": row["updated_at"],
         "created_at": row["created_at"],
+    }
+
+
+def assigned_officer_payload_from_row(row: sqlite3.Row) -> dict[str, Any] | None:
+    keys = set(row.keys())
+    if "assigned_officer_id" not in keys or row["assigned_officer_id"] is None:
+        return None
+    username = row["assigned_officer_username"] if "assigned_officer_username" in keys else None
+    role = row["assigned_officer_role"] if "assigned_officer_role" in keys else ROLE_RUSH_OFFICER
+    emoji = row["assigned_officer_emoji"] if "assigned_officer_emoji" in keys else None
+    return {
+        "user_id": row["assigned_officer_id"],
+        "username": username,
+        "role": role,
+        "emoji": emoji,
     }
 
 
@@ -1046,6 +1526,7 @@ class PNMCreateRequest(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=48)
     class_year: str
     hometown: str = Field(..., min_length=1, max_length=80)
+    phone_number: str = Field(default="", max_length=32)
     instagram_handle: str = Field(..., min_length=1, max_length=80)
     first_event_date: str
     interests: str | list[str]
@@ -1087,26 +1568,308 @@ class LunchCreateRequest(BaseModel):
         return verify_iso_date(value, "Lunch date")
 
 
+class AssignOfficerRequest(BaseModel):
+    officer_user_id: int | None = None
+
+
+class PlatformLoginRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=120)
+    access_code: str = Field(..., min_length=8, max_length=128)
+
+
+class TenantCreateRequest(BaseModel):
+    slug: str
+    display_name: str = Field(..., min_length=3, max_length=120)
+    chapter_name: str = Field(..., min_length=2, max_length=24)
+    head_seed_username: str = Field(..., min_length=3, max_length=120)
+    head_seed_first_name: str = Field(..., min_length=1, max_length=48)
+    head_seed_last_name: str = Field(..., min_length=1, max_length=48)
+    head_seed_pledge_class: str = Field(..., min_length=1, max_length=24)
+    head_seed_access_code: str = Field(..., min_length=8, max_length=128)
+    theme_primary: str | None = None
+    theme_secondary: str | None = None
+
+
 @app.on_event("startup")
 def startup() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    with db_session() as conn:
-        setup_schema(conn)
-        ensure_schema_upgrades(conn)
-        ensure_seed_data(conn)
-    if DB_PATH.exists():
+    bootstrap_platform_and_tenants()
+    default_row = fetch_tenant_row(DEFAULT_TENANT_SLUG)
+    if default_row:
+        tenant = tenant_context_from_row(default_row)
+        token = CURRENT_TENANT.set(tenant)
         try:
-            create_sqlite_snapshot(prefix="startup")
-        except Exception:
-            # Snapshot should not block app startup.
-            print("[startup] warning: unable to create startup snapshot.")
+            if tenant.db_path.exists():
+                try:
+                    create_sqlite_snapshot(prefix="startup")
+                except Exception:
+                    print("[startup] warning: unable to create startup snapshot.")
+        finally:
+            CURRENT_TENANT.reset(token)
 
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("index.html", {"request": request})
+    tenant = getattr(request.state, "tenant", None)
+    if tenant:
+        return templates.TemplateResponse(
+            "index.html",
+            {
+                "request": request,
+                "tenant": tenant,
+                "app_config": {
+                    "base_path": f"/{tenant.slug}",
+                    "api_base": f"/{tenant.slug}/api",
+                    "meeting_base": f"/{tenant.slug}/meeting",
+                    "platform_base": "/platform",
+                    "tenant_slug": tenant.slug,
+                    "tenant_name": tenant.display_name,
+                    "chapter_name": tenant.chapter_name,
+                    "logo_path": tenant.logo_path,
+                    "theme_primary": tenant.theme_primary,
+                    "theme_secondary": tenant.theme_secondary,
+                },
+            },
+        )
+
+    tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
+    return templates.TemplateResponse(
+        "platform_home.html",
+        {
+            "request": request,
+            "tenants": tenants,
+            "default_slug": DEFAULT_TENANT_SLUG,
+        },
+    )
+
+
+@app.get("/meeting", response_class=HTMLResponse)
+async def meeting_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "meeting.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": {
+                "base_path": f"/{tenant.slug}",
+                "api_base": f"/{tenant.slug}/api",
+                "meeting_base": f"/{tenant.slug}/meeting",
+                "platform_base": "/platform",
+                "tenant_slug": tenant.slug,
+                "tenant_name": tenant.display_name,
+                "chapter_name": tenant.chapter_name,
+                "logo_path": tenant.logo_path,
+                "theme_primary": tenant.theme_primary,
+                "theme_secondary": tenant.theme_secondary,
+            },
+        },
+    )
+
+
+@app.get("/platform", response_class=HTMLResponse)
+async def platform_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse("platform_admin.html", {"request": request})
+
+
+def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "slug": row["slug"],
+        "display_name": row["display_name"],
+        "chapter_name": row["chapter_name"],
+        "logo_path": row["logo_path"],
+        "theme_primary": row["theme_primary"],
+        "theme_secondary": row["theme_secondary"],
+        "db_path": row["db_path"],
+        "head_seed_username": row["head_seed_username"],
+        "is_active": bool(row["is_active"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+@app.post("/platform/api/auth/login")
+def platform_login(payload: PlatformLoginRequest, request: Request, response: Response) -> dict[str, Any]:
+    ip_address = client_ip(request)
+    assert_login_allowed(ip_address)
+
+    with platform_db_session() as conn:
+        row = conn.execute("SELECT * FROM platform_admins WHERE username = ?", (payload.username.strip(),)).fetchone()
+        if not row:
+            record_login_failure(ip_address)
+            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+
+        password_ok, needs_upgrade = verify_access_code(payload.access_code, row["access_code_hash"])
+        if not password_ok:
+            record_login_failure(ip_address)
+            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+
+        token = secrets.token_urlsafe(32)
+        now = now_iso()
+        conn.execute(
+            "INSERT INTO platform_sessions (token, admin_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)",
+            (token, row["id"], now, now),
+        )
+        conn.execute("UPDATE platform_admins SET last_login_at = ?, updated_at = ? WHERE id = ?", (now, now, row["id"]))
+        if needs_upgrade:
+            conn.execute(
+                "UPDATE platform_admins SET access_code_hash = ?, updated_at = ? WHERE id = ?",
+                (hash_access_code(payload.access_code), now_iso(), row["id"]),
+            )
+
+    response.set_cookie(
+        key=PLATFORM_SESSION_COOKIE,
+        value=token,
+        httponly=True,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+        max_age=PLATFORM_SESSION_TTL_SECONDS,
+        secure=SESSION_COOKIE_SECURE,
+        path="/",
+    )
+    record_login_success(ip_address)
+    return {"admin": platform_user_payload(row), "message": "Platform admin logged in."}
+
+
+@app.post("/platform/api/auth/logout")
+def platform_logout(request: Request, response: Response) -> dict[str, str]:
+    token = request.cookies.get(PLATFORM_SESSION_COOKIE)
+    if token:
+        with platform_db_session() as conn:
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+    response.delete_cookie(
+        key=PLATFORM_SESSION_COOKIE,
+        path="/",
+        secure=SESSION_COOKIE_SECURE,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+    )
+    return {"message": "Logged out."}
+
+
+@app.get("/platform/api/auth/me")
+def platform_auth_me(admin: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+    return {"authenticated": True, "admin": platform_user_payload(admin)}
+
+
+@app.get("/platform/api/tenants")
+def platform_list_tenants(_: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+    with platform_db_session() as conn:
+        rows = conn.execute("SELECT * FROM tenants ORDER BY display_name ASC").fetchall()
+    return {"tenants": [tenant_admin_payload(row) for row in rows]}
+
+
+@app.post("/platform/api/tenants")
+def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+    slug = normalize_slug(payload.slug)
+    display_name = payload.display_name.strip()
+    chapter_name = payload.chapter_name.strip()
+    if not display_name:
+        raise HTTPException(status_code=400, detail="Display name is required.")
+    if not chapter_name:
+        raise HTTPException(status_code=400, detail="Chapter name is required.")
+
+    theme_primary = normalize_theme_color(payload.theme_primary or "", "#8a1538")
+    theme_secondary = normalize_theme_color(payload.theme_secondary or "", "#c99a2b")
+    head_username = payload.head_seed_username.strip()
+    if not head_username:
+        raise HTTPException(status_code=400, detail="Head username is required.")
+    try:
+        validate_access_code_strength(payload.head_seed_access_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    tenant_db_path = default_tenant_db_path(slug)
+    created_at = now_iso()
+    with platform_db_session() as conn:
+        existing = conn.execute("SELECT id FROM tenants WHERE slug = ?", (slug,)).fetchone()
+        if existing:
+            raise HTTPException(status_code=409, detail="Organization slug already exists.")
+        conn.execute(
+            """
+            INSERT INTO tenants (
+                slug,
+                display_name,
+                chapter_name,
+                logo_path,
+                theme_primary,
+                theme_secondary,
+                db_path,
+                head_seed_username,
+                head_seed_first_name,
+                head_seed_last_name,
+                head_seed_pledge_class,
+                created_at,
+                updated_at,
+                is_active
+            )
+            VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """,
+            (
+                slug,
+                display_name,
+                chapter_name,
+                theme_primary,
+                theme_secondary,
+                str(tenant_db_path),
+                head_username,
+                normalize_name(payload.head_seed_first_name),
+                normalize_name(payload.head_seed_last_name),
+                payload.head_seed_pledge_class.strip(),
+                created_at,
+                created_at,
+            ),
+        )
+        row = conn.execute("SELECT * FROM tenants WHERE slug = ?", (slug,)).fetchone()
+
+    initialize_tenant_datastore(row, seed_access_code=payload.head_seed_access_code.strip())
+    return {"tenant": tenant_admin_payload(row), "message": "Organization created."}
+
+
+@app.post("/platform/api/tenants/{slug}/logo")
+async def platform_upload_tenant_logo(
+    slug: str,
+    logo: UploadFile = File(...),
+    _: sqlite3.Row = Depends(current_platform_admin),
+) -> dict[str, Any]:
+    normalized_slug = normalize_slug(slug)
+    row = require_tenant_exists(normalized_slug)
+
+    content_type = (logo.content_type or "").lower().strip()
+    extension = ALLOWED_PHOTO_TYPES.get(content_type)
+    if extension is None:
+        raise HTTPException(status_code=400, detail="Unsupported logo type. Use JPG, PNG, or WEBP.")
+
+    content = await logo.read(MAX_PNM_PHOTO_BYTES + 1)
+    if not content:
+        raise HTTPException(status_code=400, detail="Logo file cannot be empty.")
+    if len(content) > MAX_PNM_PHOTO_BYTES:
+        raise HTTPException(status_code=413, detail=f"Logo too large. Max size is {MAX_PNM_PHOTO_BYTES // (1024 * 1024)} MB.")
+
+    logo_dir = tenant_logo_fs_dir(normalized_slug)
+    logo_dir.mkdir(parents=True, exist_ok=True)
+    for prior in logo_dir.glob("logo.*"):
+        prior.unlink(missing_ok=True)
+    target = logo_dir / f"logo{extension}"
+    target.write_bytes(content)
+    public_path = tenant_logo_public_path(normalized_slug, extension)
+
+    with platform_db_session() as conn:
+        conn.execute("UPDATE tenants SET logo_path = ?, updated_at = ? WHERE slug = ?", (public_path, now_iso(), normalized_slug))
+        refreshed = conn.execute("SELECT * FROM tenants WHERE slug = ?", (normalized_slug,)).fetchone()
+    return {"tenant": tenant_admin_payload(refreshed), "message": "Logo uploaded."}
+
+
+@app.delete("/platform/api/tenants/{slug}")
+def platform_disable_tenant(slug: str, _: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, str]:
+    normalized_slug = normalize_slug(slug)
+    if normalized_slug == DEFAULT_TENANT_SLUG:
+        raise HTTPException(status_code=400, detail="Default organization cannot be disabled.")
+    with platform_db_session() as conn:
+        row = conn.execute("SELECT id FROM tenants WHERE slug = ?", (normalized_slug,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Organization not found.")
+        conn.execute("UPDATE tenants SET is_active = 0, updated_at = ? WHERE slug = ?", (now_iso(), normalized_slug))
+    return {"message": "Organization disabled."}
 
 
 @app.get("/service-worker.js", include_in_schema=False)
@@ -1399,6 +2162,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
     try:
         interests = parse_interests(payload.interests)
         instagram_handle = normalize_instagram_handle(payload.instagram_handle)
+        phone_number = normalize_phone_number(payload.phone_number)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -1422,6 +2186,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
                 last_name,
                 class_year,
                 hometown,
+                phone_number,
                 instagram_handle,
                 first_event_date,
                 interests,
@@ -1432,13 +2197,14 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
                 created_at,
                 updated_at
             )
-            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 first_name,
                 last_name,
                 payload.class_year,
                 hometown,
+                phone_number,
                 instagram_handle,
                 payload.first_event_date,
                 interests_csv,
@@ -1458,7 +2224,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
 
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
 
-    return {"pnm": pnm_payload(row, own_rating=None)}
+    return {"pnm": pnm_payload(row, own_rating=None, assigned_officer=None)}
 
 
 @app.get("/api/pnms")
@@ -1482,7 +2248,17 @@ def list_pnms(
         own_rating_by_pnm = {row["pnm_id"]: rating_payload(row) for row in own_rows}
 
         rows = conn.execute(
-            "SELECT * FROM pnms ORDER BY weighted_total DESC, last_name ASC, first_name ASC"
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+            """
         ).fetchall()
 
     filtered = []
@@ -1491,7 +2267,13 @@ def list_pnms(
             continue
         if not has_interest_match(row["interests_norm"], interest_filter):
             continue
-        filtered.append(pnm_payload(row, own_rating_by_pnm.get(row["id"])))
+        filtered.append(
+            pnm_payload(
+                row,
+                own_rating_by_pnm.get(row["id"]),
+                assigned_officer=assigned_officer_payload_from_row(row),
+            )
+        )
 
     return {"pnms": filtered}
 
@@ -1499,11 +2281,86 @@ def list_pnms(
 @app.get("/api/pnms/{pnm_id}")
 def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     with db_session() as conn:
-        row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        row = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="PNM not found.")
         own = fetch_own_rating(conn, pnm_id, user["id"])
-    return {"pnm": pnm_payload(row, own)}
+    return {"pnm": pnm_payload(row, own, assigned_officer=assigned_officer_payload_from_row(row))}
+
+
+@app.post("/api/pnms/{pnm_id}/assign")
+def assign_pnm_officer(
+    pnm_id: int,
+    payload: AssignOfficerRequest,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not pnm_row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        assigned_user_id: int | None = payload.officer_user_id
+        if assigned_user_id is not None:
+            officer = conn.execute(
+                "SELECT id, username, role, emoji FROM users WHERE id = ? AND is_approved = 1",
+                (assigned_user_id,),
+            ).fetchone()
+            if not officer:
+                raise HTTPException(status_code=404, detail="Rush Officer not found.")
+            if officer["role"] != ROLE_RUSH_OFFICER:
+                raise HTTPException(status_code=400, detail="Assignment target must be a Rush Officer.")
+        else:
+            officer = None
+
+        now = now_iso()
+        conn.execute(
+            """
+            UPDATE pnms
+            SET assigned_officer_id = ?, assigned_by = ?, assigned_at = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                assigned_user_id,
+                head_user["id"] if assigned_user_id is not None else None,
+                now if assigned_user_id is not None else None,
+                now,
+                pnm_id,
+            ),
+        )
+
+        refreshed = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, head_user["id"])
+
+    return {
+        "message": "PNM assignment updated.",
+        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+    }
 
 
 @app.post("/api/pnms/{pnm_id}/photo")
@@ -1512,6 +2369,7 @@ async def upload_pnm_photo(
     photo: UploadFile = File(...),
     user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
+    tenant = current_tenant()
     content_type = (photo.content_type or "").lower().strip()
     extension = ALLOWED_PHOTO_TYPES.get(content_type)
     if extension is None:
@@ -1524,8 +2382,10 @@ async def upload_pnm_photo(
         raise HTTPException(status_code=413, detail=f"Image too large. Max size is {MAX_PNM_PHOTO_BYTES // (1024 * 1024)} MB.")
 
     filename = f"pnm-{pnm_id}-{secrets.token_hex(10)}{extension}"
-    target_path = PNM_UPLOADS_DIR / filename
-    public_path = f"/uploads/pnms/{filename}"
+    uploads_dir = active_pnm_uploads_dir()
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    target_path = uploads_dir / filename
+    public_path = f"/uploads/tenants/{tenant.slug}/pnms/{filename}"
     old_photo_path: str | None = None
 
     try:
@@ -1550,7 +2410,20 @@ async def upload_pnm_photo(
                 (public_path, now, user["id"], now, pnm_id),
             )
 
-            refreshed = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+            refreshed = conn.execute(
+                """
+                SELECT
+                    p.*,
+                    ao.id AS assigned_officer_id,
+                    ao.username AS assigned_officer_username,
+                    ao.role AS assigned_officer_role,
+                    ao.emoji AS assigned_officer_emoji
+                FROM pnms p
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                WHERE p.id = ?
+                """,
+                (pnm_id,),
+            ).fetchone()
             own = fetch_own_rating(conn, pnm_id, user["id"])
     except Exception:
         target_path.unlink(missing_ok=True)
@@ -1561,14 +2434,27 @@ async def upload_pnm_photo(
 
     return {
         "message": "PNM photo uploaded.",
-        "pnm": pnm_payload(refreshed, own),
+        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
     }
 
 
 @app.get("/api/pnms/{pnm_id}/meeting")
 def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     with db_session() as conn:
-        pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        pnm_row = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
         if not pnm_row:
             raise HTTPException(status_code=404, detail="PNM not found.")
 
@@ -1689,7 +2575,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
     }
 
     return {
-        "pnm": pnm_payload(pnm_row, own),
+        "pnm": pnm_payload(pnm_row, own, assigned_officer=assigned_officer_payload_from_row(pnm_row)),
         "can_view_rater_identity": can_view_identity,
         "summary": summary,
         "ratings": ratings,
@@ -1898,13 +2784,30 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
             (payload.pnm_id, user["id"]),
         ).fetchone()
 
-        updated_pnm = conn.execute("SELECT * FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        updated_pnm = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (payload.pnm_id,),
+        ).fetchone()
         updated_user = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
 
     return {
         "rating": rating_payload(updated_rating),
         "change": change_event,
-        "pnm": pnm_payload(updated_pnm, rating_payload(updated_rating)),
+        "pnm": pnm_payload(
+            updated_pnm,
+            rating_payload(updated_rating),
+            assigned_officer=assigned_officer_payload_from_row(updated_pnm),
+        ),
         "member": user_payload(updated_user, updated_user["role"], updated_user["id"]),
     }
 
@@ -2017,12 +2920,29 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
         recalc_pnm_lunch_stats(conn, payload.pnm_id)
 
         refreshed_user = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
-        refreshed_pnm = conn.execute("SELECT * FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        refreshed_pnm = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (payload.pnm_id,),
+        ).fetchone()
 
     return {
         "message": "Lunch logged.",
         "member": user_payload(refreshed_user, refreshed_user["role"], refreshed_user["id"]),
-        "pnm": pnm_payload(refreshed_pnm, own_rating=None),
+        "pnm": pnm_payload(
+            refreshed_pnm,
+            own_rating=None,
+            assigned_officer=assigned_officer_payload_from_row(refreshed_pnm),
+        ),
     }
 
 
@@ -2076,7 +2996,17 @@ def matching(
         own_rating_by_pnm = {row["pnm_id"]: rating_payload(row) for row in own_rows}
 
         pnm_rows = conn.execute(
-            "SELECT * FROM pnms ORDER BY weighted_total DESC, last_name ASC, first_name ASC"
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+            """
         ).fetchall()
         user_rows = conn.execute(
             "SELECT * FROM users WHERE is_approved = 1 ORDER BY username ASC"
@@ -2088,7 +3018,13 @@ def matching(
             continue
         if not has_interest_match(row["interests_norm"], interest_filter):
             continue
-        pnms.append(pnm_payload(row, own_rating_by_pnm.get(row["id"])))
+        pnms.append(
+            pnm_payload(
+                row,
+                own_rating_by_pnm.get(row["id"]),
+                assigned_officer=assigned_officer_payload_from_row(row),
+            )
+        )
 
     members = []
     for row in user_rows:

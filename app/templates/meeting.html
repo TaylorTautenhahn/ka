@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="{{ app_config.theme_primary }}" />
+    <title>{{ app_config.tenant_name }} Meeting Packets</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/meeting.js" defer></script>
+  </head>
+  <body data-app-config='{{ app_config | tojson | forceescape }}'>
+    <main class="shell">
+      <header class="hero reveal">
+        {% if app_config.logo_path %}
+        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+        {% endif %}
+        <p class="eyebrow">{{ app_config.chapter_name }}</p>
+        <h1>Meeting Packet</h1>
+        <p>Dedicated meeting context for one rushee at a time, optimized for review and print-to-PDF exports.</p>
+      </header>
+
+      <nav class="panel quick-nav" aria-label="Tabs">
+        <a href="{{ app_config.base_path }}" class="quick-nav-link">Dashboard</a>
+        <a href="{{ app_config.meeting_base }}" class="quick-nav-link">Meeting Packets</a>
+      </nav>
+
+      <section class="panel">
+        <div class="inline-grid">
+          <label>
+            Rushee
+            <select id="meetingPnmSelect"></select>
+          </label>
+          <label class="btn-wrap">
+            <span>&nbsp;</span>
+            <button id="meetingLoadBtn" type="button">Load Packet</button>
+          </label>
+        </div>
+        <div class="action-row meeting-actions">
+          <button id="meetingPdfBtn" type="button" class="secondary">Download PDF</button>
+          <button id="meetingRefreshBtn" type="button" class="secondary">Refresh</button>
+        </div>
+      </section>
+
+      <section id="meetingPacket" class="panel meeting-view">
+        <p class="muted">Select a rushee and click Load Packet.</p>
+      </section>
+    </main>
+    <div id="meetingToast" class="toast hidden"></div>
+  </body>
+</html>

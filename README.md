@@ -1,12 +1,21 @@
 # KAO Rush Evaluation Web App
 
-Production-focused recruitment evaluation platform for Kappa Alpha Order.
+Production-focused recruitment evaluation platform with multi-organization support.
 
-The app replaces spreadsheets with role-based visibility, accountability, meeting-ready context, and connected real-time updates across PNMs, members, ratings, lunches, and photos.
+The app replaces spreadsheets with role-based visibility, accountability, meeting-ready context, and connected real-time updates across PNMs, members, ratings, lunches, photos, phone numbers, and officer assignments.
 
 ## Core Capabilities
 - Individual authentication with Head Rush Officer approval workflow.
 - Public self-registration limited to new Rush Officers using username + access code (emoji optional; PNM creation is post-login only).
+- Multi-tenant organizations by URL path:
+  - `/kappaalphaorder`
+  - `/<org-slug>/meeting`
+  - isolated SQLite DB + uploads per organization
+- Platform admin console at `/platform` for:
+  - creating organizations
+  - assigning branding colors + logos
+  - seeding tenant-specific Head login credentials
+  - disabling tenant workspaces
 - Role-aware visibility:
   - Head Rush Officer / Rush Officer can see rating ownership, comments, and deltas.
   - Rushers see overall PNM averages and only their own rating stats.
@@ -20,12 +29,15 @@ The app replaces spreadsheets with role-based visibility, accountability, meetin
   - Member rating averages.
   - Member + PNM lunch stats.
 - PNM photos (JPG/PNG/WEBP) with upload validation.
+- PNM phone number tracking.
+- Head-only assignment of PNMs to specific Rush Officers.
 - Meeting View packet per rushee:
   - profile + photo
   - weighted summary and rating spread
   - lunch timeline
   - recommended member matches by shared interests/stereotype
 - Admin Panel (Head only): remove rushees with safe cascading cleanup.
+- Dedicated Meeting page tab with print-to-PDF workflow.
 - Manual backup exports:
   - CSV archive export (zip)
   - SQLite snapshot export
@@ -115,6 +127,7 @@ docker run -p 8000:8000 \
   - `UPLOADS_DIR=/data/uploads`
   - `SESSION_COOKIE_SECURE=1`
   - `ALLOWED_HOSTS=<your-domain>`
+  - `PLATFORM_ADMIN_ACCESS_CODE=<strong-secret>`
 
 ## Environment Variables
 - `DB_PATH` (default `app/recruitment.db`)
@@ -130,6 +143,12 @@ docker run -p 8000:8000 \
 - `LOGIN_WINDOW_SECONDS` (default `300`)
 - `LOGIN_MAX_FAILURES` (default `8`)
 - `LOGIN_BLOCK_SECONDS` (default `600`)
+- `PLATFORM_DB_PATH` (default `<db-dir>/platform.db`)
+- `TENANTS_DB_DIR` (default `<db-dir>/tenants`)
+- `DEFAULT_TENANT_SLUG` (default `kappaalphaorder`)
+- `DEFAULT_TENANT_NAME` (default `Kappa Alpha Order`)
+- `PLATFORM_ADMIN_USERNAME` (default `taylortaut`)
+- `PLATFORM_ADMIN_ACCESS_CODE` (no default)
 - `AUTO_CREATE_HEAD_SEED` (default `1`)
 - `HEAD_SEED_USERNAME` (default `head.rush.officer`)
 - `HEAD_SEED_ACCESS_CODE` (no default)
@@ -138,10 +157,15 @@ docker run -p 8000:8000 \
 - `HEAD_SEED_PLEDGE_CLASS` (default `Admin`)
 
 ## API Endpoints (High-Level)
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/logout`
-- `GET /api/auth/me`
+Tenant-scoped endpoints are available at:
+- `/<org-slug>/api/...` (recommended)
+- `/api/...` (defaults to `DEFAULT_TENANT_SLUG`)
+
+Tenant APIs:
+- `POST /<org-slug>/api/auth/register`
+- `POST /<org-slug>/api/auth/login`
+- `POST /<org-slug>/api/auth/logout`
+- `GET /<org-slug>/api/auth/me`
 - `GET /api/users`
 - `PATCH /api/users/me`
 - `GET /api/users/pending` (Head only)
@@ -149,6 +173,7 @@ docker run -p 8000:8000 \
 - `POST /api/pnms`
 - `GET /api/pnms`
 - `GET /api/pnms/{pnm_id}`
+- `POST /api/pnms/{pnm_id}/assign` (Head only)
 - `POST /api/pnms/{pnm_id}/photo` (Officer+)
 - `GET /api/pnms/{pnm_id}/meeting`
 - `DELETE /api/pnms/{pnm_id}` (Head only)
@@ -162,3 +187,12 @@ docker run -p 8000:8000 \
 - `GET /api/export/csv` (Head only)
 - `GET /api/export/sqlite` (Head only)
 - `GET /health`
+
+Platform admin APIs:
+- `POST /platform/api/auth/login`
+- `POST /platform/api/auth/logout`
+- `GET /platform/api/auth/me`
+- `GET /platform/api/tenants`
+- `POST /platform/api/tenants`
+- `POST /platform/api/tenants/{slug}/logo`
+- `DELETE /platform/api/tenants/{slug}`

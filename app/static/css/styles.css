@@ -96,6 +96,16 @@ body {
   position: relative;
 }
 
+.brand-logo {
+  width: 58px;
+  height: 58px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(138, 21, 56, 0.24);
+  background: rgba(255, 255, 255, 0.86);
+  margin-bottom: 0.35rem;
+}
+
 .eyebrow {
   margin: 0;
   color: var(--accent);
@@ -341,6 +351,18 @@ button:disabled {
   min-width: 108px;
 }
 
+.meeting-actions {
+  margin-top: 0.6rem;
+}
+
+.platform-home-actions {
+  margin-bottom: 0.8rem;
+}
+
+.platform-card-actions {
+  margin-top: 0.55rem;
+}
+
 .topbar {
   display: flex;
   align-items: flex-start;
@@ -517,6 +539,12 @@ td strong {
 
 .compact-upload {
   margin-bottom: 0.95rem;
+}
+
+#assignPanel {
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px dashed rgba(138, 21, 56, 0.2);
 }
 
 .meeting-view {
@@ -900,5 +928,30 @@ td strong {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+@media print {
+  .quick-nav,
+  .action-row,
+  button,
+  #meetingPnmSelect,
+  #meetingLoadBtn,
+  #meetingPdfBtn,
+  #meetingRefreshBtn,
+  .toast {
+    display: none !important;
+  }
+
+  body {
+    background: #fff;
+    color: #111;
+  }
+
+  .panel {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    background: #fff;
+    break-inside: avoid;
   }
 }

@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Rush Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero reveal">
+        <p class="eyebrow">Multi-Organization</p>
+        <h1>Recruitment Operations Platform</h1>
+        <p>Choose an organization workspace or open the platform admin console.</p>
+      </header>
+
+      <section class="panel">
+        <div class="action-row platform-home-actions">
+          <a href="/platform" class="quick-nav-link">Platform Admin</a>
+        </div>
+        <div class="cards">
+          {% for tenant in tenants %}
+          <article class="card">
+            <strong>{{ tenant.display_name }}</strong>
+            <p>Path: /{{ tenant.slug }}</p>
+            <div class="action-row platform-card-actions">
+              <a class="quick-nav-link" href="/{{ tenant.slug }}">Open Dashboard</a>
+              <a class="quick-nav-link" href="/{{ tenant.slug }}/meeting">Meeting Page</a>
+            </div>
+          </article>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

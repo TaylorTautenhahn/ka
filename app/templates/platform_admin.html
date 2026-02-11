@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Platform Admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/platform_admin.js" defer></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero reveal">
+        <p class="eyebrow">Platform Admin</p>
+        <h1>Organization Management</h1>
+        <p>Create and manage fraternity workspaces with separate databases, branding, and head accounts.</p>
+      </header>
+
+      <section id="platformAuth" class="panel">
+        <h2>Admin Login</h2>
+        <form id="platformLoginForm" class="stack">
+          <label>
+            Username
+            <input id="platformUsername" type="text" required />
+          </label>
+          <label>
+            Access code
+            <input id="platformAccessCode" type="password" required />
+          </label>
+          <button type="submit">Sign In</button>
+        </form>
+      </section>
+
+      <section id="platformConsole" class="hidden">
+        <div class="panel topbar">
+          <div>
+            <p class="eyebrow">Session</p>
+            <h2 id="platformSessionTitle">Admin</h2>
+            <p class="muted">Create/edit organizations and maintain tenant infrastructure.</p>
+          </div>
+          <div class="action-row">
+            <button id="platformRefreshBtn" type="button" class="secondary">Refresh</button>
+            <button id="platformLogoutBtn" type="button" class="secondary">Logout</button>
+          </div>
+        </div>
+
+        <section class="panel">
+          <h2>Create Organization</h2>
+          <form id="createTenantForm" class="stack">
+            <div class="inline-grid">
+              <label>
+                Organization name
+                <input id="tenantDisplayName" type="text" required placeholder="Kappa Alpha Order" />
+              </label>
+              <label>
+                URL slug
+                <input id="tenantSlug" type="text" required placeholder="kappaalphaorder" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Chapter short name
+                <input id="tenantChapterName" type="text" required placeholder="KAO" />
+              </label>
+              <label>
+                Head username
+                <input id="tenantHeadUsername" type="text" required placeholder="head.rush.officer" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Head first name
+                <input id="tenantHeadFirstName" type="text" required placeholder="Head" />
+              </label>
+              <label>
+                Head last name
+                <input id="tenantHeadLastName" type="text" required placeholder="Officer" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Head pledge class
+                <input id="tenantHeadPledgeClass" type="text" required placeholder="Admin" />
+              </label>
+              <label>
+                Head access code
+                <input id="tenantHeadAccessCode" type="password" required />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Primary color
+                <input id="tenantThemePrimary" type="text" placeholder="#8a1538" />
+              </label>
+              <label>
+                Secondary color
+                <input id="tenantThemeSecondary" type="text" placeholder="#c99a2b" />
+              </label>
+            </div>
+            <label>
+              Organization logo (optional)
+              <input id="tenantLogoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+            </label>
+            <button type="submit">Create Organization</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>Organizations</h2>
+          <div id="tenantList" class="table-wrap"></div>
+        </section>
+      </section>
+    </main>
+
+    <div id="platformToast" class="toast hidden"></div>
+  </body>
+</html>

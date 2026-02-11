@@ -106,7 +106,7 @@
           <a href="{{ app_config.base_path if app_config else '/' }}?view=overview" class="quick-nav-link desktop-page-link" data-page="overview">Overview</a>
           <a href="{{ app_config.base_path if app_config else '/' }}?view=rushees" class="quick-nav-link desktop-page-link" data-page="rushees">Rushees</a>
           <a href="{{ app_config.base_path if app_config else '/' }}?view=members" class="quick-nav-link desktop-page-link" data-page="members">Members</a>
-          <a id="adminNavLink" href="{{ app_config.base_path if app_config else '/' }}?view=admin" class="quick-nav-link desktop-page-link" data-page="admin">Admin</a>
+          <a id="adminNavLink" href="{{ app_config.base_path if app_config else '/' }}?view=admin" class="quick-nav-link desktop-page-link" data-page="admin">Head Console</a>
           <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
         </nav>
 
@@ -383,9 +383,99 @@
           <div class="desktop-page" data-page="admin">
         <section id="adminPanel" class="panel hidden reveal delay-6">
           <div class="section-head">
-            <h2>Admin Panel</h2>
-            <p class="muted">Head Rush Officer actions for roster cleanup.</p>
+            <h2>Head Rush Officer Console</h2>
+            <p class="muted">Leadership controls, officer metrics, and rushee profile management.</p>
           </div>
+
+          <div id="headAdminSummary" class="cards"></div>
+
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Leadership Management</h3>
+              <p class="muted">Promote an approved Rush Officer to Head Rush Officer.</p>
+              <label>
+                Rush Officer
+                <select id="promoteOfficerSelect"></select>
+              </label>
+              <label class="checkbox-line">
+                <input id="demoteExistingHeads" type="checkbox" />
+                Transfer leadership (demote current heads to Rush Officer)
+              </label>
+              <div class="action-row">
+                <button id="promoteOfficerBtn" type="button">Promote To Head</button>
+              </div>
+              <h3>Current Head Team</h3>
+              <div id="currentHeadsList" class="list-box"></div>
+            </article>
+
+            <article class="list-column">
+              <h3>Edit Rushee Profile</h3>
+              <form id="adminPnmEditorForm" class="stack">
+                <label>
+                  Select rushee
+                  <select id="adminEditPnmSelect"></select>
+                </label>
+                <div class="inline-grid">
+                  <label>
+                    First name
+                    <input id="adminEditFirstName" type="text" required />
+                  </label>
+                  <label>
+                    Last name
+                    <input id="adminEditLastName" type="text" required />
+                  </label>
+                </div>
+                <div class="inline-grid">
+                  <label>
+                    Class year
+                    <select id="adminEditClassYear" required>
+                      <option value="F">F</option>
+                      <option value="S">S</option>
+                      <option value="J">J</option>
+                    </select>
+                  </label>
+                  <label>
+                    First event date
+                    <input id="adminEditFirstEventDate" type="date" required />
+                  </label>
+                </div>
+                <label>
+                  Hometown
+                  <input id="adminEditHometown" type="text" required />
+                </label>
+                <label>
+                  Phone number
+                  <input id="adminEditPhoneNumber" type="text" placeholder="+1 555 123 4567" />
+                </label>
+                <label>
+                  Instagram handle
+                  <input id="adminEditInstagramHandle" type="text" required placeholder="@username" />
+                </label>
+                <label>
+                  Interests (comma-separated)
+                  <input id="adminEditInterests" type="text" required placeholder="Golf,Fishing" />
+                </label>
+                <label>
+                  Stereotype
+                  <input id="adminEditStereotype" type="text" required />
+                </label>
+                <label>
+                  Lunch stats
+                  <input id="adminEditLunchStats" type="text" placeholder="3 lunches this week" />
+                </label>
+                <div class="action-row">
+                  <button id="saveAdminPnmBtn" type="submit">Save Rushee Changes</button>
+                </div>
+              </form>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <h3>Rush Officer Metrics</h3>
+          <div id="officerMetricsTable" class="table-wrap"></div>
+
+          <div class="divider"></div>
+          <h3>Rushee Roster Controls</h3>
           <div id="adminPnmTable" class="table-wrap"></div>
         </section>
           </div>

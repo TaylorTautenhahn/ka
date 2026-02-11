@@ -400,6 +400,22 @@ label {
   font-weight: 600;
 }
 
+.checkbox-line {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 600;
+}
+
+.checkbox-line input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  padding: 0;
+  border-radius: 4px;
+  accent-color: var(--accent);
+}
+
 input,
 select,
 textarea,
@@ -583,6 +599,11 @@ button:disabled {
 .cards {
   display: grid;
   gap: 0.55rem;
+}
+
+#headAdminSummary.cards {
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-bottom: 0.85rem;
 }
 
 .card {

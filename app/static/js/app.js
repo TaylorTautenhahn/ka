@@ -89,6 +89,14 @@ const approvalsPanel = document.getElementById("approvalsPanel");
 const pendingList = document.getElementById("pendingList");
 const adminPanel = document.getElementById("adminPanel");
 const adminPnmTable = document.getElementById("adminPnmTable");
+const headAdminSummary = document.getElementById("headAdminSummary");
+const officerMetricsTable = document.getElementById("officerMetricsTable");
+const currentHeadsList = document.getElementById("currentHeadsList");
+const promoteOfficerSelect = document.getElementById("promoteOfficerSelect");
+const demoteExistingHeads = document.getElementById("demoteExistingHeads");
+const promoteOfficerBtn = document.getElementById("promoteOfficerBtn");
+const adminPnmEditorForm = document.getElementById("adminPnmEditorForm");
+const adminEditPnmSelect = document.getElementById("adminEditPnmSelect");
 
 const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
@@ -124,6 +132,12 @@ const state = {
   calendarShare: null,
   activeDesktopPage: DEFAULT_DESKTOP_PAGE,
   liveRefreshTimer: null,
+  headAdmin: {
+    summary: null,
+    currentHeads: [],
+    rushOfficers: [],
+  },
+  adminEditPnmId: null,
 };
 
 function escapeHtml(input) {
@@ -355,6 +369,7 @@ function startLiveRefresh() {
         loadLeaderboard(),
         loadCalendarShare(),
         loadApprovals(),
+        loadHeadAdminData(),
       ]);
     } catch {
       // Passive sync should fail silently; explicit actions already report errors.
@@ -821,16 +836,193 @@ function renderPendingApprovals(data) {
   `;
 }
 
-function renderAdminPanel() {
-  if (!roleCanUseAdminPanel()) {
-    adminPanel.classList.add("hidden");
-    adminPnmTable.innerHTML = "";
+function formatLastSeen(value) {
+  if (!value) {
+    return "Never";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Unknown";
+  }
+  return parsed.toLocaleString();
+}
+
+function renderHeadAdminSummary() {
+  if (!headAdminSummary) {
+    return;
+  }
+  const summary = state.headAdmin.summary;
+  if (!summary) {
+    headAdminSummary.innerHTML = '<p class="muted">Head admin metrics unavailable.</p>';
+    return;
+  }
+  headAdminSummary.innerHTML = `
+    <div class="card">
+      <strong>${summary.head_count}</strong>
+      <p>Current Head Rush Officers</p>
+    </div>
+    <div class="card">
+      <strong>${summary.officer_count}</strong>
+      <p>Active Rush Officers</p>
+    </div>
+    <div class="card">
+      <strong>${summary.total_officer_ratings}</strong>
+      <p>Total Officer Ratings</p>
+    </div>
+    <div class="card">
+      <strong>${summary.total_officer_lunches}</strong>
+      <p>Total Officer Lunches</p>
+    </div>
+    <div class="card">
+      <strong>${Number(summary.avg_officer_score_given || 0).toFixed(2)}</strong>
+      <p>Avg Officer Score Given</p>
+    </div>
+  `;
+}
+
+function renderCurrentHeadsList() {
+  if (!currentHeadsList) {
+    return;
+  }
+  const heads = state.headAdmin.currentHeads || [];
+  if (!heads.length) {
+    currentHeadsList.innerHTML = '<p class="muted">No head officers found.</p>';
+    return;
+  }
+  currentHeadsList.innerHTML = heads
+    .map(
+      (head) => `
+        <div class="entry">
+          <div class="entry-title">
+            <strong>${escapeHtml(head.username)}</strong>
+            <span>${head.rating_count} ratings</span>
+          </div>
+          <div class="muted">Lunches: ${head.total_lunches} | Per week: ${Number(head.lunches_per_week || 0).toFixed(2)}</div>
+          <div class="muted">Last login: ${escapeHtml(formatLastSeen(head.last_login_at))}</div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function renderPromotionControls() {
+  if (!promoteOfficerSelect || !promoteOfficerBtn) {
+    return;
+  }
+  const officers = state.headAdmin.rushOfficers || [];
+  if (!officers.length) {
+    promoteOfficerSelect.innerHTML = '<option value="">No rush officers available</option>';
+    promoteOfficerSelect.disabled = true;
+    promoteOfficerBtn.disabled = true;
+    return;
+  }
+  const options = officers
+    .map((officer) => {
+      const emoji = officer.emoji ? `${officer.emoji} ` : "";
+      return `<option value="${officer.user_id}">${escapeHtml(`${emoji}${officer.username}`)}</option>`;
+    })
+    .join("");
+  promoteOfficerSelect.innerHTML = `<option value="">Select an officer</option>${options}`;
+  promoteOfficerSelect.disabled = false;
+  promoteOfficerBtn.disabled = false;
+}
+
+function renderOfficerMetrics() {
+  if (!officerMetricsTable) {
+    return;
+  }
+  const officers = state.headAdmin.rushOfficers || [];
+  if (!officers.length) {
+    officerMetricsTable.innerHTML = '<p class="muted">No Rush Officer metrics yet.</p>';
+    return;
+  }
+  const rows = officers
+    .map(
+      (officer) => `
+      <tr>
+        <td><strong>${escapeHtml(officer.username)}</strong></td>
+        <td>${escapeHtml(officer.emoji || "-")}</td>
+        <td>${officer.rating_count}</td>
+        <td>${Number(officer.avg_rating_given || 0).toFixed(2)}</td>
+        <td>${Number(officer.avg_rating_total || 0).toFixed(2)}</td>
+        <td>${officer.total_lunches}</td>
+        <td>${Number(officer.lunches_per_week || 0).toFixed(2)}</td>
+        <td>${officer.assigned_pnms_count}</td>
+        <td>${Number(officer.participation_score || 0).toFixed(2)}</td>
+        <td>${escapeHtml(formatLastSeen(officer.last_login_at))}</td>
+      </tr>
+    `
+    )
+    .join("");
+  officerMetricsTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Officer</th>
+          <th>Emoji</th>
+          <th>Ratings</th>
+          <th>Avg Given</th>
+          <th>Avg Score</th>
+          <th>Lunches</th>
+          <th>Lunches/Week</th>
+          <th>Assigned PNMs</th>
+          <th>Participation</th>
+          <th>Last Login</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderAdminPnmEditorOptions() {
+  if (!adminEditPnmSelect || !adminPnmEditorForm) {
+    return;
+  }
+  if (!state.pnms.length) {
+    adminEditPnmSelect.innerHTML = '<option value="">No rushees available</option>';
+    adminPnmEditorForm.classList.add("hidden");
+    state.adminEditPnmId = null;
     return;
   }
 
-  adminPanel.classList.remove("hidden");
+  const options = state.pnms
+    .map((pnm) => `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`)}</option>`)
+    .join("");
+  adminEditPnmSelect.innerHTML = options;
+  adminPnmEditorForm.classList.remove("hidden");
+
+  if (!state.adminEditPnmId || !state.pnms.some((pnm) => pnm.pnm_id === Number(state.adminEditPnmId))) {
+    state.adminEditPnmId = state.selectedPnmId || state.pnms[0].pnm_id;
+  }
+  adminEditPnmSelect.value = String(state.adminEditPnmId);
+  populateAdminPnmEditor(state.adminEditPnmId);
+}
+
+function populateAdminPnmEditor(pnmId) {
+  const pnm = state.pnms.find((item) => item.pnm_id === Number(pnmId));
+  if (!pnm) {
+    return;
+  }
+  state.adminEditPnmId = pnm.pnm_id;
+  document.getElementById("adminEditFirstName").value = pnm.first_name || "";
+  document.getElementById("adminEditLastName").value = pnm.last_name || "";
+  document.getElementById("adminEditClassYear").value = pnm.class_year || "F";
+  document.getElementById("adminEditFirstEventDate").value = pnm.first_event_date || "";
+  document.getElementById("adminEditHometown").value = pnm.hometown || "";
+  document.getElementById("adminEditPhoneNumber").value = pnm.phone_number || "";
+  document.getElementById("adminEditInstagramHandle").value = pnm.instagram_handle || "";
+  document.getElementById("adminEditInterests").value = (pnm.interests || []).join(",");
+  document.getElementById("adminEditStereotype").value = pnm.stereotype || "";
+  document.getElementById("adminEditLunchStats").value = pnm.lunch_stats || "";
+}
+
+function renderAdminPnmTable() {
+  if (!adminPnmTable) {
+    return;
+  }
   if (!state.pnms.length) {
-    adminPnmTable.innerHTML = '<p class="muted">No PNMs to manage.</p>';
+    adminPnmTable.innerHTML = '<p class="muted">No rushees to manage.</p>';
     return;
   }
 
@@ -841,9 +1033,17 @@ function renderAdminPanel() {
         <td>${smallPhotoCell(pnm)}</td>
         <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
         <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+        <td>${escapeHtml(pnm.phone_number || "-")}</td>
+        <td>${escapeHtml(pnm.instagram_handle)}</td>
         <td>${pnm.weighted_total.toFixed(2)}</td>
         <td>${pnm.rating_count}</td>
-        <td><button type="button" class="delete-pnm" data-pnm-id="${pnm.pnm_id}">Remove Rushee</button></td>
+        <td>${pnm.total_lunches}</td>
+        <td>
+          <div class="action-row">
+            <button type="button" class="secondary edit-pnm" data-pnm-id="${pnm.pnm_id}">Edit</button>
+            <button type="button" class="delete-pnm" data-pnm-id="${pnm.pnm_id}">Remove</button>
+          </div>
+        </td>
       </tr>
     `
     )
@@ -856,14 +1056,38 @@ function renderAdminPanel() {
           <th>Photo</th>
           <th>Code</th>
           <th>Name</th>
+          <th>Phone</th>
+          <th>Instagram</th>
           <th>Weighted Total</th>
           <th>Ratings</th>
+          <th>Lunches</th>
           <th></th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+function renderAdminPanel() {
+  if (!roleCanUseAdminPanel()) {
+    adminPanel.classList.add("hidden");
+    if (adminPnmTable) {
+      adminPnmTable.innerHTML = "";
+    }
+    if (officerMetricsTable) {
+      officerMetricsTable.innerHTML = "";
+    }
+    return;
+  }
+
+  adminPanel.classList.remove("hidden");
+  renderHeadAdminSummary();
+  renderCurrentHeadsList();
+  renderPromotionControls();
+  renderOfficerMetrics();
+  renderAdminPnmEditorOptions();
+  renderAdminPnmTable();
 }
 
 function applyRatingFormForSelected() {
@@ -1170,6 +1394,26 @@ async function loadApprovals() {
   renderPendingApprovals(payload);
 }
 
+async function loadHeadAdminData() {
+  if (!state.user || state.user.role !== "Head Rush Officer") {
+    state.headAdmin = {
+      summary: null,
+      currentHeads: [],
+      rushOfficers: [],
+    };
+    renderAdminPanel();
+    return;
+  }
+
+  const payload = await api("/api/admin/rush-officers");
+  state.headAdmin = {
+    summary: payload.summary || null,
+    currentHeads: payload.current_heads || [],
+    rushOfficers: payload.rush_officers || [],
+  };
+  renderAdminPanel();
+}
+
 async function refreshAll() {
   await Promise.all([
     loadInterestHints(),
@@ -1180,6 +1424,7 @@ async function refreshAll() {
     loadLeaderboard(),
     loadCalendarShare(),
     loadApprovals(),
+    loadHeadAdminData(),
   ]);
 }
 
@@ -1284,6 +1529,12 @@ async function handleLogout() {
   state.pnms = [];
   state.members = [];
   state.calendarShare = null;
+  state.headAdmin = {
+    summary: null,
+    currentHeads: [],
+    rushOfficers: [],
+  };
+  state.adminEditPnmId = null;
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
   animateCounter(heroLunchCount, 0);
@@ -1529,7 +1780,114 @@ async function handlePendingClick(event) {
   }
 }
 
+async function handlePromoteOfficer() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const officerId = Number(promoteOfficerSelect && promoteOfficerSelect.value ? promoteOfficerSelect.value : 0);
+  if (!officerId) {
+    showToast("Select a Rush Officer to promote.");
+    return;
+  }
+
+  const officer = (state.headAdmin.rushOfficers || []).find((entry) => entry.user_id === officerId);
+  const transferLeadership = Boolean(demoteExistingHeads && demoteExistingHeads.checked);
+  const targetName = officer ? officer.username : "selected officer";
+  const prompt = transferLeadership
+    ? `Promote ${targetName} to Head Rush Officer and demote other heads to Rush Officer?`
+    : `Promote ${targetName} to Head Rush Officer?`;
+  const confirmed = window.confirm(prompt);
+  if (!confirmed) {
+    return;
+  }
+
+  promoteOfficerBtn.disabled = true;
+  promoteOfficerBtn.textContent = "Promoting...";
+  try {
+    const payload = await api(`/api/admin/officers/${officerId}/promote-head`, {
+      method: "POST",
+      body: {
+        demote_existing_heads: transferLeadership,
+      },
+    });
+    showToast(payload.message || "Officer promoted.");
+    await ensureSession();
+  } catch (error) {
+    showToast(error.message || "Unable to promote officer.");
+  } finally {
+    promoteOfficerBtn.disabled = false;
+    promoteOfficerBtn.textContent = "Promote To Head";
+  }
+}
+
+async function handleAdminPnmEditorSubmit(event) {
+  event.preventDefault();
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const pnmId = Number(adminEditPnmSelect && adminEditPnmSelect.value ? adminEditPnmSelect.value : 0);
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+
+  const saveButton = document.getElementById("saveAdminPnmBtn");
+  const body = {
+    first_name: document.getElementById("adminEditFirstName").value.trim(),
+    last_name: document.getElementById("adminEditLastName").value.trim(),
+    class_year: document.getElementById("adminEditClassYear").value,
+    first_event_date: document.getElementById("adminEditFirstEventDate").value,
+    hometown: document.getElementById("adminEditHometown").value.trim(),
+    phone_number: document.getElementById("adminEditPhoneNumber").value.trim(),
+    instagram_handle: document.getElementById("adminEditInstagramHandle").value.trim(),
+    interests: document.getElementById("adminEditInterests").value.trim(),
+    stereotype: document.getElementById("adminEditStereotype").value.trim(),
+    lunch_stats: document.getElementById("adminEditLunchStats").value.trim(),
+  };
+
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+  }
+  try {
+    const payload = await api(`/api/pnms/${pnmId}`, {
+      method: "PATCH",
+      body,
+    });
+    state.selectedPnmId = pnmId;
+    state.adminEditPnmId = pnmId;
+    showToast(payload.message || "Rushee details saved.");
+    await refreshAll();
+    await loadPnmDetail(pnmId);
+  } catch (error) {
+    showToast(error.message || "Unable to update rushee details.");
+  } finally {
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "Save Rushee Changes";
+    }
+  }
+}
+
 async function handleAdminPanelClick(event) {
+  const editButton = event.target.closest("button.edit-pnm");
+  if (editButton) {
+    const pnmId = Number(editButton.dataset.pnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    state.adminEditPnmId = pnmId;
+    if (adminEditPnmSelect) {
+      adminEditPnmSelect.value = String(pnmId);
+    }
+    populateAdminPnmEditor(pnmId);
+    setActiveDesktopPage("admin");
+    showToast("Rushee loaded into editor.");
+    return;
+  }
+
   const button = event.target.closest("button.delete-pnm");
   if (!button) {
     return;
@@ -1732,6 +2090,21 @@ function attachEvents() {
   pnmTable.addEventListener("click", handlePnmTableClick);
   pendingList.addEventListener("click", handlePendingClick);
   adminPnmTable.addEventListener("click", handleAdminPanelClick);
+  if (promoteOfficerBtn) {
+    promoteOfficerBtn.addEventListener("click", handlePromoteOfficer);
+  }
+  if (adminPnmEditorForm) {
+    adminPnmEditorForm.addEventListener("submit", handleAdminPnmEditorSubmit);
+  }
+  if (adminEditPnmSelect) {
+    adminEditPnmSelect.addEventListener("change", (event) => {
+      const nextId = Number(event.target.value || 0);
+      if (!nextId) {
+        return;
+      }
+      populateAdminPnmEditor(nextId);
+    });
+  }
 
   ratingPnm.addEventListener("change", async (event) => {
     const selectedId = Number(event.target.value || 0);

@@ -89,6 +89,7 @@ ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
 ROLE_RUSHER = "Rusher"
 ALLOWED_ROLES = {ROLE_HEAD, ROLE_RUSH_OFFICER, ROLE_RUSHER}
+DEFAULT_RUSH_OFFICER_EMOJI = "⭐"
 RATING_FIELDS = [
     "good_with_girls",
     "will_make_it",
@@ -1970,6 +1971,36 @@ class PNMCreateRequest(BaseModel):
         return verify_iso_date(value, "First event date")
 
 
+class PNMUpdateRequest(BaseModel):
+    first_name: str | None = Field(default=None, min_length=1, max_length=48)
+    last_name: str | None = Field(default=None, min_length=1, max_length=48)
+    class_year: str | None = None
+    hometown: str | None = Field(default=None, min_length=1, max_length=80)
+    phone_number: str | None = Field(default=None, max_length=32)
+    instagram_handle: str | None = Field(default=None, min_length=1, max_length=80)
+    first_event_date: str | None = None
+    interests: str | list[str] | None = None
+    stereotype: str | None = Field(default=None, min_length=1, max_length=48)
+    lunch_stats: str | None = Field(default=None, max_length=256)
+
+    @field_validator("class_year")
+    @classmethod
+    def validate_optional_class_year(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip().upper()
+        if normalized not in {"F", "S", "J"}:
+            raise ValueError("Class year must be F, S, or J.")
+        return normalized
+
+    @field_validator("first_event_date")
+    @classmethod
+    def validate_optional_first_event_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return verify_iso_date(value, "First event date")
+
+
 class RatingUpsertRequest(BaseModel):
     pnm_id: int
     good_with_girls: int = Field(..., ge=0, le=10)
@@ -2008,6 +2039,19 @@ class LunchCreateRequest(BaseModel):
 
 class AssignOfficerRequest(BaseModel):
     officer_user_id: int | None = None
+
+
+class PromoteHeadRequest(BaseModel):
+    demote_existing_heads: bool = False
+    demoted_head_emoji: str | None = Field(default=None, max_length=8)
+
+    @field_validator("demoted_head_emoji")
+    @classmethod
+    def normalize_optional_demoted_head_emoji(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        return token or None
 
 
 class PlatformLoginRequest(BaseModel):
@@ -2694,6 +2738,146 @@ def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_head)) ->
     return {"message": "User approved."}
 
 
+@app.get("/api/admin/rush-officers")
+def head_admin_officer_metrics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    with db_session() as conn:
+        heads = conn.execute(
+            """
+            SELECT id, username, last_login_at, rating_count, total_lunches, lunches_per_week
+            FROM users
+            WHERE role = ? AND is_approved = 1
+            ORDER BY username ASC
+            """,
+            (ROLE_HEAD,),
+        ).fetchall()
+        officers = conn.execute(
+            """
+            SELECT
+                u.id,
+                u.username,
+                u.emoji,
+                u.stereotype,
+                u.interests,
+                u.rating_count,
+                u.avg_rating_given,
+                u.total_lunches,
+                u.lunches_per_week,
+                u.last_login_at,
+                COALESCE((SELECT AVG(r.total_score) FROM ratings r WHERE r.user_id = u.id), 0) AS avg_rating_total,
+                COALESCE((SELECT COUNT(*) FROM pnms p WHERE p.assigned_officer_id = u.id), 0) AS assigned_pnms_count
+            FROM users u
+            WHERE u.role = ? AND u.is_approved = 1
+            ORDER BY u.rating_count DESC, u.total_lunches DESC, u.username ASC
+            """,
+            (ROLE_RUSH_OFFICER,),
+        ).fetchall()
+
+    officer_payload = []
+    for row in officers:
+        participation_score = float(row["rating_count"]) * 1.5 + float(row["total_lunches"])
+        officer_payload.append(
+            {
+                "user_id": row["id"],
+                "username": row["username"],
+                "emoji": row["emoji"],
+                "stereotype": row["stereotype"],
+                "interests": decode_interests(row["interests"]),
+                "rating_count": int(row["rating_count"]),
+                "avg_rating_given": round(float(row["avg_rating_given"]), 2),
+                "avg_rating_total": round(float(row["avg_rating_total"]), 2),
+                "total_lunches": int(row["total_lunches"]),
+                "lunches_per_week": round(float(row["lunches_per_week"]), 2),
+                "assigned_pnms_count": int(row["assigned_pnms_count"]),
+                "last_login_at": row["last_login_at"],
+                "participation_score": round(participation_score, 2),
+            }
+        )
+
+    summary = {
+        "head_count": len(heads),
+        "officer_count": len(officer_payload),
+        "total_officer_ratings": sum(item["rating_count"] for item in officer_payload),
+        "total_officer_lunches": sum(item["total_lunches"] for item in officer_payload),
+        "avg_officer_score_given": round(
+            sum(item["avg_rating_total"] for item in officer_payload) / len(officer_payload), 2
+        )
+        if officer_payload
+        else 0.0,
+    }
+
+    return {
+        "summary": summary,
+        "current_heads": [
+            {
+                "user_id": row["id"],
+                "username": row["username"],
+                "last_login_at": row["last_login_at"],
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+                "lunches_per_week": round(float(row["lunches_per_week"]), 2),
+            }
+            for row in heads
+        ],
+        "rush_officers": officer_payload,
+    }
+
+
+@app.post("/api/admin/officers/{user_id}/promote-head")
+def promote_officer_to_head(
+    user_id: int,
+    payload: PromoteHeadRequest,
+    _: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        target = conn.execute(
+            "SELECT id, username, role, is_approved FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if not bool(target["is_approved"]):
+            raise HTTPException(status_code=400, detail="User must be approved before role changes.")
+        if target["role"] == ROLE_HEAD:
+            return {"message": f"{target['username']} is already a Head Rush Officer.", "demoted_heads": 0}
+        if target["role"] != ROLE_RUSH_OFFICER:
+            raise HTTPException(status_code=400, detail="Only approved Rush Officers can be promoted to Head Rush Officer.")
+
+        demoted_head_ids: list[int] = []
+        if payload.demote_existing_heads:
+            demoted_rows = conn.execute(
+                "SELECT id FROM users WHERE role = ? AND id != ? AND is_approved = 1",
+                (ROLE_HEAD, user_id),
+            ).fetchall()
+            demoted_head_ids = [int(row["id"]) for row in demoted_rows]
+            if demoted_head_ids:
+                placeholders = ",".join(["?"] * len(demoted_head_ids))
+                demoted_emoji = payload.demoted_head_emoji or DEFAULT_RUSH_OFFICER_EMOJI
+                conn.execute(
+                    f"""
+                    UPDATE users
+                    SET role = ?, emoji = COALESCE(NULLIF(trim(emoji), ''), ?), updated_at = ?
+                    WHERE id IN ({placeholders})
+                    """,
+                    (ROLE_RUSH_OFFICER, demoted_emoji, now_iso(), *demoted_head_ids),
+                )
+
+        conn.execute(
+            "UPDATE users SET role = ?, emoji = NULL, updated_at = ? WHERE id = ?",
+            (ROLE_HEAD, now_iso(), user_id),
+        )
+        refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+
+    return {
+        "message": f"{target['username']} promoted to Head Rush Officer.",
+        "demoted_heads": len(demoted_head_ids),
+        "user": {
+            "user_id": refreshed["id"],
+            "username": refreshed["username"],
+            "role": refreshed["role"],
+        },
+    }
+
+
 @app.get("/api/users")
 def list_users(
     interest: str | None = None,
@@ -2913,6 +3097,128 @@ def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str,
             raise HTTPException(status_code=404, detail="PNM not found.")
         own = fetch_own_rating(conn, pnm_id, user["id"])
     return {"pnm": pnm_payload(row, own, assigned_officer=assigned_officer_payload_from_row(row))}
+
+
+@app.patch("/api/pnms/{pnm_id}")
+def update_pnm_details(
+    pnm_id: int,
+    payload: PNMUpdateRequest,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    if (
+        payload.first_name is None
+        and payload.last_name is None
+        and payload.class_year is None
+        and payload.hometown is None
+        and payload.phone_number is None
+        and payload.instagram_handle is None
+        and payload.first_event_date is None
+        and payload.interests is None
+        and payload.stereotype is None
+        and payload.lunch_stats is None
+    ):
+        raise HTTPException(status_code=400, detail="No PNM changes provided.")
+
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        first_name = normalize_name(payload.first_name) if payload.first_name is not None else row["first_name"]
+        last_name = normalize_name(payload.last_name) if payload.last_name is not None else row["last_name"]
+        class_year = payload.class_year if payload.class_year is not None else row["class_year"]
+        hometown = payload.hometown.strip() if payload.hometown is not None else row["hometown"]
+        phone_number_raw = payload.phone_number if payload.phone_number is not None else row["phone_number"]
+        instagram_raw = payload.instagram_handle if payload.instagram_handle is not None else row["instagram_handle"]
+        first_event_date = payload.first_event_date if payload.first_event_date is not None else row["first_event_date"]
+        stereotype = payload.stereotype.strip() if payload.stereotype is not None else row["stereotype"]
+        lunch_stats = payload.lunch_stats.strip() if payload.lunch_stats is not None else row["lunch_stats"]
+
+        if not hometown:
+            raise HTTPException(status_code=400, detail="Hometown cannot be empty.")
+        if not stereotype:
+            raise HTTPException(status_code=400, detail="Stereotype cannot be empty.")
+
+        try:
+            instagram_handle = normalize_instagram_handle(instagram_raw)
+            phone_number = normalize_phone_number(phone_number_raw)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        interests_csv = row["interests"]
+        interests_norm = row["interests_norm"]
+        if payload.interests is not None:
+            try:
+                interests = parse_interests(payload.interests)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            interests_csv, interests_norm = encode_interests(interests)
+
+        pnm_code = row["pnm_code"]
+        if (
+            first_name != row["first_name"]
+            or last_name != row["last_name"]
+            or first_event_date != row["first_event_date"]
+        ):
+            base = pnm_code_base(first_name, last_name, first_event_date)
+            pnm_code = ensure_unique_pnm_code(conn, pnm_id, base)
+
+        conn.execute(
+            """
+            UPDATE pnms
+            SET
+                pnm_code = ?,
+                first_name = ?,
+                last_name = ?,
+                class_year = ?,
+                hometown = ?,
+                phone_number = ?,
+                instagram_handle = ?,
+                first_event_date = ?,
+                interests = ?,
+                interests_norm = ?,
+                stereotype = ?,
+                lunch_stats = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                pnm_code,
+                first_name,
+                last_name,
+                class_year,
+                hometown,
+                phone_number,
+                instagram_handle,
+                first_event_date,
+                interests_csv,
+                interests_norm,
+                stereotype,
+                lunch_stats,
+                now_iso(),
+                pnm_id,
+            ),
+        )
+        refreshed = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, head_user["id"])
+
+    return {
+        "message": "PNM details updated.",
+        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+    }
 
 
 @app.post("/api/pnms/{pnm_id}/assign")

@@ -180,9 +180,12 @@ Tenant APIs:
 - `PATCH /api/users/me`
 - `GET /api/users/pending` (Head only)
 - `POST /api/users/pending/{user_id}/approve` (Head only)
+- `GET /api/admin/rush-officers` (Head only)
+- `POST /api/admin/officers/{user_id}/promote-head` (Head only)
 - `POST /api/pnms`
 - `GET /api/pnms`
 - `GET /api/pnms/{pnm_id}`
+- `PATCH /api/pnms/{pnm_id}` (Head only)
 - `POST /api/pnms/{pnm_id}/assign` (Head only)
 - `POST /api/pnms/{pnm_id}/photo` (Officer+)
 - `GET /api/pnms/{pnm_id}/meeting`

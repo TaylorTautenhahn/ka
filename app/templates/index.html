@@ -50,7 +50,7 @@
           <form id="loginForm" class="stack">
             <label>
               Username
-              <input id="loginUsername" type="text" required placeholder="First Last - PledgeClass" />
+              <input id="loginUsername" type="text" required placeholder="head.rush.officer or approved username" />
             </label>
             <label>
               Access code
@@ -64,7 +64,8 @@
         </article>
 
         <article>
-          <h2>Register</h2>
+          <h2>Register New Rush Officer</h2>
+          <p class="muted">Self-registration is for Rush Officers only. Create and manage PNMs after login.</p>
           <form id="registerForm" class="stack">
             <div class="inline-grid">
               <label>
@@ -83,14 +84,11 @@
               </label>
               <label>
                 Role
-                <select id="regRole" required>
-                  <option>Rush Officer</option>
-                  <option>Rusher</option>
-                </select>
+                <input id="regRole" type="text" value="Rush Officer" readonly />
               </label>
             </div>
             <label>
-              Emoji (Rush Officers only)
+              Emoji (required)
               <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
             </label>
             <label>

@@ -145,18 +145,25 @@ function spawnSuccessBurst() {
 
 async function api(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(path, {
-    method: options.method || "GET",
-    headers: isFormData
-      ? {
-          ...(options.headers || {}),
-        }
-      : {
-          "Content-Type": "application/json",
-          ...(options.headers || {}),
-        },
-    body: options.body ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
-  });
+  let response;
+  try {
+    response = await fetch(path, {
+      method: options.method || "GET",
+      credentials: "same-origin",
+      headers: isFormData
+        ? {
+            ...(options.headers || {}),
+          }
+        : {
+            "Content-Type": "application/json",
+            ...(options.headers || {}),
+          },
+      body: options.body ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
+    });
+  } catch (networkError) {
+    const text = networkError instanceof Error ? networkError.message : "Network error";
+    throw new Error(`Network error: ${text}`);
+  }
 
   let payload = null;
   const contentType = response.headers.get("content-type") || "";
@@ -167,11 +174,18 @@ async function api(path, options = {}) {
   }
 
   if (!response.ok) {
-    const detail =
-      typeof payload === "object" && payload !== null && "detail" in payload
-        ? payload.detail
-        : `Request failed (${response.status})`;
-    throw new Error(detail);
+    let detail = "";
+    if (typeof payload === "object" && payload !== null && "detail" in payload) {
+      const rawDetail = payload.detail;
+      if (Array.isArray(rawDetail)) {
+        detail = rawDetail.map((item) => String(item?.msg || JSON.stringify(item))).join("; ");
+      } else {
+        detail = String(rawDetail || "");
+      }
+    } else if (typeof payload === "string") {
+      detail = payload.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    }
+    throw new Error(detail || `Request failed (${response.status})`);
   }
 
   return payload;
@@ -294,11 +308,8 @@ function setDefaultDates() {
 }
 
 function setRoleEmojiRequirement() {
-  const isRushOfficer = regRole.value === "Rush Officer";
-  regEmoji.required = isRushOfficer;
-  if (!isRushOfficer) {
-    regEmoji.value = "";
-  }
+  regRole.value = "Rush Officer";
+  regEmoji.required = true;
 }
 
 function renderInterestHints(interests) {
@@ -899,8 +910,13 @@ async function handleLogin(event) {
 async function handleRegister(event) {
   event.preventDefault();
   const accessCode = document.getElementById("regAccessCode").value;
+  const emoji = regEmoji.value.trim();
   if (accessCode.length < 8 || !/[A-Za-z]/.test(accessCode) || !/[0-9]/.test(accessCode)) {
     showToast("Access code must be 8+ characters with letters and numbers.");
+    return;
+  }
+  if (!emoji) {
+    showToast("Rush Officer emoji is required.");
     return;
   }
 
@@ -908,8 +924,8 @@ async function handleRegister(event) {
     first_name: document.getElementById("regFirstName").value.trim(),
     last_name: document.getElementById("regLastName").value.trim(),
     pledge_class: document.getElementById("regPledgeClass").value.trim(),
-    role: regRole.value,
-    emoji: regEmoji.value.trim() || null,
+    role: "Rush Officer",
+    emoji,
     stereotype: document.getElementById("regStereotype").value.trim(),
     interests: document.getElementById("regInterests").value.trim(),
     access_code: accessCode,

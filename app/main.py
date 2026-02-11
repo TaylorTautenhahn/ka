@@ -1021,8 +1021,8 @@ class RegisterRequest(BaseModel):
     @field_validator("role")
     @classmethod
     def validate_role(cls, value: str) -> str:
-        if value not in ALLOWED_ROLES:
-            raise ValueError("Invalid role.")
+        if value != ROLE_RUSH_OFFICER:
+            raise ValueError("Only Rush Officer self-registration is allowed.")
         return value
 
     @model_validator(mode="after")
@@ -1153,8 +1153,8 @@ def register(payload: RegisterRequest) -> dict[str, str]:
     if not stereotype:
         raise HTTPException(status_code=400, detail="Stereotype is required.")
 
-    if payload.role == ROLE_HEAD:
-        raise HTTPException(status_code=403, detail="Head Rush Officer accounts are controlled by admin seed/permissions.")
+    if payload.role != ROLE_RUSH_OFFICER:
+        raise HTTPException(status_code=403, detail="Only Rush Officer self-registration is allowed.")
 
     try:
         interests = parse_interests(payload.interests)

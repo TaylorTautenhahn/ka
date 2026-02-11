@@ -1792,6 +1792,8 @@ def pnm_payload(
         "avg_instagram_marketability": round(float(row["avg_instagram_marketability"]), 2),
         "weighted_total": round(float(row["weighted_total"]), 2),
         "assigned_officer_id": row["assigned_officer_id"] if "assigned_officer_id" in row.keys() else None,
+        "assigned_by": row["assigned_by"] if "assigned_by" in row.keys() else None,
+        "assigned_at": row["assigned_at"] if "assigned_at" in row.keys() else None,
         "assigned_officer": assigned_officer,
         "own_rating": own_rating,
     }
@@ -3916,7 +3918,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {
-        "message": "Lunch logged.",
+        "message": "Lunch scheduled.",
         "member": user_payload(refreshed_user, refreshed_user["role"], refreshed_user["id"]),
         "pnm": pnm_payload(
             refreshed_pnm,
@@ -3969,6 +3971,85 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str
             }
             for row in rows
         ]
+    }
+
+
+@app.get("/api/lunches/scheduled")
+def scheduled_lunches(
+    request: Request,
+    limit: int = 120,
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    tenant = current_tenant()
+    capped_limit = max(10, min(int(limit), 400))
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                l.id,
+                l.pnm_id,
+                l.user_id,
+                l.lunch_date,
+                l.start_time,
+                l.end_time,
+                l.location,
+                l.notes,
+                l.created_at,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                ao.username AS assigned_officer_username,
+                u.username AS scheduled_by_username
+            FROM lunches l
+            JOIN pnms p ON p.id = l.pnm_id
+            JOIN users u ON u.id = l.user_id
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE l.lunch_date >= date('now')
+            ORDER BY l.lunch_date ASC, COALESCE(l.start_time, '23:59') ASC, l.id ASC
+            LIMIT ?
+            """,
+            (capped_limit,),
+        ).fetchall()
+
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        google_calendar_url = None
+        try:
+            google_calendar_url = build_google_calendar_event_url(
+                pnm_name=f"{row['first_name']} {row['last_name']}",
+                pnm_code=row["pnm_code"],
+                lunch_date=row["lunch_date"],
+                notes=row["notes"] or "",
+                location=row["location"] or "",
+                start_time=row["start_time"],
+                end_time=row["end_time"],
+                logged_by_username=row["scheduled_by_username"],
+            )
+        except ValueError:
+            # Keep the event visible even if legacy malformed time values exist.
+            google_calendar_url = None
+
+        items.append(
+            {
+                "lunch_id": int(row["id"]),
+                "pnm_id": int(row["pnm_id"]),
+                "lunch_date": row["lunch_date"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "location": row["location"] or "",
+                "notes": row["notes"] or "",
+                "created_at": row["created_at"],
+                "pnm_code": row["pnm_code"],
+                "pnm_name": f"{row['first_name']} {row['last_name']}",
+                "assigned_officer_username": row["assigned_officer_username"] or "",
+                "scheduled_by_username": row["scheduled_by_username"],
+                "google_calendar_url": google_calendar_url,
+            }
+        )
+
+    return {
+        "lunches": items,
+        "calendar_share": calendar_share_payload(request, tenant),
     }
 
 

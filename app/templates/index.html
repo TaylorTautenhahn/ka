@@ -243,7 +243,8 @@
           </section>
 
           <section class="panel">
-            <h2>Log Lunch</h2>
+            <h2>Schedule Lunch</h2>
+            <p class="muted">Schedule a lunch with a specific rushee and it instantly appears on the shared calendar feed.</p>
             <form id="lunchForm" class="stack">
               <label>
                 PNM
@@ -271,7 +272,7 @@
                 Notes
                 <textarea id="lunchNotes" rows="3" placeholder="Optional lunch context"></textarea>
               </label>
-              <button type="submit">Log Lunch</button>
+              <button type="submit">Schedule Lunch</button>
             </form>
             <div id="lastLunchCalendarActions" class="action-row hidden">
               <a id="openLastLunchGoogleLink" class="quick-nav-link" href="#" target="_blank" rel="noopener">Open In Google Calendar</a>
@@ -286,6 +287,14 @@
               </div>
               <p id="calendarFeedPreview" class="muted breakable">Loading shared calendar link...</p>
             </div>
+
+            <div class="divider"></div>
+
+            <div class="section-head">
+              <h3>Scheduled Lunches (Shared)</h3>
+              <button id="refreshScheduledLunchesBtn" type="button" class="secondary">Refresh Schedule</button>
+            </div>
+            <div id="scheduledLunchesList" class="list-box muted">Loading scheduled lunches...</div>
 
             <div class="divider"></div>
 
@@ -384,6 +393,12 @@
           <h2>Members</h2>
           <div id="memberTable" class="table-wrap"></div>
         </section>
+
+        <section id="assignedRushPanel" class="panel hidden reveal delay-6">
+          <h2 id="assignedRushTitle">Assigned Rushees</h2>
+          <p id="assignedRushSubtitle" class="muted">Assignment visibility appears here for Rush Officers and Heads.</p>
+          <div id="assignedRushTable" class="table-wrap"></div>
+        </section>
           </div>
 
           <div class="desktop-page" data-page="admin">
@@ -479,6 +494,33 @@
                   <button id="saveAdminPnmBtn" type="submit">Save Rushee Changes</button>
                 </div>
               </form>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Assignment Manager</h3>
+              <p class="muted">Assign rushees to Rush Officers directly from Head Console.</p>
+              <form id="headAssignmentForm" class="stack">
+                <label>
+                  Rushee
+                  <select id="headAssignPnmSelect"></select>
+                </label>
+                <label>
+                  Rush Officer
+                  <select id="headAssignOfficerSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="headAssignSaveBtn" type="submit">Save Assignment</button>
+                  <button id="headAssignClearBtn" type="button" class="secondary">Clear Assignment</button>
+                </div>
+              </form>
+            </article>
+            <article class="list-column">
+              <h3>Assignment Board</h3>
+              <p class="muted">Live assignment view across all rushees.</p>
+              <div id="headAssignmentTable" class="table-wrap"></div>
             </article>
           </div>
 

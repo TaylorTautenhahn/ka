@@ -162,9 +162,22 @@ const openGoogleSubscribeBtn = document.getElementById("openGoogleSubscribeBtn")
 const calendarFeedPreview = document.getElementById("calendarFeedPreview");
 const lastLunchCalendarActions = document.getElementById("lastLunchCalendarActions");
 const openLastLunchGoogleLink = document.getElementById("openLastLunchGoogleLink");
+const refreshScheduledLunchesBtn = document.getElementById("refreshScheduledLunchesBtn");
+const scheduledLunchesList = document.getElementById("scheduledLunchesList");
 const desktopPageNav = document.getElementById("desktopPageNav");
 const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
 const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
+
+const assignedRushPanel = document.getElementById("assignedRushPanel");
+const assignedRushTitle = document.getElementById("assignedRushTitle");
+const assignedRushSubtitle = document.getElementById("assignedRushSubtitle");
+const assignedRushTable = document.getElementById("assignedRushTable");
+
+const headAssignmentForm = document.getElementById("headAssignmentForm");
+const headAssignPnmSelect = document.getElementById("headAssignPnmSelect");
+const headAssignOfficerSelect = document.getElementById("headAssignOfficerSelect");
+const headAssignClearBtn = document.getElementById("headAssignClearBtn");
+const headAssignmentTable = document.getElementById("headAssignmentTable");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
 const DEFAULT_INTEREST_TAGS = [
@@ -216,7 +229,9 @@ const state = {
     currentHeads: [],
     rushOfficers: [],
   },
+  scheduledLunches: [],
   adminEditPnmId: null,
+  headAssignmentPnmId: null,
 };
 
 function parseTagInput(raw) {
@@ -608,6 +623,7 @@ function startLiveRefresh() {
         loadAnalytics(),
         loadLeaderboard(),
         loadCalendarShare(),
+        loadScheduledLunches(),
         loadApprovals(),
         loadHeadAdminData(),
       ]);
@@ -652,6 +668,10 @@ function roleCanAssignOfficer() {
   return state.user && state.user.role === "Head Rush Officer";
 }
 
+function roleCanViewAssignedRushes() {
+  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
 function shouldPreferMobileUi() {
   const params = new URLSearchParams(window.location.search);
   if (params.get("desktop") === "1") {
@@ -688,6 +708,107 @@ function formatLunchWindow(row) {
         : "";
   const parts = [timeRange, row.location || ""].filter(Boolean);
   return parts.join(" | ");
+}
+
+function renderScheduledLunches() {
+  if (!scheduledLunchesList) {
+    return;
+  }
+  const rows = state.scheduledLunches || [];
+  if (!rows.length) {
+    scheduledLunchesList.innerHTML = '<p class="muted">No scheduled lunches yet.</p>';
+    return;
+  }
+
+  scheduledLunchesList.innerHTML = rows
+    .map((row) => {
+      const timing = formatLunchWindow(row);
+      const timingText = timing || "All-day lunch";
+      const assigned = row.assigned_officer_username ? `Assigned: ${row.assigned_officer_username}` : "Assigned: Unassigned";
+      const notes = row.notes || "No notes";
+      const calendarAction = row.google_calendar_url
+        ? `<a class="quick-nav-link" href="${escapeHtml(row.google_calendar_url)}" target="_blank" rel="noopener">Open Event</a>`
+        : "";
+      return `
+        <div class="entry">
+          <div class="entry-title">
+            <strong>${escapeHtml(row.lunch_date)} | ${escapeHtml(row.pnm_code)} | ${escapeHtml(row.pnm_name)}</strong>
+            <span>${escapeHtml(timingText)}</span>
+          </div>
+          <div class="muted">${escapeHtml(assigned)} | Scheduled by ${escapeHtml(row.scheduled_by_username)}</div>
+          <div class="muted">${escapeHtml(notes)}</div>
+          ${calendarAction ? `<div class="action-row">${calendarAction}</div>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderAssignedRushSection() {
+  if (!assignedRushPanel || !assignedRushTable || !assignedRushTitle || !assignedRushSubtitle) {
+    return;
+  }
+  if (!roleCanViewAssignedRushes()) {
+    assignedRushPanel.classList.add("hidden");
+    assignedRushTable.innerHTML = "";
+    return;
+  }
+
+  assignedRushPanel.classList.remove("hidden");
+  const isHead = state.user && state.user.role === "Head Rush Officer";
+  const rows = isHead
+    ? state.pnms
+    : state.pnms.filter((pnm) => Number(pnm.assigned_officer_id || 0) === Number(state.user.user_id));
+
+  if (isHead) {
+    assignedRushTitle.textContent = "Assignment Visibility";
+    assignedRushSubtitle.textContent = "Live overview of who each rushee is assigned to.";
+  } else {
+    assignedRushTitle.textContent = "My Assigned Rushees";
+    assignedRushSubtitle.textContent = `Rushees currently assigned to ${state.user.username}.`;
+  }
+
+  if (!rows.length) {
+    assignedRushTable.innerHTML = '<p class="muted">No assignments to display yet.</p>';
+    return;
+  }
+
+  const tableRows = rows
+    .map((pnm) => {
+      const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+      const assignedAt = pnm.assigned_at ? formatLastSeen(pnm.assigned_at) : "-";
+      const officerCell = isHead ? `<td>${escapeHtml(assignedOfficer)}</td>` : "";
+      const assignedAtCell = isHead ? `<td>${escapeHtml(assignedAt)}</td>` : "";
+      return `
+        <tr>
+          <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
+          <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>${escapeHtml(pnm.phone_number || "-")}</td>
+          ${officerCell}
+          ${assignedAtCell}
+          <td>${pnm.weighted_total.toFixed(2)}</td>
+          <td>${pnm.total_lunches}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  const officerHeader = isHead ? "<th>Assigned Officer</th><th>Assigned At</th>" : "";
+  assignedRushTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Phone</th>
+          ${officerHeader}
+          <th>Weighted Total</th>
+          <th>Lunches</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `;
 }
 
 function renderCalendarShareLinks(data) {
@@ -1312,6 +1433,110 @@ function renderAdminPnmTable() {
   `;
 }
 
+function syncHeadAssignmentSelection() {
+  if (!headAssignPnmSelect || !headAssignOfficerSelect) {
+    return;
+  }
+  const pnmId = Number(headAssignPnmSelect.value || 0);
+  if (!pnmId) {
+    headAssignOfficerSelect.value = "";
+    return;
+  }
+  const pnm = state.pnms.find((item) => item.pnm_id === pnmId);
+  if (!pnm || !pnm.assigned_officer_id) {
+    headAssignOfficerSelect.value = "";
+    return;
+  }
+  headAssignOfficerSelect.value = String(pnm.assigned_officer_id);
+}
+
+function renderHeadAssignmentTable() {
+  if (!headAssignmentTable) {
+    return;
+  }
+  if (!state.pnms.length) {
+    headAssignmentTable.innerHTML = '<p class="muted">No rushees available for assignment.</p>';
+    return;
+  }
+
+  const rows = [...state.pnms]
+    .sort((a, b) => {
+      const aOfficer = (a.assigned_officer && a.assigned_officer.username) || "zzzz";
+      const bOfficer = (b.assigned_officer && b.assigned_officer.username) || "zzzz";
+      if (aOfficer !== bOfficer) {
+        return aOfficer.localeCompare(bOfficer);
+      }
+      return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`);
+    })
+    .map((pnm) => {
+      const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+      const assignedAt = pnm.assigned_at ? formatLastSeen(pnm.assigned_at) : "-";
+      return `
+        <tr>
+          <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
+          <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>${escapeHtml(assignedOfficer)}</td>
+          <td>${escapeHtml(assignedAt)}</td>
+          <td>${pnm.weighted_total.toFixed(2)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  headAssignmentTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Rushee</th>
+          <th>Assigned Officer</th>
+          <th>Assigned At</th>
+          <th>Weighted Total</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderHeadAssignmentManager() {
+  if (!headAssignmentForm || !headAssignPnmSelect || !headAssignOfficerSelect || !headAssignmentTable) {
+    return;
+  }
+  if (!roleCanUseAdminPanel()) {
+    headAssignmentForm.classList.add("hidden");
+    headAssignmentTable.innerHTML = "";
+    return;
+  }
+
+  headAssignmentForm.classList.remove("hidden");
+  const pnmOptions = state.pnms
+    .map((pnm) => `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`)}</option>`)
+    .join("");
+  headAssignPnmSelect.innerHTML = pnmOptions || '<option value="">No rushees available</option>';
+
+  const officers = rushOfficerMembers();
+  const officerOptions =
+    '<option value="">Unassigned</option>' +
+    officers
+      .map((member) => {
+        const emoji = member.emoji ? `${member.emoji} ` : "";
+        return `<option value="${member.user_id}">${escapeHtml(`${emoji}${member.username}`)}</option>`;
+      })
+      .join("");
+  headAssignOfficerSelect.innerHTML = officerOptions;
+
+  const hasActiveSelection = state.pnms.some((pnm) => pnm.pnm_id === Number(state.headAssignmentPnmId));
+  if (!hasActiveSelection) {
+    state.headAssignmentPnmId = state.selectedPnmId || (state.pnms.length ? state.pnms[0].pnm_id : null);
+  }
+  if (state.headAssignmentPnmId) {
+    headAssignPnmSelect.value = String(state.headAssignmentPnmId);
+  }
+  syncHeadAssignmentSelection();
+  renderHeadAssignmentTable();
+}
+
 function renderAdminPanel() {
   if (!roleCanUseAdminPanel()) {
     adminPanel.classList.add("hidden");
@@ -1321,6 +1546,9 @@ function renderAdminPanel() {
     if (officerMetricsTable) {
       officerMetricsTable.innerHTML = "";
     }
+    if (headAssignmentTable) {
+      headAssignmentTable.innerHTML = "";
+    }
     return;
   }
 
@@ -1328,6 +1556,7 @@ function renderAdminPanel() {
   renderHeadAdminSummary();
   renderCurrentHeadsList();
   renderPromotionControls();
+  renderHeadAssignmentManager();
   renderOfficerMetrics();
   renderAdminPnmEditorOptions();
   renderAdminPnmTable();
@@ -1584,6 +1813,7 @@ async function loadPnms() {
 
   renderPnmTable();
   renderAdminPanel();
+  renderAssignedRushSection();
   applyRatingFormForSelected();
   renderAssignmentControls();
   await loadPnmDetail(state.selectedPnmId);
@@ -1595,6 +1825,8 @@ async function loadMembers() {
   state.members = payload.users || [];
   renderMemberTable();
   renderAssignmentControls();
+  renderAdminPanel();
+  renderAssignedRushSection();
 }
 
 async function loadMatching() {
@@ -1624,6 +1856,19 @@ async function loadCalendarShare() {
     if (openGoogleSubscribeBtn) {
       openGoogleSubscribeBtn.href = "#";
       openGoogleSubscribeBtn.classList.add("hidden");
+    }
+  }
+}
+
+async function loadScheduledLunches() {
+  try {
+    const payload = await api("/api/lunches/scheduled?limit=200");
+    state.scheduledLunches = payload.lunches || [];
+    renderScheduledLunches();
+  } catch {
+    state.scheduledLunches = [];
+    if (scheduledLunchesList) {
+      scheduledLunchesList.innerHTML = '<p class="muted">Unable to load scheduled lunches right now.</p>';
     }
   }
 }
@@ -1667,6 +1912,7 @@ async function refreshAll() {
     loadAnalytics(),
     loadLeaderboard(),
     loadCalendarShare(),
+    loadScheduledLunches(),
     loadApprovals(),
     loadHeadAdminData(),
   ]);
@@ -1773,17 +2019,22 @@ async function handleLogout() {
   state.pnms = [];
   state.members = [];
   state.calendarShare = null;
+  state.scheduledLunches = [];
   state.headAdmin = {
     summary: null,
     currentHeads: [],
     rushOfficers: [],
   };
   state.adminEditPnmId = null;
+  state.headAssignmentPnmId = null;
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
   animateCounter(heroLunchCount, 0);
   if (calendarFeedPreview) {
     calendarFeedPreview.textContent = "Sign in to load shared calendar link.";
+  }
+  if (scheduledLunchesList) {
+    scheduledLunchesList.innerHTML = '<p class="muted">Sign in to view scheduled lunches.</p>';
   }
   if (openGoogleSubscribeBtn) {
     openGoogleSubscribeBtn.href = "#";
@@ -1801,6 +2052,7 @@ async function handleLogout() {
   renderSelectedPnmPhoto(null);
   renderAdminPanel();
   renderAssignmentControls();
+  renderAssignedRushSection();
   stopLiveRefresh();
   setAuthView(false);
   updateTopbarActions();
@@ -1984,12 +2236,87 @@ async function handleLunchLog(event) {
       openLastLunchGoogleLink.href = payload.lunch.google_calendar_url;
       lastLunchCalendarActions.classList.remove("hidden");
     }
-    showToast("Lunch logged. Calendar link ready.");
+    showToast("Lunch scheduled and added to the shared calendar.");
     state.selectedPnmId = selectedId;
     await refreshAll();
     await loadPnmDetail(selectedId);
   } catch (error) {
-    showToast(error.message || "Unable to log lunch.");
+    showToast(error.message || "Unable to schedule lunch.");
+  }
+}
+
+async function handleHeadAssignmentSubmit(event) {
+  event.preventDefault();
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const pnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  const officerUserId = headAssignOfficerSelect && headAssignOfficerSelect.value ? Number(headAssignOfficerSelect.value) : null;
+
+  const saveButton = document.getElementById("headAssignSaveBtn");
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving...";
+  }
+  try {
+    await api(`/api/pnms/${pnmId}/assign`, {
+      method: "POST",
+      body: { officer_user_id: officerUserId },
+    });
+    state.headAssignmentPnmId = pnmId;
+    state.selectedPnmId = pnmId;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    showToast("Assignment saved from Head Console.");
+  } catch (error) {
+    showToast(error.message || "Unable to update assignment.");
+  } finally {
+    if (saveButton) {
+      saveButton.disabled = false;
+      saveButton.textContent = "Save Assignment";
+    }
+  }
+}
+
+async function handleHeadAssignmentClear() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const pnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  const clearButton = document.getElementById("headAssignClearBtn");
+  if (clearButton) {
+    clearButton.disabled = true;
+    clearButton.textContent = "Clearing...";
+  }
+  try {
+    await api(`/api/pnms/${pnmId}/assign`, {
+      method: "POST",
+      body: { officer_user_id: null },
+    });
+    state.headAssignmentPnmId = pnmId;
+    state.selectedPnmId = pnmId;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    showToast("Assignment cleared.");
+  } catch (error) {
+    showToast(error.message || "Unable to clear assignment.");
+  } finally {
+    if (clearButton) {
+      clearButton.disabled = false;
+      clearButton.textContent = "Clear Assignment";
+    }
   }
 }
 
@@ -2005,6 +2332,7 @@ async function handlePnmTableClick(event) {
   }
 
   state.selectedPnmId = pnmId;
+  state.headAssignmentPnmId = pnmId;
   renderPnmTable();
   applyRatingFormForSelected();
   await loadPnmDetail(pnmId);
@@ -2197,6 +2525,7 @@ async function handleAssignOfficer() {
       method: "POST",
       body: { officer_user_id: officerUserId },
     });
+    state.headAssignmentPnmId = pnmId;
     await refreshAll();
     state.selectedPnmId = pnmId;
     applyRatingFormForSelected();
@@ -2227,6 +2556,7 @@ async function handleClearAssignment() {
       method: "POST",
       body: { officer_user_id: null },
     });
+    state.headAssignmentPnmId = pnmId;
     await refreshAll();
     state.selectedPnmId = pnmId;
     applyRatingFormForSelected();
@@ -2331,6 +2661,16 @@ function attachEvents() {
   if (copyCalendarFeedBtn) {
     copyCalendarFeedBtn.addEventListener("click", handleCopyCalendarFeed);
   }
+  if (refreshScheduledLunchesBtn) {
+    refreshScheduledLunchesBtn.addEventListener("click", async () => {
+      try {
+        await loadScheduledLunches();
+        showToast("Scheduled lunches refreshed.");
+      } catch (error) {
+        showToast(error.message || "Unable to refresh scheduled lunches.");
+      }
+    });
+  }
   if (assignOfficerBtn) {
     assignOfficerBtn.addEventListener("click", handleAssignOfficer);
   }
@@ -2362,6 +2702,18 @@ function attachEvents() {
       }
       populateAdminPnmEditor(nextId);
     });
+  }
+  if (headAssignmentForm) {
+    headAssignmentForm.addEventListener("submit", handleHeadAssignmentSubmit);
+  }
+  if (headAssignPnmSelect) {
+    headAssignPnmSelect.addEventListener("change", () => {
+      state.headAssignmentPnmId = Number(headAssignPnmSelect.value || 0) || null;
+      syncHeadAssignmentSelection();
+    });
+  }
+  if (headAssignClearBtn) {
+    headAssignClearBtn.addEventListener("click", handleHeadAssignmentClear);
   }
 
   ratingPnm.addEventListener("change", async (event) => {

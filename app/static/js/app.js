@@ -2248,6 +2248,9 @@ async function handleLunchLog(event) {
       lastLunchCalendarActions.classList.remove("hidden");
       if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
         pendingGoogleWindow.location.href = payload.lunch.google_calendar_url;
+      } else if (shouldAutoOpenGoogle) {
+        window.location.assign(payload.lunch.google_calendar_url);
+        return;
       }
     } else if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
       pendingGoogleWindow.close();

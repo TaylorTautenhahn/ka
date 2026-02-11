@@ -59,7 +59,7 @@
             <button type="submit">Sign In</button>
           </form>
           <p class="muted">
-            Seed Head Rush Officer login: <code>taylortaut</code> / <code>Ttest123</code> (override via env).
+            Use your configured Head Rush Officer credentials.
           </p>
         </article>
 
@@ -118,6 +118,8 @@
             <p id="sessionSubtitle" class="muted"></p>
           </div>
           <div class="action-row">
+            <button id="backupCsvBtn" type="button" class="secondary hidden">Backup CSV</button>
+            <button id="backupDbBtn" type="button" class="secondary hidden">Backup DB</button>
             <button id="installBtn" type="button" class="secondary hidden">Install App</button>
             <button id="logoutBtn" type="button" class="secondary">Logout</button>
           </div>
@@ -129,7 +131,7 @@
           <a href="#detailSection" class="quick-nav-link">Rate & Notes</a>
           <a href="#meetingSection" class="quick-nav-link">Meeting View</a>
           <a href="#membersSection" class="quick-nav-link">Members</a>
-          <a href="#adminPanel" class="quick-nav-link">Admin</a>
+          <a id="adminNavLink" href="#adminPanel" class="quick-nav-link">Admin</a>
         </nav>
 
         <section class="panel workflow-tips reveal delay-2">

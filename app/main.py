@@ -2,17 +2,20 @@ from __future__ import annotations
 
 import hmac
 import hashlib
+import io
 import json
 import os
 import re
 import secrets
 import sqlite3
 import time
+import zipfile
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any
+import csv
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.gzip import GZipMiddleware
@@ -29,10 +32,12 @@ UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(BASE_DIR / "uploads")))
 PNM_UPLOADS_DIR = UPLOADS_DIR / "pnms"
 MAX_PNM_PHOTO_BYTES = int(os.getenv("MAX_PNM_PHOTO_BYTES", str(4 * 1024 * 1024)))
 PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(UPLOADS_DIR / "backups")))
+MAX_BACKUP_FILES = int(os.getenv("MAX_BACKUP_FILES", "30"))
 SESSION_COOKIE = "rush_session"
-PASSWORD_SCHEME = "pbkdf2_sha256"
+HASH_SCHEME = os.getenv("HASH_SCHEME", "pbkdf2_sha256")
 PASSWORD_ITERATIONS = int(os.getenv("PASSWORD_ITERATIONS", "260000"))
-LEGACY_PASSWORD_SALT = "kao-rush-v1"
+LEGACY_AUTH_SALT = os.getenv("LEGACY_AUTH_SALT", "kao-rush-v1")
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "43200"))
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "strict").strip().lower()
@@ -40,11 +45,12 @@ ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
 LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
-HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "Ttest123")
-HEAD_SEED_USERNAME = os.getenv("HEAD_SEED_USERNAME", "taylortaut").strip()
-HEAD_SEED_FIRST_NAME = os.getenv("HEAD_SEED_FIRST_NAME", "Taylor").strip() or "Taylor"
-HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Taut").strip() or "Taut"
+HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "").strip()
+HEAD_SEED_USERNAME = os.getenv("HEAD_SEED_USERNAME", "head.rush.officer").strip() or "head.rush.officer"
+HEAD_SEED_FIRST_NAME = os.getenv("HEAD_SEED_FIRST_NAME", "Head").strip() or "Head"
+HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Officer").strip() or "Officer"
 HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or "Admin"
+AUTO_CREATE_HEAD_SEED = os.getenv("AUTO_CREATE_HEAD_SEED", "1").strip().lower() in {"1", "true", "yes"}
 
 ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
@@ -78,6 +84,7 @@ templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 _LOGIN_GUARD = Lock()
 _LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 _LOGIN_BLOCKED_UNTIL: dict[str, float] = {}
+GENERATED_HEAD_ACCESS_CODE: str | None = None
 
 
 def now_iso() -> str:
@@ -123,6 +130,9 @@ def db_session() -> sqlite3.Connection:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
+    conn.execute("PRAGMA synchronous = NORMAL")
+    conn.execute("PRAGMA busy_timeout = 5000")
     try:
         yield conn
         conn.commit()
@@ -142,7 +152,7 @@ def hash_access_code(access_code: str) -> str:
         salt,
         PASSWORD_ITERATIONS,
     )
-    return f"{PASSWORD_SCHEME}${PASSWORD_ITERATIONS}${salt.hex()}${digest.hex()}"
+    return f"{HASH_SCHEME}${PASSWORD_ITERATIONS}${salt.hex()}${digest.hex()}"
 
 
 def verify_access_code(access_code: str, stored: str) -> tuple[bool, bool]:
@@ -152,7 +162,7 @@ def verify_access_code(access_code: str, stored: str) -> tuple[bool, bool]:
     - second: whether the stored hash should be upgraded to the current scheme
     """
     access_code_norm = access_code.strip()
-    if stored.startswith(f"{PASSWORD_SCHEME}$"):
+    if stored.startswith(f"{HASH_SCHEME}$"):
         try:
             _, iteration_raw, salt_hex, digest_hex = stored.split("$", 3)
             iterations = int(iteration_raw)
@@ -165,7 +175,7 @@ def verify_access_code(access_code: str, stored: str) -> tuple[bool, bool]:
         return valid, needs_upgrade
 
     # Legacy fallback support (single static-sha hash), upgraded on successful login.
-    legacy = hashlib.sha256(f"{LEGACY_PASSWORD_SALT}:{access_code_norm}".encode("utf-8")).hexdigest()
+    legacy = hashlib.sha256(f"{LEGACY_AUTH_SALT}:{access_code_norm}".encode("utf-8")).hexdigest()
     valid = hmac.compare_digest(legacy, stored)
     return valid, valid
 
@@ -365,6 +375,191 @@ def remove_photo_if_present(photo_path: str | None) -> None:
 
 def split_normalized_csv(value: str) -> set[str]:
     return {token for token in value.split(",") if token}
+
+
+def timestamp_slug() -> str:
+    return datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
+
+
+def prune_backup_files(prefix: str) -> None:
+    if not BACKUP_DIR.exists():
+        return
+    files = sorted(BACKUP_DIR.glob(f"{prefix}-*.sqlite"), key=lambda path: path.stat().st_mtime, reverse=True)
+    for stale in files[MAX_BACKUP_FILES:]:
+        stale.unlink(missing_ok=True)
+
+
+def create_sqlite_snapshot(prefix: str = "snapshot") -> Path:
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup_path = BACKUP_DIR / f"{prefix}-{timestamp_slug()}.sqlite"
+    source = sqlite3.connect(DB_PATH)
+    destination = sqlite3.connect(backup_path)
+    try:
+        with destination:
+            source.backup(destination)
+    finally:
+        destination.close()
+        source.close()
+    prune_backup_files(prefix)
+    return backup_path
+
+
+def csv_bytes_from_rows(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=columns)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({column: row.get(column) for column in columns})
+    return buffer.getvalue().encode("utf-8")
+
+
+def build_csv_backup_archive() -> tuple[bytes, str]:
+    with db_session() as conn:
+        users_rows = [dict(row) for row in conn.execute(
+            """
+            SELECT
+                id,
+                username,
+                first_name,
+                last_name,
+                pledge_class,
+                role,
+                emoji,
+                stereotype,
+                interests,
+                interests_norm,
+                is_approved,
+                approved_by,
+                approved_at,
+                created_at,
+                updated_at,
+                last_login_at,
+                total_lunches,
+                lunches_per_week,
+                rating_count,
+                avg_rating_given
+            FROM users
+            ORDER BY id ASC
+            """
+        ).fetchall()]
+        pnm_rows = [dict(row) for row in conn.execute("SELECT * FROM pnms ORDER BY id ASC").fetchall()]
+        rating_rows = [dict(row) for row in conn.execute("SELECT * FROM ratings ORDER BY id ASC").fetchall()]
+        rating_change_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_changes ORDER BY id ASC").fetchall()]
+        lunch_rows = [dict(row) for row in conn.execute("SELECT * FROM lunches ORDER BY id ASC").fetchall()]
+
+    export_ts = timestamp_slug()
+    archive = io.BytesIO()
+    with zipfile.ZipFile(archive, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("users.csv", csv_bytes_from_rows(list(users_rows[0].keys()) if users_rows else [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "pledge_class",
+            "role",
+            "emoji",
+            "stereotype",
+            "interests",
+            "interests_norm",
+            "is_approved",
+            "approved_by",
+            "approved_at",
+            "created_at",
+            "updated_at",
+            "last_login_at",
+            "total_lunches",
+            "lunches_per_week",
+            "rating_count",
+            "avg_rating_given",
+        ], users_rows))
+        zf.writestr("pnms.csv", csv_bytes_from_rows(list(pnm_rows[0].keys()) if pnm_rows else [
+            "id",
+            "pnm_code",
+            "first_name",
+            "last_name",
+            "class_year",
+            "hometown",
+            "instagram_handle",
+            "first_event_date",
+            "interests",
+            "interests_norm",
+            "stereotype",
+            "photo_path",
+            "photo_uploaded_at",
+            "photo_uploaded_by",
+            "lunch_stats",
+            "total_lunches",
+            "rating_count",
+            "avg_good_with_girls",
+            "avg_will_make_it",
+            "avg_personable",
+            "avg_alcohol_control",
+            "avg_instagram_marketability",
+            "weighted_total",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ], pnm_rows))
+        zf.writestr("ratings.csv", csv_bytes_from_rows(list(rating_rows[0].keys()) if rating_rows else [
+            "id",
+            "pnm_id",
+            "user_id",
+            "good_with_girls",
+            "will_make_it",
+            "personable",
+            "alcohol_control",
+            "instagram_marketability",
+            "total_score",
+            "comment",
+            "created_at",
+            "updated_at",
+        ], rating_rows))
+        zf.writestr("rating_changes.csv", csv_bytes_from_rows(list(rating_change_rows[0].keys()) if rating_change_rows else [
+            "id",
+            "rating_id",
+            "pnm_id",
+            "user_id",
+            "old_total",
+            "new_total",
+            "delta_total",
+            "old_payload",
+            "new_payload",
+            "comment",
+            "changed_at",
+        ], rating_change_rows))
+        zf.writestr("lunches.csv", csv_bytes_from_rows(list(lunch_rows[0].keys()) if lunch_rows else [
+            "id",
+            "pnm_id",
+            "user_id",
+            "lunch_date",
+            "notes",
+            "created_at",
+        ], lunch_rows))
+        readme = (
+            "KAO Rush Backup Export\n"
+            f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
+            f"Database path: {DB_PATH}\n"
+            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, lunches.csv\n"
+            "Access code hashes are intentionally excluded from users.csv for security.\n"
+        )
+        zf.writestr("README.txt", readme.encode("utf-8"))
+    return archive.getvalue(), export_ts
+
+
+def resolve_seed_access_code() -> str:
+    global GENERATED_HEAD_ACCESS_CODE
+    if HEAD_SEED_ACCESS_CODE:
+        return HEAD_SEED_ACCESS_CODE
+    if GENERATED_HEAD_ACCESS_CODE:
+        return GENERATED_HEAD_ACCESS_CODE
+    GENERATED_HEAD_ACCESS_CODE = secrets.token_urlsafe(14)
+    print(
+        "[startup] HEAD_SEED_ACCESS_CODE not provided. Generated bootstrap credentials for first login:\n"
+        f"          username={HEAD_SEED_USERNAME}\n"
+        f"          access_code={GENERATED_HEAD_ACCESS_CODE}\n"
+        "          Set HEAD_SEED_ACCESS_CODE in production to disable random generation."
+    )
+    return GENERATED_HEAD_ACCESS_CODE
 
 
 def recalc_member_rating_stats(conn: sqlite3.Connection, user_id: int) -> None:
@@ -623,6 +818,9 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
 
 
 def ensure_seed_data(conn: sqlite3.Connection) -> None:
+    if not AUTO_CREATE_HEAD_SEED:
+        return
+
     interests, interests_norm = encode_interests(["Leadership", "Recruitment"])
     created_at = now_iso()
     existing = conn.execute("SELECT id FROM users WHERE username = ?", (HEAD_SEED_USERNAME,)).fetchone()
@@ -632,14 +830,6 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
             UPDATE users
             SET
                 role = ?,
-                first_name = ?,
-                last_name = ?,
-                pledge_class = ?,
-                emoji = NULL,
-                stereotype = ?,
-                interests = ?,
-                interests_norm = ?,
-                access_code_hash = ?,
                 is_approved = 1,
                 approved_at = COALESCE(approved_at, ?),
                 updated_at = ?
@@ -647,20 +837,19 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
             """,
             (
                 ROLE_HEAD,
-                HEAD_SEED_FIRST_NAME,
-                HEAD_SEED_LAST_NAME,
-                HEAD_SEED_PLEDGE_CLASS,
-                "Strategist",
-                interests,
-                interests_norm,
-                hash_access_code(HEAD_SEED_ACCESS_CODE),
                 created_at,
                 created_at,
                 existing["id"],
             ),
         )
+        if HEAD_SEED_ACCESS_CODE:
+            conn.execute(
+                "UPDATE users SET access_code_hash = ?, updated_at = ? WHERE id = ?",
+                (hash_access_code(HEAD_SEED_ACCESS_CODE), now_iso(), existing["id"]),
+            )
         return
 
+    seed_access_code = resolve_seed_access_code()
     conn.execute(
         """
         INSERT INTO users (
@@ -690,7 +879,7 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
             "Strategist",
             interests,
             interests_norm,
-            hash_access_code(HEAD_SEED_ACCESS_CODE),
+            hash_access_code(seed_access_code),
             created_at,
             created_at,
             created_at,
@@ -906,10 +1095,17 @@ class LunchCreateRequest(BaseModel):
 def startup() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     with db_session() as conn:
         setup_schema(conn)
         ensure_schema_upgrades(conn)
         ensure_seed_data(conn)
+    if DB_PATH.exists():
+        try:
+            create_sqlite_snapshot(prefix="startup")
+        except Exception:
+            # Snapshot should not block app startup.
+            print("[startup] warning: unable to create startup snapshot.")
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -925,6 +1121,25 @@ async def service_worker() -> FileResponse:
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/export/csv")
+def export_csv_backup(_: sqlite3.Row = Depends(require_head)) -> Response:
+    archive_bytes, slug = build_csv_backup_archive()
+    filename = f"kao-rush-backup-{slug}.zip"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=archive_bytes, media_type="application/zip", headers=headers)
+
+
+@app.get("/api/export/sqlite")
+def export_sqlite_backup(_: sqlite3.Row = Depends(require_head)) -> FileResponse:
+    snapshot = create_sqlite_snapshot(prefix="manual")
+    return FileResponse(
+        snapshot,
+        media_type="application/x-sqlite3",
+        filename=snapshot.name,
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @app.post("/api/auth/register")
@@ -1144,43 +1359,50 @@ def list_users(
 
 @app.patch("/api/users/me")
 def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
-    updates: list[str] = []
-    values: list[Any] = []
-
-    if payload.stereotype is not None:
-        stereotype = payload.stereotype.strip()
-        if not stereotype:
-            raise HTTPException(status_code=400, detail="Stereotype cannot be empty.")
-        updates.append("stereotype = ?")
-        values.append(stereotype)
-
-    if payload.interests is not None:
-        try:
-            interests = parse_interests(payload.interests)
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        interests_csv, interests_norm = encode_interests(interests)
-        updates.extend(["interests = ?", "interests_norm = ?"])
-        values.extend([interests_csv, interests_norm])
-
-    if payload.emoji is not None:
-        if user["role"] != ROLE_RUSH_OFFICER:
-            raise HTTPException(status_code=400, detail="Only Rush Officers can set emoji identifiers.")
-        if not payload.emoji.strip():
-            raise HTTPException(status_code=400, detail="Emoji cannot be empty for Rush Officers.")
-        updates.append("emoji = ?")
-        values.append(payload.emoji.strip())
-
-    if not updates:
+    if payload.stereotype is None and payload.interests is None and payload.emoji is None:
         raise HTTPException(status_code=400, detail="No changes provided.")
 
-    values.extend([now_iso(), user["id"]])
-
     with db_session() as conn:
-        conn.execute(f"UPDATE users SET {', '.join(updates)}, updated_at = ? WHERE id = ?", tuple(values))
+        existing = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        stereotype_value = existing["stereotype"]
+        interests_csv = existing["interests"]
+        interests_norm = existing["interests_norm"]
+        emoji_value = existing["emoji"]
+
+        if payload.stereotype is not None:
+            stereotype = payload.stereotype.strip()
+            if not stereotype:
+                raise HTTPException(status_code=400, detail="Stereotype cannot be empty.")
+            stereotype_value = stereotype
+
+        if payload.interests is not None:
+            try:
+                interests = parse_interests(payload.interests)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            interests_csv, interests_norm = encode_interests(interests)
+
+        if payload.emoji is not None:
+            if user["role"] != ROLE_RUSH_OFFICER:
+                raise HTTPException(status_code=400, detail="Only Rush Officers can set emoji identifiers.")
+            if not payload.emoji.strip():
+                raise HTTPException(status_code=400, detail="Emoji cannot be empty for Rush Officers.")
+            emoji_value = payload.emoji.strip()
+
+        conn.execute(
+            """
+            UPDATE users
+            SET stereotype = ?, interests = ?, interests_norm = ?, emoji = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (stereotype_value, interests_csv, interests_norm, emoji_value, now_iso(), user["id"]),
+        )
         refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
 
-    return {"user": user_payload(refreshed, refreshed["role"], refreshed["id"]) }
+    return {"user": user_payload(refreshed, refreshed["role"], refreshed["id"])}
 
 
 @app.post("/api/pnms")

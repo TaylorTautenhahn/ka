@@ -121,6 +121,7 @@ h1 {
 h2 {
   font-size: 1.15rem;
   margin-bottom: 0.7rem;
+  color: #66142e;
 }
 
 h3 {
@@ -334,6 +335,10 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 0.55rem;
+}
+
+.action-row button {
+  min-width: 108px;
 }
 
 .topbar {
@@ -873,6 +878,17 @@ td strong {
     overflow-x: auto;
     flex-wrap: nowrap;
     white-space: nowrap;
+    top: 8px;
+  }
+
+  table {
+    min-width: 700px;
+  }
+
+  th,
+  td {
+    font-size: 0.8rem;
+    padding: 0.46rem 0.4rem;
   }
 }
 

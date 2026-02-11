@@ -5,6 +5,8 @@ const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
 const logoutBtn = document.getElementById("logoutBtn");
 const installBtn = document.getElementById("installBtn");
+const backupCsvBtn = document.getElementById("backupCsvBtn");
+const backupDbBtn = document.getElementById("backupDbBtn");
 
 const regRole = document.getElementById("regRole");
 const regEmoji = document.getElementById("regEmoji");
@@ -20,6 +22,7 @@ const filterInterest = document.getElementById("filterInterest");
 const filterStereotype = document.getElementById("filterStereotype");
 const applyFiltersBtn = document.getElementById("applyFiltersBtn");
 const interestHints = document.getElementById("interestHints");
+const adminNavLink = document.getElementById("adminNavLink");
 
 const pnmForm = document.getElementById("pnmForm");
 const lunchForm = document.getElementById("lunchForm");
@@ -174,9 +177,36 @@ async function api(path, options = {}) {
   return payload;
 }
 
+async function downloadFile(url, fallbackFileName) {
+  const response = await fetch(url, { method: "GET" });
+  if (!response.ok) {
+    const detail = await response.text().catch(() => "Download failed.");
+    throw new Error(detail || "Download failed.");
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  const fileNameMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+  const fileName = fileNameMatch ? fileNameMatch[1] : fallbackFileName;
+  const objectUrl = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
 function setAuthView(isAuthenticated) {
   authSection.classList.toggle("hidden", isAuthenticated);
   appSection.classList.toggle("hidden", !isAuthenticated);
+}
+
+function updateTopbarActions() {
+  const isHead = roleCanUseAdminPanel();
+  backupCsvBtn.classList.toggle("hidden", !isHead);
+  backupDbBtn.classList.toggle("hidden", !isHead);
+  adminNavLink.classList.toggle("hidden", !isHead);
 }
 
 function startLiveRefresh() {
@@ -825,11 +855,13 @@ async function ensureSession() {
     state.user = payload.user;
     setAuthView(true);
     setSessionHeading();
+    updateTopbarActions();
     await refreshAll();
     startLiveRefresh();
   } catch {
     state.user = null;
     setAuthView(false);
+    updateTopbarActions();
     stopLiveRefresh();
   }
 }
@@ -855,6 +887,7 @@ async function handleLogin(event) {
     state.user = payload.user;
     setAuthView(true);
     setSessionHeading();
+    updateTopbarActions();
     showToast("Logged in.");
     await refreshAll();
     startLiveRefresh();
@@ -913,6 +946,7 @@ async function handleLogout() {
   renderAdminPanel();
   stopLiveRefresh();
   setAuthView(false);
+  updateTopbarActions();
   showToast("Logged out.");
 }
 
@@ -1149,6 +1183,42 @@ async function handleAdminPanelClick(event) {
   }
 }
 
+async function handleCsvBackupDownload() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  backupCsvBtn.disabled = true;
+  backupCsvBtn.textContent = "Preparing...";
+  try {
+    await downloadFile("/api/export/csv", "kao-rush-backup.zip");
+    showToast("CSV backup downloaded.");
+  } catch (error) {
+    showToast(error.message || "CSV backup download failed.");
+  } finally {
+    backupCsvBtn.disabled = false;
+    backupCsvBtn.textContent = "Backup CSV";
+  }
+}
+
+async function handleDbBackupDownload() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  backupDbBtn.disabled = true;
+  backupDbBtn.textContent = "Preparing...";
+  try {
+    await downloadFile("/api/export/sqlite", "kao-rush-backup.sqlite");
+    showToast("Database snapshot downloaded.");
+  } catch (error) {
+    showToast(error.message || "Database backup download failed.");
+  } finally {
+    backupDbBtn.disabled = false;
+    backupDbBtn.textContent = "Backup DB";
+  }
+}
+
 function setupPwaInstall() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/service-worker.js").catch(() => {
@@ -1177,6 +1247,8 @@ function attachEvents() {
   loginForm.addEventListener("submit", handleLogin);
   registerForm.addEventListener("submit", handleRegister);
   logoutBtn.addEventListener("click", handleLogout);
+  backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
+  backupDbBtn.addEventListener("click", handleDbBackupDownload);
 
   regRole.addEventListener("change", setRoleEmojiRequirement);
   applyFiltersBtn.addEventListener("click", handleApplyFilters);
@@ -1215,6 +1287,7 @@ async function init() {
   setDefaultDates();
   setRoleEmojiRequirement();
   attachEvents();
+  updateTopbarActions();
   setupPwaInstall();
   await ensureSession();
 }

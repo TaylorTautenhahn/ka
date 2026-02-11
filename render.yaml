@@ -12,10 +12,10 @@ services:
       - key: ALLOWED_HOSTS
         value: "*"
       - key: HEAD_SEED_USERNAME
-        value: taylortaut
+        value: head.rush.officer
       - key: HEAD_SEED_ACCESS_CODE
         sync: false
       - key: HEAD_SEED_FIRST_NAME
-        value: Taylor
+        value: Head
       - key: HEAD_SEED_LAST_NAME
-        value: Taut
+        value: Officer

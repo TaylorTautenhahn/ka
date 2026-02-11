@@ -31,7 +31,7 @@
         <p>
           Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.
         </p>
-        <div class="hero-stats">
+        <div id="heroStats" class="hero-stats hidden">
           <article class="stat-card">
             <p>PNMs Tracked</p>
             <strong id="heroPnmCount">0</strong>
@@ -105,7 +105,7 @@
         <nav class="panel quick-nav reveal delay-1" aria-label="App sections">
           <a href="{{ app_config.base_path if app_config else '/' }}" class="quick-nav-link">Dashboard</a>
           <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
-          <a href="{{ app_config.mobile_base if app_config else '/mobile' }}" class="quick-nav-link">Mobile Mode</a>
+          <a href="{{ app_config.mobile_base if app_config else '/mobile' }}" class="quick-nav-link">Phone View</a>
           <a href="#createSection" class="quick-nav-link">Add Rushee</a>
           <a href="#pnmSection" class="quick-nav-link">PNMs</a>
           <a href="#detailSection" class="quick-nav-link">Rate & Notes</a>

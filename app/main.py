@@ -22,7 +22,7 @@ import csv
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator
@@ -329,6 +329,19 @@ def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
 
     lines.append("END:VCARD")
     return "\r\n".join(lines)
+
+
+def request_prefers_mobile(request: Request) -> bool:
+    if request.query_params.get("desktop") == "1":
+        return False
+
+    sec_mobile = (request.headers.get("sec-ch-ua-mobile") or "").strip()
+    if sec_mobile == "?1":
+        return True
+
+    user_agent = (request.headers.get("user-agent") or "").lower()
+    mobile_markers = ["iphone", "android", "mobile", "ipad", "ipod"]
+    return any(marker in user_agent for marker in mobile_markers)
 
 
 def current_platform_admin(request: Request) -> sqlite3.Row:
@@ -1692,6 +1705,8 @@ def startup() -> None:
 async def home(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if tenant:
+        if request_prefers_mobile(request):
+            return RedirectResponse(url=f"/{tenant.slug}/mobile", status_code=307)
         return templates.TemplateResponse(
             "index.html",
             {
@@ -1717,6 +1732,8 @@ async def meeting_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    if request_prefers_mobile(request):
+        return RedirectResponse(url=f"/{tenant.slug}/mobile/meeting", status_code=307)
     return templates.TemplateResponse(
         "meeting.html",
         {

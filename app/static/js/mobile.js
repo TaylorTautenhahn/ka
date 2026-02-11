@@ -89,7 +89,7 @@ async function ensureSession() {
   try {
     await api("/api/auth/me");
   } catch {
-    window.location.href = BASE_PATH || "/";
+    window.location.href = `${BASE_PATH || "/"}?desktop=1`;
     throw new Error("Not authenticated");
   }
 }

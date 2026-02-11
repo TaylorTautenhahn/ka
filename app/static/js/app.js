@@ -49,6 +49,7 @@ const regEmoji = document.getElementById("regEmoji");
 const sessionTitle = document.getElementById("sessionTitle");
 const sessionSubtitle = document.getElementById("sessionSubtitle");
 const toastEl = document.getElementById("toast");
+const heroStats = document.getElementById("heroStats");
 const heroPnmCount = document.getElementById("heroPnmCount");
 const heroRatingCount = document.getElementById("heroRatingCount");
 const heroLunchCount = document.getElementById("heroLunchCount");
@@ -264,6 +265,9 @@ async function downloadFile(url, fallbackFileName) {
 function setAuthView(isAuthenticated) {
   authSection.classList.toggle("hidden", isAuthenticated);
   appSection.classList.toggle("hidden", !isAuthenticated);
+  if (heroStats) {
+    heroStats.classList.toggle("hidden", !isAuthenticated);
+  }
 }
 
 function updateTopbarActions() {
@@ -322,6 +326,18 @@ function roleCanUseAdminPanel() {
 
 function roleCanAssignOfficer() {
   return state.user && state.user.role === "Head Rush Officer";
+}
+
+function shouldPreferMobileUi() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("desktop") === "1") {
+    return false;
+  }
+  if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) {
+    return true;
+  }
+  const ua = navigator.userAgent.toLowerCase();
+  return /iphone|ipad|ipod|android|mobile/.test(ua);
 }
 
 function renderSelectedPnmPhoto(pnm) {
@@ -1004,6 +1020,12 @@ async function handleLogin(event) {
         access_code: accessCode,
       },
     });
+
+    if (APP_CONFIG.mobile_base && shouldPreferMobileUi()) {
+      window.location.href = APP_CONFIG.mobile_base;
+      return;
+    }
+
     state.user = payload.user;
     setAuthView(true);
     setSessionHeading();

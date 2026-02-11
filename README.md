@@ -10,7 +10,7 @@ The app pulls data from Yahoo Finance, normalizes performance for representative
 ## Tech Stack
 - FastAPI backend
 - Custom HTML/CSS/JavaScript frontend
-- Yahoo Finance data via `yfinance`
+- Yahoo Finance data via direct Yahoo spark API requests
 - PDF generation via `reportlab`
 
 ## Features
@@ -60,4 +60,3 @@ http://127.0.0.1:8000
 ## Notes
 - Data source is Yahoo Finance and may have gaps for delisted/incomplete symbols.
 - The platform is for analysis/reporting and does not provide investment advice.
-

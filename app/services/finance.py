@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
-import yfinance as yf
+import requests
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -30,6 +30,17 @@ class FinanceDataError(Exception):
 
 _ANALYSIS_CACHE: dict[tuple[str, ...], tuple[float, "AnalysisResult"]] = {}
 _CACHE_TTL_SECONDS = 900
+_YAHOO_SPARK_URLS = (
+    "https://query1.finance.yahoo.com/v7/finance/spark",
+    "https://query2.finance.yahoo.com/v7/finance/spark",
+)
+_YAHOO_SPARK_BASE_PARAMS = {
+    "range": "10y",
+    "interval": "1d",
+}
+_YAHOO_HEADERS = {
+    "User-Agent": "Mozilla/5.0"
+}
 
 
 def clean_tickers(raw_tickers: list[str] | str) -> list[str]:
@@ -51,87 +62,81 @@ def clean_tickers(raw_tickers: list[str] | str) -> list[str]:
     return cleaned
 
 
-def _extract_close_from_download(download_frame: pd.DataFrame, ticker: str) -> pd.Series:
-    if download_frame.empty:
-        raise FinanceDataError(f"No 10-year price history found for {ticker}.")
-
-    if isinstance(download_frame.columns, pd.MultiIndex):
-        if "Close" in download_frame.columns.get_level_values(0):
-            close = download_frame["Close"][ticker]
-        elif "Adj Close" in download_frame.columns.get_level_values(0):
-            close = download_frame["Adj Close"][ticker]
-        else:
-            raise FinanceDataError(f"Close price data is unavailable for {ticker}.")
-    else:
-        if "Close" in download_frame.columns:
-            close = download_frame["Close"]
-        elif "Adj Close" in download_frame.columns:
-            close = download_frame["Adj Close"]
-        else:
-            raise FinanceDataError(f"Close price data is unavailable for {ticker}.")
-
-    return close.rename(ticker).dropna()
-
-
-def _fetch_close_series(ticker: str) -> pd.Series:
+def _fetch_spark_series(tickers: list[str]) -> dict[str, pd.Series]:
     last_error: Exception | None = None
 
     for attempt in range(4):
-        try:
-            history = yf.Ticker(ticker).history(period="10y", auto_adjust=True)
-            if not history.empty and "Close" in history.columns:
-                close = history["Close"].dropna()
-                if not close.empty:
-                    try:
-                        close.index = close.index.tz_localize(None)
-                    except TypeError:
-                        pass
-                    return close.rename(ticker)
-        except Exception as exc:
-            last_error = exc
-
-        try:
-            download_frame = yf.download(
-                ticker,
-                period="10y",
-                auto_adjust=True,
-                progress=False,
-                threads=False,
-            )
-            close = _extract_close_from_download(download_frame, ticker)
+        for spark_url in _YAHOO_SPARK_URLS:
+            params = {**_YAHOO_SPARK_BASE_PARAMS, "symbols": ",".join(tickers)}
             try:
-                close.index = close.index.tz_localize(None)
-            except TypeError:
-                pass
-            return close
-        except Exception as exc:
-            last_error = exc
+                response = requests.get(
+                    spark_url,
+                    params=params,
+                    headers=_YAHOO_HEADERS,
+                    timeout=20,
+                )
 
-        backoff_seconds = (2**attempt) + random.uniform(0.3, 0.8)
+                if response.status_code == 429:
+                    raise FinanceDataError("Yahoo Finance rate-limited the request.")
+
+                response.raise_for_status()
+                payload = response.json()
+                spark = payload.get("spark", {})
+                results = spark.get("result") or []
+                if not results:
+                    raise FinanceDataError("No Yahoo Finance results were returned.")
+
+                price_map: dict[str, pd.Series] = {}
+                for result in results:
+                    symbol = str(result.get("symbol", "")).upper()
+                    response_rows = result.get("response") or []
+                    if not symbol or not response_rows:
+                        continue
+
+                    row = response_rows[0]
+                    timestamps = row.get("timestamp") or []
+                    quote = (row.get("indicators", {}).get("quote") or [{}])[0]
+                    closes = quote.get("close") or []
+                    if not timestamps or not closes:
+                        continue
+
+                    length = min(len(timestamps), len(closes))
+                    index = pd.to_datetime(timestamps[:length], unit="s", utc=True).tz_localize(None)
+                    series = pd.Series(closes[:length], index=index, name=symbol).dropna()
+                    if series.empty:
+                        continue
+                    price_map[symbol] = series
+
+                if price_map:
+                    return price_map
+                raise FinanceDataError("Yahoo Finance returned empty close data.")
+            except Exception as exc:
+                last_error = exc
+
+        backoff_seconds = (2**attempt) + random.uniform(0.25, 0.7)
         time.sleep(backoff_seconds)
 
     message = str(last_error) if last_error else "Unknown Yahoo Finance error."
-    if "Rate limited" in message or "Too Many Requests" in message or "429" in message:
-        raise FinanceDataError(
-            f"Yahoo Finance rate-limited the request for {ticker}. Please retry in a minute."
-        ) from last_error
-    raise FinanceDataError(f"Unable to retrieve data for {ticker}: {message}") from last_error
+    raise FinanceDataError(f"Unable to retrieve data from Yahoo Finance: {message}") from last_error
 
 
 def _build_price_frame(tickers: list[str]) -> tuple[pd.DataFrame, dict[str, str]]:
     price_series: list[pd.Series] = []
     excluded_details: dict[str, str] = {}
+    series_map = _fetch_spark_series(tickers)
 
     for ticker in tickers:
-        try:
-            price_series.append(_fetch_close_series(ticker))
-        except Exception as exc:
-            excluded_details[ticker] = str(exc)
-        time.sleep(0.2)
+        series = series_map.get(ticker)
+        if series is None:
+            excluded_details[ticker] = "No 10-year close data returned by Yahoo Finance."
+            continue
+        price_series.append(series.rename(ticker))
 
     if not price_series:
+        error_details = " | ".join(f"{ticker}: {reason}" for ticker, reason in excluded_details.items())
         raise FinanceDataError(
-            "No valid tickers found. Confirm symbols exist on Yahoo Finance and try again."
+            "No valid tickers found. Confirm symbols exist on Yahoo Finance and try again. "
+            f"Details: {error_details}"
         )
 
     frame = pd.concat(price_series, axis=1).sort_index()

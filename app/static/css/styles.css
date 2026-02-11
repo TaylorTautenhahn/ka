@@ -78,7 +78,7 @@ body {
 .shell {
   position: relative;
   z-index: 1;
-  max-width: 1220px;
+  max-width: 1320px;
   margin: 0 auto;
   padding: 1.4rem 0.95rem 2rem;
 }
@@ -649,7 +649,7 @@ button:disabled {
 table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 840px;
+  min-width: 780px;
 }
 
 th,
@@ -1123,6 +1123,50 @@ td strong {
 
   .meeting-metrics {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 760px) and (max-width: 1220px) {
+  .shell {
+    max-width: 1080px;
+    padding: 1.45rem 0.78rem 2rem;
+  }
+
+  h1 {
+    font-size: clamp(1.56rem, 3.2vw, 2.2rem);
+  }
+
+  .panel {
+    padding: 0.85rem;
+  }
+
+  .quick-nav-link {
+    padding: 0.34rem 0.58rem;
+    font-size: 0.76rem;
+  }
+
+  .action-row button {
+    min-width: 96px;
+  }
+
+  #createSection.grid-two,
+  #detailSection.grid-two,
+  #membersSection.grid-two {
+    grid-template-columns: 1fr;
+  }
+
+  .meeting-header {
+    grid-template-columns: 180px 1fr;
+  }
+
+  table {
+    min-width: 700px;
+  }
+
+  th,
+  td {
+    font-size: 0.81rem;
+    padding: 0.46rem 0.4rem;
   }
 }
 

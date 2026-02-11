@@ -1207,10 +1207,10 @@ async function ensureSession() {
 async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("loginUsername").value.trim();
-  const accessCode = document.getElementById("loginAccessCode").value;
+  const password = document.getElementById("loginAccessCode").value;
 
-  if (!username || !accessCode) {
-    showToast("Username and access code are required.");
+  if (!username || !password) {
+    showToast("Username and password are required.");
     return;
   }
 
@@ -1219,7 +1219,7 @@ async function handleLogin(event) {
       method: "POST",
       body: {
         username,
-        access_code: accessCode,
+        password,
       },
     });
 
@@ -1243,21 +1243,21 @@ async function handleLogin(event) {
 async function handleRegister(event) {
   event.preventDefault();
   const username = document.getElementById("regUsername").value.trim();
-  const accessCode = document.getElementById("regAccessCode").value;
+  const password = document.getElementById("regAccessCode").value;
   const emoji = regEmoji.value.trim();
   if (!username) {
     showToast("Username is required.");
     return;
   }
-  if (accessCode.length < 8 || !/[A-Za-z]/.test(accessCode) || !/[0-9]/.test(accessCode)) {
-    showToast("Access code must be 8+ characters with letters and numbers.");
+  if (password.length < 8 || !/[A-Za-z]/.test(password) || !/[0-9]/.test(password)) {
+    showToast("Password must be 8+ characters with letters and numbers.");
     return;
   }
 
   const body = {
     username,
     emoji: emoji || null,
-    access_code: accessCode,
+    password,
   };
 
   try {

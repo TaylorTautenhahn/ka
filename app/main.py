@@ -26,7 +26,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 
@@ -73,7 +73,7 @@ DEFAULT_TENANT_NAME = os.getenv("DEFAULT_TENANT_NAME", "Kappa Alpha Order").stri
 PLATFORM_ADMIN_USERNAME = os.getenv("PLATFORM_ADMIN_USERNAME", "taylortaut").strip() or "taylortaut"
 PLATFORM_ADMIN_ACCESS_CODE = os.getenv("PLATFORM_ADMIN_ACCESS_CODE", "").strip()
 HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "").strip()
-HEAD_SEED_USERNAME = os.getenv("HEAD_SEED_USERNAME", "head.rush.officer").strip() or "head.rush.officer"
+HEAD_SEED_USERNAME = os.getenv("HEAD_SEED_USERNAME", "chapteradmin").strip() or "chapteradmin"
 HEAD_SEED_FIRST_NAME = os.getenv("HEAD_SEED_FIRST_NAME", "Head").strip() or "Head"
 HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Officer").strip() or "Officer"
 HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or "Admin"
@@ -685,7 +685,7 @@ def hash_access_code(access_code: str) -> str:
 def verify_access_code(access_code: str, stored: str) -> tuple[bool, bool]:
     """
     Returns tuple:
-    - first: whether the supplied access code is valid
+    - first: whether the supplied password is valid
     - second: whether the stored hash should be upgraded to the current scheme
     """
     access_code_norm = access_code.strip()
@@ -710,9 +710,9 @@ def verify_access_code(access_code: str, stored: str) -> tuple[bool, bool]:
 def validate_access_code_strength(access_code: str) -> None:
     access_code_norm = access_code.strip()
     if len(access_code_norm) < 8:
-        raise ValueError("Access code must be at least 8 characters.")
+        raise ValueError("Password must be at least 8 characters.")
     if not re.search(r"[A-Za-z]", access_code_norm) or not re.search(r"[0-9]", access_code_norm):
-        raise ValueError("Access code must include at least one letter and one number.")
+        raise ValueError("Password must include at least one letter and one number.")
 
 
 def client_ip(request: Request) -> str:
@@ -1114,7 +1114,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
             f"Database path: {db_path}\n"
             "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, lunches.csv\n"
-            "Access code hashes are intentionally excluded from users.csv for security.\n"
+            "Password hashes are intentionally excluded from users.csv for security.\n"
         )
         zf.writestr("README.txt", readme.encode("utf-8"))
     return archive.getvalue(), export_ts
@@ -1130,7 +1130,7 @@ def resolve_seed_access_code() -> str:
     print(
         "[startup] HEAD_SEED_ACCESS_CODE not provided. Generated bootstrap credentials for first login:\n"
         f"          username={HEAD_SEED_USERNAME}\n"
-        f"          access_code={GENERATED_HEAD_ACCESS_CODE}\n"
+        f"          password={GENERATED_HEAD_ACCESS_CODE}\n"
         "          Set HEAD_SEED_ACCESS_CODE in production to disable random generation."
     )
     return GENERATED_HEAD_ACCESS_CODE
@@ -1509,7 +1509,7 @@ def resolve_platform_admin_access_code() -> str:
     print(
         "[startup] PLATFORM_ADMIN_ACCESS_CODE not provided. Generated bootstrap platform admin credentials:\n"
         f"          username={PLATFORM_ADMIN_USERNAME}\n"
-        f"          access_code={GENERATED_PLATFORM_ADMIN_ACCESS_CODE}\n"
+        f"          password={GENERATED_PLATFORM_ADMIN_ACCESS_CODE}\n"
         "          Set PLATFORM_ADMIN_ACCESS_CODE in production to disable random generation."
     )
     return GENERATED_PLATFORM_ADMIN_ACCESS_CODE
@@ -1898,6 +1898,15 @@ class RegisterRequest(BaseModel):
     emoji: str | None = None
     access_code: str = Field(..., min_length=8, max_length=128)
 
+    @model_validator(mode="before")
+    @classmethod
+    def accept_password_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "access_code" not in data and "password" in data:
+            merged = dict(data)
+            merged["access_code"] = merged.get("password")
+            return merged
+        return data
+
     @field_validator("username")
     @classmethod
     def validate_username(cls, value: str) -> str:
@@ -1918,6 +1927,15 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=120)
     access_code: str = Field(..., min_length=8, max_length=128)
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_password_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "access_code" not in data and "password" in data:
+            merged = dict(data)
+            merged["access_code"] = merged.get("password")
+            return merged
+        return data
 
 
 class SelfUpdateRequest(BaseModel):
@@ -1996,6 +2014,15 @@ class PlatformLoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=120)
     access_code: str = Field(..., min_length=8, max_length=128)
 
+    @model_validator(mode="before")
+    @classmethod
+    def accept_password_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "access_code" not in data and "password" in data:
+            merged = dict(data)
+            merged["access_code"] = merged.get("password")
+            return merged
+        return data
+
 
 class TenantCreateRequest(BaseModel):
     slug: str
@@ -2008,6 +2035,15 @@ class TenantCreateRequest(BaseModel):
     head_seed_access_code: str = Field(..., min_length=8, max_length=128)
     theme_primary: str | None = None
     theme_secondary: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_password_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "head_seed_access_code" not in data and "head_seed_password" in data:
+            merged = dict(data)
+            merged["head_seed_access_code"] = merged.get("head_seed_password")
+            return merged
+        return data
 
 
 @app.on_event("startup")
@@ -2196,12 +2232,12 @@ def platform_login(payload: PlatformLoginRequest, request: Request, response: Re
         row = conn.execute("SELECT * FROM platform_admins WHERE username = ?", (payload.username.strip(),)).fetchone()
         if not row:
             record_login_failure(throttle_key)
-            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         password_ok, needs_upgrade = verify_access_code(payload.access_code, row["access_code_hash"])
         if not password_ok:
             record_login_failure(throttle_key)
-            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         token = secrets.token_urlsafe(32)
         now = now_iso()
@@ -2552,12 +2588,12 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
         row = conn.execute("SELECT * FROM users WHERE username = ?", (payload.username.strip(),)).fetchone()
         if not row:
             record_login_failure(throttle_key)
-            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         password_ok, needs_upgrade = verify_access_code(payload.access_code, row["access_code_hash"])
         if not password_ok:
             record_login_failure(throttle_key)
-            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+            raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         if not bool(row["is_approved"]):
             raise HTTPException(status_code=403, detail="Username pending Head Rush Officer approval.")

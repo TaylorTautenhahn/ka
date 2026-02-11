@@ -117,7 +117,7 @@ docker build -t kao-rush-app .
 docker run -p 8000:8000 \
   -e SESSION_COOKIE_SECURE=1 \
   -e SESSION_COOKIE_SAMESITE=strict \
-  -e HEAD_SEED_USERNAME=head.rush.officer \
+  -e HEAD_SEED_USERNAME=chapteradmin \
   -e HEAD_SEED_ACCESS_CODE='set-a-strong-secret' \
   -e DB_PATH=/data/recruitment.db \
   -e UPLOADS_DIR=/data/uploads \
@@ -160,7 +160,7 @@ docker run -p 8000:8000 \
 - `PLATFORM_ADMIN_USERNAME` (default `taylortaut`)
 - `PLATFORM_ADMIN_ACCESS_CODE` (no default)
 - `AUTO_CREATE_HEAD_SEED` (default `1`)
-- `HEAD_SEED_USERNAME` (default `head.rush.officer`)
+- `HEAD_SEED_USERNAME` (default `chapteradmin`)
 - `HEAD_SEED_ACCESS_CODE` (no default)
 - `HEAD_SEED_FIRST_NAME` (default `Head`)
 - `HEAD_SEED_LAST_NAME` (default `Officer`)

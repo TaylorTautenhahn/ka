@@ -139,13 +139,13 @@ async function ensureSession() {
 async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("platformUsername").value.trim();
-  const accessCode = document.getElementById("platformAccessCode").value;
+  const password = document.getElementById("platformAccessCode").value;
   try {
     await api("/platform/api/auth/login", {
       method: "POST",
       body: {
         username,
-        access_code: accessCode,
+        password,
       },
     });
     setAuthView(true);
@@ -177,7 +177,7 @@ async function handleCreateTenant(event) {
     head_seed_first_name: document.getElementById("tenantHeadFirstName").value.trim(),
     head_seed_last_name: document.getElementById("tenantHeadLastName").value.trim(),
     head_seed_pledge_class: document.getElementById("tenantHeadPledgeClass").value.trim(),
-    head_seed_access_code: document.getElementById("tenantHeadAccessCode").value,
+    head_seed_password: document.getElementById("tenantHeadAccessCode").value,
     theme_primary: document.getElementById("tenantThemePrimary").value.trim() || null,
     theme_secondary: document.getElementById("tenantThemeSecondary").value.trim() || null,
   };

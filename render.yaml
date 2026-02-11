@@ -38,7 +38,7 @@ services:
       - key: PLATFORM_ADMIN_ACCESS_CODE
         sync: false
       - key: HEAD_SEED_USERNAME
-        value: head.rush.officer
+        value: chapteradmin
       - key: HEAD_SEED_ACCESS_CODE
         sync: false
       - key: HEAD_SEED_FIRST_NAME

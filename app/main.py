@@ -1,26 +1,42 @@
 from __future__ import annotations
 
+import hmac
 import hashlib
 import json
+import os
 import re
 import secrets
 import sqlite3
+import time
 from contextlib import contextmanager
 from datetime import date, datetime, timezone
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = BASE_DIR / "recruitment.db"
+DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "recruitment.db")))
 SESSION_COOKIE = "rush_session"
-PASSWORD_SALT = "kao-rush-v1"
+PASSWORD_SCHEME = "pbkdf2_sha256"
+PASSWORD_ITERATIONS = int(os.getenv("PASSWORD_ITERATIONS", "260000"))
+LEGACY_PASSWORD_SALT = "kao-rush-v1"
+SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "43200"))
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
+SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "strict").strip().lower()
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
+LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
+LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
+HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "KAO2026")
 
 ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
@@ -39,12 +55,53 @@ app = FastAPI(
     description="Connected, role-aware recruitment evaluation platform.",
     version="1.0.0",
 )
+app.add_middleware(GZipMiddleware, minimum_size=512)
+if ALLOWED_HOSTS != ["*"]:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+
+_LOGIN_GUARD = Lock()
+_LOGIN_ATTEMPTS: dict[str, list[float]] = {}
+_LOGIN_BLOCKED_UNTIL: dict[str, float] = {}
 
 
 def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def now_epoch() -> float:
+    return time.time()
+
+
+def normalize_samesite(value: str) -> str:
+    if value in {"lax", "strict", "none"}:
+        return value
+    return "strict"
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'; "
+        "manifest-src 'self'; "
+        "worker-src 'self'; "
+        "frame-ancestors 'none'; "
+        "base-uri 'self'"
+    )
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    return response
 
 
 @contextmanager
@@ -63,8 +120,86 @@ def db_session() -> sqlite3.Connection:
 
 
 def hash_access_code(access_code: str) -> str:
-    payload = f"{PASSWORD_SALT}:{access_code.strip()}".encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    access_code_norm = access_code.strip()
+    salt = secrets.token_bytes(16)
+    digest = hashlib.pbkdf2_hmac(
+        "sha256",
+        access_code_norm.encode("utf-8"),
+        salt,
+        PASSWORD_ITERATIONS,
+    )
+    return f"{PASSWORD_SCHEME}${PASSWORD_ITERATIONS}${salt.hex()}${digest.hex()}"
+
+
+def verify_access_code(access_code: str, stored: str) -> tuple[bool, bool]:
+    """
+    Returns tuple:
+    - first: whether the supplied access code is valid
+    - second: whether the stored hash should be upgraded to the current scheme
+    """
+    access_code_norm = access_code.strip()
+    if stored.startswith(f"{PASSWORD_SCHEME}$"):
+        try:
+            _, iteration_raw, salt_hex, digest_hex = stored.split("$", 3)
+            iterations = int(iteration_raw)
+            salt = bytes.fromhex(salt_hex)
+        except (ValueError, TypeError):
+            return False, False
+        digest = hashlib.pbkdf2_hmac("sha256", access_code_norm.encode("utf-8"), salt, iterations).hex()
+        valid = hmac.compare_digest(digest, digest_hex)
+        needs_upgrade = valid and iterations < PASSWORD_ITERATIONS
+        return valid, needs_upgrade
+
+    # Legacy fallback support (single static-sha hash), upgraded on successful login.
+    legacy = hashlib.sha256(f"{LEGACY_PASSWORD_SALT}:{access_code_norm}".encode("utf-8")).hexdigest()
+    valid = hmac.compare_digest(legacy, stored)
+    return valid, valid
+
+
+def validate_access_code_strength(access_code: str) -> None:
+    access_code_norm = access_code.strip()
+    if len(access_code_norm) < 8:
+        raise ValueError("Access code must be at least 8 characters.")
+    if not re.search(r"[A-Za-z]", access_code_norm) or not re.search(r"[0-9]", access_code_norm):
+        raise ValueError("Access code must include at least one letter and one number.")
+
+
+def client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",")[0].strip() or "unknown"
+    if request.client and request.client.host:
+        return request.client.host
+    return "unknown"
+
+
+def assert_login_allowed(ip_address: str) -> None:
+    now = now_epoch()
+    with _LOGIN_GUARD:
+        blocked_until = _LOGIN_BLOCKED_UNTIL.get(ip_address, 0)
+        if blocked_until > now:
+            retry_after = max(1, int(blocked_until - now))
+            raise HTTPException(
+                status_code=429,
+                detail=f"Too many login attempts. Try again in {retry_after} seconds.",
+            )
+
+
+def record_login_failure(ip_address: str) -> None:
+    now = now_epoch()
+    with _LOGIN_GUARD:
+        attempts = [ts for ts in _LOGIN_ATTEMPTS.get(ip_address, []) if now - ts <= LOGIN_WINDOW_SECONDS]
+        attempts.append(now)
+        _LOGIN_ATTEMPTS[ip_address] = attempts
+        if len(attempts) >= LOGIN_MAX_FAILURES:
+            _LOGIN_BLOCKED_UNTIL[ip_address] = now + LOGIN_BLOCK_SECONDS
+            _LOGIN_ATTEMPTS[ip_address] = []
+
+
+def record_login_success(ip_address: str) -> None:
+    with _LOGIN_GUARD:
+        _LOGIN_ATTEMPTS.pop(ip_address, None)
+        _LOGIN_BLOCKED_UNTIL.pop(ip_address, None)
 
 
 def normalize_name(value: str) -> str:
@@ -178,6 +313,17 @@ def verify_iso_date(value: str, label: str) -> str:
     except ValueError as exc:
         raise ValueError(f"{label} must be in YYYY-MM-DD format.") from exc
     return value
+
+
+def normalize_instagram_handle(value: str) -> str:
+    handle = value.strip()
+    if not handle:
+        raise ValueError("Instagram handle is required.")
+    if not handle.startswith("@"):
+        handle = f"@{handle}"
+    if not re.fullmatch(r"@[A-Za-z0-9._]{1,30}", handle):
+        raise ValueError("Instagram handle must contain only letters, numbers, dots, or underscores.")
+    return handle
 
 
 def recalc_member_rating_stats(conn: sqlite3.Connection, user_id: int) -> None:
@@ -462,7 +608,7 @@ def ensure_seed_data(conn: sqlite3.Connection) -> None:
             "Strategist",
             interests,
             interests_norm,
-            hash_access_code("KAO2026"),
+            hash_access_code(HEAD_SEED_ACCESS_CODE),
             created_at,
             created_at,
             created_at,
@@ -554,7 +700,7 @@ def current_user(request: Request) -> sqlite3.Row:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT u.*
+            SELECT u.*, s.last_seen_at, s.created_at AS session_created_at
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token = ?
@@ -562,6 +708,15 @@ def current_user(request: Request) -> sqlite3.Row:
             (token,),
         ).fetchone()
         if not row:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > SESSION_TTL_SECONDS:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
         conn.execute("UPDATE sessions SET last_seen_at = ? WHERE token = ?", (now_iso(), token))
@@ -582,7 +737,7 @@ class RegisterRequest(BaseModel):
     emoji: str | None = None
     stereotype: str = Field(..., min_length=1, max_length=48)
     interests: str | list[str]
-    access_code: str = Field(..., min_length=4, max_length=128)
+    access_code: str = Field(..., min_length=8, max_length=128)
 
     @field_validator("role")
     @classmethod
@@ -659,6 +814,7 @@ class LunchCreateRequest(BaseModel):
 
 @app.on_event("startup")
 def startup() -> None:
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with db_session() as conn:
         setup_schema(conn)
         ensure_seed_data(conn)
@@ -686,12 +842,16 @@ def register(payload: RegisterRequest) -> dict[str, str]:
     pledge_class = payload.pledge_class.strip()
     if not pledge_class:
         raise HTTPException(status_code=400, detail="Pledge class is required.")
+    stereotype = payload.stereotype.strip()
+    if not stereotype:
+        raise HTTPException(status_code=400, detail="Stereotype is required.")
 
     if payload.role == ROLE_HEAD:
         raise HTTPException(status_code=403, detail="Head Rush Officer accounts are controlled by admin seed/permissions.")
 
     try:
         interests = parse_interests(payload.interests)
+        validate_access_code_strength(payload.access_code)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -731,7 +891,7 @@ def register(payload: RegisterRequest) -> dict[str, str]:
                     pledge_class,
                     payload.role,
                     payload.emoji.strip() if payload.emoji else None,
-                    payload.stereotype.strip(),
+                    stereotype,
                     interests_csv,
                     interests_norm,
                     hash_access_code(payload.access_code),
@@ -749,13 +909,19 @@ def register(payload: RegisterRequest) -> dict[str, str]:
 
 
 @app.post("/api/auth/login")
-def login(payload: LoginRequest, response: Response) -> dict[str, Any]:
+def login(payload: LoginRequest, request: Request, response: Response) -> dict[str, Any]:
+    ip_address = client_ip(request)
+    assert_login_allowed(ip_address)
+
     with db_session() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (payload.username.strip(),)).fetchone()
         if not row:
+            record_login_failure(ip_address)
             raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
-        if row["access_code_hash"] != hash_access_code(payload.access_code):
+        password_ok, needs_upgrade = verify_access_code(payload.access_code, row["access_code_hash"])
+        if not password_ok:
+            record_login_failure(ip_address)
             raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
         if not bool(row["is_approved"]):
@@ -765,16 +931,22 @@ def login(payload: LoginRequest, response: Response) -> dict[str, Any]:
         now = now_iso()
         conn.execute("INSERT INTO sessions (token, user_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)", (token, row["id"], now, now))
         conn.execute("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?", (now, now, row["id"]))
+        if needs_upgrade:
+            conn.execute(
+                "UPDATE users SET access_code_hash = ?, updated_at = ? WHERE id = ?",
+                (hash_access_code(payload.access_code), now_iso(), row["id"]),
+            )
 
         response.set_cookie(
             key=SESSION_COOKIE,
             value=token,
             httponly=True,
-            samesite="lax",
-            max_age=60 * 60 * 12,
-            secure=False,
+            samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+            max_age=SESSION_TTL_SECONDS,
+            secure=SESSION_COOKIE_SECURE,
             path="/",
         )
+        record_login_success(ip_address)
 
         return {
             "user": user_payload(row, row["role"], row["id"]),
@@ -788,7 +960,12 @@ def logout(request: Request, response: Response) -> dict[str, str]:
     if token:
         with db_session() as conn:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
-    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    response.delete_cookie(
+        key=SESSION_COOKIE,
+        path="/",
+        secure=SESSION_COOKIE_SECURE,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+    )
     return {"message": "Logged out."}
 
 
@@ -879,8 +1056,11 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
     values: list[Any] = []
 
     if payload.stereotype is not None:
+        stereotype = payload.stereotype.strip()
+        if not stereotype:
+            raise HTTPException(status_code=400, detail="Stereotype cannot be empty.")
         updates.append("stereotype = ?")
-        values.append(payload.stereotype.strip())
+        values.append(stereotype)
 
     if payload.interests is not None:
         try:
@@ -915,6 +1095,7 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
 def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     try:
         interests = parse_interests(payload.interests)
+        instagram_handle = normalize_instagram_handle(payload.instagram_handle)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -922,6 +1103,12 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
     created_at = now_iso()
     first_name = normalize_name(payload.first_name)
     last_name = normalize_name(payload.last_name)
+    stereotype = payload.stereotype.strip()
+    hometown = payload.hometown.strip()
+    if not stereotype:
+        raise HTTPException(status_code=400, detail="Stereotype is required.")
+    if not hometown:
+        raise HTTPException(status_code=400, detail="Hometown is required.")
 
     with db_session() as conn:
         cursor = conn.execute(
@@ -948,12 +1135,12 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
                 first_name,
                 last_name,
                 payload.class_year,
-                payload.hometown.strip(),
-                payload.instagram_handle.strip(),
+                hometown,
+                instagram_handle,
                 payload.first_event_date,
                 interests_csv,
                 interests_norm,
-                payload.stereotype.strip(),
+                stereotype,
                 payload.lunch_stats.strip(),
                 user["id"],
                 created_at,

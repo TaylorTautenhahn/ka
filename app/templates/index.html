@@ -19,6 +19,7 @@
   <body>
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
+    <div class="noise"></div>
 
     <main class="shell">
       <header class="hero reveal">
@@ -27,6 +28,20 @@
         <p>
           Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.
         </p>
+        <div class="hero-stats">
+          <article class="stat-card">
+            <p>PNMs Tracked</p>
+            <strong id="heroPnmCount">0</strong>
+          </article>
+          <article class="stat-card">
+            <p>Member Ratings</p>
+            <strong id="heroRatingCount">0</strong>
+          </article>
+          <article class="stat-card">
+            <p>Lunch Logs</p>
+            <strong id="heroLunchCount">0</strong>
+          </article>
+        </div>
       </header>
 
       <section id="authSection" class="panel auth-grid reveal delay-1">
@@ -44,7 +59,7 @@
             <button type="submit">Sign In</button>
           </form>
           <p class="muted">
-            Seed Head Rush Officer login: <code>Head Officer - Admin</code> / <code>KAO2026</code>
+            Seed Head Rush Officer login: <code>Head Officer - Admin</code> / <code>KAO2026</code> (override via env).
           </p>
         </article>
 
@@ -88,7 +103,7 @@
             </label>
             <label>
               Access code
-              <input id="regAccessCode" type="password" required />
+              <input id="regAccessCode" type="password" required placeholder="At least 8 chars, letters + numbers" />
             </label>
             <button type="submit" class="secondary">Submit for Approval</button>
           </form>

@@ -6,7 +6,7 @@ The app replaces spreadsheets with role-based visibility, accountability, meetin
 
 ## Core Capabilities
 - Individual authentication with Head Rush Officer approval workflow.
-- Public self-registration limited to new Rush Officers (PNM creation is post-login only).
+- Public self-registration limited to new Rush Officers using username + access code (emoji optional; PNM creation is post-login only).
 - Role-aware visibility:
   - Head Rush Officer / Rush Officer can see rating ownership, comments, and deltas.
   - Rushers see overall PNM averages and only their own rating stats.

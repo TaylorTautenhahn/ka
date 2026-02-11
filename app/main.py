@@ -22,7 +22,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 
@@ -1009,29 +1009,25 @@ def require_officer(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
 
 
 class RegisterRequest(BaseModel):
-    first_name: str = Field(..., min_length=1, max_length=48)
-    last_name: str = Field(..., min_length=1, max_length=48)
-    pledge_class: str = Field(..., min_length=1, max_length=24)
-    role: str
+    username: str = Field(..., min_length=3, max_length=64)
     emoji: str | None = None
-    stereotype: str = Field(..., min_length=1, max_length=48)
-    interests: str | list[str]
     access_code: str = Field(..., min_length=8, max_length=128)
 
-    @field_validator("role")
+    @field_validator("username")
     @classmethod
-    def validate_role(cls, value: str) -> str:
-        if value != ROLE_RUSH_OFFICER:
-            raise ValueError("Only Rush Officer self-registration is allowed.")
-        return value
+    def validate_username(cls, value: str) -> str:
+        username = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9._-]{3,64}", username):
+            raise ValueError("Username may only include letters, numbers, dots, underscores, and hyphens.")
+        return username
 
-    @model_validator(mode="after")
-    def validate_emoji_by_role(self) -> "RegisterRequest":
-        if self.role == ROLE_RUSH_OFFICER and (self.emoji is None or not self.emoji.strip()):
-            raise ValueError("Rush Officers must include an emoji identifier.")
-        if self.role != ROLE_RUSH_OFFICER:
-            self.emoji = None
-        return self
+    @field_validator("emoji")
+    @classmethod
+    def normalize_optional_emoji(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        emoji = value.strip()
+        return emoji or None
 
 
 class LoginRequest(BaseModel):
@@ -1144,31 +1140,24 @@ def export_sqlite_backup(_: sqlite3.Row = Depends(require_head)) -> FileResponse
 
 @app.post("/api/auth/register")
 def register(payload: RegisterRequest) -> dict[str, str]:
-    first_name = normalize_name(payload.first_name)
-    last_name = normalize_name(payload.last_name)
-    pledge_class = payload.pledge_class.strip()
-    if not pledge_class:
-        raise HTTPException(status_code=400, detail="Pledge class is required.")
-    stereotype = payload.stereotype.strip()
-    if not stereotype:
-        raise HTTPException(status_code=400, detail="Stereotype is required.")
-
-    if payload.role != ROLE_RUSH_OFFICER:
-        raise HTTPException(status_code=403, detail="Only Rush Officer self-registration is allowed.")
-
     try:
-        interests = parse_interests(payload.interests)
         validate_access_code_strength(payload.access_code)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    interests_csv, interests_norm = encode_interests(interests)
-    username = f"{first_name} {last_name} - {pledge_class}"
+    username = payload.username.strip()
+    parts = [token for token in re.split(r"[._-]+", username) if token]
+    first_name = normalize_name((parts[0] if parts else "Rush")[:48])
+    last_name = normalize_name((parts[1] if len(parts) > 1 else "Officer")[:48])
+    pledge_class = "Open"
+    stereotype = "Unassigned"
+    interests_csv, interests_norm = encode_interests(["Recruitment"])
+    emoji = payload.emoji if payload.emoji else "🛡️"
 
     with db_session() as conn:
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
-            raise HTTPException(status_code=409, detail="Username already exists. Choose a different pledge class label.")
+            raise HTTPException(status_code=409, detail="Username already exists.")
 
         created_at = now_iso()
         try:
@@ -1196,8 +1185,8 @@ def register(payload: RegisterRequest) -> dict[str, str]:
                     first_name,
                     last_name,
                     pledge_class,
-                    payload.role,
-                    payload.emoji.strip() if payload.emoji else None,
+                    ROLE_RUSH_OFFICER,
+                    emoji,
                     stereotype,
                     interests_csv,
                     interests_norm,

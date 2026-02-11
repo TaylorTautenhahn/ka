@@ -65,39 +65,15 @@
 
         <article>
           <h2>Register New Rush Officer</h2>
-          <p class="muted">Self-registration is for Rush Officers only. Create and manage PNMs after login.</p>
+          <p class="muted">Register with username and password. Emoji is optional. Create/manage PNMs after login.</p>
           <form id="registerForm" class="stack">
-            <div class="inline-grid">
-              <label>
-                First name
-                <input id="regFirstName" type="text" required />
-              </label>
-              <label>
-                Last name
-                <input id="regLastName" type="text" required />
-              </label>
-            </div>
-            <div class="inline-grid">
-              <label>
-                Pledge class
-                <input id="regPledgeClass" type="text" required placeholder="Fall25" />
-              </label>
-              <label>
-                Role
-                <input id="regRole" type="text" value="Rush Officer" readonly />
-              </label>
-            </div>
             <label>
-              Emoji (required)
+              Username
+              <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
+            </label>
+            <label>
+              Emoji (optional)
               <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
-            </label>
-            <label>
-              Stereotype
-              <input id="regStereotype" type="text" required />
-            </label>
-            <label>
-              Interests (comma-separated)
-              <input id="regInterests" type="text" required placeholder="Golf,Hiking,Finance" />
             </label>
             <label>
               Access code

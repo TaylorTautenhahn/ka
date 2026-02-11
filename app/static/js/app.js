@@ -8,7 +8,6 @@ const installBtn = document.getElementById("installBtn");
 const backupCsvBtn = document.getElementById("backupCsvBtn");
 const backupDbBtn = document.getElementById("backupDbBtn");
 
-const regRole = document.getElementById("regRole");
 const regEmoji = document.getElementById("regEmoji");
 
 const sessionTitle = document.getElementById("sessionTitle");
@@ -308,8 +307,7 @@ function setDefaultDates() {
 }
 
 function setRoleEmojiRequirement() {
-  regRole.value = "Rush Officer";
-  regEmoji.required = true;
+  regEmoji.required = false;
 }
 
 function renderInterestHints(interests) {
@@ -909,25 +907,21 @@ async function handleLogin(event) {
 
 async function handleRegister(event) {
   event.preventDefault();
+  const username = document.getElementById("regUsername").value.trim();
   const accessCode = document.getElementById("regAccessCode").value;
   const emoji = regEmoji.value.trim();
+  if (!username) {
+    showToast("Username is required.");
+    return;
+  }
   if (accessCode.length < 8 || !/[A-Za-z]/.test(accessCode) || !/[0-9]/.test(accessCode)) {
     showToast("Access code must be 8+ characters with letters and numbers.");
     return;
   }
-  if (!emoji) {
-    showToast("Rush Officer emoji is required.");
-    return;
-  }
 
   const body = {
-    first_name: document.getElementById("regFirstName").value.trim(),
-    last_name: document.getElementById("regLastName").value.trim(),
-    pledge_class: document.getElementById("regPledgeClass").value.trim(),
-    role: "Rush Officer",
-    emoji,
-    stereotype: document.getElementById("regStereotype").value.trim(),
-    interests: document.getElementById("regInterests").value.trim(),
+    username,
+    emoji: emoji || null,
     access_code: accessCode,
   };
 
@@ -1266,7 +1260,6 @@ function attachEvents() {
   backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
   backupDbBtn.addEventListener("click", handleDbBackupDownload);
 
-  regRole.addEventListener("change", setRoleEmojiRequirement);
   applyFiltersBtn.addEventListener("click", handleApplyFilters);
 
   pnmForm.addEventListener("submit", handlePnmCreate);

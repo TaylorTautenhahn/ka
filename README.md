@@ -135,6 +135,8 @@ docker run -p 8000:8000 \
   - `SESSION_COOKIE_SECURE=1`
   - `ALLOWED_HOSTS=<your-domain>`
   - `PLATFORM_ADMIN_ACCESS_CODE=<strong-secret>`
+- Recommended safety flag:
+  - `REQUIRE_PERSISTENT_DATA=1` (startup fails if storage is not mapped under `/data`)
 
 ## Environment Variables
 - `DB_PATH` (default `app/recruitment.db`)
@@ -150,6 +152,7 @@ docker run -p 8000:8000 \
 - `LOGIN_WINDOW_SECONDS` (default `300`)
 - `LOGIN_MAX_FAILURES` (default `8`)
 - `LOGIN_BLOCK_SECONDS` (default `600`)
+- `REQUIRE_PERSISTENT_DATA` (default `0`; set `1` in production)
 - `PLATFORM_DB_PATH` (default `<db-dir>/platform.db`)
 - `TENANTS_DB_DIR` (default `<db-dir>/tenants`)
 - `DEFAULT_TENANT_SLUG` (default `kappaalphaorder`)
@@ -194,6 +197,7 @@ Tenant APIs:
 - `GET /api/export/csv` (Head only)
 - `GET /api/export/sqlite` (Head only)
 - `GET /api/export/contacts.vcf`
+- `GET /api/admin/storage` (Head only, runtime storage diagnostics)
 - `GET /health`
 
 Platform admin APIs:

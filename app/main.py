@@ -66,6 +66,7 @@ ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
 LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
+REQUIRE_PERSISTENT_DATA = os.getenv("REQUIRE_PERSISTENT_DATA", "0").strip().lower() in {"1", "true", "yes"}
 PLATFORM_DB_PATH = Path(os.getenv("PLATFORM_DB_PATH", str(DATA_ROOT / "platform.db")))
 DEFAULT_TENANT_SLUG = os.getenv("DEFAULT_TENANT_SLUG", "kappaalphaorder").strip().lower() or "kappaalphaorder"
 DEFAULT_TENANT_NAME = os.getenv("DEFAULT_TENANT_NAME", "Kappa Alpha Order").strip() or "Kappa Alpha Order"
@@ -143,6 +144,59 @@ def now_iso() -> str:
 
 def now_epoch() -> float:
     return time.time()
+
+
+def uses_data_mount(path: Path) -> bool:
+    raw = str(path.expanduser())
+    return raw == "/data" or raw.startswith("/data/")
+
+
+def collect_storage_warnings() -> list[str]:
+    warnings: list[str] = []
+    if not os.getenv("DATA_ROOT") and not os.getenv("DB_PATH") and DATA_ROOT == BASE_DIR:
+        warnings.append(
+            "Using local app directory for SQLite storage. Configure persistent DATA_ROOT/DB_PATH/UPLOADS_DIR in production."
+        )
+    if os.getenv("RENDER") and not uses_data_mount(DATA_ROOT):
+        warnings.append(f"Render detected but DATA_ROOT is {DATA_ROOT} (expected /data or /data/*).")
+    if uses_data_mount(DATA_ROOT):
+        data_mount = Path("/data")
+        if not data_mount.exists():
+            warnings.append("DATA_ROOT targets /data but /data does not exist. Persistent disk may not be mounted.")
+        elif not os.access(data_mount, os.W_OK):
+            warnings.append("DATA_ROOT targets /data but /data is not writable.")
+    return warnings
+
+
+def enforce_persistent_storage_if_required() -> None:
+    if not REQUIRE_PERSISTENT_DATA:
+        return
+
+    issues: list[str] = []
+    required_paths = {
+        "DATA_ROOT": DATA_ROOT,
+        "DB_PATH": DB_PATH,
+        "PLATFORM_DB_PATH": PLATFORM_DB_PATH,
+        "TENANTS_DB_DIR": TENANTS_DB_DIR,
+        "UPLOADS_DIR": UPLOADS_DIR,
+        "BACKUP_DIR": BACKUP_DIR,
+    }
+    for key, path in required_paths.items():
+        if not uses_data_mount(path):
+            issues.append(f"{key}={path} is not under /data")
+
+    data_mount = Path("/data")
+    if not data_mount.exists():
+        issues.append("/data mount does not exist")
+    elif not os.access(data_mount, os.W_OK):
+        issues.append("/data mount is not writable")
+
+    if issues:
+        raise RuntimeError(
+            "Persistent storage requirement failed. "
+            + " | ".join(issues)
+            + " | Mount a Render disk at /data and set DATA_ROOT=/data."
+        )
 
 
 def normalize_samesite(value: str) -> str:
@@ -225,6 +279,19 @@ def active_pnm_uploads_dir() -> Path:
     if tenant:
         return tenant.pnm_uploads_dir
     return UPLOADS_DIR / "pnms"
+
+
+def file_metadata(path: Path) -> dict[str, Any]:
+    entry: dict[str, Any] = {
+        "path": str(path),
+        "exists": path.exists(),
+        "uses_data_mount": uses_data_mount(path),
+    }
+    if path.exists():
+        stat = path.stat()
+        entry["size_bytes"] = int(stat.st_size)
+        entry["modified_at"] = datetime.fromtimestamp(stat.st_mtime, timezone.utc).isoformat()
+    return entry
 
 
 def tenant_logo_public_path(slug: str, extension: str) -> str:
@@ -657,10 +724,15 @@ def client_ip(request: Request) -> str:
     return "unknown"
 
 
-def assert_login_allowed(ip_address: str) -> None:
+def login_throttle_key(request: Request, username: str, *, scope: str) -> str:
+    username_token = username.strip().lower() or "unknown-user"
+    return f"{scope}:{client_ip(request)}:{username_token}"
+
+
+def assert_login_allowed(throttle_key: str) -> None:
     now = now_epoch()
     with _LOGIN_GUARD:
-        blocked_until = _LOGIN_BLOCKED_UNTIL.get(ip_address, 0)
+        blocked_until = _LOGIN_BLOCKED_UNTIL.get(throttle_key, 0)
         if blocked_until > now:
             retry_after = max(1, int(blocked_until - now))
             raise HTTPException(
@@ -669,21 +741,21 @@ def assert_login_allowed(ip_address: str) -> None:
             )
 
 
-def record_login_failure(ip_address: str) -> None:
+def record_login_failure(throttle_key: str) -> None:
     now = now_epoch()
     with _LOGIN_GUARD:
-        attempts = [ts for ts in _LOGIN_ATTEMPTS.get(ip_address, []) if now - ts <= LOGIN_WINDOW_SECONDS]
+        attempts = [ts for ts in _LOGIN_ATTEMPTS.get(throttle_key, []) if now - ts <= LOGIN_WINDOW_SECONDS]
         attempts.append(now)
-        _LOGIN_ATTEMPTS[ip_address] = attempts
+        _LOGIN_ATTEMPTS[throttle_key] = attempts
         if len(attempts) >= LOGIN_MAX_FAILURES:
-            _LOGIN_BLOCKED_UNTIL[ip_address] = now + LOGIN_BLOCK_SECONDS
-            _LOGIN_ATTEMPTS[ip_address] = []
+            _LOGIN_BLOCKED_UNTIL[throttle_key] = now + LOGIN_BLOCK_SECONDS
+            _LOGIN_ATTEMPTS[throttle_key] = []
 
 
-def record_login_success(ip_address: str) -> None:
+def record_login_success(throttle_key: str) -> None:
     with _LOGIN_GUARD:
-        _LOGIN_ATTEMPTS.pop(ip_address, None)
-        _LOGIN_BLOCKED_UNTIL.pop(ip_address, None)
+        _LOGIN_ATTEMPTS.pop(throttle_key, None)
+        _LOGIN_BLOCKED_UNTIL.pop(throttle_key, None)
 
 
 def normalize_name(value: str) -> str:
@@ -1940,16 +2012,19 @@ class TenantCreateRequest(BaseModel):
 
 @app.on_event("startup")
 def startup() -> None:
-    if not os.getenv("DATA_ROOT") and not os.getenv("DB_PATH") and DATA_ROOT == BASE_DIR:
-        print(
-            "[startup] warning: using local app directory for SQLite storage.\n"
-            "          To prevent data loss across deployments, configure a persistent DATA_ROOT or DB_PATH/UPLOADS_DIR"
-            " (for Render, mount /data and set DATA_ROOT=/data/ka-rush)."
-        )
+    enforce_persistent_storage_if_required()
+    print(
+        "[startup] storage config: "
+        f"DATA_ROOT={DATA_ROOT} DB_PATH={DB_PATH} PLATFORM_DB_PATH={PLATFORM_DB_PATH} "
+        f"TENANTS_DB_DIR={TENANTS_DB_DIR} UPLOADS_DIR={UPLOADS_DIR}"
+    )
+    for warning in collect_storage_warnings():
+        print(f"[startup] warning: {warning}")
     bootstrap_platform_and_tenants()
     default_row = fetch_tenant_row(DEFAULT_TENANT_SLUG)
     if default_row:
         tenant = tenant_context_from_row(default_row)
+        print(f"[startup] default tenant db path: slug={tenant.slug} db_path={tenant.db_path}")
         token = CURRENT_TENANT.set(tenant)
         try:
             if tenant.db_path.exists():
@@ -1985,6 +2060,11 @@ async def home(request: Request) -> HTMLResponse:
             "default_slug": DEFAULT_TENANT_SLUG,
         },
     )
+
+
+@app.head("/", include_in_schema=False)
+async def home_head() -> Response:
+    return Response(status_code=200)
 
 
 @app.get("/meeting", response_class=HTMLResponse)
@@ -2109,18 +2189,18 @@ def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
 
 @app.post("/platform/api/auth/login")
 def platform_login(payload: PlatformLoginRequest, request: Request, response: Response) -> dict[str, Any]:
-    ip_address = client_ip(request)
-    assert_login_allowed(ip_address)
+    throttle_key = login_throttle_key(request, payload.username, scope="platform")
+    assert_login_allowed(throttle_key)
 
     with platform_db_session() as conn:
         row = conn.execute("SELECT * FROM platform_admins WHERE username = ?", (payload.username.strip(),)).fetchone()
         if not row:
-            record_login_failure(ip_address)
+            record_login_failure(throttle_key)
             raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
         password_ok, needs_upgrade = verify_access_code(payload.access_code, row["access_code_hash"])
         if not password_ok:
-            record_login_failure(ip_address)
+            record_login_failure(throttle_key)
             raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
         token = secrets.token_urlsafe(32)
@@ -2146,7 +2226,7 @@ def platform_login(payload: PlatformLoginRequest, request: Request, response: Re
         secure=secure_cookie,
         path="/",
     )
-    record_login_success(ip_address)
+    record_login_success(throttle_key)
     return {"admin": platform_user_payload(row), "message": "Platform admin logged in."}
 
 
@@ -2299,9 +2379,60 @@ async def service_worker() -> FileResponse:
     return FileResponse(BASE_DIR / "static" / "service-worker.js", media_type="application/javascript")
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> FileResponse:
+    return FileResponse(BASE_DIR / "static" / "icons" / "icon-192.png", media_type="image/png")
+
+
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/api/admin/storage")
+def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    tenant = current_tenant()
+    with db_session(tenant.db_path) as conn:
+        users_count = int(conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"])
+        pnms_count = int(conn.execute("SELECT COUNT(*) AS count FROM pnms").fetchone()["count"])
+        ratings_count = int(conn.execute("SELECT COUNT(*) AS count FROM ratings").fetchone()["count"])
+        lunches_count = int(conn.execute("SELECT COUNT(*) AS count FROM lunches").fetchone()["count"])
+
+    with platform_db_session() as conn:
+        active_tenants = int(conn.execute("SELECT COUNT(*) AS count FROM tenants WHERE is_active = 1").fetchone()["count"])
+
+    storage_paths = {
+        "DATA_ROOT": str(DATA_ROOT),
+        "DB_PATH": str(DB_PATH),
+        "PLATFORM_DB_PATH": str(PLATFORM_DB_PATH),
+        "TENANTS_DB_DIR": str(TENANTS_DB_DIR),
+        "UPLOADS_DIR": str(UPLOADS_DIR),
+        "BACKUP_DIR": str(BACKUP_DIR),
+        "ACTIVE_TENANT_DB_PATH": str(tenant.db_path),
+        "ACTIVE_TENANT_UPLOADS_DIR": str(tenant.pnm_uploads_dir),
+        "ACTIVE_TENANT_BACKUP_DIR": str(tenant.backup_dir),
+    }
+
+    return {
+        "tenant_slug": tenant.slug,
+        "active_tenants": active_tenants,
+        "render_env_detected": bool(os.getenv("RENDER")),
+        "require_persistent_data": REQUIRE_PERSISTENT_DATA,
+        "persistent_paths_ok": all(uses_data_mount(Path(path)) for path in storage_paths.values()),
+        "warnings": collect_storage_warnings(),
+        "table_counts": {
+            "users": users_count,
+            "pnms": pnms_count,
+            "ratings": ratings_count,
+            "lunches": lunches_count,
+        },
+        "paths": storage_paths,
+        "files": {
+            "platform_db": file_metadata(PLATFORM_DB_PATH),
+            "default_tenant_db": file_metadata(DB_PATH),
+            "active_tenant_db": file_metadata(tenant.db_path),
+        },
+    }
 
 
 @app.get("/api/export/csv")
@@ -2414,18 +2545,18 @@ def register(payload: RegisterRequest) -> dict[str, str]:
 
 @app.post("/api/auth/login")
 def login(payload: LoginRequest, request: Request, response: Response) -> dict[str, Any]:
-    ip_address = client_ip(request)
-    assert_login_allowed(ip_address)
+    throttle_key = login_throttle_key(request, payload.username, scope="tenant")
+    assert_login_allowed(throttle_key)
 
     with db_session() as conn:
         row = conn.execute("SELECT * FROM users WHERE username = ?", (payload.username.strip(),)).fetchone()
         if not row:
-            record_login_failure(ip_address)
+            record_login_failure(throttle_key)
             raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
         password_ok, needs_upgrade = verify_access_code(payload.access_code, row["access_code_hash"])
         if not password_ok:
-            record_login_failure(ip_address)
+            record_login_failure(throttle_key)
             raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
         if not bool(row["is_approved"]):
@@ -2451,7 +2582,7 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
             secure=secure_cookie,
             path="/",
         )
-        record_login_success(ip_address)
+        record_login_success(throttle_key)
 
         return {
             "user": user_payload(row, row["role"], row["id"]),

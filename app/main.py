@@ -1,45 +1,667 @@
 from __future__ import annotations
 
+import hashlib
+import json
+import re
+import secrets
+import sqlite3
+from contextlib import contextmanager
+from datetime import date, datetime, timezone
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, Response
+from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, Field
-
-from app.services.finance import (
-    FinanceDataError,
-    analyze_tickers,
-    build_pdf_report,
-    clean_tickers,
-)
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 BASE_DIR = Path(__file__).resolve().parent
+DB_PATH = BASE_DIR / "recruitment.db"
+SESSION_COOKIE = "rush_session"
+PASSWORD_SALT = "kao-rush-v1"
+
+ROLE_HEAD = "Head Rush Officer"
+ROLE_RUSH_OFFICER = "Rush Officer"
+ROLE_RUSHER = "Rusher"
+ALLOWED_ROLES = {ROLE_HEAD, ROLE_RUSH_OFFICER, ROLE_RUSHER}
+RATING_FIELDS = [
+    "good_with_girls",
+    "will_make_it",
+    "personable",
+    "alcohol_control",
+    "instagram_marketability",
+]
 
 app = FastAPI(
-    title="Financial Modeling Platform",
-    description="10-year performance modeling for stocks, ETFs, and mutual funds using Yahoo Finance.",
+    title="KA Recruitment Evaluation",
+    description="Connected, role-aware recruitment evaluation platform.",
     version="1.0.0",
 )
-
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
-class AnalyzeRequest(BaseModel):
-    tickers: list[str] | str = Field(
-        ...,
-        description="Ticker symbols as an array or comma-separated string.",
+def now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
+@contextmanager
+def db_session() -> sqlite3.Connection:
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def hash_access_code(access_code: str) -> str:
+    payload = f"{PASSWORD_SALT}:{access_code.strip()}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
+def normalize_name(value: str) -> str:
+    value = value.strip()
+    if not value:
+        raise ValueError("Name fields cannot be empty.")
+    return value[0].upper() + value[1:].strip()
+
+
+def normalize_interest(raw: str) -> str:
+    token = raw.strip()
+    if not token:
+        raise ValueError("Interests cannot be empty.")
+    if " " in token:
+        raise ValueError("Interests must be one word with no spaces.")
+    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]*", token):
+        raise ValueError("Interests must start with a letter and contain only letters or numbers.")
+    return token[0].upper() + token[1:].lower()
+
+
+def parse_interests(payload: str | list[str]) -> list[str]:
+    if isinstance(payload, str):
+        raw_tokens = [part.strip() for part in re.split(r"[,;\n]+", payload) if part.strip()]
+    else:
+        raw_tokens = [str(part).strip() for part in payload if str(part).strip()]
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for token in raw_tokens:
+        value = normalize_interest(token)
+        key = value.lower()
+        if key not in seen:
+            seen.add(key)
+            normalized.append(value)
+
+    if not normalized:
+        raise ValueError("Provide at least one interest.")
+    return normalized
+
+
+def encode_interests(interests: list[str]) -> tuple[str, str]:
+    canonical = ",".join(interests)
+    normalized = ",".join([interest.lower() for interest in interests])
+    return canonical, normalized
+
+
+def decode_interests(interests_csv: str) -> list[str]:
+    if not interests_csv:
+        return []
+    return [item for item in interests_csv.split(",") if item]
+
+
+def parse_interest_filter(raw_interest: str | None) -> set[str]:
+    if raw_interest is None or not raw_interest.strip():
+        return set()
+    if "," not in raw_interest and ";" not in raw_interest and "\n" not in raw_interest:
+        values = [raw_interest.strip()]
+    else:
+        values = [part.strip() for part in re.split(r"[,;\n]+", raw_interest) if part.strip()]
+    return {normalize_interest(value).lower() for value in values}
+
+
+def has_interest_match(normalized_csv: str, required: set[str]) -> bool:
+    if not required:
+        return True
+    candidate = {item for item in normalized_csv.split(",") if item}
+    return bool(candidate & required)
+
+
+def role_weight(role: str) -> float:
+    if role in {ROLE_RUSH_OFFICER, ROLE_HEAD}:
+        return 0.6
+    return 0.4
+
+
+def score_total(payload: dict[str, int]) -> int:
+    return (
+        payload["good_with_girls"]
+        + payload["will_make_it"]
+        + payload["personable"]
+        + payload["alcohol_control"]
+        + payload["instagram_marketability"]
     )
 
 
-class PDFRequest(AnalyzeRequest):
-    report_title: str | None = Field(
-        default=None,
-        description="Optional custom title for the exported PDF report.",
+def count_words(text: str) -> int:
+    return len(re.findall(r"\b[\w'-]+\b", text))
+
+
+def pnm_code_base(first_name: str, last_name: str, first_event_date: str) -> str:
+    prefix = (first_name[:1] + last_name[:2]).upper()
+    prefix = (prefix + "XXX")[:3]
+    dt = datetime.strptime(first_event_date, "%Y-%m-%d")
+    return f"{prefix}{dt.strftime('%m%d%Y')}"
+
+
+def ensure_unique_pnm_code(conn: sqlite3.Connection, pnm_id: int, code_base: str) -> str:
+    code = code_base
+    suffix = 2
+    while True:
+        row = conn.execute("SELECT id FROM pnms WHERE pnm_code = ? AND id != ?", (code, pnm_id)).fetchone()
+        if not row:
+            return code
+        code = f"{code_base}{suffix}"
+        suffix += 1
+
+
+def verify_iso_date(value: str, label: str) -> str:
+    try:
+        date.fromisoformat(value)
+    except ValueError as exc:
+        raise ValueError(f"{label} must be in YYYY-MM-DD format.") from exc
+    return value
+
+
+def recalc_member_rating_stats(conn: sqlite3.Connection, user_id: int) -> None:
+    stats = conn.execute(
+        "SELECT COUNT(*) AS c, COALESCE(AVG(total_score), 0) AS avg_total FROM ratings WHERE user_id = ?",
+        (user_id,),
+    ).fetchone()
+    conn.execute(
+        "UPDATE users SET rating_count = ?, avg_rating_given = ?, updated_at = ? WHERE id = ?",
+        (int(stats["c"]), float(stats["avg_total"]), now_iso(), user_id),
     )
+
+
+def recalc_member_lunch_stats(conn: sqlite3.Connection, user_id: int) -> None:
+    total_row = conn.execute("SELECT COUNT(*) AS c FROM lunches WHERE user_id = ?", (user_id,)).fetchone()
+    week_row = conn.execute(
+        "SELECT COUNT(*) AS c FROM lunches WHERE user_id = ? AND lunch_date >= date('now', '-6 day')",
+        (user_id,),
+    ).fetchone()
+    conn.execute(
+        "UPDATE users SET total_lunches = ?, lunches_per_week = ?, updated_at = ? WHERE id = ?",
+        (int(total_row["c"]), float(week_row["c"]), now_iso(), user_id),
+    )
+
+
+def recalc_pnm_lunch_stats(conn: sqlite3.Connection, pnm_id: int) -> None:
+    row = conn.execute("SELECT COUNT(*) AS c FROM lunches WHERE pnm_id = ?", (pnm_id,)).fetchone()
+    conn.execute(
+        "UPDATE pnms SET total_lunches = ?, updated_at = ? WHERE id = ?",
+        (int(row["c"]), now_iso(), pnm_id),
+    )
+
+
+def recalc_pnm_rating_stats(conn: sqlite3.Connection, pnm_id: int) -> None:
+    rows = conn.execute(
+        """
+        SELECT
+            r.good_with_girls,
+            r.will_make_it,
+            r.personable,
+            r.alcohol_control,
+            r.instagram_marketability,
+            r.total_score,
+            u.role
+        FROM ratings r
+        JOIN users u ON u.id = r.user_id
+        WHERE r.pnm_id = ?
+        """,
+        (pnm_id,),
+    ).fetchall()
+
+    if not rows:
+        conn.execute(
+            """
+            UPDATE pnms
+            SET
+                rating_count = 0,
+                avg_good_with_girls = 0,
+                avg_will_make_it = 0,
+                avg_personable = 0,
+                avg_alcohol_control = 0,
+                avg_instagram_marketability = 0,
+                weighted_total = 0,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (now_iso(), pnm_id),
+        )
+        return
+
+    weighted_totals = {
+        "good_with_girls": 0.0,
+        "will_make_it": 0.0,
+        "personable": 0.0,
+        "alcohol_control": 0.0,
+        "instagram_marketability": 0.0,
+        "total_score": 0.0,
+    }
+    total_weight = 0.0
+
+    for row in rows:
+        weight = role_weight(row["role"])
+        total_weight += weight
+        weighted_totals["good_with_girls"] += row["good_with_girls"] * weight
+        weighted_totals["will_make_it"] += row["will_make_it"] * weight
+        weighted_totals["personable"] += row["personable"] * weight
+        weighted_totals["alcohol_control"] += row["alcohol_control"] * weight
+        weighted_totals["instagram_marketability"] += row["instagram_marketability"] * weight
+        weighted_totals["total_score"] += row["total_score"] * weight
+
+    if total_weight == 0:
+        avg_good = avg_will = avg_personable = avg_alcohol = avg_ig = avg_total = 0.0
+    else:
+        avg_good = weighted_totals["good_with_girls"] / total_weight
+        avg_will = weighted_totals["will_make_it"] / total_weight
+        avg_personable = weighted_totals["personable"] / total_weight
+        avg_alcohol = weighted_totals["alcohol_control"] / total_weight
+        avg_ig = weighted_totals["instagram_marketability"] / total_weight
+        avg_total = weighted_totals["total_score"] / total_weight
+
+    conn.execute(
+        """
+        UPDATE pnms
+        SET
+            rating_count = ?,
+            avg_good_with_girls = ?,
+            avg_will_make_it = ?,
+            avg_personable = ?,
+            avg_alcohol_control = ?,
+            avg_instagram_marketability = ?,
+            weighted_total = ?,
+            updated_at = ?
+        WHERE id = ?
+        """,
+        (
+            len(rows),
+            float(avg_good),
+            float(avg_will),
+            float(avg_personable),
+            float(avg_alcohol),
+            float(avg_ig),
+            float(avg_total),
+            now_iso(),
+            pnm_id,
+        ),
+    )
+
+
+def setup_schema(conn: sqlite3.Connection) -> None:
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            pledge_class TEXT NOT NULL,
+            role TEXT NOT NULL CHECK (role IN ('Head Rush Officer', 'Rush Officer', 'Rusher')),
+            emoji TEXT,
+            stereotype TEXT NOT NULL,
+            interests TEXT NOT NULL,
+            interests_norm TEXT NOT NULL,
+            access_code_hash TEXT NOT NULL,
+            is_approved INTEGER NOT NULL DEFAULT 0,
+            approved_by INTEGER REFERENCES users(id),
+            approved_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            last_login_at TEXT,
+            total_lunches INTEGER NOT NULL DEFAULT 0,
+            lunches_per_week REAL NOT NULL DEFAULT 0,
+            rating_count INTEGER NOT NULL DEFAULT 0,
+            avg_rating_given REAL NOT NULL DEFAULT 0,
+            CHECK (
+                (role = 'Rush Officer' AND emoji IS NOT NULL AND length(trim(emoji)) > 0)
+                OR (role != 'Rush Officer' AND (emoji IS NULL OR length(trim(emoji)) = 0))
+            )
+        );
+
+        CREATE TABLE IF NOT EXISTS pnms (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_code TEXT NOT NULL UNIQUE,
+            first_name TEXT NOT NULL,
+            last_name TEXT NOT NULL,
+            class_year TEXT NOT NULL CHECK (class_year IN ('F', 'S', 'J')),
+            hometown TEXT NOT NULL,
+            instagram_handle TEXT NOT NULL,
+            first_event_date TEXT NOT NULL,
+            interests TEXT NOT NULL,
+            interests_norm TEXT NOT NULL,
+            stereotype TEXT NOT NULL,
+            lunch_stats TEXT NOT NULL DEFAULT '',
+            total_lunches INTEGER NOT NULL DEFAULT 0,
+            rating_count INTEGER NOT NULL DEFAULT 0,
+            avg_good_with_girls REAL NOT NULL DEFAULT 0,
+            avg_will_make_it REAL NOT NULL DEFAULT 0,
+            avg_personable REAL NOT NULL DEFAULT 0,
+            avg_alcohol_control REAL NOT NULL DEFAULT 0,
+            avg_instagram_marketability REAL NOT NULL DEFAULT 0,
+            weighted_total REAL NOT NULL DEFAULT 0,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS ratings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            good_with_girls INTEGER NOT NULL CHECK (good_with_girls BETWEEN 0 AND 10),
+            will_make_it INTEGER NOT NULL CHECK (will_make_it BETWEEN 0 AND 10),
+            personable INTEGER NOT NULL CHECK (personable BETWEEN 0 AND 10),
+            alcohol_control INTEGER NOT NULL CHECK (alcohol_control BETWEEN 0 AND 10),
+            instagram_marketability INTEGER NOT NULL CHECK (instagram_marketability BETWEEN 0 AND 5),
+            total_score INTEGER NOT NULL CHECK (total_score BETWEEN 0 AND 45),
+            comment TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (pnm_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS rating_changes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rating_id INTEGER NOT NULL UNIQUE REFERENCES ratings(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            old_total INTEGER NOT NULL,
+            new_total INTEGER NOT NULL,
+            delta_total INTEGER NOT NULL,
+            old_payload TEXT NOT NULL,
+            new_payload TEXT NOT NULL,
+            comment TEXT NOT NULL,
+            changed_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS lunches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            lunch_date TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            UNIQUE (pnm_id, user_id, lunch_date)
+        );
+
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            last_seen_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_users_stereotype ON users(stereotype);
+        CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
+        CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
+        CREATE INDEX IF NOT EXISTS idx_pnms_interests ON pnms(interests_norm);
+        CREATE INDEX IF NOT EXISTS idx_ratings_pnm ON ratings(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
+        CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
+        """
+    )
+
+
+def ensure_seed_data(conn: sqlite3.Connection) -> None:
+    count_row = conn.execute("SELECT COUNT(*) AS c FROM users").fetchone()
+    if int(count_row["c"]) > 0:
+        return
+
+    interests, interests_norm = encode_interests(["Leadership", "Recruitment"])
+    created_at = now_iso()
+    first_name = "Head"
+    last_name = "Officer"
+    pledge_class = "Admin"
+    username = f"{first_name} {last_name} - {pledge_class}"
+    conn.execute(
+        """
+        INSERT INTO users (
+            username,
+            first_name,
+            last_name,
+            pledge_class,
+            role,
+            emoji,
+            stereotype,
+            interests,
+            interests_norm,
+            access_code_hash,
+            is_approved,
+            approved_at,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, 1, ?, ?, ?)
+        """,
+        (
+            username,
+            first_name,
+            last_name,
+            pledge_class,
+            ROLE_HEAD,
+            "Strategist",
+            interests,
+            interests_norm,
+            hash_access_code("KAO2026"),
+            created_at,
+            created_at,
+            created_at,
+        ),
+    )
+
+
+def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str, Any]:
+    can_view_rating_stats = viewer_role in {ROLE_HEAD, ROLE_RUSH_OFFICER} or row["id"] == viewer_id
+    payload = {
+        "user_id": row["id"],
+        "username": row["username"],
+        "role": row["role"],
+        "emoji": row["emoji"] if row["role"] == ROLE_RUSH_OFFICER else None,
+        "stereotype": row["stereotype"],
+        "interests": decode_interests(row["interests"]),
+        "is_approved": bool(row["is_approved"]),
+        "total_lunches": int(row["total_lunches"]),
+        "lunches_per_week": round(float(row["lunches_per_week"]), 2),
+    }
+    if can_view_rating_stats:
+        payload["rating_count"] = int(row["rating_count"])
+        payload["avg_rating_given"] = round(float(row["avg_rating_given"]), 2)
+    else:
+        payload["rating_count"] = None
+        payload["avg_rating_given"] = None
+    return payload
+
+
+def pnm_payload(row: sqlite3.Row, own_rating: dict[str, Any] | None) -> dict[str, Any]:
+    days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
+    return {
+        "pnm_id": row["id"],
+        "pnm_code": row["pnm_code"],
+        "first_name": row["first_name"],
+        "last_name": row["last_name"],
+        "class_year": row["class_year"],
+        "hometown": row["hometown"],
+        "instagram_handle": row["instagram_handle"],
+        "first_event_date": row["first_event_date"],
+        "days_since_first_event": days_since_event,
+        "interests": decode_interests(row["interests"]),
+        "stereotype": row["stereotype"],
+        "lunch_stats": row["lunch_stats"],
+        "total_lunches": int(row["total_lunches"]),
+        "rating_count": int(row["rating_count"]),
+        "avg_good_with_girls": round(float(row["avg_good_with_girls"]), 2),
+        "avg_will_make_it": round(float(row["avg_will_make_it"]), 2),
+        "avg_personable": round(float(row["avg_personable"]), 2),
+        "avg_alcohol_control": round(float(row["avg_alcohol_control"]), 2),
+        "avg_instagram_marketability": round(float(row["avg_instagram_marketability"]), 2),
+        "weighted_total": round(float(row["weighted_total"]), 2),
+        "own_rating": own_rating,
+    }
+
+
+def rating_payload(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "rating_id": row["id"],
+        "pnm_id": row["pnm_id"],
+        "user_id": row["user_id"],
+        "good_with_girls": row["good_with_girls"],
+        "will_make_it": row["will_make_it"],
+        "personable": row["personable"],
+        "alcohol_control": row["alcohol_control"],
+        "instagram_marketability": row["instagram_marketability"],
+        "total_score": row["total_score"],
+        "comment": row["comment"],
+        "updated_at": row["updated_at"],
+        "created_at": row["created_at"],
+    }
+
+
+def fetch_own_rating(conn: sqlite3.Connection, pnm_id: int, user_id: int) -> dict[str, Any] | None:
+    row = conn.execute(
+        "SELECT * FROM ratings WHERE pnm_id = ? AND user_id = ?",
+        (pnm_id, user_id),
+    ).fetchone()
+    if not row:
+        return None
+    return rating_payload(row)
+
+
+def current_user(request: Request) -> sqlite3.Row:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated.")
+
+    with db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT u.*
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
+
+        conn.execute("UPDATE sessions SET last_seen_at = ? WHERE token = ?", (now_iso(), token))
+        return row
+
+
+def require_head(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
+    if user["role"] != ROLE_HEAD:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Head Rush Officer permission required.")
+    return user
+
+
+class RegisterRequest(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=48)
+    last_name: str = Field(..., min_length=1, max_length=48)
+    pledge_class: str = Field(..., min_length=1, max_length=24)
+    role: str
+    emoji: str | None = None
+    stereotype: str = Field(..., min_length=1, max_length=48)
+    interests: str | list[str]
+    access_code: str = Field(..., min_length=4, max_length=128)
+
+    @field_validator("role")
+    @classmethod
+    def validate_role(cls, value: str) -> str:
+        if value not in ALLOWED_ROLES:
+            raise ValueError("Invalid role.")
+        return value
+
+    @model_validator(mode="after")
+    def validate_emoji_by_role(self) -> "RegisterRequest":
+        if self.role == ROLE_RUSH_OFFICER and (self.emoji is None or not self.emoji.strip()):
+            raise ValueError("Rush Officers must include an emoji identifier.")
+        if self.role != ROLE_RUSH_OFFICER:
+            self.emoji = None
+        return self
+
+
+class LoginRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=120)
+    access_code: str = Field(..., min_length=4, max_length=128)
+
+
+class SelfUpdateRequest(BaseModel):
+    stereotype: str | None = Field(default=None, min_length=1, max_length=48)
+    interests: str | list[str] | None = None
+    emoji: str | None = None
+
+
+class PNMCreateRequest(BaseModel):
+    first_name: str = Field(..., min_length=1, max_length=48)
+    last_name: str = Field(..., min_length=1, max_length=48)
+    class_year: str
+    hometown: str = Field(..., min_length=1, max_length=80)
+    instagram_handle: str = Field(..., min_length=1, max_length=80)
+    first_event_date: str
+    interests: str | list[str]
+    stereotype: str = Field(..., min_length=1, max_length=48)
+    lunch_stats: str = Field(default="", max_length=256)
+
+    @field_validator("class_year")
+    @classmethod
+    def validate_class_year(cls, value: str) -> str:
+        normalized = value.strip().upper()
+        if normalized not in {"F", "S", "J"}:
+            raise ValueError("Class year must be F, S, or J.")
+        return normalized
+
+    @field_validator("first_event_date")
+    @classmethod
+    def validate_first_event_date(cls, value: str) -> str:
+        return verify_iso_date(value, "First event date")
+
+
+class RatingUpsertRequest(BaseModel):
+    pnm_id: int
+    good_with_girls: int = Field(..., ge=0, le=10)
+    will_make_it: int = Field(..., ge=0, le=10)
+    personable: int = Field(..., ge=0, le=10)
+    alcohol_control: int = Field(..., ge=0, le=10)
+    instagram_marketability: int = Field(..., ge=0, le=5)
+    comment: str | None = Field(default=None, max_length=1000)
+
+
+class LunchCreateRequest(BaseModel):
+    pnm_id: int
+    lunch_date: str
+    notes: str = Field(default="", max_length=500)
+
+    @field_validator("lunch_date")
+    @classmethod
+    def validate_lunch_date(cls, value: str) -> str:
+        return verify_iso_date(value, "Lunch date")
+
+
+@app.on_event("startup")
+def startup() -> None:
+    with db_session() as conn:
+        setup_schema(conn)
+        ensure_seed_data(conn)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -52,38 +674,768 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.post("/api/analyze")
-async def analyze(payload: AnalyzeRequest) -> dict:
-    tickers = clean_tickers(payload.tickers)
-    if not tickers:
-        raise HTTPException(status_code=400, detail="Provide at least one ticker.")
+@app.post("/api/auth/register")
+def register(payload: RegisterRequest) -> dict[str, str]:
+    first_name = normalize_name(payload.first_name)
+    last_name = normalize_name(payload.last_name)
+    pledge_class = payload.pledge_class.strip()
+    if not pledge_class:
+        raise HTTPException(status_code=400, detail="Pledge class is required.")
+
+    if payload.role == ROLE_HEAD:
+        raise HTTPException(status_code=403, detail="Head Rush Officer accounts are controlled by admin seed/permissions.")
 
     try:
-        result = analyze_tickers(tickers)
-    except FinanceDataError as exc:
+        interests = parse_interests(payload.interests)
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}") from exc
 
-    return result.to_payload()
+    interests_csv, interests_norm = encode_interests(interests)
+    username = f"{first_name} {last_name} - {pledge_class}"
+
+    with db_session() as conn:
+        existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already exists. Choose a different pledge class label.")
+
+        created_at = now_iso()
+        try:
+            conn.execute(
+                """
+                INSERT INTO users (
+                    username,
+                    first_name,
+                    last_name,
+                    pledge_class,
+                    role,
+                    emoji,
+                    stereotype,
+                    interests,
+                    interests_norm,
+                    access_code_hash,
+                    is_approved,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                """,
+                (
+                    username,
+                    first_name,
+                    last_name,
+                    pledge_class,
+                    payload.role,
+                    payload.emoji.strip() if payload.emoji else None,
+                    payload.stereotype.strip(),
+                    interests_csv,
+                    interests_norm,
+                    hash_access_code(payload.access_code),
+                    created_at,
+                    created_at,
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=400, detail=f"Could not register user: {exc}") from exc
+
+    return {
+        "message": "Registration submitted. Head Rush Officer approval is required before login.",
+        "username": username,
+    }
 
 
-@app.post("/api/report/pdf")
-async def report_pdf(payload: PDFRequest) -> Response:
-    tickers = clean_tickers(payload.tickers)
-    if not tickers:
-        raise HTTPException(status_code=400, detail="Provide at least one ticker.")
+@app.post("/api/auth/login")
+def login(payload: LoginRequest, response: Response) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM users WHERE username = ?", (payload.username.strip(),)).fetchone()
+        if not row:
+            raise HTTPException(status_code=401, detail="Invalid username or access code.")
 
+        if row["access_code_hash"] != hash_access_code(payload.access_code):
+            raise HTTPException(status_code=401, detail="Invalid username or access code.")
+
+        if not bool(row["is_approved"]):
+            raise HTTPException(status_code=403, detail="Username pending Head Rush Officer approval.")
+
+        token = secrets.token_urlsafe(32)
+        now = now_iso()
+        conn.execute("INSERT INTO sessions (token, user_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)", (token, row["id"], now, now))
+        conn.execute("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?", (now, now, row["id"]))
+
+        response.set_cookie(
+            key=SESSION_COOKIE,
+            value=token,
+            httponly=True,
+            samesite="lax",
+            max_age=60 * 60 * 12,
+            secure=False,
+            path="/",
+        )
+
+        return {
+            "user": user_payload(row, row["role"], row["id"]),
+            "message": "Logged in.",
+        }
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, response: Response) -> dict[str, str]:
+    token = request.cookies.get(SESSION_COOKIE)
+    if token:
+        with db_session() as conn:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+    response.delete_cookie(key=SESSION_COOKIE, path="/")
+    return {"message": "Logged out."}
+
+
+@app.get("/api/auth/me")
+def auth_me(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    return {
+        "authenticated": True,
+        "user": user_payload(user, user["role"], user["id"]),
+    }
+
+
+@app.get("/api/users/pending")
+def pending_users(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT id, username, role, stereotype, interests, created_at
+            FROM users
+            WHERE is_approved = 0
+            ORDER BY created_at ASC
+            """
+        ).fetchall()
+
+    return {
+        "pending": [
+            {
+                "user_id": row["id"],
+                "username": row["username"],
+                "role": row["role"],
+                "stereotype": row["stereotype"],
+                "interests": decode_interests(row["interests"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.post("/api/users/pending/{user_id}/approve")
+def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
+    with db_session() as conn:
+        row = conn.execute("SELECT id, is_approved FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if bool(row["is_approved"]):
+            return {"message": "User already approved."}
+
+        conn.execute(
+            "UPDATE users SET is_approved = 1, approved_by = ?, approved_at = ?, updated_at = ? WHERE id = ?",
+            (approver["id"], now_iso(), now_iso(), user_id),
+        )
+
+    return {"message": "User approved."}
+
+
+@app.get("/api/users")
+def list_users(
+    interest: str | None = None,
+    stereotype: str | None = None,
+    user: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
     try:
-        result = analyze_tickers(tickers)
-        pdf_bytes = build_pdf_report(result, report_title=payload.report_title)
-    except FinanceDataError as exc:
+        interest_filter = parse_interest_filter(interest)
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {exc}") from exc
 
-    filename_slug = "-".join(tickers[:5]).lower()
-    filename = f"financial-report-{filename_slug or 'analysis'}.pdf"
-    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
+    normalized_stereotype = stereotype.strip().lower() if stereotype else None
 
+    with db_session() as conn:
+        rows = conn.execute(
+            "SELECT * FROM users WHERE is_approved = 1 ORDER BY role ASC, username ASC"
+        ).fetchall()
+
+    filtered = []
+    for row in rows:
+        if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
+            continue
+        if not has_interest_match(row["interests_norm"], interest_filter):
+            continue
+        filtered.append(user_payload(row, user["role"], user["id"]))
+
+    return {"users": filtered}
+
+
+@app.patch("/api/users/me")
+def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    updates: list[str] = []
+    values: list[Any] = []
+
+    if payload.stereotype is not None:
+        updates.append("stereotype = ?")
+        values.append(payload.stereotype.strip())
+
+    if payload.interests is not None:
+        try:
+            interests = parse_interests(payload.interests)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        interests_csv, interests_norm = encode_interests(interests)
+        updates.extend(["interests = ?", "interests_norm = ?"])
+        values.extend([interests_csv, interests_norm])
+
+    if payload.emoji is not None:
+        if user["role"] != ROLE_RUSH_OFFICER:
+            raise HTTPException(status_code=400, detail="Only Rush Officers can set emoji identifiers.")
+        if not payload.emoji.strip():
+            raise HTTPException(status_code=400, detail="Emoji cannot be empty for Rush Officers.")
+        updates.append("emoji = ?")
+        values.append(payload.emoji.strip())
+
+    if not updates:
+        raise HTTPException(status_code=400, detail="No changes provided.")
+
+    values.extend([now_iso(), user["id"]])
+
+    with db_session() as conn:
+        conn.execute(f"UPDATE users SET {', '.join(updates)}, updated_at = ? WHERE id = ?", tuple(values))
+        refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+
+    return {"user": user_payload(refreshed, refreshed["role"], refreshed["id"]) }
+
+
+@app.post("/api/pnms")
+def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    try:
+        interests = parse_interests(payload.interests)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    interests_csv, interests_norm = encode_interests(interests)
+    created_at = now_iso()
+    first_name = normalize_name(payload.first_name)
+    last_name = normalize_name(payload.last_name)
+
+    with db_session() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO pnms (
+                pnm_code,
+                first_name,
+                last_name,
+                class_year,
+                hometown,
+                instagram_handle,
+                first_event_date,
+                interests,
+                interests_norm,
+                stereotype,
+                lunch_stats,
+                created_by,
+                created_at,
+                updated_at
+            )
+            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                first_name,
+                last_name,
+                payload.class_year,
+                payload.hometown.strip(),
+                payload.instagram_handle.strip(),
+                payload.first_event_date,
+                interests_csv,
+                interests_norm,
+                payload.stereotype.strip(),
+                payload.lunch_stats.strip(),
+                user["id"],
+                created_at,
+                created_at,
+            ),
+        )
+        pnm_id = int(cursor.lastrowid)
+
+        base = pnm_code_base(first_name, last_name, payload.first_event_date)
+        code = ensure_unique_pnm_code(conn, pnm_id, base)
+        conn.execute("UPDATE pnms SET pnm_code = ?, updated_at = ? WHERE id = ?", (code, now_iso(), pnm_id))
+
+        row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+
+    return {"pnm": pnm_payload(row, own_rating=None)}
+
+
+@app.get("/api/pnms")
+def list_pnms(
+    interest: str | None = None,
+    stereotype: str | None = None,
+    user: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    try:
+        interest_filter = parse_interest_filter(interest)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    normalized_stereotype = stereotype.strip().lower() if stereotype else None
+
+    with db_session() as conn:
+        own_rows = conn.execute(
+            "SELECT * FROM ratings WHERE user_id = ?",
+            (user["id"],),
+        ).fetchall()
+        own_rating_by_pnm = {row["pnm_id"]: rating_payload(row) for row in own_rows}
+
+        rows = conn.execute(
+            "SELECT * FROM pnms ORDER BY weighted_total DESC, last_name ASC, first_name ASC"
+        ).fetchall()
+
+    filtered = []
+    for row in rows:
+        if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
+            continue
+        if not has_interest_match(row["interests_norm"], interest_filter):
+            continue
+        filtered.append(pnm_payload(row, own_rating_by_pnm.get(row["id"])))
+
+    return {"pnms": filtered}
+
+
+@app.get("/api/pnms/{pnm_id}")
+def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+        own = fetch_own_rating(conn, pnm_id, user["id"])
+    return {"pnm": pnm_payload(row, own)}
+
+
+@app.post("/api/ratings")
+def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    score_data = {
+        "good_with_girls": payload.good_with_girls,
+        "will_make_it": payload.will_make_it,
+        "personable": payload.personable,
+        "alcohol_control": payload.alcohol_control,
+        "instagram_marketability": payload.instagram_marketability,
+    }
+    new_total = score_total(score_data)
+
+    with db_session() as conn:
+        pnm_row = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        if not pnm_row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        existing = conn.execute(
+            "SELECT * FROM ratings WHERE pnm_id = ? AND user_id = ?",
+            (payload.pnm_id, user["id"]),
+        ).fetchone()
+
+        now = now_iso()
+        change_event: dict[str, Any] | None = None
+
+        if existing:
+            old_payload = {
+                "good_with_girls": existing["good_with_girls"],
+                "will_make_it": existing["will_make_it"],
+                "personable": existing["personable"],
+                "alcohol_control": existing["alcohol_control"],
+                "instagram_marketability": existing["instagram_marketability"],
+                "total_score": existing["total_score"],
+            }
+            changed = any(old_payload[field] != score_data[field] for field in RATING_FIELDS)
+
+            if changed:
+                comment = (payload.comment or "").strip()
+                if count_words(comment) <= 5:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Updating an existing rating requires a comment longer than 5 words.",
+                    )
+            else:
+                comment = existing["comment"]
+
+            conn.execute(
+                """
+                UPDATE ratings
+                SET
+                    good_with_girls = ?,
+                    will_make_it = ?,
+                    personable = ?,
+                    alcohol_control = ?,
+                    instagram_marketability = ?,
+                    total_score = ?,
+                    comment = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    payload.good_with_girls,
+                    payload.will_make_it,
+                    payload.personable,
+                    payload.alcohol_control,
+                    payload.instagram_marketability,
+                    new_total,
+                    comment,
+                    now,
+                    existing["id"],
+                ),
+            )
+
+            if changed:
+                new_payload = {
+                    "good_with_girls": payload.good_with_girls,
+                    "will_make_it": payload.will_make_it,
+                    "personable": payload.personable,
+                    "alcohol_control": payload.alcohol_control,
+                    "instagram_marketability": payload.instagram_marketability,
+                    "total_score": new_total,
+                }
+                delta_total = new_total - int(existing["total_score"])
+                conn.execute(
+                    """
+                    INSERT INTO rating_changes (
+                        rating_id,
+                        pnm_id,
+                        user_id,
+                        old_total,
+                        new_total,
+                        delta_total,
+                        old_payload,
+                        new_payload,
+                        comment,
+                        changed_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(rating_id) DO UPDATE SET
+                        pnm_id = excluded.pnm_id,
+                        user_id = excluded.user_id,
+                        old_total = excluded.old_total,
+                        new_total = excluded.new_total,
+                        delta_total = excluded.delta_total,
+                        old_payload = excluded.old_payload,
+                        new_payload = excluded.new_payload,
+                        comment = excluded.comment,
+                        changed_at = excluded.changed_at
+                    """,
+                    (
+                        existing["id"],
+                        payload.pnm_id,
+                        user["id"],
+                        int(existing["total_score"]),
+                        new_total,
+                        delta_total,
+                        json.dumps(old_payload),
+                        json.dumps(new_payload),
+                        comment,
+                        now,
+                    ),
+                )
+                change_event = {
+                    "old_total": int(existing["total_score"]),
+                    "new_total": new_total,
+                    "delta_total": delta_total,
+                    "comment": comment,
+                    "changed_at": now,
+                }
+        else:
+            conn.execute(
+                """
+                INSERT INTO ratings (
+                    pnm_id,
+                    user_id,
+                    good_with_girls,
+                    will_make_it,
+                    personable,
+                    alcohol_control,
+                    instagram_marketability,
+                    total_score,
+                    comment,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.pnm_id,
+                    user["id"],
+                    payload.good_with_girls,
+                    payload.will_make_it,
+                    payload.personable,
+                    payload.alcohol_control,
+                    payload.instagram_marketability,
+                    new_total,
+                    (payload.comment or "").strip(),
+                    now,
+                    now,
+                ),
+            )
+
+        recalc_pnm_rating_stats(conn, payload.pnm_id)
+        recalc_member_rating_stats(conn, user["id"])
+
+        updated_rating = conn.execute(
+            "SELECT * FROM ratings WHERE pnm_id = ? AND user_id = ?",
+            (payload.pnm_id, user["id"]),
+        ).fetchone()
+
+        updated_pnm = conn.execute("SELECT * FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        updated_user = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+
+    return {
+        "rating": rating_payload(updated_rating),
+        "change": change_event,
+        "pnm": pnm_payload(updated_pnm, rating_payload(updated_rating)),
+        "member": user_payload(updated_user, updated_user["role"], updated_user["id"]),
+    }
+
+
+@app.get("/api/pnms/{pnm_id}/ratings")
+def pnm_ratings(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        target = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        rows = conn.execute(
+            """
+            SELECT
+                r.*,
+                u.username,
+                u.role,
+                u.emoji,
+                rc.old_total,
+                rc.new_total,
+                rc.delta_total,
+                rc.comment AS delta_comment,
+                rc.changed_at
+            FROM ratings r
+            JOIN users u ON u.id = r.user_id
+            LEFT JOIN rating_changes rc ON rc.rating_id = r.id
+            WHERE r.pnm_id = ?
+            ORDER BY r.total_score DESC, r.updated_at DESC
+            """,
+            (pnm_id,),
+        ).fetchall()
+
+    can_view_identity = user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
+    response_rows: list[dict[str, Any]] = []
+
+    for row in rows:
+        entry = {
+            "rating_id": row["id"],
+            "pnm_id": row["pnm_id"],
+            "from_me": row["user_id"] == user["id"],
+            "good_with_girls": row["good_with_girls"],
+            "will_make_it": row["will_make_it"],
+            "personable": row["personable"],
+            "alcohol_control": row["alcohol_control"],
+            "instagram_marketability": row["instagram_marketability"],
+            "total_score": row["total_score"],
+            "updated_at": row["updated_at"],
+        }
+
+        if can_view_identity:
+            entry["rater"] = {
+                "username": row["username"],
+                "role": row["role"],
+                "emoji": row["emoji"],
+            }
+            entry["comment"] = row["comment"]
+            entry["last_change"] = (
+                {
+                    "old_total": row["old_total"],
+                    "new_total": row["new_total"],
+                    "delta_total": row["delta_total"],
+                    "comment": row["delta_comment"],
+                    "changed_at": row["changed_at"],
+                }
+                if row["changed_at"]
+                else None
+            )
+        else:
+            if row["user_id"] == user["id"]:
+                entry["comment"] = row["comment"]
+                entry["last_change"] = (
+                    {
+                        "old_total": row["old_total"],
+                        "new_total": row["new_total"],
+                        "delta_total": row["delta_total"],
+                        "comment": row["delta_comment"],
+                        "changed_at": row["changed_at"],
+                    }
+                    if row["changed_at"]
+                    else None
+                )
+
+        response_rows.append(entry)
+
+    return {
+        "can_view_rater_identity": can_view_identity,
+        "ratings": response_rows,
+    }
+
+
+@app.post("/api/lunches")
+def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        pnm = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        if not pnm:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        try:
+            conn.execute(
+                "INSERT INTO lunches (pnm_id, user_id, lunch_date, notes, created_at) VALUES (?, ?, ?, ?, ?)",
+                (payload.pnm_id, user["id"], payload.lunch_date, payload.notes.strip(), now_iso()),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail="Duplicate lunch log for this member, PNM, and date is not allowed.",
+            ) from exc
+
+        recalc_member_lunch_stats(conn, user["id"])
+        recalc_pnm_lunch_stats(conn, payload.pnm_id)
+
+        refreshed_user = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+        refreshed_pnm = conn.execute("SELECT * FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+
+    return {
+        "message": "Lunch logged.",
+        "member": user_payload(refreshed_user, refreshed_user["role"], refreshed_user["id"]),
+        "pnm": pnm_payload(refreshed_pnm, own_rating=None),
+    }
+
+
+@app.get("/api/pnms/{pnm_id}/lunches")
+def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        target = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        rows = conn.execute(
+            """
+            SELECT l.lunch_date, l.notes, l.created_at, u.username
+            FROM lunches l
+            JOIN users u ON u.id = l.user_id
+            WHERE l.pnm_id = ?
+            ORDER BY l.lunch_date DESC, l.created_at DESC
+            LIMIT 50
+            """,
+            (pnm_id,),
+        ).fetchall()
+
+    return {
+        "lunches": [
+            {
+                "lunch_date": row["lunch_date"],
+                "notes": row["notes"],
+                "created_at": row["created_at"],
+                "username": row["username"],
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.get("/api/matching")
+def matching(
+    interest: str | None = None,
+    stereotype: str | None = None,
+    user: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    try:
+        interest_filter = parse_interest_filter(interest)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    normalized_stereotype = stereotype.strip().lower() if stereotype else None
+
+    with db_session() as conn:
+        own_rows = conn.execute("SELECT * FROM ratings WHERE user_id = ?", (user["id"],)).fetchall()
+        own_rating_by_pnm = {row["pnm_id"]: rating_payload(row) for row in own_rows}
+
+        pnm_rows = conn.execute(
+            "SELECT * FROM pnms ORDER BY weighted_total DESC, last_name ASC, first_name ASC"
+        ).fetchall()
+        user_rows = conn.execute(
+            "SELECT * FROM users WHERE is_approved = 1 ORDER BY username ASC"
+        ).fetchall()
+
+    pnms = []
+    for row in pnm_rows:
+        if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
+            continue
+        if not has_interest_match(row["interests_norm"], interest_filter):
+            continue
+        pnms.append(pnm_payload(row, own_rating_by_pnm.get(row["id"])))
+
+    members = []
+    for row in user_rows:
+        if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
+            continue
+        if not has_interest_match(row["interests_norm"], interest_filter):
+            continue
+        members.append(user_payload(row, user["role"], user["id"]))
+
+    return {
+        "filters": {
+            "interest": sorted(list(interest_filter)),
+            "stereotype": stereotype.strip() if stereotype else "",
+        },
+        "pnms": pnms,
+        "members": members,
+    }
+
+
+@app.get("/api/analytics/overview")
+def analytics_overview(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        top_pnms = conn.execute(
+            """
+            SELECT id, pnm_code, first_name, last_name, weighted_total, rating_count, total_lunches
+            FROM pnms
+            ORDER BY weighted_total DESC, rating_count DESC
+            LIMIT 10
+            """
+        ).fetchall()
+
+        members = conn.execute(
+            "SELECT * FROM users WHERE is_approved = 1 ORDER BY rating_count DESC, total_lunches DESC LIMIT 15"
+        ).fetchall()
+
+    return {
+        "top_pnms": [
+            {
+                "pnm_id": row["id"],
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "weighted_total": round(float(row["weighted_total"]), 2),
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+            }
+            for row in top_pnms
+        ],
+        "member_participation": [user_payload(row, user["role"], user["id"]) for row in members],
+    }
+
+
+@app.get("/api/interests")
+def list_interests(_: sqlite3.Row = Depends(current_user)) -> dict[str, list[str]]:
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT interests FROM users WHERE is_approved = 1
+            UNION ALL
+            SELECT interests FROM pnms
+            """
+        ).fetchall()
+
+    values: set[str] = set()
+    for row in rows:
+        for interest in decode_interests(row["interests"]):
+            values.add(interest)
+
+    return {"interests": sorted(values)}

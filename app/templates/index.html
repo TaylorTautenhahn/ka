@@ -3,110 +3,280 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Atlas Financial Modeling</title>
+    <meta name="theme-color" content="#1b4d3e" />
+    <title>KAO Rush Evaluation</title>
+    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Sora:wght@300;400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/styles.css" />
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
     <script src="/static/js/app.js" defer></script>
   </head>
   <body>
-    <div class="ambient ambient-one"></div>
-    <div class="ambient ambient-two"></div>
+    <div class="aura aura-one"></div>
+    <div class="aura aura-two"></div>
 
     <main class="shell">
       <header class="hero reveal">
-        <p class="eyebrow">Atlas Platform</p>
-        <h1>10-Year Financial Modeling for Stocks, ETFs, and Mutual Funds</h1>
-        <p class="hero-copy">
-          Compare representative performance using Yahoo Finance data, then export a clean printable PDF report for clients or investment committees.
+        <p class="eyebrow">Kappa Alpha Order</p>
+        <h1>Connected Rush Evaluation</h1>
+        <p>
+          Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.
         </p>
       </header>
 
-      <section class="panel controls reveal delay-1">
-        <div class="control-grid">
-          <label for="tickerInput">Tickers</label>
-          <div class="input-row">
-            <input
-              id="tickerInput"
-              type="text"
-              autocomplete="off"
-              placeholder="AAPL, VOO, SWPPX, FSKAX"
-            />
-            <button id="analyzeBtn" type="button">Analyze 10Y</button>
-            <button id="pdfBtn" type="button" class="secondary" disabled>Download PDF</button>
-          </div>
-          <p class="helper">
-            Use commas or spaces. Mixed assets supported, including single stocks, ETFs, and mutual funds.
+      <section id="authSection" class="panel auth-grid reveal delay-1">
+        <article>
+          <h2>Login</h2>
+          <form id="loginForm" class="stack">
+            <label>
+              Username
+              <input id="loginUsername" type="text" required placeholder="First Last - PledgeClass" />
+            </label>
+            <label>
+              Access code
+              <input id="loginAccessCode" type="password" required placeholder="Enter code" />
+            </label>
+            <button type="submit">Sign In</button>
+          </form>
+          <p class="muted">
+            Seed Head Rush Officer login: <code>Head Officer - Admin</code> / <code>KAO2026</code>
           </p>
-        </div>
-        <div class="presets">
-          <button type="button" class="chip" data-tickers="AAPL,MSFT,NVDA">Growth Leaders</button>
-          <button type="button" class="chip" data-tickers="VOO,VTI,QQQ">Core ETFs</button>
-          <button type="button" class="chip" data-tickers="VTSAX,FXAIX,SWPPX">Mutual Funds</button>
-        </div>
-      </section>
-
-      <section class="layout reveal delay-2">
-        <article class="panel chart-panel">
-          <div class="panel-head">
-            <h2>Representative Performance</h2>
-            <p id="rangeLabel" class="muted">Run an analysis to populate chart data.</p>
-          </div>
-          <div class="chart-wrap">
-            <canvas id="performanceChart" aria-label="Performance chart" role="img"></canvas>
-          </div>
         </article>
 
-        <article class="panel metrics-panel">
-          <div class="panel-head">
-            <h2>Snapshot</h2>
-            <p class="muted">Key portfolio-level comparables.</p>
-          </div>
-          <div id="metricCards" class="metric-cards">
-            <p class="muted">No data yet.</p>
-          </div>
+        <article>
+          <h2>Register</h2>
+          <form id="registerForm" class="stack">
+            <div class="inline-grid">
+              <label>
+                First name
+                <input id="regFirstName" type="text" required />
+              </label>
+              <label>
+                Last name
+                <input id="regLastName" type="text" required />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Pledge class
+                <input id="regPledgeClass" type="text" required placeholder="Fall25" />
+              </label>
+              <label>
+                Role
+                <select id="regRole" required>
+                  <option>Rush Officer</option>
+                  <option>Rusher</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Emoji (Rush Officers only)
+              <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
+            </label>
+            <label>
+              Stereotype
+              <input id="regStereotype" type="text" required />
+            </label>
+            <label>
+              Interests (comma-separated)
+              <input id="regInterests" type="text" required placeholder="Golf,Hiking,Finance" />
+            </label>
+            <label>
+              Access code
+              <input id="regAccessCode" type="password" required />
+            </label>
+            <button type="submit" class="secondary">Submit for Approval</button>
+          </form>
         </article>
       </section>
 
-      <section class="panel table-panel reveal delay-3">
-        <div class="panel-head">
-          <h2>Detailed Metrics</h2>
-          <p id="excludedNote" class="muted"></p>
+      <section id="appSection" class="hidden">
+        <div class="panel topbar reveal delay-1">
+          <div>
+            <p class="eyebrow">Session</p>
+            <h2 id="sessionTitle">Welcome</h2>
+            <p id="sessionSubtitle" class="muted"></p>
+          </div>
+          <div class="action-row">
+            <button id="installBtn" type="button" class="secondary hidden">Install App</button>
+            <button id="logoutBtn" type="button" class="secondary">Logout</button>
+          </div>
         </div>
-        <div class="table-wrap">
-          <table id="metricsTable">
-            <thead>
-              <tr>
-                <th>Ticker</th>
-                <th>Total Return</th>
-                <th>CAGR</th>
-                <th>Ann. Volatility</th>
-                <th>Max Drawdown</th>
-                <th>Start Price</th>
-                <th>End Price</th>
-                <th>$10K Ending Value</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td colspan="8" class="empty-row">Run an analysis to view metric rows.</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      <footer class="footnote">
-        Data source: Yahoo Finance. For informational use; not investment advice.
-      </footer>
+        <div class="panel filters reveal delay-2">
+          <h2>Filtering & Matching</h2>
+          <div class="inline-grid filters-grid">
+            <label>
+              Interest (ANY match)
+              <input id="filterInterest" list="interestHints" type="text" placeholder="Golf" />
+            </label>
+            <label>
+              Stereotype
+              <input id="filterStereotype" type="text" placeholder="Connector" />
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyFiltersBtn" type="button">Apply Filters</button>
+            </label>
+          </div>
+          <datalist id="interestHints"></datalist>
+        </div>
+
+        <div class="grid-two reveal delay-3">
+          <section class="panel">
+            <h2>Create PNM</h2>
+            <form id="pnmForm" class="stack">
+              <div class="inline-grid">
+                <label>
+                  First name
+                  <input id="pnmFirstName" type="text" required />
+                </label>
+                <label>
+                  Last name
+                  <input id="pnmLastName" type="text" required />
+                </label>
+              </div>
+              <div class="inline-grid">
+                <label>
+                  Class year
+                  <select id="pnmClassYear" required>
+                    <option>F</option>
+                    <option>S</option>
+                    <option>J</option>
+                  </select>
+                </label>
+                <label>
+                  First event date
+                  <input id="pnmEventDate" type="date" required />
+                </label>
+              </div>
+              <label>
+                Hometown
+                <input id="pnmHometown" type="text" required />
+              </label>
+              <label>
+                Instagram handle
+                <input id="pnmInstagram" type="text" required placeholder="@username" />
+              </label>
+              <label>
+                Interests (comma-separated)
+                <input id="pnmInterests" type="text" required placeholder="Golf,Fishing" />
+              </label>
+              <label>
+                Stereotype
+                <input id="pnmStereotype" type="text" required />
+              </label>
+              <label>
+                Lunch stats (optional)
+                <input id="pnmLunchStats" type="text" placeholder="3 lunches this week" />
+              </label>
+              <button type="submit">Add PNM</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <h2>Log Lunch</h2>
+            <form id="lunchForm" class="stack">
+              <label>
+                PNM
+                <select id="lunchPnm" required></select>
+              </label>
+              <label>
+                Date
+                <input id="lunchDate" type="date" required />
+              </label>
+              <label>
+                Notes
+                <textarea id="lunchNotes" rows="3" placeholder="Optional lunch context"></textarea>
+              </label>
+              <button type="submit">Log Lunch</button>
+            </form>
+
+            <div class="divider"></div>
+
+            <h2>Analytics Snapshot</h2>
+            <div id="analyticsCards" class="cards"></div>
+          </section>
+        </div>
+
+        <section id="approvalsPanel" class="panel hidden reveal delay-4">
+          <h2>Pending Username Approvals</h2>
+          <div id="pendingList" class="table-wrap"></div>
+        </section>
+
+        <section class="panel reveal delay-4">
+          <div class="section-head">
+            <h2>PNMs</h2>
+            <p class="muted">Weighted totals and per-category averages auto-update with every rating change.</p>
+          </div>
+          <div id="pnmTable" class="table-wrap"></div>
+        </section>
+
+        <section class="panel reveal delay-5">
+          <div class="section-head">
+            <h2>Selected PNM Detail</h2>
+            <p id="selectedPnmLabel" class="muted">Select a PNM to rate and review rating/lunch history.</p>
+          </div>
+
+          <div class="grid-two">
+            <article>
+              <h3>Rate / Update Rating</h3>
+              <form id="ratingForm" class="stack">
+                <label>
+                  PNM
+                  <select id="ratingPnm" required></select>
+                </label>
+                <div class="inline-grid five-cols compact-inputs">
+                  <label>Girls (0-10)<input id="rateGirls" type="number" min="0" max="10" required /></label>
+                  <label>Process (0-10)<input id="rateProcess" type="number" min="0" max="10" required /></label>
+                  <label>Personable (0-10)<input id="ratePersonable" type="number" min="0" max="10" required /></label>
+                  <label>Alcohol (0-10)<input id="rateAlcohol" type="number" min="0" max="10" required /></label>
+                  <label>IG (0-5)<input id="rateIg" type="number" min="0" max="5" required /></label>
+                </div>
+                <label>
+                  Comment (required on updates; must exceed 5 words)
+                  <textarea id="rateComment" rows="3" placeholder="Explain what changed and why"></textarea>
+                </label>
+                <button type="submit">Save Rating</button>
+              </form>
+            </article>
+
+            <article>
+              <h3>Ratings View</h3>
+              <div id="ratingList" class="list-box muted">Select a PNM to view rating entries.</div>
+              <h3>Lunch History</h3>
+              <div id="lunchHistory" class="list-box muted">Select a PNM to view lunch logs.</div>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel reveal delay-5">
+          <h2>Members</h2>
+          <div id="memberTable" class="table-wrap"></div>
+        </section>
+
+        <section class="panel reveal delay-6">
+          <h2>Matching View</h2>
+          <p class="muted">Apply shared filters above to pair PNMs and members intentionally.</p>
+          <div class="grid-two matching-grid">
+            <div>
+              <h3>Filtered PNMs</h3>
+              <div id="matchingPnms" class="list-box"></div>
+            </div>
+            <div>
+              <h3>Filtered Members</h3>
+              <div id="matchingMembers" class="list-box"></div>
+            </div>
+          </div>
+        </section>
+      </section>
     </main>
 
     <div id="toast" class="toast hidden"></div>
   </body>
 </html>
-

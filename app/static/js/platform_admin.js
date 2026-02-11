@@ -79,6 +79,10 @@ function renderTenantList(rows) {
           <td>
             <div class="action-row">
               <a class="quick-nav-link" href="${escapeHtml(path)}">Open</a>
+              <div class="tenant-logo-upload">
+                <input type="file" class="tenant-logo-file" data-slug="${escapeHtml(tenant.slug)}" accept="image/png,image/jpeg,image/webp" />
+                <button type="button" class="secondary upload-tenant-logo" data-slug="${escapeHtml(tenant.slug)}">Upload Logo</button>
+              </div>
               ${
                 tenant.slug === "kappaalphaorder"
                   ? ""
@@ -194,6 +198,40 @@ async function handleCreateTenant(event) {
 }
 
 async function handleTenantListClick(event) {
+  const uploadButton = event.target.closest("button.upload-tenant-logo");
+  if (uploadButton) {
+    const slug = uploadButton.dataset.slug;
+    if (!slug) {
+      return;
+    }
+    const fileInput = Array.from(tenantList.querySelectorAll("input.tenant-logo-file")).find(
+      (input) => input.dataset.slug === slug
+    );
+    const file = fileInput && fileInput.files && fileInput.files.length ? fileInput.files[0] : null;
+    if (!file) {
+      showToast("Choose a logo file first.");
+      return;
+    }
+    uploadButton.disabled = true;
+    uploadButton.textContent = "Uploading...";
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+      await api(`/platform/api/tenants/${slug}/logo`, {
+        method: "POST",
+        body: formData,
+      });
+      showToast(`Logo updated for /${slug}.`);
+      await loadTenants();
+    } catch (error) {
+      showToast(error.message || "Unable to upload logo.");
+    } finally {
+      uploadButton.disabled = false;
+      uploadButton.textContent = "Upload Logo";
+    }
+    return;
+  }
+
   const button = event.target.closest("button.disable-tenant");
   if (!button) {
     return;

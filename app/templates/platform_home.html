@@ -16,25 +16,49 @@
     <main class="shell">
       <header class="hero reveal">
         <p class="eyebrow">Multi-Organization</p>
-        <h1>Recruitment Operations Platform</h1>
-        <p>Choose an organization workspace or open the platform admin console.</p>
+        <h1>Select A Fraternity Workspace</h1>
+        <p>Choose the chapter you want to manage. Each workspace has isolated data, branding, and access control.</p>
       </header>
 
       <section class="panel">
-        <div class="action-row platform-home-actions">
-          <a href="/platform" class="quick-nav-link">Platform Admin</a>
+        <div class="section-head">
+          <h2>Organizations</h2>
+          <div class="action-row platform-home-actions">
+            <a href="/platform" class="quick-nav-link">Open Platform Admin</a>
+          </div>
         </div>
-        <div class="cards">
+        <div class="tenant-picker-grid">
           {% for tenant in tenants %}
-          <article class="card">
-            <strong>{{ tenant.display_name }}</strong>
-            <p>Path: /{{ tenant.slug }}</p>
+          <article class="tenant-card reveal">
+            <a class="tenant-card-link" href="/{{ tenant.slug }}" aria-label="Open {{ tenant.display_name }} dashboard">
+              <div class="tenant-card-top">
+                {% if tenant.logo_path %}
+                <img src="{{ tenant.logo_path }}" alt="{{ tenant.display_name }} logo" class="tenant-logo" />
+                {% else %}
+                <div class="tenant-logo tenant-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</div>
+                {% endif %}
+                <div>
+                  <strong>{{ tenant.display_name }}</strong>
+                  <p class="muted">{{ tenant.chapter_name }}</p>
+                </div>
+              </div>
+              <p class="muted tenant-path">Path: /{{ tenant.slug }}</p>
+            </a>
             <div class="action-row platform-card-actions">
-              <a class="quick-nav-link" href="/{{ tenant.slug }}">Open Dashboard</a>
-              <a class="quick-nav-link" href="/{{ tenant.slug }}/meeting">Meeting Page</a>
+              <a class="quick-nav-link" href="/{{ tenant.slug }}">Dashboard</a>
+              <a class="quick-nav-link" href="/{{ tenant.slug }}/meeting">Meeting</a>
             </div>
           </article>
           {% endfor %}
+          {% if not tenants %}
+          <article class="tenant-card">
+            <strong>No organizations configured yet</strong>
+            <p class="muted">Use Platform Admin to create your first fraternity workspace and upload its logo.</p>
+            <div class="action-row platform-card-actions">
+              <a class="quick-nav-link" href="/platform">Open Platform Admin</a>
+            </div>
+          </article>
+          {% endif %}
         </div>
       </section>
     </main>

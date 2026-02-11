@@ -363,6 +363,69 @@ button:disabled {
   margin-top: 0.55rem;
 }
 
+.tenant-picker-grid {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: 1fr;
+}
+
+.tenant-card {
+  border: 1px solid rgba(138, 21, 56, 0.16);
+  border-radius: 14px;
+  padding: 0.75rem;
+  background: rgba(255, 255, 255, 0.9);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.tenant-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 22px rgba(95, 16, 41, 0.16);
+}
+
+.tenant-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.tenant-card-top {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.tenant-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  object-fit: cover;
+  border: 1px solid rgba(138, 21, 56, 0.2);
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.tenant-logo-placeholder {
+  display: grid;
+  place-items: center;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.15rem;
+  color: var(--accent);
+  background: linear-gradient(140deg, rgba(255, 255, 255, 0.96), rgba(241, 226, 198, 0.92));
+}
+
+.tenant-path {
+  margin-top: 0.5rem;
+}
+
+.tenant-logo-upload {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tenant-logo-upload input[type="file"] {
+  max-width: 180px;
+}
+
 .topbar {
   display: flex;
   align-items: flex-start;
@@ -879,6 +942,10 @@ td strong {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
+  .tenant-picker-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .meeting-header {
     grid-template-columns: 220px 1fr;
     align-items: start;
@@ -886,6 +953,12 @@ td strong {
 
   .meeting-metrics {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  .tenant-picker-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

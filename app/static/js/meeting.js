@@ -216,6 +216,7 @@ function renderPacket(payload) {
         <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
         <p class="muted">${escapeHtml(pnm.hometown)} | ${escapeHtml(pnm.class_year)} | ${escapeHtml(pnm.instagram_handle)} | ${escapeHtml(pnm.phone_number || "No phone")}</p>
         <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
+        <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
         <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
       </div>
     </div>

@@ -1051,6 +1051,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "last_name",
             "class_year",
             "hometown",
+            "phone_number",
             "instagram_handle",
             "first_event_date",
             "interests",
@@ -1060,6 +1061,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "photo_uploaded_at",
             "photo_uploaded_by",
             "lunch_stats",
+            "notes",
             "total_lunches",
             "rating_count",
             "avg_good_with_girls",
@@ -1068,6 +1070,9 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "avg_alcohol_control",
             "avg_instagram_marketability",
             "weighted_total",
+            "assigned_officer_id",
+            "assigned_by",
+            "assigned_at",
             "created_by",
             "created_at",
             "updated_at",
@@ -1311,6 +1316,7 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             photo_uploaded_at TEXT,
             photo_uploaded_by INTEGER REFERENCES users(id),
             lunch_stats TEXT NOT NULL DEFAULT '',
+            notes TEXT NOT NULL DEFAULT '',
             total_lunches INTEGER NOT NULL DEFAULT 0,
             rating_count INTEGER NOT NULL DEFAULT 0,
             avg_good_with_girls REAL NOT NULL DEFAULT 0,
@@ -1405,6 +1411,8 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE pnms ADD COLUMN assigned_by INTEGER REFERENCES users(id)")
     if "assigned_at" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN assigned_at TEXT")
+    if "notes" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id)")
 
     lunch_columns = {row["name"] for row in conn.execute("PRAGMA table_info(lunches)").fetchall()}
@@ -1774,6 +1782,7 @@ def pnm_payload(
         "photo_url": public_photo_url(row["photo_path"]),
         "photo_uploaded_at": row["photo_uploaded_at"],
         "lunch_stats": row["lunch_stats"],
+        "notes": row["notes"] if "notes" in row.keys() else "",
         "total_lunches": int(row["total_lunches"]),
         "rating_count": int(row["rating_count"]),
         "avg_good_with_girls": round(float(row["avg_good_with_girls"]), 2),
@@ -1956,6 +1965,7 @@ class PNMCreateRequest(BaseModel):
     interests: str | list[str]
     stereotype: str = Field(..., min_length=1, max_length=48)
     lunch_stats: str = Field(default="", max_length=256)
+    notes: str = Field(default="", max_length=2000)
 
     @field_validator("class_year")
     @classmethod
@@ -1982,6 +1992,7 @@ class PNMUpdateRequest(BaseModel):
     interests: str | list[str] | None = None
     stereotype: str | None = Field(default=None, min_length=1, max_length=48)
     lunch_stats: str | None = Field(default=None, max_length=256)
+    notes: str | None = Field(default=None, max_length=2000)
 
     @field_validator("class_year")
     @classmethod
@@ -2991,11 +3002,12 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
                 interests_norm,
                 stereotype,
                 lunch_stats,
+                notes,
                 created_by,
                 created_at,
                 updated_at
             )
-            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 first_name,
@@ -3009,6 +3021,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_us
                 interests_norm,
                 stereotype,
                 payload.lunch_stats.strip(),
+                payload.notes.strip(),
                 user["id"],
                 created_at,
                 created_at,
@@ -3116,6 +3129,7 @@ def update_pnm_details(
         and payload.interests is None
         and payload.stereotype is None
         and payload.lunch_stats is None
+        and payload.notes is None
     ):
         raise HTTPException(status_code=400, detail="No PNM changes provided.")
 
@@ -3133,6 +3147,7 @@ def update_pnm_details(
         first_event_date = payload.first_event_date if payload.first_event_date is not None else row["first_event_date"]
         stereotype = payload.stereotype.strip() if payload.stereotype is not None else row["stereotype"]
         lunch_stats = payload.lunch_stats.strip() if payload.lunch_stats is not None else row["lunch_stats"]
+        notes = payload.notes.strip() if payload.notes is not None else row["notes"]
 
         if not hometown:
             raise HTTPException(status_code=400, detail="Hometown cannot be empty.")
@@ -3179,6 +3194,7 @@ def update_pnm_details(
                 interests_norm = ?,
                 stereotype = ?,
                 lunch_stats = ?,
+                notes = ?,
                 updated_at = ?
             WHERE id = ?
             """,
@@ -3195,6 +3211,7 @@ def update_pnm_details(
                 interests_norm,
                 stereotype,
                 lunch_stats,
+                notes,
                 now_iso(),
                 pnm_id,
             ),

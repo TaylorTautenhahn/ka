@@ -932,6 +932,39 @@ td strong {
   margin-right: 0.2rem;
 }
 
+.tag-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.38rem;
+  margin-bottom: 0.1rem;
+}
+
+.tag-picker .tag-pill {
+  min-width: 0;
+  padding: 0.32rem 0.58rem;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb), 0.24);
+  background: rgba(255, 255, 255, 0.76);
+  color: var(--accent);
+  box-shadow: none;
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.tag-picker .tag-pill:hover:not(:disabled) {
+  transform: translateY(0);
+  border-color: rgba(var(--accent-rgb), 0.44);
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.tag-picker .tag-pill.is-active {
+  color: #fff;
+  border-color: rgba(var(--accent-rgb), 0.86);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%);
+  box-shadow: 0 6px 14px rgba(var(--accent-shadow-rgb), 0.2);
+}
+
 .hidden {
   display: none !important;
 }

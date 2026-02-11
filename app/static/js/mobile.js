@@ -15,6 +15,30 @@ const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const MOBILE_BASE = (APP_CONFIG.mobile_base || `${BASE_PATH}/mobile`).replace(/\/$/, "");
 const MOBILE_PAGE = (document.body && document.body.dataset.mobilePage) || "";
+const DEFAULT_INTEREST_TAGS = [
+  "Leadership",
+  "Sports",
+  "Fitness",
+  "Finance",
+  "Outdoors",
+  "Music",
+  "Faith",
+  "Academics",
+  "Entrepreneurship",
+  "Philanthropy",
+  "Gaming",
+  "Travel",
+];
+const DEFAULT_STEREOTYPE_TAGS = [
+  "Leader",
+  "Connector",
+  "Scholar",
+  "Athlete",
+  "Social",
+  "Creative",
+  "Mentor",
+  "Builder",
+];
 
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -99,6 +123,126 @@ function showToast(message) {
   toastEl.classList.remove("hidden");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2500);
+}
+
+function parseTagInput(raw) {
+  return String(raw || "")
+    .split(/[,;\n]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function uniqueNormalized(values) {
+  const out = [];
+  const seen = new Set();
+  values.forEach((value) => {
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    out.push(value);
+  });
+  return out;
+}
+
+function renderTagPickerButtons(pickerEl, tags, selectedSet) {
+  if (!pickerEl) {
+    return;
+  }
+  pickerEl.innerHTML = tags
+    .map((tag) => {
+      const active = selectedSet.has(tag.toLowerCase()) ? " is-active" : "";
+      return `<button type="button" class="tag-pill${active}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`;
+    })
+    .join("");
+}
+
+function syncInterestPickerFromInput(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker) {
+    return;
+  }
+  const selected = new Set(parseTagInput(input.value).map((value) => value.toLowerCase()));
+  renderTagPickerButtons(picker, DEFAULT_INTEREST_TAGS, selected);
+}
+
+function syncStereotypePickerFromInput(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker) {
+    return;
+  }
+  const selected = new Set();
+  const value = String(input.value || "").trim().toLowerCase();
+  if (value) {
+    selected.add(value);
+  }
+  renderTagPickerButtons(picker, DEFAULT_STEREOTYPE_TAGS, selected);
+}
+
+function bindInterestPicker(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker || picker.dataset.bound === "1") {
+    return;
+  }
+  picker.dataset.bound = "1";
+
+  picker.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-tag]");
+    if (!button) {
+      return;
+    }
+    const tag = String(button.dataset.tag || "").trim();
+    if (!tag) {
+      return;
+    }
+    const tokens = parseTagInput(input.value);
+    const existing = new Set(tokens.map((value) => value.toLowerCase()));
+    if (existing.has(tag.toLowerCase())) {
+      input.value = tokens.filter((value) => value.toLowerCase() !== tag.toLowerCase()).join(",");
+    } else {
+      tokens.push(tag);
+      input.value = uniqueNormalized(tokens).join(",");
+    }
+    syncInterestPickerFromInput(inputId, pickerId);
+  });
+
+  input.addEventListener("input", () => syncInterestPickerFromInput(inputId, pickerId));
+  syncInterestPickerFromInput(inputId, pickerId);
+}
+
+function bindStereotypePicker(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker || picker.dataset.bound === "1") {
+    return;
+  }
+  picker.dataset.bound = "1";
+
+  picker.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-tag]");
+    if (!button) {
+      return;
+    }
+    const tag = String(button.dataset.tag || "").trim();
+    if (!tag) {
+      return;
+    }
+    const current = String(input.value || "").trim().toLowerCase();
+    input.value = current === tag.toLowerCase() ? "" : tag;
+    syncStereotypePickerFromInput(inputId, pickerId);
+  });
+
+  input.addEventListener("input", () => syncStereotypePickerFromInput(inputId, pickerId));
+  syncStereotypePickerFromInput(inputId, pickerId);
+}
+
+function initializeMobileTagPickers() {
+  bindInterestPicker("mobilePnmInterests", "mobileInterestTags");
+  bindStereotypePicker("mobilePnmStereotype", "mobileStereotypeTags");
 }
 
 function resolveApiPath(path) {
@@ -311,6 +455,11 @@ async function loadMembersPage() {
 
 async function handleCreateSubmit(event) {
   event.preventDefault();
+  const interestsValue = document.getElementById("mobilePnmInterests").value.trim();
+  if (!interestsValue) {
+    showToast("Select or type at least one interest.");
+    return;
+  }
   const body = {
     first_name: document.getElementById("mobilePnmFirstName").value.trim(),
     last_name: document.getElementById("mobilePnmLastName").value.trim(),
@@ -319,9 +468,10 @@ async function handleCreateSubmit(event) {
     phone_number: document.getElementById("mobilePnmPhone").value.trim(),
     instagram_handle: document.getElementById("mobilePnmInstagram").value.trim(),
     first_event_date: document.getElementById("mobilePnmEventDate").value,
-    interests: document.getElementById("mobilePnmInterests").value.trim(),
+    interests: interestsValue,
     stereotype: document.getElementById("mobilePnmStereotype").value.trim(),
     lunch_stats: document.getElementById("mobilePnmLunchStats").value.trim(),
+    notes: document.getElementById("mobilePnmNotes").value.trim(),
   };
 
   const form = document.getElementById("mobileCreatePnmForm");
@@ -347,6 +497,8 @@ async function handleCreateSubmit(event) {
 
     form.reset();
     document.getElementById("mobilePnmEventDate").value = new Date().toISOString().slice(0, 10);
+    syncInterestPickerFromInput("mobilePnmInterests", "mobileInterestTags");
+    syncStereotypePickerFromInput("mobilePnmStereotype", "mobileStereotypeTags");
     showToast("PNM created.");
     window.location.href = `${MOBILE_BASE}/pnms`;
   } catch (error) {
@@ -404,6 +556,7 @@ function attachPageEvents() {
     if (form) {
       form.addEventListener("submit", handleCreateSubmit);
     }
+    initializeMobileTagPickers();
   }
 }
 

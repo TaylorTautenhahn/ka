@@ -217,16 +217,22 @@
                 <input id="pnmInstagram" type="text" required placeholder="@username" />
               </label>
               <label>
-                Interests (comma-separated)
-                <input id="pnmInterests" type="text" required placeholder="Golf,Fishing" />
+                Interests
+                <div id="pnmInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
+                <input id="pnmInterests" type="text" placeholder="Custom interests (comma-separated)" />
               </label>
               <label>
                 Stereotype
-                <input id="pnmStereotype" type="text" required />
+                <div id="pnmStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
+                <input id="pnmStereotype" type="text" required placeholder="Select default or type custom" />
               </label>
               <label>
                 Lunch stats (optional)
                 <input id="pnmLunchStats" type="text" placeholder="3 lunches this week" />
+              </label>
+              <label>
+                Notes (optional)
+                <textarea id="pnmNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea>
               </label>
               <label>
                 PNM photo (optional)
@@ -452,16 +458,22 @@
                   <input id="adminEditInstagramHandle" type="text" required placeholder="@username" />
                 </label>
                 <label>
-                  Interests (comma-separated)
-                  <input id="adminEditInterests" type="text" required placeholder="Golf,Fishing" />
+                  Interests
+                  <div id="adminEditInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
+                  <input id="adminEditInterests" type="text" placeholder="Custom interests (comma-separated)" />
                 </label>
                 <label>
                   Stereotype
-                  <input id="adminEditStereotype" type="text" required />
+                  <div id="adminEditStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
+                  <input id="adminEditStereotype" type="text" required placeholder="Select default or type custom" />
                 </label>
                 <label>
                   Lunch stats
                   <input id="adminEditLunchStats" type="text" placeholder="3 lunches this week" />
+                </label>
+                <label>
+                  Notes
+                  <textarea id="adminEditNotes" rows="3" placeholder="Meeting notes, fit context, concerns"></textarea>
                 </label>
                 <div class="action-row">
                   <button id="saveAdminPnmBtn" type="submit">Save Rushee Changes</button>

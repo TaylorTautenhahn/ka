@@ -167,6 +167,30 @@ const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-pa
 const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
 
 const DEFAULT_DESKTOP_PAGE = "overview";
+const DEFAULT_INTEREST_TAGS = [
+  "Leadership",
+  "Sports",
+  "Fitness",
+  "Finance",
+  "Outdoors",
+  "Music",
+  "Faith",
+  "Academics",
+  "Entrepreneurship",
+  "Philanthropy",
+  "Gaming",
+  "Travel",
+];
+const DEFAULT_STEREOTYPE_TAGS = [
+  "Leader",
+  "Connector",
+  "Scholar",
+  "Athlete",
+  "Social",
+  "Creative",
+  "Mentor",
+  "Builder",
+];
 
 const state = {
   user: null,
@@ -194,6 +218,128 @@ const state = {
   },
   adminEditPnmId: null,
 };
+
+function parseTagInput(raw) {
+  return String(raw || "")
+    .split(/[,;\n]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function uniqueNormalized(values) {
+  const out = [];
+  const seen = new Set();
+  values.forEach((value) => {
+    const key = value.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    out.push(value);
+  });
+  return out;
+}
+
+function renderTagPickerButtons(pickerEl, tags, selectedSet) {
+  if (!pickerEl) {
+    return;
+  }
+  pickerEl.innerHTML = tags
+    .map((tag) => {
+      const active = selectedSet.has(tag.toLowerCase()) ? " is-active" : "";
+      return `<button type="button" class="tag-pill${active}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`;
+    })
+    .join("");
+}
+
+function syncInterestPickerFromInput(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker) {
+    return;
+  }
+  const selected = new Set(parseTagInput(input.value).map((value) => value.toLowerCase()));
+  renderTagPickerButtons(picker, DEFAULT_INTEREST_TAGS, selected);
+}
+
+function syncStereotypePickerFromInput(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker) {
+    return;
+  }
+  const selected = new Set();
+  const value = String(input.value || "").trim().toLowerCase();
+  if (value) {
+    selected.add(value);
+  }
+  renderTagPickerButtons(picker, DEFAULT_STEREOTYPE_TAGS, selected);
+}
+
+function bindInterestPicker(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker || picker.dataset.bound === "1") {
+    return;
+  }
+  picker.dataset.bound = "1";
+
+  picker.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-tag]");
+    if (!button) {
+      return;
+    }
+    const tag = String(button.dataset.tag || "").trim();
+    if (!tag) {
+      return;
+    }
+    const tokens = parseTagInput(input.value);
+    const existing = new Set(tokens.map((value) => value.toLowerCase()));
+    if (existing.has(tag.toLowerCase())) {
+      input.value = tokens.filter((value) => value.toLowerCase() !== tag.toLowerCase()).join(",");
+    } else {
+      tokens.push(tag);
+      input.value = uniqueNormalized(tokens).join(",");
+    }
+    syncInterestPickerFromInput(inputId, pickerId);
+  });
+
+  input.addEventListener("input", () => syncInterestPickerFromInput(inputId, pickerId));
+  syncInterestPickerFromInput(inputId, pickerId);
+}
+
+function bindStereotypePicker(inputId, pickerId) {
+  const input = document.getElementById(inputId);
+  const picker = document.getElementById(pickerId);
+  if (!input || !picker || picker.dataset.bound === "1") {
+    return;
+  }
+  picker.dataset.bound = "1";
+
+  picker.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-tag]");
+    if (!button) {
+      return;
+    }
+    const tag = String(button.dataset.tag || "").trim();
+    if (!tag) {
+      return;
+    }
+    const current = String(input.value || "").trim().toLowerCase();
+    input.value = current === tag.toLowerCase() ? "" : tag;
+    syncStereotypePickerFromInput(inputId, pickerId);
+  });
+
+  input.addEventListener("input", () => syncStereotypePickerFromInput(inputId, pickerId));
+  syncStereotypePickerFromInput(inputId, pickerId);
+}
+
+function initializePresetTagPickers() {
+  bindInterestPicker("pnmInterests", "pnmInterestTags");
+  bindInterestPicker("adminEditInterests", "adminEditInterestTags");
+  bindStereotypePicker("pnmStereotype", "pnmStereotypeTags");
+  bindStereotypePicker("adminEditStereotype", "adminEditStereotypeTags");
+}
 
 function escapeHtml(input) {
   return String(input)
@@ -1070,6 +1216,9 @@ function populateAdminPnmEditor(pnmId) {
   document.getElementById("adminEditInterests").value = (pnm.interests || []).join(",");
   document.getElementById("adminEditStereotype").value = pnm.stereotype || "";
   document.getElementById("adminEditLunchStats").value = pnm.lunch_stats || "";
+  document.getElementById("adminEditNotes").value = pnm.notes || "";
+  syncInterestPickerFromInput("adminEditInterests", "adminEditInterestTags");
+  syncStereotypePickerFromInput("adminEditStereotype", "adminEditStereotypeTags");
 }
 
 function renderAdminPnmTable() {
@@ -1301,6 +1450,7 @@ function renderMeetingView(payload) {
         <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
         <p class="muted">${escapeHtml(pnm.hometown)} | ${escapeHtml(pnm.class_year)} | ${escapeHtml(pnm.instagram_handle)} | ${escapeHtml(pnm.phone_number || "No phone")}</p>
         <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
+        <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
         <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
       </div>
     </div>
@@ -1638,6 +1788,11 @@ async function handleApplyFilters() {
 async function handlePnmCreate(event) {
   event.preventDefault();
 
+  const interestsValue = document.getElementById("pnmInterests").value.trim();
+  if (!interestsValue) {
+    showToast("Select or type at least one interest.");
+    return;
+  }
   const body = {
     first_name: document.getElementById("pnmFirstName").value.trim(),
     last_name: document.getElementById("pnmLastName").value.trim(),
@@ -1646,9 +1801,10 @@ async function handlePnmCreate(event) {
     phone_number: document.getElementById("pnmPhone").value.trim(),
     instagram_handle: document.getElementById("pnmInstagram").value.trim(),
     first_event_date: document.getElementById("pnmEventDate").value,
-    interests: document.getElementById("pnmInterests").value.trim(),
+    interests: interestsValue,
     stereotype: document.getElementById("pnmStereotype").value.trim(),
     lunch_stats: document.getElementById("pnmLunchStats").value.trim(),
+    notes: document.getElementById("pnmNotes").value.trim(),
   };
 
   try {
@@ -1668,6 +1824,8 @@ async function handlePnmCreate(event) {
     }
     pnmPhotoInput.value = "";
     setDefaultDates();
+    syncInterestPickerFromInput("pnmInterests", "pnmInterestTags");
+    syncStereotypePickerFromInput("pnmStereotype", "pnmStereotypeTags");
     showToast(`PNM added: ${payload.pnm.pnm_code}`);
     await refreshAll();
     state.selectedPnmId = payload.pnm.pnm_id;
@@ -1888,6 +2046,11 @@ async function handleAdminPnmEditorSubmit(event) {
     return;
   }
 
+  const interestsValue = document.getElementById("adminEditInterests").value.trim();
+  if (!interestsValue) {
+    showToast("Select or type at least one interest.");
+    return;
+  }
   const saveButton = document.getElementById("saveAdminPnmBtn");
   const body = {
     first_name: document.getElementById("adminEditFirstName").value.trim(),
@@ -1897,9 +2060,10 @@ async function handleAdminPnmEditorSubmit(event) {
     hometown: document.getElementById("adminEditHometown").value.trim(),
     phone_number: document.getElementById("adminEditPhoneNumber").value.trim(),
     instagram_handle: document.getElementById("adminEditInstagramHandle").value.trim(),
-    interests: document.getElementById("adminEditInterests").value.trim(),
+    interests: interestsValue,
     stereotype: document.getElementById("adminEditStereotype").value.trim(),
     lunch_stats: document.getElementById("adminEditLunchStats").value.trim(),
+    notes: document.getElementById("adminEditNotes").value.trim(),
   };
 
   if (saveButton) {
@@ -2200,6 +2364,7 @@ function attachEvents() {
 async function init() {
   setDefaultDates();
   setRoleEmojiRequirement();
+  initializePresetTagPickers();
   attachEvents();
   setActiveDesktopPage(currentRequestedDesktopPage(), false);
   updateTopbarActions();

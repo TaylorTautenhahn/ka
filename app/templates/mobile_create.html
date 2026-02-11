@@ -42,9 +42,18 @@
           <label>Hometown<input id="mobilePnmHometown" type="text" required /></label>
           <label>Phone number<input id="mobilePnmPhone" type="text" placeholder="+1 555 123 4567" /></label>
           <label>Instagram handle<input id="mobilePnmInstagram" type="text" required placeholder="@username" /></label>
-          <label>Interests<input id="mobilePnmInterests" type="text" required placeholder="Golf,Finance" /></label>
-          <label>Stereotype<input id="mobilePnmStereotype" type="text" required /></label>
+          <label>
+            Interests
+            <div id="mobileInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
+            <input id="mobilePnmInterests" type="text" placeholder="Custom interests (comma-separated)" />
+          </label>
+          <label>
+            Stereotype
+            <div id="mobileStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
+            <input id="mobilePnmStereotype" type="text" required placeholder="Select default or type custom" />
+          </label>
           <label>Lunch stats (optional)<input id="mobilePnmLunchStats" type="text" /></label>
+          <label>Notes (optional)<textarea id="mobilePnmNotes" rows="3" placeholder="Talking points, strengths, concerns"></textarea></label>
           <label>Photo (optional)<input id="mobilePnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" /></label>
           <button type="submit">Create PNM</button>
         </form>

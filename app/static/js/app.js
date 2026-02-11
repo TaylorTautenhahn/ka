@@ -135,6 +135,7 @@ const lunchPnm = document.getElementById("lunchPnm");
 const lunchStartTime = document.getElementById("lunchStartTime");
 const lunchEndTime = document.getElementById("lunchEndTime");
 const lunchLocation = document.getElementById("lunchLocation");
+const autoOpenGoogleLunchEvent = document.getElementById("autoOpenGoogleLunchEvent");
 const assignPanel = document.getElementById("assignPanel");
 const assignOfficerSelect = document.getElementById("assignOfficerSelect");
 const assignOfficerBtn = document.getElementById("assignOfficerBtn");
@@ -2217,6 +2218,16 @@ async function handleLunchLog(event) {
     notes: document.getElementById("lunchNotes").value.trim(),
   };
 
+  const shouldAutoOpenGoogle = Boolean(autoOpenGoogleLunchEvent && autoOpenGoogleLunchEvent.checked);
+  let pendingGoogleWindow = null;
+  if (shouldAutoOpenGoogle) {
+    try {
+      pendingGoogleWindow = window.open("", "_blank");
+    } catch {
+      pendingGoogleWindow = null;
+    }
+  }
+
   try {
     const payload = await api("/api/lunches", {
       method: "POST",
@@ -2235,12 +2246,20 @@ async function handleLunchLog(event) {
     if (payload.lunch && payload.lunch.google_calendar_url && openLastLunchGoogleLink && lastLunchCalendarActions) {
       openLastLunchGoogleLink.href = payload.lunch.google_calendar_url;
       lastLunchCalendarActions.classList.remove("hidden");
+      if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
+        pendingGoogleWindow.location.href = payload.lunch.google_calendar_url;
+      }
+    } else if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
+      pendingGoogleWindow.close();
     }
-    showToast("Lunch scheduled and added to the shared calendar.");
+    showToast("Lunch scheduled. Shared calendar updated; Google subscribed calendars may sync with delay.");
     state.selectedPnmId = selectedId;
     await refreshAll();
     await loadPnmDetail(selectedId);
   } catch (error) {
+    if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
+      pendingGoogleWindow.close();
+    }
     showToast(error.message || "Unable to schedule lunch.");
   }
 }

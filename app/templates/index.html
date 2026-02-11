@@ -272,6 +272,10 @@
                 Notes
                 <textarea id="lunchNotes" rows="3" placeholder="Optional lunch context"></textarea>
               </label>
+              <label class="checkbox-line">
+                <input id="autoOpenGoogleLunchEvent" type="checkbox" checked />
+                Open Google Calendar event after scheduling
+              </label>
               <button type="submit">Schedule Lunch</button>
             </form>
             <div id="lastLunchCalendarActions" class="action-row hidden">
@@ -281,6 +285,7 @@
             <div id="sharedCalendarPanel" class="calendar-share">
               <h3>Shared Lunch Calendar</h3>
               <p class="muted">Subscribe once and everyone can view the same chapter lunch calendar.</p>
+              <p class="muted">Google can delay external calendar sync. Use "Open In Google Calendar" for immediate event creation.</p>
               <div class="action-row">
                 <button id="copyCalendarFeedBtn" type="button" class="secondary">Copy Calendar URL</button>
                 <a id="openGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>

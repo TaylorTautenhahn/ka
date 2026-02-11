@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException, Request, Response, status
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -667,6 +667,11 @@ def startup() -> None:
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/service-worker.js", include_in_schema=False)
+async def service_worker() -> FileResponse:
+    return FileResponse(BASE_DIR / "static" / "service-worker.js", media_type="application/javascript")
 
 
 @app.get("/health")

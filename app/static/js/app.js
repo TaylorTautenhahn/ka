@@ -1,284 +1,842 @@
-const inputEl = document.getElementById("tickerInput");
-const analyzeBtn = document.getElementById("analyzeBtn");
-const pdfBtn = document.getElementById("pdfBtn");
-const rangeLabel = document.getElementById("rangeLabel");
-const metricCards = document.getElementById("metricCards");
-const metricsTableBody = document.querySelector("#metricsTable tbody");
-const excludedNote = document.getElementById("excludedNote");
-const toast = document.getElementById("toast");
-const chartCanvas = document.getElementById("performanceChart");
+const authSection = document.getElementById("authSection");
+const appSection = document.getElementById("appSection");
+
+const loginForm = document.getElementById("loginForm");
+const registerForm = document.getElementById("registerForm");
+const logoutBtn = document.getElementById("logoutBtn");
+const installBtn = document.getElementById("installBtn");
+
+const regRole = document.getElementById("regRole");
+const regEmoji = document.getElementById("regEmoji");
+
+const sessionTitle = document.getElementById("sessionTitle");
+const sessionSubtitle = document.getElementById("sessionSubtitle");
+const toastEl = document.getElementById("toast");
+
+const filterInterest = document.getElementById("filterInterest");
+const filterStereotype = document.getElementById("filterStereotype");
+const applyFiltersBtn = document.getElementById("applyFiltersBtn");
+const interestHints = document.getElementById("interestHints");
+
+const pnmForm = document.getElementById("pnmForm");
+const lunchForm = document.getElementById("lunchForm");
+const ratingForm = document.getElementById("ratingForm");
+
+const pnmTable = document.getElementById("pnmTable");
+const memberTable = document.getElementById("memberTable");
+const ratingList = document.getElementById("ratingList");
+const lunchHistory = document.getElementById("lunchHistory");
+const selectedPnmLabel = document.getElementById("selectedPnmLabel");
+const ratingPnm = document.getElementById("ratingPnm");
+const lunchPnm = document.getElementById("lunchPnm");
+
+const approvalsPanel = document.getElementById("approvalsPanel");
+const pendingList = document.getElementById("pendingList");
+
+const analyticsCards = document.getElementById("analyticsCards");
+const matchingPnms = document.getElementById("matchingPnms");
+const matchingMembers = document.getElementById("matchingMembers");
 
 const state = {
-  chart: null,
-  lastPayload: null,
+  user: null,
+  pnms: [],
+  members: [],
+  selectedPnmId: null,
+  deferredPrompt: null,
   toastTimer: null,
+  filters: {
+    interest: "",
+    stereotype: "",
+  },
 };
 
-const colorPalette = [
-  "#007f8a",
-  "#d46734",
-  "#1d8758",
-  "#2f5f9a",
-  "#a6513f",
-  "#318276",
-  "#8e7b35",
-  "#424a98",
-];
-
-function parseTickers(raw) {
-  return [...new Set(raw.toUpperCase().split(/[\s,]+/).map((value) => value.trim()).filter(Boolean))];
-}
-
-function formatPct(value) {
-  const signClass = value >= 0 ? "positive" : "negative";
-  const prefix = value > 0 ? "+" : "";
-  return `<span class="${signClass}">${prefix}${value.toFixed(2)}%</span>`;
-}
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-  }).format(value);
-}
-
-function setLoading(isLoading) {
-  inputEl.disabled = isLoading;
-  analyzeBtn.disabled = isLoading;
-  analyzeBtn.textContent = isLoading ? "Analyzing..." : "Analyze 10Y";
-  if (isLoading) {
-    pdfBtn.disabled = true;
-  } else {
-    pdfBtn.disabled = !state.lastPayload;
-  }
+function escapeHtml(input) {
+  return String(input)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
 function showToast(message) {
-  toast.textContent = message;
-  toast.classList.remove("hidden");
-  if (state.toastTimer) {
-    clearTimeout(state.toastTimer);
-  }
+  toastEl.textContent = message;
+  toastEl.classList.remove("hidden");
+  clearTimeout(state.toastTimer);
   state.toastTimer = setTimeout(() => {
-    toast.classList.add("hidden");
-  }, 3200);
+    toastEl.classList.add("hidden");
+  }, 3300);
 }
 
-function renderChart(payload) {
-  const labels = payload.chart.timeline;
-  const tickerNames = Object.keys(payload.chart.series);
-  const datasets = tickerNames.map((ticker, index) => ({
-    label: ticker,
-    data: payload.chart.series[ticker],
-    borderColor: colorPalette[index % colorPalette.length],
-    backgroundColor: "transparent",
-    borderWidth: 2.5,
-    pointRadius: 0,
-    pointHitRadius: 8,
-    tension: 0.22,
-  }));
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    method: options.method || "GET",
+    headers: {
+      "Content-Type": "application/json",
+      ...(options.headers || {}),
+    },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
 
-  if (state.chart) {
-    state.chart.destroy();
+  let payload = null;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    payload = await response.json().catch(() => ({}));
+  } else {
+    payload = await response.text().catch(() => "");
   }
 
-  state.chart = new Chart(chartCanvas.getContext("2d"), {
-    type: "line",
-    data: { labels, datasets },
-    options: {
-      maintainAspectRatio: false,
-      responsive: true,
-      interaction: { intersect: false, mode: "index" },
-      plugins: {
-        legend: { position: "bottom" },
-        tooltip: {
-          callbacks: {
-            label(context) {
-              const value = context.parsed.y;
-              return `${context.dataset.label}: ${value.toFixed(2)}`;
-            },
-          },
-        },
-      },
-      scales: {
-        y: {
-          title: { display: true, text: "Growth Index (Base 100)" },
-          grid: { color: "rgba(24,49,74,0.14)" },
-          ticks: {
-            callback(value) {
-              return Number(value).toFixed(0);
-            },
-          },
-        },
-        x: {
-          grid: { display: false },
-          ticks: {
-            maxTicksLimit: 10,
-          },
-        },
-      },
-    },
-  });
+  if (!response.ok) {
+    const detail =
+      typeof payload === "object" && payload !== null && "detail" in payload
+        ? payload.detail
+        : `Request failed (${response.status})`;
+    throw new Error(detail);
+  }
+
+  return payload;
 }
 
-function renderCards(metrics) {
-  if (!metrics.length) {
-    metricCards.innerHTML = '<p class="muted">No comparable data found.</p>';
+function setAuthView(isAuthenticated) {
+  authSection.classList.toggle("hidden", isAuthenticated);
+  appSection.classList.toggle("hidden", !isAuthenticated);
+}
+
+function setSessionHeading() {
+  if (!state.user) {
+    sessionTitle.textContent = "Welcome";
+    sessionSubtitle.textContent = "";
     return;
   }
 
-  metricCards.innerHTML = metrics
+  sessionTitle.textContent = state.user.username;
+  const emoji = state.user.emoji ? `${state.user.emoji} ` : "";
+  sessionSubtitle.textContent = `${emoji}${state.user.role} | Stereotype: ${state.user.stereotype}`;
+}
+
+function roleCanSeeRaters() {
+  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
+function toQuery(params) {
+  const q = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) {
+      q.set(key, value);
+    }
+  });
+  const asText = q.toString();
+  return asText ? `?${asText}` : "";
+}
+
+function setDefaultDates() {
+  const today = new Date().toISOString().slice(0, 10);
+  document.getElementById("pnmEventDate").value = today;
+  document.getElementById("lunchDate").value = today;
+}
+
+function setRoleEmojiRequirement() {
+  const isRushOfficer = regRole.value === "Rush Officer";
+  regEmoji.required = isRushOfficer;
+  if (!isRushOfficer) {
+    regEmoji.value = "";
+  }
+}
+
+function renderInterestHints(interests) {
+  interestHints.innerHTML = interests.map((interest) => `<option value="${escapeHtml(interest)}"></option>`).join("");
+}
+
+function renderPnmSelectOptions() {
+  const options =
+    '<option value="">Select PNM</option>' +
+    state.pnms
+      .map((pnm) => {
+        const label = `${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`;
+        return `<option value="${pnm.pnm_id}">${escapeHtml(label)}</option>`;
+      })
+      .join("");
+  ratingPnm.innerHTML = options;
+  lunchPnm.innerHTML = options;
+
+  if (state.selectedPnmId) {
+    ratingPnm.value = String(state.selectedPnmId);
+    lunchPnm.value = String(state.selectedPnmId);
+  }
+}
+
+function renderPnmTable() {
+  if (!state.pnms.length) {
+    pnmTable.innerHTML = '<p class="muted">No PNMs match current filters.</p>';
+    return;
+  }
+
+  const rows = state.pnms
+    .map((pnm) => {
+      const own = pnm.own_rating;
+      const ownDisplay = own ? `${own.total_score}/45` : "Not rated";
+      return `
+        <tr>
+          <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
+          <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>${escapeHtml(pnm.class_year)}</td>
+          <td>${pnm.days_since_first_event}</td>
+          <td>${pnm.rating_count}</td>
+          <td><strong>${pnm.weighted_total.toFixed(2)}</strong></td>
+          <td>${pnm.avg_good_with_girls.toFixed(2)}</td>
+          <td>${pnm.avg_will_make_it.toFixed(2)}</td>
+          <td>${pnm.avg_personable.toFixed(2)}</td>
+          <td>${pnm.avg_alcohol_control.toFixed(2)}</td>
+          <td>${pnm.avg_instagram_marketability.toFixed(2)}</td>
+          <td>${pnm.total_lunches}</td>
+          <td>${ownDisplay}</td>
+          <td><button type="button" class="secondary select-pnm" data-pnm-id="${pnm.pnm_id}">Select</button></td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  pnmTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Class</th>
+          <th>Days Since Event</th>
+          <th>Ratings</th>
+          <th>Weighted Total</th>
+          <th>Girls</th>
+          <th>Process</th>
+          <th>Personable</th>
+          <th>Alcohol</th>
+          <th>IG</th>
+          <th>Lunches</th>
+          <th>My Rating</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderMemberTable() {
+  if (!state.members.length) {
+    memberTable.innerHTML = '<p class="muted">No members match current filters.</p>';
+    return;
+  }
+
+  const rows = state.members
+    .map((member) => {
+      const avgRating = member.avg_rating_given == null ? "Hidden" : member.avg_rating_given.toFixed(2);
+      const ratingCount = member.rating_count == null ? "Hidden" : member.rating_count;
+      return `
+        <tr>
+          <td>${escapeHtml(member.username)}</td>
+          <td>${escapeHtml(member.role)}</td>
+          <td>${member.emoji ? escapeHtml(member.emoji) : "-"}</td>
+          <td>${escapeHtml(member.stereotype)}</td>
+          <td>${member.interests.map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join("")}</td>
+          <td>${member.total_lunches}</td>
+          <td>${member.lunches_per_week.toFixed(2)}</td>
+          <td>${ratingCount}</td>
+          <td>${avgRating}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  memberTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Emoji</th>
+          <th>Stereotype</th>
+          <th>Interests</th>
+          <th>Total Lunches</th>
+          <th>Lunches / Week</th>
+          <th>Ratings Given</th>
+          <th>Avg Rating Given</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderAnalytics(overview) {
+  const pnmCards = overview.top_pnms
+    .slice(0, 5)
     .map(
-      (metric) => `
-        <article class="metric-card">
-          <p class="metric-card-title">${metric.ticker}</p>
-          <div class="metric-main">
-            <span class="metric-total">${formatPct(metric.total_return_pct)}</span>
-            <span class="metric-sub">CAGR ${metric.cagr_pct.toFixed(2)}%</span>
-          </div>
-          <p class="metric-sub">Volatility ${metric.annualized_volatility_pct.toFixed(2)}% | Max DD ${metric.max_drawdown_pct.toFixed(2)}%</p>
-        </article>
-      `
+      (pnm) => `
+      <article class="card">
+        <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.name)}</strong>
+        <p>Weighted Total: ${pnm.weighted_total.toFixed(2)} | Ratings: ${pnm.rating_count} | Lunches: ${pnm.total_lunches}</p>
+      </article>
+    `
     )
+    .join("");
+
+  const memberCards = overview.member_participation
+    .slice(0, 5)
+    .map(
+      (member) => `
+      <article class="card">
+        <strong>${escapeHtml(member.username)}</strong>
+        <p>Lunches: ${member.total_lunches} | Lunches/Week: ${member.lunches_per_week.toFixed(2)}</p>
+      </article>
+    `
+    )
+    .join("");
+
+  analyticsCards.innerHTML = `${pnmCards}${memberCards}` || '<p class="muted">No analytics yet.</p>';
+}
+
+function renderMatching(data) {
+  matchingPnms.innerHTML =
+    data.pnms
+      .map(
+        (pnm) => `
+      <div class="entry">
+        <div class="entry-title">
+          <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+          <span>${pnm.weighted_total.toFixed(2)}</span>
+        </div>
+        <div class="muted">${escapeHtml(pnm.stereotype)} | ${pnm.interests.map((item) => escapeHtml(item)).join(", ")}</div>
+      </div>
+    `
+      )
+      .join("") || '<p class="muted">No matching PNMs.</p>';
+
+  matchingMembers.innerHTML =
+    data.members
+      .map(
+        (member) => `
+      <div class="entry">
+        <div class="entry-title">
+          <strong>${escapeHtml(member.username)}</strong>
+          <span>${escapeHtml(member.role)}</span>
+        </div>
+        <div class="muted">${escapeHtml(member.stereotype)} | ${member.interests
+          .map((item) => escapeHtml(item))
+          .join(", ")}</div>
+      </div>
+    `
+      )
+      .join("") || '<p class="muted">No matching members.</p>';
+}
+
+function renderPendingApprovals(data) {
+  if (!state.user || state.user.role !== "Head Rush Officer") {
+    approvalsPanel.classList.add("hidden");
+    return;
+  }
+
+  approvalsPanel.classList.remove("hidden");
+
+  if (!data.pending.length) {
+    pendingList.innerHTML = '<p class="muted">No pending usernames.</p>';
+    return;
+  }
+
+  const rows = data.pending
+    .map(
+      (item) => `
+      <tr>
+        <td>${escapeHtml(item.username)}</td>
+        <td>${escapeHtml(item.role)}</td>
+        <td>${escapeHtml(item.stereotype)}</td>
+        <td>${item.interests.map((interest) => `<span class="pill">${escapeHtml(interest)}</span>`).join("")}</td>
+        <td><button type="button" class="approve-user" data-user-id="${item.user_id}">Approve</button></td>
+      </tr>
+    `
+    )
+    .join("");
+
+  pendingList.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Stereotype</th>
+          <th>Interests</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function applyRatingFormForSelected() {
+  if (!state.selectedPnmId) {
+    ratingForm.reset();
+    return;
+  }
+
+  const selected = state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId);
+  if (!selected) {
+    return;
+  }
+
+  selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name}`;
+  ratingPnm.value = String(selected.pnm_id);
+  lunchPnm.value = String(selected.pnm_id);
+
+  const own = selected.own_rating;
+  document.getElementById("rateGirls").value = own ? own.good_with_girls : 0;
+  document.getElementById("rateProcess").value = own ? own.will_make_it : 0;
+  document.getElementById("ratePersonable").value = own ? own.personable : 0;
+  document.getElementById("rateAlcohol").value = own ? own.alcohol_control : 0;
+  document.getElementById("rateIg").value = own ? own.instagram_marketability : 0;
+  document.getElementById("rateComment").value = own ? own.comment || "" : "";
+}
+
+function renderRatingEntries(data) {
+  if (!data.ratings.length) {
+    ratingList.innerHTML = '<p class="muted">No ratings for this PNM yet.</p>';
+    return;
+  }
+
+  ratingList.innerHTML = data.ratings
+    .map((row) => {
+      const rater = data.can_view_rater_identity
+        ? `${escapeHtml(row.rater.username)} (${escapeHtml(row.rater.role)})`
+        : row.from_me
+          ? "Your rating"
+          : "Member rating";
+
+      const delta = row.last_change ? Number(row.last_change.delta_total) : 0;
+      let deltaMarkup = "";
+      if (row.last_change) {
+        if (delta > 0) {
+          deltaMarkup = `<span class="good">+${delta}</span>`;
+        } else if (delta < 0) {
+          deltaMarkup = `<span class="bad">${delta}</span>`;
+        } else {
+          deltaMarkup = `<span class="warn">0</span>`;
+        }
+      }
+
+      const comment = row.comment ? `<div class="muted">Comment: ${escapeHtml(row.comment)}</div>` : "";
+      const changeComment = row.last_change
+        ? `<div class="muted">Last change: ${escapeHtml(row.last_change.comment || "No comment")}</div>`
+        : "";
+
+      return `
+        <div class="entry">
+          <div class="entry-title">
+            <strong>${rater}</strong>
+            <span>Score ${row.total_score}/45 ${deltaMarkup}</span>
+          </div>
+          <div class="muted">Girls ${row.good_with_girls} | Process ${row.will_make_it} | Personable ${row.personable} | Alcohol ${row.alcohol_control} | IG ${row.instagram_marketability}</div>
+          ${comment}
+          ${changeComment}
+        </div>
+      `;
+    })
     .join("");
 }
 
-function renderTable(metrics) {
-  if (!metrics.length) {
-    metricsTableBody.innerHTML =
-      '<tr><td colspan="8" class="empty-row">No comparable data was returned.</td></tr>';
+function renderLunchEntries(data) {
+  if (!data.lunches.length) {
+    lunchHistory.innerHTML = '<p class="muted">No lunches logged for this PNM.</p>';
     return;
   }
 
-  metricsTableBody.innerHTML = metrics
+  lunchHistory.innerHTML = data.lunches
     .map(
       (row) => `
-      <tr>
-        <td>${row.ticker}</td>
-        <td>${formatPct(row.total_return_pct)}</td>
-        <td>${row.cagr_pct.toFixed(2)}%</td>
-        <td>${row.annualized_volatility_pct.toFixed(2)}%</td>
-        <td>${row.max_drawdown_pct.toFixed(2)}%</td>
-        <td>${formatCurrency(row.start_price)}</td>
-        <td>${formatCurrency(row.end_price)}</td>
-        <td>${formatCurrency(row.ending_value_of_10000)}</td>
-      </tr>
+      <div class="entry">
+        <div class="entry-title">
+          <strong>${escapeHtml(row.lunch_date)}</strong>
+          <span>${escapeHtml(row.username)}</span>
+        </div>
+        <div class="muted">${escapeHtml(row.notes || "No notes")}</div>
+      </div>
     `
     )
     .join("");
 }
 
-function renderPayload(payload) {
-  renderChart(payload);
-  renderCards(payload.metrics);
-  renderTable(payload.metrics);
-  rangeLabel.textContent = `${payload.common_start_date} to ${payload.common_end_date}`;
-
-  if (payload.excluded_tickers.length) {
-    excludedNote.textContent = `Excluded due to missing data: ${payload.excluded_tickers.join(", ")}`;
-  } else {
-    excludedNote.textContent = "";
-  }
-}
-
-async function requestAnalysis() {
-  const tickers = parseTickers(inputEl.value);
-  if (!tickers.length) {
-    showToast("Enter at least one ticker.");
+async function loadPnmDetail(pnmId) {
+  if (!pnmId) {
+    ratingList.innerHTML = '<p class="muted">Select a PNM to view rating entries.</p>';
+    lunchHistory.innerHTML = '<p class="muted">Select a PNM to view lunch logs.</p>';
     return;
   }
 
-  setLoading(true);
   try {
-    const response = await fetch("/api/analyze", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tickers }),
-    });
-
-    if (!response.ok) {
-      const errorPayload = await response.json().catch(() => ({}));
-      throw new Error(errorPayload.detail || "Analysis request failed.");
-    }
-
-    const payload = await response.json();
-    state.lastPayload = payload;
-    renderPayload(payload);
-    pdfBtn.disabled = false;
+    const [ratings, lunches] = await Promise.all([
+      api(`/api/pnms/${pnmId}/ratings`),
+      api(`/api/pnms/${pnmId}/lunches`),
+    ]);
+    renderRatingEntries(ratings);
+    renderLunchEntries(lunches);
   } catch (error) {
-    showToast(error.message || "Unable to complete analysis.");
-  } finally {
-    setLoading(false);
+    showToast(error.message || "Unable to load selected PNM details.");
   }
 }
 
-async function downloadPdf() {
-  const tickers =
-    state.lastPayload?.requested_tickers && state.lastPayload.requested_tickers.length
-      ? state.lastPayload.requested_tickers
-      : parseTickers(inputEl.value);
+async function loadInterestHints() {
+  const payload = await api("/api/interests");
+  renderInterestHints(payload.interests || []);
+}
 
-  if (!tickers.length) {
-    showToast("Run an analysis before exporting.");
+async function loadPnms() {
+  const query = toQuery(state.filters);
+  const payload = await api(`/api/pnms${query}`);
+  state.pnms = payload.pnms || [];
+  renderPnmSelectOptions();
+  renderPnmTable();
+
+  if (state.selectedPnmId && !state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId)) {
+    state.selectedPnmId = null;
+  }
+
+  if (!state.selectedPnmId && state.pnms.length) {
+    state.selectedPnmId = state.pnms[0].pnm_id;
+  }
+
+  applyRatingFormForSelected();
+  await loadPnmDetail(state.selectedPnmId);
+}
+
+async function loadMembers() {
+  const query = toQuery(state.filters);
+  const payload = await api(`/api/users${query}`);
+  state.members = payload.users || [];
+  renderMemberTable();
+}
+
+async function loadMatching() {
+  const query = toQuery(state.filters);
+  const payload = await api(`/api/matching${query}`);
+  renderMatching(payload);
+}
+
+async function loadAnalytics() {
+  const payload = await api("/api/analytics/overview");
+  renderAnalytics(payload);
+}
+
+async function loadApprovals() {
+  if (!state.user || state.user.role !== "Head Rush Officer") {
+    approvalsPanel.classList.add("hidden");
     return;
   }
 
-  pdfBtn.disabled = true;
-  pdfBtn.textContent = "Building PDF...";
+  const payload = await api("/api/users/pending");
+  renderPendingApprovals(payload);
+}
 
+async function refreshAll() {
+  await Promise.all([loadInterestHints(), loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadApprovals()]);
+}
+
+async function ensureSession() {
   try {
-    const response = await fetch("/api/report/pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tickers,
-        report_title: `Financial Modeling Report (${new Date().toISOString().slice(0, 10)})`,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorPayload = await response.json().catch(() => ({}));
-      throw new Error(errorPayload.detail || "PDF generation failed.");
-    }
-
-    const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    const disposition = response.headers.get("Content-Disposition") || "";
-    const fileNameMatch = disposition.match(/filename="?([^"]+)"?/);
-    anchor.href = url;
-    anchor.download = fileNameMatch ? fileNameMatch[1] : "financial-report.pdf";
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.URL.revokeObjectURL(url);
-  } catch (error) {
-    showToast(error.message || "Unable to generate PDF.");
-  } finally {
-    pdfBtn.textContent = "Download PDF";
-    pdfBtn.disabled = false;
+    const payload = await api("/api/auth/me");
+    state.user = payload.user;
+    setAuthView(true);
+    setSessionHeading();
+    await refreshAll();
+  } catch {
+    state.user = null;
+    setAuthView(false);
   }
 }
 
-function bindEvents() {
-  analyzeBtn.addEventListener("click", requestAnalysis);
-  pdfBtn.addEventListener("click", downloadPdf);
+async function handleLogin(event) {
+  event.preventDefault();
+  const username = document.getElementById("loginUsername").value.trim();
+  const accessCode = document.getElementById("loginAccessCode").value;
 
-  inputEl.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-      event.preventDefault();
-      requestAnalysis();
+  if (!username || !accessCode) {
+    showToast("Username and access code are required.");
+    return;
+  }
+
+  try {
+    const payload = await api("/api/auth/login", {
+      method: "POST",
+      body: {
+        username,
+        access_code: accessCode,
+      },
+    });
+    state.user = payload.user;
+    setAuthView(true);
+    setSessionHeading();
+    showToast("Logged in.");
+    await refreshAll();
+  } catch (error) {
+    showToast(error.message || "Login failed.");
+  }
+}
+
+async function handleRegister(event) {
+  event.preventDefault();
+
+  const body = {
+    first_name: document.getElementById("regFirstName").value.trim(),
+    last_name: document.getElementById("regLastName").value.trim(),
+    pledge_class: document.getElementById("regPledgeClass").value.trim(),
+    role: regRole.value,
+    emoji: regEmoji.value.trim() || null,
+    stereotype: document.getElementById("regStereotype").value.trim(),
+    interests: document.getElementById("regInterests").value.trim(),
+    access_code: document.getElementById("regAccessCode").value,
+  };
+
+  try {
+    const payload = await api("/api/auth/register", {
+      method: "POST",
+      body,
+    });
+    registerForm.reset();
+    setRoleEmojiRequirement();
+    showToast(`${payload.message} Username: ${payload.username}`);
+  } catch (error) {
+    showToast(error.message || "Registration failed.");
+  }
+}
+
+async function handleLogout() {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+  } catch {
+    // ignore logout transport errors; local reset still required.
+  }
+  state.user = null;
+  state.selectedPnmId = null;
+  setAuthView(false);
+  showToast("Logged out.");
+}
+
+function getCurrentFilters() {
+  return {
+    interest: filterInterest.value.trim(),
+    stereotype: filterStereotype.value.trim(),
+  };
+}
+
+async function handleApplyFilters() {
+  state.filters = getCurrentFilters();
+  try {
+    await Promise.all([loadPnms(), loadMembers(), loadMatching()]);
+    showToast("Filters applied.");
+  } catch (error) {
+    showToast(error.message || "Unable to apply filters.");
+  }
+}
+
+async function handlePnmCreate(event) {
+  event.preventDefault();
+
+  const body = {
+    first_name: document.getElementById("pnmFirstName").value.trim(),
+    last_name: document.getElementById("pnmLastName").value.trim(),
+    class_year: document.getElementById("pnmClassYear").value,
+    hometown: document.getElementById("pnmHometown").value.trim(),
+    instagram_handle: document.getElementById("pnmInstagram").value.trim(),
+    first_event_date: document.getElementById("pnmEventDate").value,
+    interests: document.getElementById("pnmInterests").value.trim(),
+    stereotype: document.getElementById("pnmStereotype").value.trim(),
+    lunch_stats: document.getElementById("pnmLunchStats").value.trim(),
+  };
+
+  try {
+    const payload = await api("/api/pnms", {
+      method: "POST",
+      body,
+    });
+    pnmForm.reset();
+    setDefaultDates();
+    showToast(`PNM added: ${payload.pnm.pnm_code}`);
+    await refreshAll();
+    state.selectedPnmId = payload.pnm.pnm_id;
+    applyRatingFormForSelected();
+    await loadPnmDetail(state.selectedPnmId);
+  } catch (error) {
+    showToast(error.message || "Unable to create PNM.");
+  }
+}
+
+async function handleRatingSave(event) {
+  event.preventDefault();
+  const selectedId = Number(ratingPnm.value || state.selectedPnmId || 0);
+
+  if (!selectedId) {
+    showToast("Select a PNM before saving a rating.");
+    return;
+  }
+
+  const body = {
+    pnm_id: selectedId,
+    good_with_girls: Number(document.getElementById("rateGirls").value),
+    will_make_it: Number(document.getElementById("rateProcess").value),
+    personable: Number(document.getElementById("ratePersonable").value),
+    alcohol_control: Number(document.getElementById("rateAlcohol").value),
+    instagram_marketability: Number(document.getElementById("rateIg").value),
+    comment: document.getElementById("rateComment").value.trim(),
+  };
+
+  try {
+    const payload = await api("/api/ratings", {
+      method: "POST",
+      body,
+    });
+    state.selectedPnmId = selectedId;
+    await refreshAll();
+    await loadPnmDetail(selectedId);
+
+    if (payload.change && Number(payload.change.delta_total) > 0) {
+      showToast(`Rating increased to ${payload.change.new_total}/45 (+${payload.change.delta_total}).`);
+    } else {
+      showToast("Rating saved.");
     }
+  } catch (error) {
+    showToast(error.message || "Unable to save rating.");
+  }
+}
+
+async function handleLunchLog(event) {
+  event.preventDefault();
+  const selectedId = Number(lunchPnm.value || state.selectedPnmId || 0);
+
+  if (!selectedId) {
+    showToast("Select a PNM before logging lunch.");
+    return;
+  }
+
+  const body = {
+    pnm_id: selectedId,
+    lunch_date: document.getElementById("lunchDate").value,
+    notes: document.getElementById("lunchNotes").value.trim(),
+  };
+
+  try {
+    await api("/api/lunches", {
+      method: "POST",
+      body,
+    });
+    document.getElementById("lunchNotes").value = "";
+    showToast("Lunch logged.");
+    state.selectedPnmId = selectedId;
+    await refreshAll();
+    await loadPnmDetail(selectedId);
+  } catch (error) {
+    showToast(error.message || "Unable to log lunch.");
+  }
+}
+
+async function handlePnmTableClick(event) {
+  const button = event.target.closest("button.select-pnm");
+  if (!button) {
+    return;
+  }
+
+  const pnmId = Number(button.dataset.pnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+
+  state.selectedPnmId = pnmId;
+  applyRatingFormForSelected();
+  await loadPnmDetail(pnmId);
+}
+
+async function handlePendingClick(event) {
+  const button = event.target.closest("button.approve-user");
+  if (!button) {
+    return;
+  }
+
+  const userId = Number(button.dataset.userId || 0);
+  if (!userId) {
+    return;
+  }
+
+  try {
+    await api(`/api/users/pending/${userId}/approve`, {
+      method: "POST",
+    });
+    showToast("User approved.");
+    await Promise.all([loadApprovals(), loadMembers(), loadMatching()]);
+  } catch (error) {
+    showToast(error.message || "Unable to approve user.");
+  }
+}
+
+function setupPwaInstall() {
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/service-worker.js").catch(() => {
+      // service worker registration failure should not block core app.
+    });
+  }
+
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    state.deferredPrompt = event;
+    installBtn.classList.remove("hidden");
   });
 
-  document.querySelectorAll(".chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      inputEl.value = chip.dataset.tickers || "";
-      requestAnalysis();
-    });
+  installBtn.addEventListener("click", async () => {
+    if (!state.deferredPrompt) {
+      return;
+    }
+    state.deferredPrompt.prompt();
+    await state.deferredPrompt.userChoice;
+    state.deferredPrompt = null;
+    installBtn.classList.add("hidden");
   });
 }
 
-bindEvents();
+function attachEvents() {
+  loginForm.addEventListener("submit", handleLogin);
+  registerForm.addEventListener("submit", handleRegister);
+  logoutBtn.addEventListener("click", handleLogout);
 
+  regRole.addEventListener("change", setRoleEmojiRequirement);
+  applyFiltersBtn.addEventListener("click", handleApplyFilters);
+
+  pnmForm.addEventListener("submit", handlePnmCreate);
+  ratingForm.addEventListener("submit", handleRatingSave);
+  lunchForm.addEventListener("submit", handleLunchLog);
+
+  pnmTable.addEventListener("click", handlePnmTableClick);
+  pendingList.addEventListener("click", handlePendingClick);
+
+  ratingPnm.addEventListener("change", async (event) => {
+    const selectedId = Number(event.target.value || 0);
+    if (!selectedId) {
+      return;
+    }
+    state.selectedPnmId = selectedId;
+    applyRatingFormForSelected();
+    await loadPnmDetail(selectedId);
+  });
+
+  lunchPnm.addEventListener("change", (event) => {
+    const selectedId = Number(event.target.value || 0);
+    if (selectedId) {
+      state.selectedPnmId = selectedId;
+      applyRatingFormForSelected();
+    }
+  });
+}
+
+async function init() {
+  setDefaultDates();
+  setRoleEmojiRequirement();
+  attachEvents();
+  setupPwaInstall();
+  await ensureSession();
+}
+
+init();

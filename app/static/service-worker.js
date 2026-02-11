@@ -1,6 +1,5 @@
-const CACHE_NAME = "kao-rush-shell-v2";
+const CACHE_NAME = "kao-rush-shell-v3";
 const APP_SHELL = [
-  "/",
   "/static/css/styles.css",
   "/static/js/app.js",
   "/static/js/meeting.js",
@@ -33,21 +32,33 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(event.request));
     return;
   }
-
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
-      return fetch(event.request)
+  // Always prefer network for HTML navigations so new deployments appear immediately.
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      fetch(event.request)
         .then((response) => {
           const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, clone);
-          });
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
           return response;
         })
-        .catch(() => caches.match("/"));
-    })
-  );
+        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+    );
+    return;
+  }
+
+  // For static assets, use network-first with cache fallback.
+  if (url.pathname.startsWith("/static/")) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });

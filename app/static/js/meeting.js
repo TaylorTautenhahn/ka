@@ -25,13 +25,68 @@ const APP_CONFIG = readAppConfig();
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
 
-if (APP_CONFIG.theme_primary) {
-  document.documentElement.style.setProperty("--accent", APP_CONFIG.theme_primary);
-  document.documentElement.style.setProperty("--accent-bright", APP_CONFIG.theme_primary);
+function clampChannel(value) {
+  return Math.max(0, Math.min(255, Math.round(value)));
 }
-if (APP_CONFIG.theme_secondary) {
-  document.documentElement.style.setProperty("--gold", APP_CONFIG.theme_secondary);
+
+function hexToRgb(hex) {
+  const normalized = String(hex || "").trim();
+  const match = normalized.match(/^#([0-9a-fA-F]{6})$/);
+  if (!match) {
+    return null;
+  }
+  const token = match[1];
+  return {
+    r: Number.parseInt(token.slice(0, 2), 16),
+    g: Number.parseInt(token.slice(2, 4), 16),
+    b: Number.parseInt(token.slice(4, 6), 16),
+  };
 }
+
+function rgbToHex(rgb) {
+  const toHex = (value) => clampChannel(value).toString(16).padStart(2, "0");
+  return `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`;
+}
+
+function mixRgb(base, target, ratio) {
+  const t = Math.max(0, Math.min(1, ratio));
+  return {
+    r: clampChannel(base.r + (target.r - base.r) * t),
+    g: clampChannel(base.g + (target.g - base.g) * t),
+    b: clampChannel(base.b + (target.b - base.b) * t),
+  };
+}
+
+function rgbTriplet(rgb) {
+  return `${rgb.r}, ${rgb.g}, ${rgb.b}`;
+}
+
+function applyTenantTheme(config) {
+  const root = document.documentElement;
+  const accentBase = hexToRgb(config.theme_primary) || hexToRgb("#8a1538");
+  const goldBase = hexToRgb(config.theme_secondary) || hexToRgb("#c99a2b");
+  if (!accentBase || !goldBase) {
+    return;
+  }
+
+  const accentBright = mixRgb(accentBase, { r: 255, g: 255, b: 255 }, 0.16);
+  const accentSoft = mixRgb(accentBase, { r: 255, g: 255, b: 255 }, 0.11);
+  const accentDeep = mixRgb(accentBase, { r: 0, g: 0, b: 0 }, 0.34);
+  const accentShadow = mixRgb(accentBase, { r: 0, g: 0, b: 0 }, 0.42);
+  const heading = mixRgb(accentBase, { r: 36, g: 24, b: 31 }, 0.32);
+
+  root.style.setProperty("--accent", rgbToHex(accentBase));
+  root.style.setProperty("--accent-bright", rgbToHex(accentBright));
+  root.style.setProperty("--gold", rgbToHex(goldBase));
+  root.style.setProperty("--accent-rgb", rgbTriplet(accentBase));
+  root.style.setProperty("--accent-soft-rgb", rgbTriplet(accentSoft));
+  root.style.setProperty("--accent-deep-rgb", rgbTriplet(accentDeep));
+  root.style.setProperty("--accent-shadow-rgb", rgbTriplet(accentShadow));
+  root.style.setProperty("--gold-rgb", rgbTriplet(goldBase));
+  root.style.setProperty("--heading", rgbToHex(heading));
+}
+
+applyTenantTheme(APP_CONFIG);
 
 const pnmSelect = document.getElementById("meetingPnmSelect");
 const loadBtn = document.getElementById("meetingLoadBtn");

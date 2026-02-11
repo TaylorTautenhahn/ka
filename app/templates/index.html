@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Atlas Financial Modeling</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Sora:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" defer></script>
+    <script src="/static/js/app.js" defer></script>
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <main class="shell">
+      <header class="hero reveal">
+        <p class="eyebrow">Atlas Platform</p>
+        <h1>10-Year Financial Modeling for Stocks, ETFs, and Mutual Funds</h1>
+        <p class="hero-copy">
+          Compare representative performance using Yahoo Finance data, then export a clean printable PDF report for clients or investment committees.
+        </p>
+      </header>
+
+      <section class="panel controls reveal delay-1">
+        <div class="control-grid">
+          <label for="tickerInput">Tickers</label>
+          <div class="input-row">
+            <input
+              id="tickerInput"
+              type="text"
+              autocomplete="off"
+              placeholder="AAPL, VOO, SWPPX, FSKAX"
+            />
+            <button id="analyzeBtn" type="button">Analyze 10Y</button>
+            <button id="pdfBtn" type="button" class="secondary" disabled>Download PDF</button>
+          </div>
+          <p class="helper">
+            Use commas or spaces. Mixed assets supported, including single stocks, ETFs, and mutual funds.
+          </p>
+        </div>
+        <div class="presets">
+          <button type="button" class="chip" data-tickers="AAPL,MSFT,NVDA">Growth Leaders</button>
+          <button type="button" class="chip" data-tickers="VOO,VTI,QQQ">Core ETFs</button>
+          <button type="button" class="chip" data-tickers="VTSAX,FXAIX,SWPPX">Mutual Funds</button>
+        </div>
+      </section>
+
+      <section class="layout reveal delay-2">
+        <article class="panel chart-panel">
+          <div class="panel-head">
+            <h2>Representative Performance</h2>
+            <p id="rangeLabel" class="muted">Run an analysis to populate chart data.</p>
+          </div>
+          <div class="chart-wrap">
+            <canvas id="performanceChart" aria-label="Performance chart" role="img"></canvas>
+          </div>
+        </article>
+
+        <article class="panel metrics-panel">
+          <div class="panel-head">
+            <h2>Snapshot</h2>
+            <p class="muted">Key portfolio-level comparables.</p>
+          </div>
+          <div id="metricCards" class="metric-cards">
+            <p class="muted">No data yet.</p>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel table-panel reveal delay-3">
+        <div class="panel-head">
+          <h2>Detailed Metrics</h2>
+          <p id="excludedNote" class="muted"></p>
+        </div>
+        <div class="table-wrap">
+          <table id="metricsTable">
+            <thead>
+              <tr>
+                <th>Ticker</th>
+                <th>Total Return</th>
+                <th>CAGR</th>
+                <th>Ann. Volatility</th>
+                <th>Max Drawdown</th>
+                <th>Start Price</th>
+                <th>End Price</th>
+                <th>$10K Ending Value</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td colspan="8" class="empty-row">Run an analysis to view metric rows.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="footnote">
+        Data source: Yahoo Finance. For informational use; not investment advice.
+      </footer>
+    </main>
+
+    <div id="toast" class="toast hidden"></div>
+  </body>
+</html>
+

@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#1b4d3e" />
+    <meta name="theme-color" content="#8a1538" />
     <title>KAO Rush Evaluation</title>
     <link rel="manifest" href="/static/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
@@ -123,6 +123,33 @@
           </div>
         </div>
 
+        <nav class="panel quick-nav reveal delay-1" aria-label="App sections">
+          <a href="#createSection" class="quick-nav-link">Add Rushee</a>
+          <a href="#pnmSection" class="quick-nav-link">PNMs</a>
+          <a href="#detailSection" class="quick-nav-link">Rate & Notes</a>
+          <a href="#meetingSection" class="quick-nav-link">Meeting View</a>
+          <a href="#membersSection" class="quick-nav-link">Members</a>
+          <a href="#adminPanel" class="quick-nav-link">Admin</a>
+        </nav>
+
+        <section class="panel workflow-tips reveal delay-2">
+          <h2>Fast Workflow</h2>
+          <div class="tips-grid">
+            <article>
+              <strong>1. Add + Select</strong>
+              <p class="muted">Create a rushee, upload photo, then select them from the PNM table.</p>
+            </article>
+            <article>
+              <strong>2. Rate + Log</strong>
+              <p class="muted">Capture rating updates and lunches immediately after each interaction.</p>
+            </article>
+            <article>
+              <strong>3. Run Meeting</strong>
+              <p class="muted">Open Meeting View for full packet details before final vote.</p>
+            </article>
+          </div>
+        </section>
+
         <div class="panel filters reveal delay-2">
           <h2>Filtering & Matching</h2>
           <div class="inline-grid filters-grid">
@@ -142,8 +169,8 @@
           <datalist id="interestHints"></datalist>
         </div>
 
-        <div class="grid-two reveal delay-3">
-          <section class="panel">
+        <div id="createSection" class="grid-two reveal delay-3">
+          <section class="panel emphasis-panel">
             <h2>Create PNM</h2>
             <form id="pnmForm" class="stack">
               <div class="inline-grid">
@@ -228,7 +255,7 @@
           <div id="pendingList" class="table-wrap"></div>
         </section>
 
-        <section class="panel reveal delay-4">
+        <section id="pnmSection" class="panel reveal delay-4">
           <div class="section-head">
             <h2>PNMs</h2>
             <p class="muted">Weighted totals and per-category averages auto-update with every rating change.</p>
@@ -236,7 +263,7 @@
           <div id="pnmTable" class="table-wrap"></div>
         </section>
 
-        <section class="panel reveal delay-5">
+        <section id="detailSection" class="panel reveal delay-5">
           <div class="section-head">
             <h2>Selected PNM Detail</h2>
             <p id="selectedPnmLabel" class="muted">Select a PNM to rate and review rating/lunch history.</p>
@@ -286,12 +313,12 @@
           </div>
         </section>
 
-        <section class="panel reveal delay-5">
+        <section id="membersSection" class="panel reveal delay-5">
           <h2>Members</h2>
           <div id="memberTable" class="table-wrap"></div>
         </section>
 
-        <section class="panel reveal delay-6">
+        <section id="matchingSection" class="panel reveal delay-6">
           <h2>Matching View</h2>
           <p class="muted">Apply shared filters above to pair PNMs and members intentionally.</p>
           <div class="grid-two matching-grid">
@@ -306,7 +333,7 @@
           </div>
         </section>
 
-        <section class="panel reveal delay-6">
+        <section id="meetingSection" class="panel reveal delay-6">
           <div class="section-head">
             <h2>Meeting View</h2>
             <p class="muted">Pull a single rushee profile with meeting-ready context.</p>

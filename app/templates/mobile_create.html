@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="{{ app_config.theme_primary }}" />
+    <title>{{ app_config.tenant_name }} Add Rushee</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/mobile.js" defer></script>
+  </head>
+  <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="create">
+    <main class="shell mobile-shell">
+      <header class="hero mobile-hero">
+        <p class="eyebrow">{{ app_config.chapter_name }}</p>
+        <h1>Add Rushee</h1>
+        <p>Create PNMs quickly from your phone during events.</p>
+      </header>
+
+      <section class="panel mobile-panel">
+        <form id="mobileCreatePnmForm" class="stack">
+          <div class="inline-grid">
+            <label>First name<input id="mobilePnmFirstName" type="text" required /></label>
+            <label>Last name<input id="mobilePnmLastName" type="text" required /></label>
+          </div>
+          <div class="inline-grid">
+            <label>
+              Class year
+              <select id="mobilePnmClassYear" required>
+                <option>F</option>
+                <option>S</option>
+                <option>J</option>
+              </select>
+            </label>
+            <label>First event date<input id="mobilePnmEventDate" type="date" required /></label>
+          </div>
+          <label>Hometown<input id="mobilePnmHometown" type="text" required /></label>
+          <label>Phone number<input id="mobilePnmPhone" type="text" placeholder="+1 555 123 4567" /></label>
+          <label>Instagram handle<input id="mobilePnmInstagram" type="text" required placeholder="@username" /></label>
+          <label>Interests<input id="mobilePnmInterests" type="text" required placeholder="Golf,Finance" /></label>
+          <label>Stereotype<input id="mobilePnmStereotype" type="text" required /></label>
+          <label>Lunch stats (optional)<input id="mobilePnmLunchStats" type="text" /></label>
+          <label>Photo (optional)<input id="mobilePnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+          <button type="submit">Create PNM</button>
+        </form>
+      </section>
+    </main>
+
+    <nav class="mobile-tabs" aria-label="Mobile Navigation">
+      <a href="{{ app_config.mobile_base }}" class="mobile-tab">Home</a>
+      <a href="{{ app_config.mobile_base }}/pnms" class="mobile-tab">PNMs</a>
+      <a href="{{ app_config.mobile_base }}/create" class="mobile-tab is-active">Create</a>
+      <a href="{{ app_config.mobile_base }}/members" class="mobile-tab">Members</a>
+      <a href="{{ app_config.mobile_base }}/meeting" class="mobile-tab">Meeting</a>
+    </nav>
+
+    <div id="mobileToast" class="toast hidden"></div>
+  </body>
+</html>

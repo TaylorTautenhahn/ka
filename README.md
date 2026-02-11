@@ -38,6 +38,13 @@ The app replaces spreadsheets with role-based visibility, accountability, meetin
   - recommended member matches by shared interests/stereotype
 - Admin Panel (Head only): remove rushees with safe cascading cleanup.
 - Dedicated Meeting page tab with print-to-PDF workflow.
+- Mobile route set with separate pages (not a long single scroll):
+  - `/<org-slug>/mobile`
+  - `/<org-slug>/mobile/pnms`
+  - `/<org-slug>/mobile/create`
+  - `/<org-slug>/mobile/members`
+  - `/<org-slug>/mobile/meeting`
+- iPhone contact export for PNMs as `.vcf` including name, phone, photo, and org field `PNM (<Fraternity Name>)`.
 - Manual backup exports:
   - CSV archive export (zip)
   - SQLite snapshot export
@@ -186,6 +193,7 @@ Tenant APIs:
 - `GET /api/interests`
 - `GET /api/export/csv` (Head only)
 - `GET /api/export/sqlite` (Head only)
+- `GET /api/export/contacts.vcf`
 - `GET /health`
 
 Platform admin APIs:

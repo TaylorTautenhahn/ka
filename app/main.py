@@ -4,6 +4,7 @@ import hmac
 import hashlib
 import io
 import json
+import base64
 import os
 import re
 import secrets
@@ -255,6 +256,79 @@ def require_tenant_exists(slug: str) -> sqlite3.Row:
     if not row:
         raise HTTPException(status_code=404, detail="Organization not found.")
     return row
+
+
+def app_config_for_tenant(tenant: TenantContext) -> dict[str, str | None]:
+    return {
+        "base_path": f"/{tenant.slug}",
+        "api_base": f"/{tenant.slug}/api",
+        "meeting_base": f"/{tenant.slug}/meeting",
+        "platform_base": "/platform",
+        "mobile_base": f"/{tenant.slug}/mobile",
+        "tenant_slug": tenant.slug,
+        "tenant_name": tenant.display_name,
+        "chapter_name": tenant.chapter_name,
+        "logo_path": tenant.logo_path,
+        "theme_primary": tenant.theme_primary,
+        "theme_secondary": tenant.theme_secondary,
+    }
+
+
+def vcard_escape(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("\n", "\\n")
+    escaped = escaped.replace(";", "\\;").replace(",", "\\,")
+    return escaped
+
+
+def fold_vcard_line(line: str, limit: int = 75) -> str:
+    if len(line) <= limit:
+        return line
+    chunks = [line[:limit]]
+    remainder = line[limit:]
+    while remainder:
+        chunks.append(f" {remainder[:limit-1]}")
+        remainder = remainder[limit - 1 :]
+    return "\r\n".join(chunks)
+
+
+def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
+    first_name = row["first_name"] or ""
+    last_name = row["last_name"] or ""
+    full_name = f"{first_name} {last_name}".strip() or row["pnm_code"]
+    org_name = f"PNM ({tenant_name})"
+    lines = [
+        "BEGIN:VCARD",
+        "VERSION:3.0",
+        fold_vcard_line(f"N:{vcard_escape(last_name)};{vcard_escape(first_name)};;;"),
+        fold_vcard_line(f"FN:{vcard_escape(full_name)}"),
+        fold_vcard_line(f"ORG:{vcard_escape(org_name)}"),
+    ]
+
+    phone = (row["phone_number"] or "").strip()
+    if phone:
+        lines.append(fold_vcard_line(f"TEL;TYPE=CELL:{vcard_escape(phone)}"))
+
+    ig = (row["instagram_handle"] or "").strip()
+    if ig:
+        ig_name = ig[1:] if ig.startswith("@") else ig
+        lines.append(fold_vcard_line(f"item1.URL:https://instagram.com/{vcard_escape(ig_name)}"))
+        lines.append("item1.X-ABLabel:Instagram")
+
+    photo_path = row["photo_path"]
+    fs_path = photo_fs_path(photo_path)
+    if fs_path and fs_path.exists() and fs_path.is_file():
+        raw = fs_path.read_bytes()
+        photo_type = "JPEG"
+        suffix = fs_path.suffix.lower()
+        if suffix == ".png":
+            photo_type = "PNG"
+        elif suffix == ".webp":
+            photo_type = "WEBP"
+        encoded = base64.b64encode(raw).decode("ascii")
+        lines.append(fold_vcard_line(f"PHOTO;ENCODING=b;TYPE={photo_type}:{encoded}"))
+
+    lines.append("END:VCARD")
+    return "\r\n".join(lines)
 
 
 def current_platform_admin(request: Request) -> sqlite3.Row:
@@ -1616,18 +1690,7 @@ async def home(request: Request) -> HTMLResponse:
             {
                 "request": request,
                 "tenant": tenant,
-                "app_config": {
-                    "base_path": f"/{tenant.slug}",
-                    "api_base": f"/{tenant.slug}/api",
-                    "meeting_base": f"/{tenant.slug}/meeting",
-                    "platform_base": "/platform",
-                    "tenant_slug": tenant.slug,
-                    "tenant_name": tenant.display_name,
-                    "chapter_name": tenant.chapter_name,
-                    "logo_path": tenant.logo_path,
-                    "theme_primary": tenant.theme_primary,
-                    "theme_secondary": tenant.theme_secondary,
-                },
+                "app_config": app_config_for_tenant(tenant),
             },
         )
 
@@ -1652,18 +1715,87 @@ async def meeting_page(request: Request) -> HTMLResponse:
         {
             "request": request,
             "tenant": tenant,
-            "app_config": {
-                "base_path": f"/{tenant.slug}",
-                "api_base": f"/{tenant.slug}/api",
-                "meeting_base": f"/{tenant.slug}/meeting",
-                "platform_base": "/platform",
-                "tenant_slug": tenant.slug,
-                "tenant_name": tenant.display_name,
-                "chapter_name": tenant.chapter_name,
-                "logo_path": tenant.logo_path,
-                "theme_primary": tenant.theme_primary,
-                "theme_secondary": tenant.theme_secondary,
-            },
+            "app_config": app_config_for_tenant(tenant),
+        },
+    )
+
+
+@app.get("/mobile", response_class=HTMLResponse)
+async def mobile_home_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_home.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "home",
+        },
+    )
+
+
+@app.get("/mobile/pnms", response_class=HTMLResponse)
+async def mobile_pnms_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_pnms.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "pnms",
+        },
+    )
+
+
+@app.get("/mobile/create", response_class=HTMLResponse)
+async def mobile_create_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_create.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "create",
+        },
+    )
+
+
+@app.get("/mobile/members", response_class=HTMLResponse)
+async def mobile_members_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_members.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "members",
+        },
+    )
+
+
+@app.get("/mobile/meeting", response_class=HTMLResponse)
+async def mobile_meeting_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_meeting.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "meeting",
         },
     )
 
@@ -1899,6 +2031,29 @@ def export_sqlite_backup(_: sqlite3.Row = Depends(require_head)) -> FileResponse
         filename=snapshot.name,
         headers={"Cache-Control": "no-store"},
     )
+
+
+@app.get("/api/export/contacts.vcf")
+def export_contacts_vcf(_: sqlite3.Row = Depends(current_user)) -> Response:
+    tenant = CURRENT_TENANT.get()
+    if tenant is None:
+        default_row = require_tenant_exists(DEFAULT_TENANT_SLUG)
+        tenant = tenant_context_from_row(default_row)
+
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT first_name, last_name, pnm_code, phone_number, instagram_handle, photo_path
+            FROM pnms
+            ORDER BY last_name ASC, first_name ASC
+            """
+        ).fetchall()
+
+    cards = [build_pnm_vcard(row, tenant.display_name) for row in rows]
+    payload = ("\r\n".join(cards) + ("\r\n" if cards else "")).encode("utf-8")
+    filename = f"pnm-contacts-{tenant.slug}-{timestamp_slug()}.vcf"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=payload, media_type="text/vcard; charset=utf-8", headers=headers)
 
 
 @app.post("/api/auth/register")

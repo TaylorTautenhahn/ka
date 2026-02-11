@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="{{ app_config.theme_primary }}" />
+    <title>{{ app_config.tenant_name }} Mobile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/mobile.js" defer></script>
+  </head>
+  <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="home">
+    <main class="shell mobile-shell">
+      <header class="hero mobile-hero">
+        {% if app_config.logo_path %}
+        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+        {% endif %}
+        <p class="eyebrow">{{ app_config.chapter_name }}</p>
+        <h1>Mobile Command</h1>
+        <p>{{ app_config.tenant_name }} rush operations, optimized for iPhone use during events.</p>
+      </header>
+
+      <section class="panel mobile-panel">
+        <h2>Live Snapshot</h2>
+        <div class="mobile-kpi-grid">
+          <article class="card"><strong id="mobilePnmCount">0</strong><p>PNMs</p></article>
+          <article class="card"><strong id="mobileRatingCount">0</strong><p>Ratings</p></article>
+          <article class="card"><strong id="mobileLunchCount">0</strong><p>Lunches</p></article>
+        </div>
+      </section>
+
+      <section class="panel mobile-panel">
+        <h2>Quick Actions</h2>
+        <div class="mobile-action-grid">
+          <a href="{{ app_config.base_path }}" class="quick-nav-link">Desktop Dashboard</a>
+          <a href="{{ app_config.meeting_base }}" class="quick-nav-link">Desktop Meeting</a>
+          <a href="{{ app_config.mobile_base }}/pnms" class="quick-nav-link">PNM Directory</a>
+          <a href="{{ app_config.mobile_base }}/create" class="quick-nav-link">Add Rushee</a>
+        </div>
+      </section>
+    </main>
+
+    <nav class="mobile-tabs" aria-label="Mobile Navigation">
+      <a href="{{ app_config.mobile_base }}" class="mobile-tab is-active">Home</a>
+      <a href="{{ app_config.mobile_base }}/pnms" class="mobile-tab">PNMs</a>
+      <a href="{{ app_config.mobile_base }}/create" class="mobile-tab">Create</a>
+      <a href="{{ app_config.mobile_base }}/members" class="mobile-tab">Members</a>
+      <a href="{{ app_config.mobile_base }}/meeting" class="mobile-tab">Meeting</a>
+    </nav>
+
+    <div id="mobileToast" class="toast hidden"></div>
+  </body>
+</html>

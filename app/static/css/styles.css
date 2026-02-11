@@ -80,6 +80,80 @@ body {
   padding: 1.4rem 0.95rem 2rem;
 }
 
+.mobile-shell {
+  max-width: 640px;
+  padding-bottom: 6.5rem;
+}
+
+.mobile-hero h1 {
+  font-size: clamp(1.45rem, 6.2vw, 2rem);
+}
+
+.mobile-panel {
+  border-radius: 14px;
+  padding: 0.8rem;
+}
+
+.mobile-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.mobile-action-grid {
+  display: grid;
+  gap: 0.45rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.mobile-list {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.mobile-card {
+  margin-bottom: 0;
+}
+
+.mobile-card-row {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.mobile-tabs {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.3rem;
+  padding: 0.5rem 0.55rem calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+  background: rgba(255, 255, 255, 0.96);
+  border-top: 1px solid rgba(138, 21, 56, 0.14);
+  backdrop-filter: blur(8px);
+}
+
+.mobile-tab {
+  text-decoration: none;
+  text-align: center;
+  color: var(--ink-soft);
+  border: 1px solid rgba(138, 21, 56, 0.14);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.44rem 0.25rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.mobile-tab.is-active {
+  color: #fff;
+  border-color: var(--accent);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%);
+}
+
 #createSection,
 #pnmSection,
 #detailSection,

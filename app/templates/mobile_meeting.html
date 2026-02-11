@@ -2,9 +2,9 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="{{ app_config.theme_primary }}" />
-    <title>{{ app_config.tenant_name }} Meeting Packets</title>
+    <title>{{ app_config.tenant_name }} Meeting</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -14,24 +14,15 @@
     <link rel="stylesheet" href="/static/css/styles.css" />
     <script src="/static/js/meeting.js" defer></script>
   </head>
-  <body data-app-config='{{ app_config | tojson | forceescape }}'>
-    <main class="shell">
-      <header class="hero reveal">
-        {% if app_config.logo_path %}
-        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-        {% endif %}
+  <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="meeting">
+    <main class="shell mobile-shell">
+      <header class="hero mobile-hero">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Meeting Packet</h1>
-        <p>Dedicated meeting context for one rushee at a time, optimized for review and print-to-PDF exports.</p>
+        <p>Open one PNM at a time and export the packet as PDF for chapter review.</p>
       </header>
 
-      <nav class="panel quick-nav" aria-label="Tabs">
-        <a href="{{ app_config.base_path }}" class="quick-nav-link">Dashboard</a>
-        <a href="{{ app_config.meeting_base }}" class="quick-nav-link">Meeting Packets</a>
-        <a href="{{ app_config.mobile_base }}" class="quick-nav-link">Mobile Mode</a>
-      </nav>
-
-      <section class="panel">
+      <section class="panel mobile-panel">
         <div class="inline-grid">
           <label>
             Rushee
@@ -48,10 +39,19 @@
         </div>
       </section>
 
-      <section id="meetingPacket" class="panel meeting-view">
+      <section id="meetingPacket" class="panel meeting-view mobile-panel">
         <p class="muted">Select a rushee and click Load Packet.</p>
       </section>
     </main>
+
+    <nav class="mobile-tabs" aria-label="Mobile Navigation">
+      <a href="{{ app_config.mobile_base }}" class="mobile-tab">Home</a>
+      <a href="{{ app_config.mobile_base }}/pnms" class="mobile-tab">PNMs</a>
+      <a href="{{ app_config.mobile_base }}/create" class="mobile-tab">Create</a>
+      <a href="{{ app_config.mobile_base }}/members" class="mobile-tab">Members</a>
+      <a href="{{ app_config.mobile_base }}/meeting" class="mobile-tab is-active">Meeting</a>
+    </nav>
+
     <div id="meetingToast" class="toast hidden"></div>
   </body>
 </html>

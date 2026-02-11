@@ -230,7 +230,15 @@ function attachEvents() {
 
 async function init() {
   await ensureSession();
+  const fromQuery = Number(new URLSearchParams(window.location.search).get("pnm_id") || 0);
+  if (fromQuery) {
+    currentPnmId = fromQuery;
+  }
   await loadPnms();
+  if (currentPnmId) {
+    pnmSelect.value = String(currentPnmId);
+    await loadPacket();
+  }
   attachEvents();
 }
 

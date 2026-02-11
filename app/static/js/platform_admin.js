@@ -113,8 +113,13 @@ function renderTenantList(rows) {
 }
 
 async function loadTenants() {
-  const payload = await api("/platform/api/tenants");
-  renderTenantList(payload.tenants || []);
+  try {
+    const payload = await api("/platform/api/tenants");
+    renderTenantList(payload.tenants || []);
+  } catch (error) {
+    tenantList.innerHTML = '<p class="muted">Unable to load organizations.</p>';
+    showToast(error.message || "Unable to load organizations.");
+  }
 }
 
 async function ensureSession() {
@@ -123,8 +128,11 @@ async function ensureSession() {
     setAuthView(true);
     sessionTitle.textContent = payload.admin.username;
     await loadTenants();
-  } catch {
+  } catch (error) {
     setAuthView(false);
+    if (error && error.message) {
+      showToast(error.message);
+    }
   }
 }
 
@@ -140,7 +148,9 @@ async function handleLogin(event) {
         access_code: accessCode,
       },
     });
-    showToast("Signed in.");
+    setAuthView(true);
+    sessionTitle.textContent = username;
+    showToast("Signed in. Loading organizations...");
     await ensureSession();
   } catch (error) {
     showToast(error.message || "Unable to sign in.");

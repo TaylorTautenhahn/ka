@@ -247,7 +247,8 @@ function renderTagPickerButtons(pickerEl, tags, selectedSet) {
   pickerEl.innerHTML = tags
     .map((tag) => {
       const active = selectedSet.has(tag.toLowerCase()) ? " is-active" : "";
-      return `<button type="button" class="tag-pill${active}" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`;
+      const pressed = active ? "true" : "false";
+      return `<span class="tag-pill${active}" data-tag="${escapeHtml(tag)}" role="button" tabindex="0" aria-pressed="${pressed}">${escapeHtml(tag)}</span>`;
     })
     .join("");
 }
@@ -284,12 +285,7 @@ function bindInterestPicker(inputId, pickerId) {
   }
   picker.dataset.bound = "1";
 
-  picker.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-tag]");
-    if (!button) {
-      return;
-    }
-    const tag = String(button.dataset.tag || "").trim();
+  const applyTagToggle = (tag) => {
     if (!tag) {
       return;
     }
@@ -302,6 +298,30 @@ function bindInterestPicker(inputId, pickerId) {
       input.value = uniqueNormalized(tokens).join(",");
     }
     syncInterestPickerFromInput(inputId, pickerId);
+  };
+
+  picker.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-tag]");
+    if (!chip) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const tag = String(chip.dataset.tag || "").trim();
+    applyTagToggle(tag);
+  });
+
+  picker.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    const chip = event.target.closest("[data-tag]");
+    if (!chip) {
+      return;
+    }
+    event.preventDefault();
+    const tag = String(chip.dataset.tag || "").trim();
+    applyTagToggle(tag);
   });
 
   input.addEventListener("input", () => syncInterestPickerFromInput(inputId, pickerId));
@@ -316,18 +336,37 @@ function bindStereotypePicker(inputId, pickerId) {
   }
   picker.dataset.bound = "1";
 
-  picker.addEventListener("click", (event) => {
-    const button = event.target.closest("button[data-tag]");
-    if (!button) {
-      return;
-    }
-    const tag = String(button.dataset.tag || "").trim();
+  const applyStereotype = (tag) => {
     if (!tag) {
       return;
     }
     const current = String(input.value || "").trim().toLowerCase();
     input.value = current === tag.toLowerCase() ? "" : tag;
     syncStereotypePickerFromInput(inputId, pickerId);
+  };
+
+  picker.addEventListener("click", (event) => {
+    const chip = event.target.closest("[data-tag]");
+    if (!chip) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    const tag = String(chip.dataset.tag || "").trim();
+    applyStereotype(tag);
+  });
+
+  picker.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    const chip = event.target.closest("[data-tag]");
+    if (!chip) {
+      return;
+    }
+    event.preventDefault();
+    const tag = String(chip.dataset.tag || "").trim();
+    applyStereotype(tag);
   });
 
   input.addEventListener("input", () => syncStereotypePickerFromInput(inputId, pickerId));

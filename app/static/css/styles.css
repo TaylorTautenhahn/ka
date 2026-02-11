@@ -940,6 +940,9 @@ td strong {
 }
 
 .tag-picker .tag-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
   padding: 0.32rem 0.58rem;
   border-radius: 999px;
@@ -950,12 +953,19 @@ td strong {
   font-size: 0.74rem;
   font-weight: 700;
   line-height: 1.15;
+  cursor: pointer;
+  user-select: none;
 }
 
-.tag-picker .tag-pill:hover:not(:disabled) {
+.tag-picker .tag-pill:hover {
   transform: translateY(0);
   border-color: rgba(var(--accent-rgb), 0.44);
   background: rgba(var(--accent-rgb), 0.1);
+}
+
+.tag-picker .tag-pill:focus-visible {
+  outline: 2px solid rgba(var(--accent-rgb), 0.45);
+  outline-offset: 2px;
 }
 
 .tag-picker .tag-pill.is-active {

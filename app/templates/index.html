@@ -102,17 +102,16 @@
           </div>
         </div>
 
-        <nav class="panel quick-nav reveal delay-1" aria-label="App sections">
-          <a href="{{ app_config.base_path if app_config else '/' }}" class="quick-nav-link">Dashboard</a>
+        <nav id="desktopPageNav" class="panel quick-nav reveal delay-1" aria-label="Desktop pages">
+          <a href="{{ app_config.base_path if app_config else '/' }}?view=overview" class="quick-nav-link desktop-page-link" data-page="overview">Overview</a>
+          <a href="{{ app_config.base_path if app_config else '/' }}?view=rushees" class="quick-nav-link desktop-page-link" data-page="rushees">Rushees</a>
+          <a href="{{ app_config.base_path if app_config else '/' }}?view=members" class="quick-nav-link desktop-page-link" data-page="members">Members</a>
+          <a id="adminNavLink" href="{{ app_config.base_path if app_config else '/' }}?view=admin" class="quick-nav-link desktop-page-link" data-page="admin">Admin</a>
           <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
-          <a href="{{ app_config.mobile_base if app_config else '/mobile' }}" class="quick-nav-link">Phone View</a>
-          <a href="#createSection" class="quick-nav-link">Add Rushee</a>
-          <a href="#pnmSection" class="quick-nav-link">PNMs</a>
-          <a href="#leaderboardSection" class="quick-nav-link">Leaderboard</a>
-          <a href="#detailSection" class="quick-nav-link">Rate & Notes</a>
-          <a href="#membersSection" class="quick-nav-link">Members</a>
-          <a id="adminNavLink" href="#adminPanel" class="quick-nav-link">Admin</a>
         </nav>
+
+        <div class="desktop-pages">
+          <div class="desktop-page is-active" data-page="overview">
 
         <section class="panel workflow-tips reveal delay-2">
           <h2>Fast Workflow</h2>
@@ -150,6 +149,32 @@
           </div>
           <datalist id="interestHints"></datalist>
         </div>
+
+        <section id="leaderboardSection" class="panel reveal delay-5">
+          <div class="section-head">
+            <h2>PNM Leaderboard</h2>
+            <p class="muted">Overall rankings across all PNMs by weighted total score, then participation metrics.</p>
+          </div>
+          <div id="leaderboardTable" class="table-wrap"></div>
+        </section>
+
+        <section id="matchingSection" class="panel reveal delay-7">
+          <h2>Matching View</h2>
+          <p class="muted">Apply shared filters above to pair PNMs and members intentionally.</p>
+          <div class="grid-two matching-grid">
+            <div>
+              <h3>Filtered PNMs</h3>
+              <div id="matchingPnms" class="list-box"></div>
+            </div>
+            <div>
+              <h3>Filtered Members</h3>
+              <div id="matchingMembers" class="list-box"></div>
+            </div>
+          </div>
+        </section>
+          </div>
+
+          <div class="desktop-page" data-page="rushees">
 
         <div id="createSection" class="grid-two reveal delay-3">
           <section class="panel emphasis-panel">
@@ -263,25 +288,12 @@
           </section>
         </div>
 
-        <section id="approvalsPanel" class="panel hidden reveal delay-4">
-          <h2>Pending Username Approvals</h2>
-          <div id="pendingList" class="table-wrap"></div>
-        </section>
-
         <section id="pnmSection" class="panel reveal delay-4">
           <div class="section-head">
             <h2>PNMs</h2>
             <p class="muted">Weighted totals and per-category averages auto-update with every rating change.</p>
           </div>
           <div id="pnmTable" class="table-wrap"></div>
-        </section>
-
-        <section id="leaderboardSection" class="panel reveal delay-5">
-          <div class="section-head">
-            <h2>PNM Leaderboard</h2>
-            <p class="muted">Overall rankings across all PNMs by weighted total score, then participation metrics.</p>
-          </div>
-          <div id="leaderboardTable" class="table-wrap"></div>
         </section>
 
         <section id="detailSection" class="panel reveal delay-6">
@@ -345,26 +357,6 @@
           </div>
         </section>
 
-        <section id="membersSection" class="panel reveal delay-6">
-          <h2>Members</h2>
-          <div id="memberTable" class="table-wrap"></div>
-        </section>
-
-        <section id="matchingSection" class="panel reveal delay-7">
-          <h2>Matching View</h2>
-          <p class="muted">Apply shared filters above to pair PNMs and members intentionally.</p>
-          <div class="grid-two matching-grid">
-            <div>
-              <h3>Filtered PNMs</h3>
-              <div id="matchingPnms" class="list-box"></div>
-            </div>
-            <div>
-              <h3>Filtered Members</h3>
-              <div id="matchingMembers" class="list-box"></div>
-            </div>
-          </div>
-        </section>
-
         <section id="meetingSection" class="panel reveal delay-6">
           <div class="section-head">
             <h2>Meeting Packets</h2>
@@ -374,6 +366,21 @@
           <div id="meetingView" class="meeting-view hidden"></div>
         </section>
 
+          </div>
+
+          <div class="desktop-page" data-page="members">
+        <section id="approvalsPanel" class="panel hidden reveal delay-4">
+          <h2>Pending Username Approvals</h2>
+          <div id="pendingList" class="table-wrap"></div>
+        </section>
+
+        <section id="membersSection" class="panel reveal delay-6">
+          <h2>Members</h2>
+          <div id="memberTable" class="table-wrap"></div>
+        </section>
+          </div>
+
+          <div class="desktop-page" data-page="admin">
         <section id="adminPanel" class="panel hidden reveal delay-6">
           <div class="section-head">
             <h2>Admin Panel</h2>
@@ -381,6 +388,8 @@
           </div>
           <div id="adminPnmTable" class="table-wrap"></div>
         </section>
+          </div>
+        </div>
       </section>
     </main>
 

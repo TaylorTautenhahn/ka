@@ -329,6 +329,26 @@ h3 {
   border-color: rgba(138, 21, 56, 0.4);
 }
 
+.quick-nav-link.desktop-page-link.is-active {
+  color: #fff;
+  border-color: rgba(138, 21, 56, 0.88);
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-bright) 100%);
+  box-shadow: 0 10px 22px rgba(95, 16, 41, 0.22);
+}
+
+.desktop-pages {
+  display: grid;
+}
+
+.desktop-page {
+  display: none;
+}
+
+.desktop-page.is-active {
+  display: block;
+  animation: riseIn 0.3s ease both;
+}
+
 .workflow-tips {
   border: 1px solid rgba(201, 154, 43, 0.32);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 247, 227, 0.64));

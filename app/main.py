@@ -3445,20 +3445,142 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str
     }
 
 
-@app.get("/api/calendar/share")
-def calendar_share_links(request: Request, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
-    tenant = current_tenant()
+def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str, Any]:
     feed_path = f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}"
     base_origin = str(request.base_url).rstrip("/")
     feed_url = f"{base_origin}{feed_path}"
-    webcal_url = build_webcal_url(feed_url)
-    google_subscribe_url = build_google_subscribe_url(feed_url)
     return {
         "feed_url": feed_url,
-        "webcal_url": webcal_url,
-        "google_subscribe_url": google_subscribe_url,
+        "webcal_url": build_webcal_url(feed_url),
+        "google_subscribe_url": build_google_subscribe_url(feed_url),
         "timezone": CALENDAR_TIMEZONE,
     }
+
+
+@app.get("/api/mobile/home")
+def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    tenant = current_tenant()
+    with db_session() as conn:
+        totals = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS pnm_count,
+                COALESCE(SUM(rating_count), 0) AS rating_count,
+                COALESCE(SUM(total_lunches), 0) AS lunch_count
+            FROM pnms
+            """
+        ).fetchone()
+        rows = conn.execute(
+            """
+            SELECT
+                p.id,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                p.weighted_total,
+                p.rating_count,
+                p.total_lunches,
+                p.first_event_date,
+                ao.username AS assigned_officer_username
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.rating_count DESC, p.total_lunches DESC, p.last_name ASC, p.first_name ASC
+            LIMIT 10
+            """
+        ).fetchall()
+
+    leaderboard: list[dict[str, Any]] = []
+    for index, row in enumerate(rows, start=1):
+        leaderboard.append(
+            {
+                "rank": index,
+                "pnm_id": row["id"],
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "weighted_total": round(float(row["weighted_total"]), 2),
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+                "days_since_first_event": (date.today() - date.fromisoformat(row["first_event_date"])).days,
+                "assigned_officer_username": row["assigned_officer_username"] or "",
+            }
+        )
+
+    return {
+        "stats": {
+            "pnm_count": int(totals["pnm_count"]),
+            "rating_count": int(totals["rating_count"]),
+            "lunch_count": int(totals["lunch_count"]),
+        },
+        "leaderboard": leaderboard,
+        "calendar_share": calendar_share_payload(request, tenant),
+    }
+
+
+@app.get("/api/mobile/pnms")
+def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                p.id,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                p.phone_number,
+                p.instagram_handle,
+                p.interests,
+                p.first_event_date,
+                p.weighted_total,
+                p.rating_count,
+                p.total_lunches,
+                p.photo_path,
+                ao.username AS assigned_officer_username
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+            LIMIT 300
+            """
+        ).fetchall()
+
+    return {
+        "pnms": [
+            {
+                "pnm_id": row["id"],
+                "pnm_code": row["pnm_code"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "phone_number": row["phone_number"],
+                "instagram_handle": row["instagram_handle"],
+                "interests": decode_interests(row["interests"]),
+                "weighted_total": round(float(row["weighted_total"]), 2),
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+                "days_since_first_event": (date.today() - date.fromisoformat(row["first_event_date"])).days,
+                "photo_url": public_photo_url(row["photo_path"]),
+                "assigned_officer": (
+                    {"username": row["assigned_officer_username"]}
+                    if row["assigned_officer_username"]
+                    else None
+                ),
+            }
+            for row in rows
+        ]
+    }
+
+
+@app.get("/api/mobile/members")
+def mobile_members_payload(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        rows = conn.execute(
+            "SELECT * FROM users WHERE is_approved = 1 ORDER BY role ASC, username ASC LIMIT 400"
+        ).fetchall()
+    return {"users": [user_payload(row, user["role"], user["id"]) for row in rows]}
+
+
+@app.get("/api/calendar/share")
+def calendar_share_links(request: Request, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    tenant = current_tenant()
+    return calendar_share_payload(request, tenant)
 
 
 @app.get("/calendar/lunches.ics")

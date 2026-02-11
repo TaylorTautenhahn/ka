@@ -108,11 +108,6 @@ function renderMobileCalendarShare(data) {
   }
 }
 
-async function loadMobileCalendarShare() {
-  const payload = await api("/api/calendar/share");
-  renderMobileCalendarShare(payload);
-}
-
 async function handleMobileCopyCalendar() {
   if (!mobileCalendarShare || !mobileCalendarShare.feed_url) {
     showToast("Calendar URL is not ready yet.");
@@ -135,19 +130,16 @@ async function handleMobileCopyCalendar() {
   }
 }
 
-function renderHomeStats(pnms) {
+function renderHomeStats(stats) {
   const pnmCountEl = document.getElementById("mobilePnmCount");
   const ratingCountEl = document.getElementById("mobileRatingCount");
   const lunchCountEl = document.getElementById("mobileLunchCount");
   if (!pnmCountEl || !ratingCountEl || !lunchCountEl) {
     return;
   }
-  const pnmCount = pnms.length;
-  const ratingCount = pnms.reduce((sum, pnm) => sum + Number(pnm.rating_count || 0), 0);
-  const lunchCount = pnms.reduce((sum, pnm) => sum + Number(pnm.total_lunches || 0), 0);
-  pnmCountEl.textContent = String(pnmCount);
-  ratingCountEl.textContent = String(ratingCount);
-  lunchCountEl.textContent = String(lunchCount);
+  pnmCountEl.textContent = String(Number(stats.pnm_count || 0));
+  ratingCountEl.textContent = String(Number(stats.rating_count || 0));
+  lunchCountEl.textContent = String(Number(stats.lunch_count || 0));
 }
 
 function renderHomeLeaderboard(rows) {
@@ -244,23 +236,21 @@ function renderMembers(members) {
 }
 
 async function loadHomePage() {
-  const [pnmPayload, boardPayload] = await Promise.all([api("/api/pnms"), api("/api/leaderboard/pnms?limit=15")]);
-  renderHomeStats(pnmPayload.pnms || []);
-  renderHomeLeaderboard(boardPayload.leaderboard || []);
-  try {
-    await loadMobileCalendarShare();
-  } catch {
-    // Calendar link fetch should not block mobile home rendering.
+  const payload = await api("/api/mobile/home");
+  renderHomeStats(payload.stats || {});
+  renderHomeLeaderboard(payload.leaderboard || []);
+  if (payload.calendar_share) {
+    renderMobileCalendarShare(payload.calendar_share);
   }
 }
 
 async function loadPnmsPage() {
-  const payload = await api("/api/pnms");
+  const payload = await api("/api/mobile/pnms");
   renderPnmCards(payload.pnms || []);
 }
 
 async function loadMembersPage() {
-  const payload = await api("/api/users");
+  const payload = await api("/api/mobile/members");
   renderMembers(payload.users || []);
 }
 

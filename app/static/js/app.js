@@ -99,6 +99,11 @@ const openGoogleSubscribeBtn = document.getElementById("openGoogleSubscribeBtn")
 const calendarFeedPreview = document.getElementById("calendarFeedPreview");
 const lastLunchCalendarActions = document.getElementById("lastLunchCalendarActions");
 const openLastLunchGoogleLink = document.getElementById("openLastLunchGoogleLink");
+const desktopPageNav = document.getElementById("desktopPageNav");
+const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
+const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
+
+const DEFAULT_DESKTOP_PAGE = "overview";
 
 const state = {
   user: null,
@@ -117,6 +122,7 @@ const state = {
     lunchCount: 0,
   },
   calendarShare: null,
+  activeDesktopPage: DEFAULT_DESKTOP_PAGE,
   liveRefreshTimer: null,
 };
 
@@ -278,13 +284,58 @@ function setAuthView(isAuthenticated) {
   if (heroStats) {
     heroStats.classList.toggle("hidden", !isAuthenticated);
   }
+  if (isAuthenticated) {
+    setActiveDesktopPage(currentRequestedDesktopPage(), false);
+  }
+}
+
+function availableDesktopPages() {
+  return desktopPages.map((panel) => panel.dataset.page).filter(Boolean);
+}
+
+function currentRequestedDesktopPage() {
+  const requested = new URLSearchParams(window.location.search).get("view");
+  if (!requested) {
+    return DEFAULT_DESKTOP_PAGE;
+  }
+  return requested.trim().toLowerCase();
+}
+
+function setActiveDesktopPage(page, updateUrl = true) {
+  if (!desktopPages.length) {
+    return;
+  }
+  const available = new Set(availableDesktopPages());
+  let target = available.has(page) ? page : DEFAULT_DESKTOP_PAGE;
+  if (target === "admin" && !roleCanUseAdminPanel()) {
+    target = DEFAULT_DESKTOP_PAGE;
+  }
+  state.activeDesktopPage = target;
+  desktopPages.forEach((panel) => {
+    panel.classList.toggle("is-active", panel.dataset.page === target);
+  });
+  desktopPageLinks.forEach((link) => {
+    link.classList.toggle("is-active", link.dataset.page === target);
+  });
+
+  if (!updateUrl) {
+    return;
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set("view", target);
+  window.history.replaceState({}, "", url.toString());
 }
 
 function updateTopbarActions() {
   const isHead = roleCanUseAdminPanel();
   backupCsvBtn.classList.toggle("hidden", !isHead);
   backupDbBtn.classList.toggle("hidden", !isHead);
-  adminNavLink.classList.toggle("hidden", !isHead);
+  if (adminNavLink) {
+    adminNavLink.classList.toggle("hidden", !isHead);
+  }
+  if (!isHead && state.activeDesktopPage === "admin") {
+    setActiveDesktopPage(DEFAULT_DESKTOP_PAGE);
+  }
 }
 
 function startLiveRefresh() {
@@ -1701,12 +1752,28 @@ function attachEvents() {
       applyRatingFormForSelected();
     }
   });
+
+  if (desktopPageNav) {
+    desktopPageNav.addEventListener("click", (event) => {
+      const link = event.target.closest(".desktop-page-link[data-page]");
+      if (!link) {
+        return;
+      }
+      event.preventDefault();
+      setActiveDesktopPage((link.dataset.page || DEFAULT_DESKTOP_PAGE).toLowerCase());
+    });
+  }
+
+  window.addEventListener("popstate", () => {
+    setActiveDesktopPage(currentRequestedDesktopPage(), false);
+  });
 }
 
 async function init() {
   setDefaultDates();
   setRoleEmojiRequirement();
   attachEvents();
+  setActiveDesktopPage(currentRequestedDesktopPage(), false);
   updateTopbarActions();
   setupPwaInstall();
   await ensureSession();

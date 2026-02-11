@@ -883,6 +883,25 @@ def create_sqlite_snapshot(prefix: str = "snapshot") -> Path:
     return backup_path
 
 
+def copy_sqlite_database(source: Path, destination: Path) -> bool:
+    if not source.exists() or source == destination:
+        return False
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    source_conn = sqlite3.connect(source)
+    destination_conn = sqlite3.connect(destination)
+    try:
+        with destination_conn:
+            source_conn.backup(destination_conn)
+    except Exception:
+        destination_conn.close()
+        source_conn.close()
+        destination.unlink(missing_ok=True)
+        return False
+    destination_conn.close()
+    source_conn.close()
+    return True
+
+
 def csv_bytes_from_rows(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=columns)
@@ -1511,11 +1530,29 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
         existing_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
         calendar_share_token = existing_token or secrets.token_urlsafe(24)
         existing_db_path_raw = (row["db_path"] or "").strip()
-        existing_db_path = Path(existing_db_path_raw) if existing_db_path_raw else None
-        if existing_db_path and existing_db_path.exists():
-            preserved_db_path = existing_db_path
-        else:
-            preserved_db_path = default_db_path
+        existing_db_path = Path(existing_db_path_raw).expanduser() if existing_db_path_raw else None
+        preserved_db_path = existing_db_path or default_db_path
+
+        if existing_db_path and existing_db_path != default_db_path:
+            if not existing_db_path.exists():
+                preserved_db_path = default_db_path
+                print(
+                    f"[startup] warning: prior default tenant DB path not found ({existing_db_path}). "
+                    f"Switching to configured path {default_db_path}."
+                )
+            else:
+                if not default_db_path.exists() and copy_sqlite_database(existing_db_path, default_db_path):
+                    print(
+                        f"[startup] migrated default tenant DB from {existing_db_path} to {default_db_path} "
+                        "for persistent storage."
+                    )
+                if default_db_path.exists():
+                    preserved_db_path = default_db_path
+                else:
+                    print(
+                        f"[startup] warning: default tenant DB path differs from configured path and migration was not "
+                        f"possible ({existing_db_path} -> {default_db_path}). Keeping existing path."
+                    )
 
         conn.execute(
             """

@@ -4,7 +4,13 @@ services:
     env: docker
     autoDeploy: true
     healthCheckPath: /health
+    disks:
+      - name: kao_data
+        mountPath: /data
+        sizeGB: 10
     envVars:
+      - key: DATA_ROOT
+        value: /data
       - key: SESSION_COOKIE_SECURE
         value: "1"
       - key: SESSION_COOKIE_SAMESITE

@@ -25,6 +25,7 @@ if (APP_CONFIG.theme_secondary) {
 }
 
 const toastEl = document.getElementById("mobileToast");
+let mobileCalendarShare = null;
 
 function escapeHtml(input) {
   return String(input)
@@ -91,6 +92,46 @@ async function ensureSession() {
   } catch {
     window.location.href = BASE_PATH || "/";
     throw new Error("Not authenticated");
+  }
+}
+
+function renderMobileCalendarShare(data) {
+  mobileCalendarShare = data;
+  const googleLink = document.getElementById("mobileGoogleSubscribeLink");
+  const preview = document.getElementById("mobileCalendarFeedPreview");
+  if (googleLink) {
+    googleLink.href = data.google_subscribe_url || "#";
+    googleLink.classList.toggle("hidden", !data.google_subscribe_url);
+  }
+  if (preview) {
+    preview.textContent = data.feed_url || "Calendar URL unavailable.";
+  }
+}
+
+async function loadMobileCalendarShare() {
+  const payload = await api("/api/calendar/share");
+  renderMobileCalendarShare(payload);
+}
+
+async function handleMobileCopyCalendar() {
+  if (!mobileCalendarShare || !mobileCalendarShare.feed_url) {
+    showToast("Calendar URL is not ready yet.");
+    return;
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(mobileCalendarShare.feed_url);
+    } else {
+      const input = document.createElement("input");
+      input.value = mobileCalendarShare.feed_url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+    showToast("Calendar URL copied.");
+  } catch {
+    showToast("Unable to copy URL.");
   }
 }
 
@@ -203,12 +244,14 @@ function renderMembers(members) {
 }
 
 async function loadHomePage() {
-  const [pnmPayload, boardPayload] = await Promise.all([
-    api("/api/pnms"),
-    api("/api/leaderboard/pnms?limit=15"),
-  ]);
+  const [pnmPayload, boardPayload] = await Promise.all([api("/api/pnms"), api("/api/leaderboard/pnms?limit=15")]);
   renderHomeStats(pnmPayload.pnms || []);
   renderHomeLeaderboard(boardPayload.leaderboard || []);
+  try {
+    await loadMobileCalendarShare();
+  } catch {
+    // Calendar link fetch should not block mobile home rendering.
+  }
 }
 
 async function loadPnmsPage() {
@@ -270,6 +313,13 @@ async function handleCreateSubmit(event) {
 }
 
 function attachPageEvents() {
+  if (MOBILE_PAGE === "home") {
+    const copyBtn = document.getElementById("mobileCopyCalendarBtn");
+    if (copyBtn) {
+      copyBtn.addEventListener("click", handleMobileCopyCalendar);
+    }
+  }
+
   if (MOBILE_PAGE === "pnms") {
     const refreshBtn = document.getElementById("mobileRefreshPnmsBtn");
     const downloadBtn = document.getElementById("mobileDownloadContactsBtn");

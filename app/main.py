@@ -12,9 +12,10 @@ import sqlite3
 import time
 import zipfile
 import contextvars
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -30,10 +31,25 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 
 BASE_DIR = Path(__file__).resolve().parent
-DB_PATH = Path(os.getenv("DB_PATH", str(BASE_DIR / "recruitment.db")))
-UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(BASE_DIR / "uploads")))
+
+
+def resolve_data_root() -> Path:
+    configured = os.getenv("DATA_ROOT", "").strip()
+    if configured:
+        return Path(configured).expanduser()
+
+    data_mount = Path("/data")
+    if data_mount.exists() and data_mount.is_dir() and os.access(data_mount, os.W_OK):
+        return data_mount / "ka-rush"
+
+    return BASE_DIR
+
+
+DATA_ROOT = resolve_data_root()
+DB_PATH = Path(os.getenv("DB_PATH", str(DATA_ROOT / "recruitment.db")))
+UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(DATA_ROOT / "uploads")))
 TENANT_UPLOADS_ROOT = UPLOADS_DIR / "tenants"
-TENANTS_DB_DIR = Path(os.getenv("TENANTS_DB_DIR", str(DB_PATH.parent / "tenants")))
+TENANTS_DB_DIR = Path(os.getenv("TENANTS_DB_DIR", str(DATA_ROOT / "tenants")))
 MAX_PNM_PHOTO_BYTES = int(os.getenv("MAX_PNM_PHOTO_BYTES", str(4 * 1024 * 1024)))
 BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(UPLOADS_DIR / "backups")))
 MAX_BACKUP_FILES = int(os.getenv("MAX_BACKUP_FILES", "30"))
@@ -50,7 +66,7 @@ ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
 LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
-PLATFORM_DB_PATH = Path(os.getenv("PLATFORM_DB_PATH", str(DB_PATH.parent / "platform.db")))
+PLATFORM_DB_PATH = Path(os.getenv("PLATFORM_DB_PATH", str(DATA_ROOT / "platform.db")))
 DEFAULT_TENANT_SLUG = os.getenv("DEFAULT_TENANT_SLUG", "kappaalphaorder").strip().lower() or "kappaalphaorder"
 DEFAULT_TENANT_NAME = os.getenv("DEFAULT_TENANT_NAME", "Kappa Alpha Order").strip() or "Kappa Alpha Order"
 PLATFORM_ADMIN_USERNAME = os.getenv("PLATFORM_ADMIN_USERNAME", "taylortaut").strip() or "taylortaut"
@@ -61,7 +77,9 @@ HEAD_SEED_FIRST_NAME = os.getenv("HEAD_SEED_FIRST_NAME", "Head").strip() or "Hea
 HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Officer").strip() or "Officer"
 HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or "Admin"
 AUTO_CREATE_HEAD_SEED = os.getenv("AUTO_CREATE_HEAD_SEED", "1").strip().lower() in {"1", "true", "yes"}
+CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "America/Chicago").strip() or "America/Chicago"
 
+DATA_ROOT.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 TENANT_UPLOADS_ROOT.mkdir(parents=True, exist_ok=True)
 TENANTS_DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -113,6 +131,7 @@ class TenantContext:
     db_path: Path
     pnm_uploads_dir: Path
     backup_dir: Path
+    calendar_share_token: str
 
 
 CURRENT_TENANT: contextvars.ContextVar[TenantContext | None] = contextvars.ContextVar("current_tenant", default=None)
@@ -130,6 +149,15 @@ def normalize_samesite(value: str) -> str:
     if value in {"lax", "strict", "none"}:
         return value
     return "strict"
+
+
+def should_use_secure_cookie(request: Request) -> bool:
+    if SESSION_COOKIE_SECURE:
+        return True
+    forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if forwarded_proto == "https":
+        return True
+    return request.url.scheme == "https"
 
 
 def normalize_slug(value: str) -> str:
@@ -210,6 +238,9 @@ def tenant_logo_fs_dir(slug: str) -> Path:
 def tenant_context_from_row(row: sqlite3.Row) -> TenantContext:
     slug = row["slug"]
     db_path = Path(row["db_path"])
+    calendar_share_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
+    if not calendar_share_token:
+        calendar_share_token = secrets.token_urlsafe(24)
     return TenantContext(
         slug=slug,
         display_name=row["display_name"],
@@ -220,6 +251,7 @@ def tenant_context_from_row(row: sqlite3.Row) -> TenantContext:
         db_path=db_path,
         pnm_uploads_dir=TENANT_UPLOADS_ROOT / slug / "pnms",
         backup_dir=TENANT_UPLOADS_ROOT / slug / "backups",
+        calendar_share_token=calendar_share_token,
     )
 
 
@@ -271,6 +303,8 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, str | None]:
         "logo_path": tenant.logo_path,
         "theme_primary": tenant.theme_primary,
         "theme_secondary": tenant.theme_secondary,
+        "calendar_timezone": CALENDAR_TIMEZONE,
+        "calendar_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
     }
 
 
@@ -289,6 +323,103 @@ def fold_vcard_line(line: str, limit: int = 75) -> str:
         chunks.append(f" {remainder[:limit-1]}")
         remainder = remainder[limit - 1 :]
     return "\r\n".join(chunks)
+
+
+def fold_ical_line(line: str, limit: int = 75) -> str:
+    if len(line) <= limit:
+        return line
+    chunks = [line[:limit]]
+    remainder = line[limit:]
+    while remainder:
+        chunks.append(f" {remainder[:limit-1]}")
+        remainder = remainder[limit - 1 :]
+    return "\r\n".join(chunks)
+
+
+def escape_ical_text(value: str) -> str:
+    escaped = value.replace("\\", "\\\\")
+    escaped = escaped.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
+    escaped = escaped.replace(";", "\\;").replace(",", "\\,")
+    return escaped
+
+
+def format_utc_ical(value: str) -> str:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+
+
+def format_google_event_stamp(dt: datetime) -> str:
+    return dt.strftime("%Y%m%dT%H%M%S")
+
+
+def parse_clock_value(raw: str | None) -> tuple[int, int] | None:
+    if raw is None:
+        return None
+    token = raw.strip()
+    if not token:
+        return None
+    if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", token):
+        raise ValueError("Time must use HH:MM in 24-hour format.")
+    hour, minute = token.split(":")
+    return int(hour), int(minute)
+
+
+def build_google_calendar_event_url(
+    *,
+    pnm_name: str,
+    pnm_code: str,
+    lunch_date: str,
+    notes: str,
+    location: str,
+    start_time: str | None,
+    end_time: str | None,
+    logged_by_username: str,
+) -> str:
+    event_date = date.fromisoformat(lunch_date)
+    title = f"Lunch with {pnm_name}"
+    details_parts = [f"PNM Code: {pnm_code}", f"Logged by: {logged_by_username}"]
+    if notes:
+        details_parts.append(f"Notes: {notes}")
+    details = "\n".join(details_parts)
+
+    start_clock = parse_clock_value(start_time)
+    end_clock = parse_clock_value(end_time)
+    if end_clock and not start_clock:
+        raise ValueError("End time requires a start time.")
+
+    if start_clock:
+        start_dt = datetime(event_date.year, event_date.month, event_date.day, start_clock[0], start_clock[1], 0)
+        if end_clock:
+            end_dt = datetime(event_date.year, event_date.month, event_date.day, end_clock[0], end_clock[1], 0)
+            if end_dt <= start_dt:
+                raise ValueError("End time must be after start time.")
+        else:
+            end_dt = start_dt + timedelta(hours=1)
+        dates_value = f"{format_google_event_stamp(start_dt)}/{format_google_event_stamp(end_dt)}"
+    else:
+        end_date = event_date + timedelta(days=1)
+        dates_value = f"{event_date.strftime('%Y%m%d')}/{end_date.strftime('%Y%m%d')}"
+
+    params = {
+        "action": "TEMPLATE",
+        "text": title,
+        "dates": dates_value,
+        "details": details,
+        "location": location,
+        "ctz": CALENDAR_TIMEZONE,
+    }
+    return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
+
+
+def build_webcal_url(http_url: str) -> str:
+    parsed = urlsplit(http_url)
+    return urlunsplit(("webcal", parsed.netloc, parsed.path, parsed.query, ""))
+
+
+def build_google_subscribe_url(http_url: str) -> str:
+    return f"https://calendar.google.com/calendar/u/0/r?cid={quote(http_url, safe='')}"
 
 
 def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
@@ -881,6 +1012,9 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "pnm_id",
             "user_id",
             "lunch_date",
+            "start_time",
+            "end_time",
+            "location",
             "notes",
             "created_at",
         ], lunch_rows))
@@ -1136,6 +1270,9 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             lunch_date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            location TEXT NOT NULL DEFAULT '',
             notes TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
             UNIQUE (pnm_id, user_id, lunch_date)
@@ -1156,7 +1293,6 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
-        CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id);
         """
     )
 
@@ -1178,6 +1314,14 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     if "assigned_at" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN assigned_at TEXT")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id)")
+
+    lunch_columns = {row["name"] for row in conn.execute("PRAGMA table_info(lunches)").fetchall()}
+    if "start_time" not in lunch_columns:
+        conn.execute("ALTER TABLE lunches ADD COLUMN start_time TEXT")
+    if "end_time" not in lunch_columns:
+        conn.execute("ALTER TABLE lunches ADD COLUMN end_time TEXT")
+    if "location" not in lunch_columns:
+        conn.execute("ALTER TABLE lunches ADD COLUMN location TEXT NOT NULL DEFAULT ''")
 
 
 def ensure_seed_data(
@@ -1307,6 +1451,7 @@ def setup_platform_schema(conn: sqlite3.Connection) -> None:
             logo_path TEXT,
             theme_primary TEXT NOT NULL DEFAULT '#8a1538',
             theme_secondary TEXT NOT NULL DEFAULT '#c99a2b',
+            calendar_share_token TEXT NOT NULL DEFAULT '',
             db_path TEXT NOT NULL,
             head_seed_username TEXT NOT NULL,
             head_seed_first_name TEXT NOT NULL,
@@ -1320,6 +1465,21 @@ def setup_platform_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_tenants_slug ON tenants(slug);
         """
     )
+
+
+def ensure_platform_schema_upgrades(conn: sqlite3.Connection) -> None:
+    tenant_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tenants)").fetchall()}
+    if "calendar_share_token" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN calendar_share_token TEXT NOT NULL DEFAULT ''")
+
+    rows = conn.execute("SELECT id, calendar_share_token FROM tenants").fetchall()
+    for row in rows:
+        if (row["calendar_share_token"] or "").strip():
+            continue
+        conn.execute(
+            "UPDATE tenants SET calendar_share_token = ?, updated_at = ? WHERE id = ?",
+            (secrets.token_urlsafe(24), now_iso(), row["id"]),
+        )
 
 
 def ensure_platform_admin_seed(conn: sqlite3.Connection) -> None:
@@ -1348,6 +1508,8 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
     default_db_path = default_tenant_db_path(DEFAULT_TENANT_SLUG)
     row = conn.execute("SELECT * FROM tenants WHERE slug = ?", (DEFAULT_TENANT_SLUG,)).fetchone()
     if row:
+        existing_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
+        calendar_share_token = existing_token or secrets.token_urlsafe(24)
         existing_db_path_raw = (row["db_path"] or "").strip()
         existing_db_path = Path(existing_db_path_raw) if existing_db_path_raw else None
         if existing_db_path and existing_db_path.exists():
@@ -1361,6 +1523,7 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
             SET
                 display_name = ?,
                 db_path = ?,
+                calendar_share_token = ?,
                 head_seed_username = ?,
                 head_seed_first_name = ?,
                 head_seed_last_name = ?,
@@ -1372,6 +1535,7 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
             (
                 DEFAULT_TENANT_NAME,
                 str(preserved_db_path),
+                calendar_share_token,
                 HEAD_SEED_USERNAME,
                 HEAD_SEED_FIRST_NAME,
                 HEAD_SEED_LAST_NAME,
@@ -1391,6 +1555,7 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
             logo_path,
             theme_primary,
             theme_secondary,
+            calendar_share_token,
             db_path,
             head_seed_username,
             head_seed_first_name,
@@ -1400,12 +1565,13 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
             updated_at,
             is_active
         )
-        VALUES (?, ?, ?, NULL, '#8a1538', '#c99a2b', ?, ?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, NULL, '#8a1538', '#c99a2b', ?, ?, ?, ?, ?, ?, ?, ?, 1)
         """,
         (
             DEFAULT_TENANT_SLUG,
             DEFAULT_TENANT_NAME,
             "KAO",
+            secrets.token_urlsafe(24),
             str(default_db_path),
             HEAD_SEED_USERNAME,
             HEAD_SEED_FIRST_NAME,
@@ -1444,6 +1610,7 @@ def bootstrap_platform_and_tenants() -> None:
 
     with platform_db_session() as conn:
         setup_platform_schema(conn)
+        ensure_platform_schema_upgrades(conn)
         ensure_platform_admin_seed(conn)
         ensure_default_tenant_record(conn)
         tenant_rows = conn.execute("SELECT * FROM tenants WHERE is_active = 1").fetchall()
@@ -1689,12 +1856,27 @@ class RatingUpsertRequest(BaseModel):
 class LunchCreateRequest(BaseModel):
     pnm_id: int
     lunch_date: str
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str = Field(default="", max_length=120)
     notes: str = Field(default="", max_length=500)
 
     @field_validator("lunch_date")
     @classmethod
     def validate_lunch_date(cls, value: str) -> str:
         return verify_iso_date(value, "Lunch date")
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time_value(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return None
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", token):
+            raise ValueError("Time must use HH:MM in 24-hour format.")
+        return token
 
 
 class AssignOfficerRequest(BaseModel):
@@ -1721,6 +1903,12 @@ class TenantCreateRequest(BaseModel):
 
 @app.on_event("startup")
 def startup() -> None:
+    if not os.getenv("DATA_ROOT") and not os.getenv("DB_PATH") and DATA_ROOT == BASE_DIR:
+        print(
+            "[startup] warning: using local app directory for SQLite storage.\n"
+            "          To prevent data loss across deployments, configure a persistent DATA_ROOT or DB_PATH/UPLOADS_DIR"
+            " (for Render, mount /data and set DATA_ROOT=/data/ka-rush)."
+        )
     bootstrap_platform_and_tenants()
     default_row = fetch_tenant_row(DEFAULT_TENANT_SLUG)
     if default_row:
@@ -1865,6 +2053,7 @@ async def platform_page(request: Request) -> HTMLResponse:
 
 
 def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
+    calendar_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
     return {
         "slug": row["slug"],
         "display_name": row["display_name"],
@@ -1875,6 +2064,7 @@ def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
         "db_path": row["db_path"],
         "head_seed_username": row["head_seed_username"],
         "is_active": bool(row["is_active"]),
+        "calendar_feed_path": f"/{row['slug']}/calendar/lunches.ics?token={calendar_token}" if calendar_token else None,
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -1909,13 +2099,14 @@ def platform_login(payload: PlatformLoginRequest, request: Request, response: Re
                 (hash_access_code(payload.access_code), now_iso(), row["id"]),
             )
 
+    secure_cookie = should_use_secure_cookie(request)
     response.set_cookie(
         key=PLATFORM_SESSION_COOKIE,
         value=token,
         httponly=True,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
         max_age=PLATFORM_SESSION_TTL_SECONDS,
-        secure=SESSION_COOKIE_SECURE,
+        secure=secure_cookie,
         path="/",
     )
     record_login_success(ip_address)
@@ -1928,10 +2119,11 @@ def platform_logout(request: Request, response: Response) -> dict[str, str]:
     if token:
         with platform_db_session() as conn:
             conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+    secure_cookie = should_use_secure_cookie(request)
     response.delete_cookie(
         key=PLATFORM_SESSION_COOKIE,
         path="/",
-        secure=SESSION_COOKIE_SECURE,
+        secure=secure_cookie,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
     )
     return {"message": "Logged out."}
@@ -1984,6 +2176,7 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
                 logo_path,
                 theme_primary,
                 theme_secondary,
+                calendar_share_token,
                 db_path,
                 head_seed_username,
                 head_seed_first_name,
@@ -1993,7 +2186,7 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
                 updated_at,
                 is_active
             )
-            VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
             """,
             (
                 slug,
@@ -2001,6 +2194,7 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
                 chapter_name,
                 theme_primary,
                 theme_secondary,
+                secrets.token_urlsafe(24),
                 str(tenant_db_path),
                 head_username,
                 normalize_name(payload.head_seed_first_name),
@@ -2210,13 +2404,14 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
                 (hash_access_code(payload.access_code), now_iso(), row["id"]),
             )
 
+        secure_cookie = should_use_secure_cookie(request)
         response.set_cookie(
             key=SESSION_COOKIE,
             value=token,
             httponly=True,
             samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
             max_age=SESSION_TTL_SECONDS,
-            secure=SESSION_COOKIE_SECURE,
+            secure=secure_cookie,
             path="/",
         )
         record_login_success(ip_address)
@@ -2233,10 +2428,11 @@ def logout(request: Request, response: Response) -> dict[str, str]:
     if token:
         with db_session() as conn:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+    secure_cookie = should_use_secure_cookie(request)
     response.delete_cookie(
         key=SESSION_COOKIE,
         path="/",
-        secure=SESSION_COOKIE_SECURE,
+        secure=secure_cookie,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
     )
     return {"message": "Logged out."}
@@ -2696,7 +2892,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
 
         lunch_rows = conn.execute(
             """
-            SELECT l.lunch_date, l.notes, l.created_at, u.username, u.role
+            SELECT l.lunch_date, l.start_time, l.end_time, l.location, l.notes, l.created_at, u.username, u.role
             FROM lunches l
             JOIN users u ON u.id = l.user_id
             WHERE l.pnm_id = ?
@@ -2796,6 +2992,9 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
         "lunches": [
             {
                 "lunch_date": row["lunch_date"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "location": row["location"],
                 "notes": row["notes"],
                 "created_at": row["created_at"],
                 "username": row["username"],
@@ -3114,15 +3313,40 @@ def pnm_ratings(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[
 
 @app.post("/api/lunches")
 def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    tenant = current_tenant()
+    if payload.end_time and not payload.start_time:
+        raise HTTPException(status_code=400, detail="End time requires a start time.")
+    if payload.start_time and payload.end_time:
+        start_hour, start_min = parse_clock_value(payload.start_time) or (0, 0)
+        end_hour, end_min = parse_clock_value(payload.end_time) or (0, 0)
+        if end_hour * 60 + end_min <= start_hour * 60 + start_min:
+            raise HTTPException(status_code=400, detail="End time must be after start time.")
+
     with db_session() as conn:
-        pnm = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        pnm = conn.execute(
+            "SELECT id, pnm_code, first_name, last_name FROM pnms WHERE id = ?",
+            (payload.pnm_id,),
+        ).fetchone()
         if not pnm:
             raise HTTPException(status_code=404, detail="PNM not found.")
 
         try:
-            conn.execute(
-                "INSERT INTO lunches (pnm_id, user_id, lunch_date, notes, created_at) VALUES (?, ?, ?, ?, ?)",
-                (payload.pnm_id, user["id"], payload.lunch_date, payload.notes.strip(), now_iso()),
+            now = now_iso()
+            cursor = conn.execute(
+                """
+                INSERT INTO lunches (pnm_id, user_id, lunch_date, start_time, end_time, location, notes, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    payload.pnm_id,
+                    user["id"],
+                    payload.lunch_date,
+                    payload.start_time,
+                    payload.end_time,
+                    payload.location.strip(),
+                    payload.notes.strip(),
+                    now,
+                ),
             )
         except sqlite3.IntegrityError as exc:
             raise HTTPException(
@@ -3130,6 +3354,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
                 detail="Duplicate lunch log for this member, PNM, and date is not allowed.",
             ) from exc
 
+        lunch_id = int(cursor.lastrowid or 0)
         recalc_member_lunch_stats(conn, user["id"])
         recalc_pnm_lunch_stats(conn, payload.pnm_id)
 
@@ -3149,6 +3374,20 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             (payload.pnm_id,),
         ).fetchone()
 
+    try:
+        google_calendar_url = build_google_calendar_event_url(
+            pnm_name=f"{pnm['first_name']} {pnm['last_name']}",
+            pnm_code=pnm["pnm_code"],
+            lunch_date=payload.lunch_date,
+            notes=payload.notes.strip(),
+            location=payload.location.strip(),
+            start_time=payload.start_time,
+            end_time=payload.end_time,
+            logged_by_username=user["username"],
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     return {
         "message": "Lunch logged.",
         "member": user_payload(refreshed_user, refreshed_user["role"], refreshed_user["id"]),
@@ -3157,6 +3396,17 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             own_rating=None,
             assigned_officer=assigned_officer_payload_from_row(refreshed_pnm),
         ),
+        "lunch": {
+            "lunch_id": lunch_id,
+            "pnm_id": payload.pnm_id,
+            "lunch_date": payload.lunch_date,
+            "start_time": payload.start_time,
+            "end_time": payload.end_time,
+            "location": payload.location.strip(),
+            "notes": payload.notes.strip(),
+            "google_calendar_url": google_calendar_url,
+            "calendar_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
+        },
     }
 
 
@@ -3169,7 +3419,7 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str
 
         rows = conn.execute(
             """
-            SELECT l.lunch_date, l.notes, l.created_at, u.username
+            SELECT l.lunch_date, l.start_time, l.end_time, l.location, l.notes, l.created_at, u.username
             FROM lunches l
             JOIN users u ON u.id = l.user_id
             WHERE l.pnm_id = ?
@@ -3183,6 +3433,9 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str
         "lunches": [
             {
                 "lunch_date": row["lunch_date"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "location": row["location"],
                 "notes": row["notes"],
                 "created_at": row["created_at"],
                 "username": row["username"],
@@ -3190,6 +3443,119 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str
             for row in rows
         ]
     }
+
+
+@app.get("/api/calendar/share")
+def calendar_share_links(request: Request, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    tenant = current_tenant()
+    feed_path = f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}"
+    base_origin = str(request.base_url).rstrip("/")
+    feed_url = f"{base_origin}{feed_path}"
+    webcal_url = build_webcal_url(feed_url)
+    google_subscribe_url = build_google_subscribe_url(feed_url)
+    return {
+        "feed_url": feed_url,
+        "webcal_url": webcal_url,
+        "google_subscribe_url": google_subscribe_url,
+        "timezone": CALENDAR_TIMEZONE,
+    }
+
+
+@app.get("/calendar/lunches.ics")
+def public_lunch_calendar_feed(token: str | None = None) -> Response:
+    tenant = current_tenant()
+    expected_token = tenant.calendar_share_token.strip()
+    if not token or not expected_token or not hmac.compare_digest(token, expected_token):
+        raise HTTPException(status_code=401, detail="Invalid calendar token.")
+
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                l.id,
+                l.lunch_date,
+                l.start_time,
+                l.end_time,
+                l.location,
+                l.notes,
+                l.created_at,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                u.username
+            FROM lunches l
+            JOIN pnms p ON p.id = l.pnm_id
+            JOIN users u ON u.id = l.user_id
+            ORDER BY l.lunch_date ASC, COALESCE(l.start_time, '00:00') ASC, l.id ASC
+            """
+        ).fetchall()
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Rush Evaluation//Lunch Calendar//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        fold_ical_line(f"X-WR-CALNAME:{escape_ical_text(f'{tenant.display_name} Lunch Calendar')}"),
+        fold_ical_line(f"X-WR-TIMEZONE:{escape_ical_text(CALENDAR_TIMEZONE)}"),
+    ]
+
+    for row in rows:
+        lunch_day = date.fromisoformat(row["lunch_date"])
+        try:
+            start_clock = parse_clock_value(row["start_time"])
+        except ValueError:
+            start_clock = None
+        try:
+            end_clock = parse_clock_value(row["end_time"])
+        except ValueError:
+            end_clock = None
+
+        summary = f"Lunch with {row['first_name']} {row['last_name']}"
+        description_parts = [
+            f"PNM Code: {row['pnm_code']}",
+            f"Logged by: {row['username']}",
+        ]
+        if row["notes"]:
+            description_parts.append(f"Notes: {row['notes']}")
+        description = "\n".join(description_parts)
+
+        lines.append("BEGIN:VEVENT")
+        lines.append(fold_ical_line(f"UID:lunch-{tenant.slug}-{row['id']}@rush-evaluation"))
+        lines.append(fold_ical_line(f"DTSTAMP:{format_utc_ical(row['created_at'])}"))
+        lines.append(fold_ical_line(f"SUMMARY:{escape_ical_text(summary)}"))
+        lines.append(fold_ical_line(f"DESCRIPTION:{escape_ical_text(description)}"))
+        if row["location"]:
+            lines.append(fold_ical_line(f"LOCATION:{escape_ical_text(row['location'])}"))
+
+        if start_clock:
+            start_dt = datetime(lunch_day.year, lunch_day.month, lunch_day.day, start_clock[0], start_clock[1], 0)
+            if end_clock:
+                end_dt = datetime(lunch_day.year, lunch_day.month, lunch_day.day, end_clock[0], end_clock[1], 0)
+                if end_dt <= start_dt:
+                    end_dt = start_dt + timedelta(hours=1)
+            else:
+                end_dt = start_dt + timedelta(hours=1)
+            lines.append(
+                fold_ical_line(f"DTSTART;TZID={CALENDAR_TIMEZONE}:{format_google_event_stamp(start_dt)}")
+            )
+            lines.append(
+                fold_ical_line(f"DTEND;TZID={CALENDAR_TIMEZONE}:{format_google_event_stamp(end_dt)}")
+            )
+        else:
+            next_day = lunch_day + timedelta(days=1)
+            lines.append(fold_ical_line(f"DTSTART;VALUE=DATE:{lunch_day.strftime('%Y%m%d')}"))
+            lines.append(fold_ical_line(f"DTEND;VALUE=DATE:{next_day.strftime('%Y%m%d')}"))
+
+        lines.append("END:VEVENT")
+
+    lines.append("END:VCALENDAR")
+    payload = "\r\n".join(lines) + "\r\n"
+    return Response(
+        content=payload,
+        media_type="text/calendar; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @app.get("/api/matching")

@@ -1,18 +1,20 @@
 :root {
   --bg: #f4efe6;
-  --bg-2: #efe6d4;
-  --ink: #2f1821;
-  --ink-soft: #6b4f58;
-  --panel: rgba(255, 255, 255, 0.94);
-  --stroke: rgba(138, 21, 56, 0.2);
+  --bg-2: #f9f4ec;
+  --ink: #2a1921;
+  --ink-soft: #6a5460;
+  --panel: rgba(255, 255, 255, 0.58);
+  --stroke: rgba(255, 255, 255, 0.38);
+  --glass-highlight: rgba(255, 255, 255, 0.56);
+  --glass-shadow: 0 20px 42px rgba(79, 27, 44, 0.16);
   --accent: #8a1538;
   --accent-bright: #b11f4a;
   --gold: #c99a2b;
   --good: #1d7a4b;
   --bad: #a71f35;
   --warn: #9a6f1f;
-  --shadow: 0 18px 36px rgba(72, 23, 38, 0.14);
-  --glow: 0 0 0 1px rgba(175, 40, 78, 0.3), 0 12px 34px rgba(90, 22, 43, 0.24);
+  --shadow: var(--glass-shadow);
+  --glow: 0 0 0 1px rgba(175, 40, 78, 0.24), 0 16px 38px rgba(90, 22, 43, 0.2);
 }
 
 * {
@@ -30,9 +32,10 @@ body {
 body {
   font-family: "Karla", sans-serif;
   background:
-    radial-gradient(circle at 8% 8%, rgba(138, 21, 56, 0.2), transparent 44%),
-    radial-gradient(circle at 94% 92%, rgba(201, 154, 43, 0.24), transparent 46%),
-    linear-gradient(170deg, var(--bg) 0%, var(--bg-2) 100%);
+    radial-gradient(circle at 6% 5%, rgba(138, 21, 56, 0.22), transparent 38%),
+    radial-gradient(circle at 96% 0%, rgba(255, 255, 255, 0.65), transparent 34%),
+    radial-gradient(circle at 92% 90%, rgba(201, 154, 43, 0.26), transparent 38%),
+    linear-gradient(165deg, var(--bg) 0%, var(--bg-2) 100%);
   color: var(--ink);
   overflow-x: hidden;
 }
@@ -269,10 +272,24 @@ h3 {
   border: 1px solid var(--stroke);
   border-radius: 18px;
   box-shadow: var(--shadow);
-  backdrop-filter: blur(7px);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
   padding: 1rem;
   margin-bottom: 1rem;
   transform: translateZ(0);
+  position: relative;
+  overflow: clip;
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, var(--glass-highlight), rgba(255, 255, 255, 0)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0));
+  pointer-events: none;
+  opacity: 0.68;
 }
 
 .quick-nav {
@@ -283,7 +300,11 @@ h3 {
   gap: 0.5rem;
   flex-wrap: wrap;
   padding: 0.62rem;
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(12px);
+  background: rgba(255, 255, 255, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(73, 22, 39, 0.1);
 }
 
 .quick-nav-link {
@@ -292,8 +313,9 @@ h3 {
   justify-content: center;
   text-decoration: none;
   color: var(--accent);
-  border: 1px solid rgba(138, 21, 56, 0.2);
-  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid rgba(138, 21, 56, 0.16);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.52);
   border-radius: 999px;
   padding: 0.38rem 0.7rem;
   font-size: 0.8rem;
@@ -303,13 +325,13 @@ h3 {
 
 .quick-nav-link:hover {
   transform: translateY(-1px);
-  background: rgba(138, 21, 56, 0.08);
+  background: rgba(255, 255, 255, 0.9);
   border-color: rgba(138, 21, 56, 0.4);
 }
 
 .workflow-tips {
-  border: 1px solid rgba(201, 154, 43, 0.4);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 247, 227, 0.9));
+  border: 1px solid rgba(201, 154, 43, 0.32);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 247, 227, 0.64));
 }
 
 .tips-grid {
@@ -319,10 +341,10 @@ h3 {
 }
 
 .tips-grid article {
-  border: 1px solid rgba(138, 21, 56, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
   padding: 0.55rem 0.62rem;
-  background: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.64);
 }
 
 .tips-grid strong {
@@ -368,10 +390,11 @@ button {
 input,
 select,
 textarea {
-  border: 1px solid rgba(138, 21, 56, 0.24);
+  border: 1px solid rgba(138, 21, 56, 0.2);
   border-radius: 11px;
   padding: 0.66rem 0.74rem;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
   color: var(--ink);
 }
 
@@ -409,7 +432,7 @@ button:disabled {
 }
 
 .secondary {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.78);
   color: var(--ink);
   border: 1px solid rgba(138, 21, 56, 0.24);
   box-shadow: none;
@@ -444,11 +467,12 @@ button:disabled {
 }
 
 .tenant-card {
-  border: 1px solid rgba(138, 21, 56, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.44);
   border-radius: 14px;
   padding: 0.75rem;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.6);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
+  backdrop-filter: blur(10px);
 }
 
 .tenant-card:hover {
@@ -505,7 +529,7 @@ button:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 0.9rem;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.97), rgba(248, 238, 223, 0.92));
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.72), rgba(248, 238, 223, 0.65));
 }
 
 .topbar h2 {
@@ -542,22 +566,37 @@ button:disabled {
 }
 
 .card {
-  border: 1px solid rgba(138, 21, 56, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(255, 255, 255, 0.64);
   padding: 0.7rem;
   transition: transform 0.22s ease, box-shadow 0.22s ease;
+  backdrop-filter: blur(12px);
 }
 
 .card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 10px 26px rgba(95, 16, 41, 0.18);
+  box-shadow: 0 14px 30px rgba(95, 16, 41, 0.16);
 }
 
 .card p {
   margin: 0.2rem 0 0;
   color: var(--ink-soft);
   font-size: 0.85rem;
+}
+
+.calendar-share {
+  margin-top: 0.85rem;
+  border: 1px dashed rgba(138, 21, 56, 0.26);
+  border-radius: 12px;
+  padding: 0.7rem;
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(12px);
+}
+
+.breakable {
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .mini-photo {
@@ -581,9 +620,10 @@ button:disabled {
 
 .table-wrap {
   overflow-x: auto;
-  border: 1px solid rgba(138, 21, 56, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.56);
+  backdrop-filter: blur(11px);
 }
 
 table {
@@ -620,7 +660,7 @@ th {
   color: var(--ink-soft);
   position: sticky;
   top: 0;
-  background: rgba(255, 255, 255, 0.98);
+  background: rgba(255, 255, 255, 0.86);
   z-index: 1;
 }
 
@@ -661,13 +701,14 @@ td strong {
 }
 
 .list-box {
-  border: 1px solid rgba(138, 21, 56, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.58);
   padding: 0.6rem;
   min-height: 120px;
   max-height: 240px;
   overflow: auto;
+  backdrop-filter: blur(10px);
 }
 
 .meeting-photo-wrap {
@@ -698,7 +739,7 @@ td strong {
   border: 1px dashed rgba(138, 21, 56, 0.33);
   border-radius: 12px;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.76);
+  background: rgba(255, 255, 255, 0.58);
 }
 
 .photo-placeholder.large {
@@ -734,10 +775,11 @@ td strong {
 }
 
 .list-column {
-  border: 1px solid rgba(138, 21, 56, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.84);
+  background: rgba(255, 255, 255, 0.58);
   padding: 0.65rem;
+  backdrop-filter: blur(11px);
 }
 
 .meeting-list {
@@ -752,10 +794,11 @@ td strong {
 .entry {
   padding: 0.5rem;
   border-radius: 9px;
-  border: 1px solid rgba(138, 21, 56, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   margin-bottom: 0.45rem;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.62);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
+  backdrop-filter: blur(9px);
 }
 
 .entry:hover {
@@ -838,7 +881,8 @@ td strong {
   left: 50%;
   transform: translateX(-50%);
   width: min(96vw, 620px);
-  background: #5f1a33;
+  background: rgba(76, 23, 42, 0.86);
+  border: 1px solid rgba(255, 255, 255, 0.36);
   color: #fff;
   border-radius: 12px;
   padding: 0.7rem 0.9rem;
@@ -867,7 +911,7 @@ td strong {
 }
 
 .score-bar-track {
-  fill: rgba(138, 21, 56, 0.16);
+  fill: rgba(138, 21, 56, 0.13);
 }
 
 .score-bar-fill {

@@ -51,6 +51,17 @@ function escapeHtml(input) {
     .replaceAll("'", "&#039;");
 }
 
+function formatLunchWindow(row) {
+  const timeRange =
+    row.start_time && row.end_time
+      ? `${row.start_time}-${row.end_time}`
+      : row.start_time
+        ? `${row.start_time}`
+        : "";
+  const parts = [timeRange, row.location || ""].filter(Boolean);
+  return parts.join(" | ");
+}
+
 function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.remove("hidden");
@@ -127,7 +138,11 @@ function renderPacket(payload) {
   const lunchMarkup =
     lunches
       .slice(0, 12)
-      .map((row) => `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})</li>`)
+      .map((row) => {
+        const timing = formatLunchWindow(row);
+        const detail = timing ? ` | ${escapeHtml(timing)}` : "";
+        return `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})${detail}</li>`;
+      })
       .join("") || "<li>No lunch logs yet.</li>";
 
   const matchMarkup =

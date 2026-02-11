@@ -222,12 +222,39 @@
                 Date
                 <input id="lunchDate" type="date" required />
               </label>
+              <div class="inline-grid two-cols">
+                <label>
+                  Start time (optional)
+                  <input id="lunchStartTime" type="time" />
+                </label>
+                <label>
+                  End time (optional)
+                  <input id="lunchEndTime" type="time" />
+                </label>
+              </div>
+              <label>
+                Location (optional)
+                <input id="lunchLocation" type="text" placeholder="Main Street Cafe" />
+              </label>
               <label>
                 Notes
                 <textarea id="lunchNotes" rows="3" placeholder="Optional lunch context"></textarea>
               </label>
               <button type="submit">Log Lunch</button>
             </form>
+            <div id="lastLunchCalendarActions" class="action-row hidden">
+              <a id="openLastLunchGoogleLink" class="quick-nav-link" href="#" target="_blank" rel="noopener">Open In Google Calendar</a>
+            </div>
+
+            <div id="sharedCalendarPanel" class="calendar-share">
+              <h3>Shared Lunch Calendar</h3>
+              <p class="muted">Subscribe once and everyone can view the same chapter lunch calendar.</p>
+              <div class="action-row">
+                <button id="copyCalendarFeedBtn" type="button" class="secondary">Copy Calendar URL</button>
+                <a id="openGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
+              </div>
+              <p id="calendarFeedPreview" class="muted breakable">Loading shared calendar link...</p>
+            </div>
 
             <div class="divider"></div>
 

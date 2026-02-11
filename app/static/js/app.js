@@ -77,6 +77,9 @@ const selectedPnmLabel = document.getElementById("selectedPnmLabel");
 const meetingView = document.getElementById("meetingView");
 const ratingPnm = document.getElementById("ratingPnm");
 const lunchPnm = document.getElementById("lunchPnm");
+const lunchStartTime = document.getElementById("lunchStartTime");
+const lunchEndTime = document.getElementById("lunchEndTime");
+const lunchLocation = document.getElementById("lunchLocation");
 const assignPanel = document.getElementById("assignPanel");
 const assignOfficerSelect = document.getElementById("assignOfficerSelect");
 const assignOfficerBtn = document.getElementById("assignOfficerBtn");
@@ -91,6 +94,11 @@ const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
 const matchingMembers = document.getElementById("matchingMembers");
 const leaderboardTable = document.getElementById("leaderboardTable");
+const copyCalendarFeedBtn = document.getElementById("copyCalendarFeedBtn");
+const openGoogleSubscribeBtn = document.getElementById("openGoogleSubscribeBtn");
+const calendarFeedPreview = document.getElementById("calendarFeedPreview");
+const lastLunchCalendarActions = document.getElementById("lastLunchCalendarActions");
+const openLastLunchGoogleLink = document.getElementById("openLastLunchGoogleLink");
 
 const state = {
   user: null,
@@ -108,6 +116,7 @@ const state = {
     ratingCount: 0,
     lunchCount: 0,
   },
+  calendarShare: null,
   liveRefreshTimer: null,
 };
 
@@ -287,7 +296,15 @@ function startLiveRefresh() {
       return;
     }
     try {
-      await Promise.all([loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadLeaderboard(), loadApprovals()]);
+      await Promise.all([
+        loadPnms(),
+        loadMembers(),
+        loadMatching(),
+        loadAnalytics(),
+        loadLeaderboard(),
+        loadCalendarShare(),
+        loadApprovals(),
+      ]);
     } catch {
       // Passive sync should fail silently; explicit actions already report errors.
     }
@@ -354,6 +371,27 @@ function shouldRedirectToMobileNow() {
     return false;
   }
   return true;
+}
+
+function formatLunchWindow(row) {
+  const timeRange =
+    row.start_time && row.end_time
+      ? `${row.start_time}-${row.end_time}`
+      : row.start_time
+        ? `${row.start_time}`
+        : "";
+  const parts = [timeRange, row.location || ""].filter(Boolean);
+  return parts.join(" | ");
+}
+
+function renderCalendarShareLinks(data) {
+  state.calendarShare = data;
+  if (!calendarFeedPreview || !openGoogleSubscribeBtn) {
+    return;
+  }
+  calendarFeedPreview.textContent = data.feed_url || "Calendar URL unavailable.";
+  openGoogleSubscribeBtn.href = data.google_subscribe_url || "#";
+  openGoogleSubscribeBtn.classList.toggle("hidden", !data.google_subscribe_url);
 }
 
 function renderSelectedPnmPhoto(pnm) {
@@ -872,6 +910,7 @@ function renderLunchEntries(data) {
           <strong>${escapeHtml(row.lunch_date)}</strong>
           <span>${escapeHtml(row.username)}</span>
         </div>
+        <div class="muted">${escapeHtml(formatLunchWindow(row) || "All-day lunch")}</div>
         <div class="muted">${escapeHtml(row.notes || "No notes")}</div>
       </div>
     `
@@ -909,7 +948,11 @@ function renderMeetingView(payload) {
   const lunchMarkup =
     lunches
       .slice(0, 8)
-      .map((row) => `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})</li>`)
+      .map((row) => {
+        const timing = formatLunchWindow(row);
+        const detail = timing ? ` | ${escapeHtml(timing)}` : "";
+        return `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})${detail}</li>`;
+      })
       .join("") || "<li>No lunch logs yet.</li>";
 
   const matchMarkup =
@@ -1051,6 +1094,21 @@ async function loadLeaderboard() {
   renderLeaderboard(payload.leaderboard || []);
 }
 
+async function loadCalendarShare() {
+  try {
+    const payload = await api("/api/calendar/share");
+    renderCalendarShareLinks(payload);
+  } catch {
+    if (calendarFeedPreview) {
+      calendarFeedPreview.textContent = "Unable to load shared calendar link right now.";
+    }
+    if (openGoogleSubscribeBtn) {
+      openGoogleSubscribeBtn.href = "#";
+      openGoogleSubscribeBtn.classList.add("hidden");
+    }
+  }
+}
+
 async function loadApprovals() {
   if (!state.user || state.user.role !== "Head Rush Officer") {
     approvalsPanel.classList.add("hidden");
@@ -1062,7 +1120,16 @@ async function loadApprovals() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadInterestHints(), loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadLeaderboard(), loadApprovals()]);
+  await Promise.all([
+    loadInterestHints(),
+    loadPnms(),
+    loadMembers(),
+    loadMatching(),
+    loadAnalytics(),
+    loadLeaderboard(),
+    loadCalendarShare(),
+    loadApprovals(),
+  ]);
 }
 
 async function ensureSession() {
@@ -1165,9 +1232,23 @@ async function handleLogout() {
   state.selectedPnmId = null;
   state.pnms = [];
   state.members = [];
+  state.calendarShare = null;
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
   animateCounter(heroLunchCount, 0);
+  if (calendarFeedPreview) {
+    calendarFeedPreview.textContent = "Sign in to load shared calendar link.";
+  }
+  if (openGoogleSubscribeBtn) {
+    openGoogleSubscribeBtn.href = "#";
+    openGoogleSubscribeBtn.classList.add("hidden");
+  }
+  if (lastLunchCalendarActions) {
+    lastLunchCalendarActions.classList.add("hidden");
+  }
+  if (openLastLunchGoogleLink) {
+    openLastLunchGoogleLink.href = "#";
+  }
   if (meetingView) {
     meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
   }
@@ -1324,16 +1405,32 @@ async function handleLunchLog(event) {
   const body = {
     pnm_id: selectedId,
     lunch_date: document.getElementById("lunchDate").value,
+    start_time: lunchStartTime && lunchStartTime.value ? lunchStartTime.value : null,
+    end_time: lunchEndTime && lunchEndTime.value ? lunchEndTime.value : null,
+    location: lunchLocation ? lunchLocation.value.trim() : "",
     notes: document.getElementById("lunchNotes").value.trim(),
   };
 
   try {
-    await api("/api/lunches", {
+    const payload = await api("/api/lunches", {
       method: "POST",
       body,
     });
     document.getElementById("lunchNotes").value = "";
-    showToast("Lunch logged.");
+    if (lunchStartTime) {
+      lunchStartTime.value = "";
+    }
+    if (lunchEndTime) {
+      lunchEndTime.value = "";
+    }
+    if (lunchLocation) {
+      lunchLocation.value = "";
+    }
+    if (payload.lunch && payload.lunch.google_calendar_url && openLastLunchGoogleLink && lastLunchCalendarActions) {
+      openLastLunchGoogleLink.href = payload.lunch.google_calendar_url;
+      lastLunchCalendarActions.classList.remove("hidden");
+    }
+    showToast("Lunch logged. Calendar link ready.");
     state.selectedPnmId = selectedId;
     await refreshAll();
     await loadPnmDetail(selectedId);
@@ -1512,6 +1609,28 @@ async function handleDbBackupDownload() {
   }
 }
 
+async function handleCopyCalendarFeed() {
+  if (!state.calendarShare || !state.calendarShare.feed_url) {
+    showToast("Shared calendar link is not ready yet.");
+    return;
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(state.calendarShare.feed_url);
+    } else {
+      const input = document.createElement("input");
+      input.value = state.calendarShare.feed_url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+    showToast("Shared calendar URL copied.");
+  } catch {
+    showToast("Unable to copy URL. Use the link shown below the button.");
+  }
+}
+
 function setupPwaInstall() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("/service-worker.js").catch(() => {
@@ -1542,6 +1661,9 @@ function attachEvents() {
   logoutBtn.addEventListener("click", handleLogout);
   backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
   backupDbBtn.addEventListener("click", handleDbBackupDownload);
+  if (copyCalendarFeedBtn) {
+    copyCalendarFeedBtn.addEventListener("click", handleCopyCalendarFeed);
+  }
   if (assignOfficerBtn) {
     assignOfficerBtn.addEventListener("click", handleAssignOfficer);
   }

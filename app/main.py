@@ -1321,6 +1321,13 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
     default_db_path = default_tenant_db_path(DEFAULT_TENANT_SLUG)
     row = conn.execute("SELECT * FROM tenants WHERE slug = ?", (DEFAULT_TENANT_SLUG,)).fetchone()
     if row:
+        existing_db_path_raw = (row["db_path"] or "").strip()
+        existing_db_path = Path(existing_db_path_raw) if existing_db_path_raw else None
+        if existing_db_path and existing_db_path.exists():
+            preserved_db_path = existing_db_path
+        else:
+            preserved_db_path = default_db_path
+
         conn.execute(
             """
             UPDATE tenants
@@ -1337,7 +1344,7 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
             """,
             (
                 DEFAULT_TENANT_NAME,
-                str(default_db_path),
+                str(preserved_db_path),
                 HEAD_SEED_USERNAME,
                 HEAD_SEED_FIRST_NAME,
                 HEAD_SEED_LAST_NAME,

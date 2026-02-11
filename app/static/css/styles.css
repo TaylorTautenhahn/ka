@@ -12,6 +12,7 @@
   --bad: #9a2f2f;
   --warn: #8f5a1c;
   --shadow: 0 20px 40px rgba(23, 37, 34, 0.14);
+  --glow: 0 0 0 1px rgba(29, 104, 84, 0.24), 0 14px 40px rgba(22, 61, 50, 0.2);
 }
 
 * {
@@ -32,6 +33,7 @@ body {
     radial-gradient(circle at 98% 98%, rgba(180, 132, 45, 0.27), transparent 46%),
     linear-gradient(170deg, var(--bg) 0%, var(--bg-2) 100%);
   color: var(--ink);
+  overflow-x: hidden;
 }
 
 .aura {
@@ -56,6 +58,17 @@ body {
   right: -120px;
   bottom: -120px;
   background: rgba(180, 132, 45, 0.2);
+  animation: floatDrift 16s ease-in-out infinite alternate;
+}
+
+.noise {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.18;
+  background-image: radial-gradient(rgba(14, 26, 22, 0.18) 0.45px, transparent 0.45px);
+  background-size: 4px 4px;
 }
 
 .shell {
@@ -69,6 +82,7 @@ body {
 .hero {
   margin-bottom: 1rem;
   animation: riseIn 0.5s ease both;
+  position: relative;
 }
 
 .eyebrow {
@@ -110,6 +124,50 @@ h3 {
   margin-top: 0.7rem;
 }
 
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(1, minmax(0, 1fr));
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.stat-card {
+  background: linear-gradient(140deg, rgba(20, 53, 42, 0.92), rgba(31, 92, 74, 0.92));
+  color: #f3f8f5;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 0.55rem 0.66rem;
+  box-shadow: var(--glow);
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: "";
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  right: -18px;
+  top: -70px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.33), transparent 70%);
+}
+
+.stat-card p {
+  margin: 0;
+  font-size: 0.73rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  opacity: 0.84;
+}
+
+.stat-card strong {
+  display: block;
+  margin-top: 0.22rem;
+  font-size: 1.35rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--stroke);
@@ -118,6 +176,7 @@ h3 {
   backdrop-filter: blur(7px);
   padding: 1rem;
   margin-bottom: 1rem;
+  transform: translateZ(0);
 }
 
 .auth-grid,
@@ -243,6 +302,12 @@ button:disabled {
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.88);
   padding: 0.7rem;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 26px rgba(19, 46, 38, 0.2);
 }
 
 .card p {
@@ -268,6 +333,18 @@ td {
   padding: 0.52rem 0.46rem;
   white-space: nowrap;
   font-size: 0.86rem;
+}
+
+tbody tr {
+  transition: background-color 0.2s ease;
+}
+
+tbody tr:hover {
+  background: rgba(35, 100, 82, 0.07);
+}
+
+tbody tr.selected-row {
+  background: rgba(27, 77, 62, 0.13);
 }
 
 th {
@@ -297,6 +374,12 @@ td strong {
   border: 1px solid rgba(21, 51, 40, 0.14);
   margin-bottom: 0.45rem;
   background: rgba(255, 255, 255, 0.9);
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.entry:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 18px rgba(22, 44, 37, 0.12);
 }
 
 .entry:last-child {
@@ -386,6 +469,32 @@ td strong {
   animation: riseIn 0.42s ease both;
 }
 
+.count-up {
+  animation: pulseOnce 0.35s ease;
+}
+
+.score-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.score-bar {
+  width: 58px;
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(21, 51, 40, 0.14);
+  overflow: hidden;
+}
+
+.score-fill {
+  display: block;
+  height: 100%;
+  width: var(--score-width, 0%);
+  background: linear-gradient(90deg, #2b7b61 0%, #d0a34b 100%);
+  border-radius: 999px;
+}
+
 .delay-1 {
   animation-delay: 0.05s;
 }
@@ -421,6 +530,27 @@ td strong {
   }
 }
 
+@keyframes pulseOnce {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes floatDrift {
+  from {
+    transform: translate(-8px, -12px);
+  }
+  to {
+    transform: translate(14px, 8px);
+  }
+}
+
 @media (min-width: 760px) {
   .shell {
     padding: 2rem 1.15rem 2.4rem;
@@ -437,6 +567,10 @@ td strong {
 
   .five-cols {
     grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .hero-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

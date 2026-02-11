@@ -12,6 +12,9 @@ const regEmoji = document.getElementById("regEmoji");
 const sessionTitle = document.getElementById("sessionTitle");
 const sessionSubtitle = document.getElementById("sessionSubtitle");
 const toastEl = document.getElementById("toast");
+const heroPnmCount = document.getElementById("heroPnmCount");
+const heroRatingCount = document.getElementById("heroRatingCount");
+const heroLunchCount = document.getElementById("heroLunchCount");
 
 const filterInterest = document.getElementById("filterInterest");
 const filterStereotype = document.getElementById("filterStereotype");
@@ -48,6 +51,12 @@ const state = {
     interest: "",
     stereotype: "",
   },
+  heroStats: {
+    pnmCount: 0,
+    ratingCount: 0,
+    lunchCount: 0,
+  },
+  liveRefreshTimer: null,
 };
 
 function escapeHtml(input) {
@@ -66,6 +75,61 @@ function showToast(message) {
   state.toastTimer = setTimeout(() => {
     toastEl.classList.add("hidden");
   }, 3300);
+}
+
+function animateCounter(element, nextValue) {
+  if (!element) {
+    return;
+  }
+  const startValue = Number(element.textContent || "0");
+  const target = Number(nextValue || 0);
+  if (startValue === target) {
+    return;
+  }
+
+  const startedAt = performance.now();
+  const duration = 420;
+
+  function tick(now) {
+    const progress = Math.min(1, (now - startedAt) / duration);
+    const eased = 1 - (1 - progress) ** 3;
+    const current = Math.round(startValue + (target - startValue) * eased);
+    element.textContent = String(current);
+    if (progress < 1) {
+      requestAnimationFrame(tick);
+    } else {
+      element.classList.remove("count-up");
+      void element.offsetWidth;
+      element.classList.add("count-up");
+    }
+  }
+
+  requestAnimationFrame(tick);
+}
+
+function updateHeroStats() {
+  const ratingCount = state.pnms.reduce((sum, pnm) => sum + Number(pnm.rating_count || 0), 0);
+  const lunchCount = state.pnms.reduce((sum, pnm) => sum + Number(pnm.total_lunches || 0), 0);
+  const pnmCount = state.pnms.length;
+
+  state.heroStats = { pnmCount, ratingCount, lunchCount };
+  animateCounter(heroPnmCount, pnmCount);
+  animateCounter(heroRatingCount, ratingCount);
+  animateCounter(heroLunchCount, lunchCount);
+}
+
+function spawnSuccessBurst() {
+  const burst = document.createElement("div");
+  burst.className = "burst-wrap";
+
+  for (let index = 0; index < 14; index += 1) {
+    const spark = document.createElement("span");
+    spark.className = "burst-spark";
+    burst.appendChild(spark);
+  }
+
+  document.body.appendChild(burst);
+  setTimeout(() => burst.remove(), 720);
 }
 
 async function api(path, options = {}) {
@@ -100,6 +164,29 @@ async function api(path, options = {}) {
 function setAuthView(isAuthenticated) {
   authSection.classList.toggle("hidden", isAuthenticated);
   appSection.classList.toggle("hidden", !isAuthenticated);
+}
+
+function startLiveRefresh() {
+  if (state.liveRefreshTimer) {
+    clearInterval(state.liveRefreshTimer);
+  }
+  state.liveRefreshTimer = setInterval(async () => {
+    if (!state.user) {
+      return;
+    }
+    try {
+      await Promise.all([loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadApprovals()]);
+    } catch {
+      // Passive sync should fail silently; explicit actions already report errors.
+    }
+  }, 18000);
+}
+
+function stopLiveRefresh() {
+  if (state.liveRefreshTimer) {
+    clearInterval(state.liveRefreshTimer);
+    state.liveRefreshTimer = null;
+  }
 }
 
 function setSessionHeading() {
@@ -175,14 +262,25 @@ function renderPnmTable() {
     .map((pnm) => {
       const own = pnm.own_rating;
       const ownDisplay = own ? `${own.total_score}/45` : "Not rated";
+      const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / 45) * 100));
+      const barWidth = Math.round((weightedPct / 100) * 58);
+      const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
       return `
-        <tr>
+        <tr class="${selectedClass}">
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
           <td>${escapeHtml(pnm.class_year)}</td>
           <td>${pnm.days_since_first_event}</td>
           <td>${pnm.rating_count}</td>
-          <td><strong>${pnm.weighted_total.toFixed(2)}</strong></td>
+          <td>
+            <div class="score-wrap">
+              <strong>${pnm.weighted_total.toFixed(2)}</strong>
+              <svg class="score-bar" viewBox="0 0 58 7" aria-hidden="true" focusable="false">
+                <rect x="0" y="0" width="58" height="7" rx="4" class="score-bar-track"></rect>
+                <rect x="0" y="0" width="${barWidth}" height="7" rx="4" class="score-bar-fill"></rect>
+              </svg>
+            </div>
+          </td>
           <td>${pnm.avg_good_with_girls.toFixed(2)}</td>
           <td>${pnm.avg_will_make_it.toFixed(2)}</td>
           <td>${pnm.avg_personable.toFixed(2)}</td>
@@ -491,8 +589,8 @@ async function loadPnms() {
   const query = toQuery(state.filters);
   const payload = await api(`/api/pnms${query}`);
   state.pnms = payload.pnms || [];
+  updateHeroStats();
   renderPnmSelectOptions();
-  renderPnmTable();
 
   if (state.selectedPnmId && !state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId)) {
     state.selectedPnmId = null;
@@ -502,6 +600,7 @@ async function loadPnms() {
     state.selectedPnmId = state.pnms[0].pnm_id;
   }
 
+  renderPnmTable();
   applyRatingFormForSelected();
   await loadPnmDetail(state.selectedPnmId);
 }
@@ -545,9 +644,11 @@ async function ensureSession() {
     setAuthView(true);
     setSessionHeading();
     await refreshAll();
+    startLiveRefresh();
   } catch {
     state.user = null;
     setAuthView(false);
+    stopLiveRefresh();
   }
 }
 
@@ -574,6 +675,7 @@ async function handleLogin(event) {
     setSessionHeading();
     showToast("Logged in.");
     await refreshAll();
+    startLiveRefresh();
   } catch (error) {
     showToast(error.message || "Login failed.");
   }
@@ -581,6 +683,11 @@ async function handleLogin(event) {
 
 async function handleRegister(event) {
   event.preventDefault();
+  const accessCode = document.getElementById("regAccessCode").value;
+  if (accessCode.length < 8 || !/[A-Za-z]/.test(accessCode) || !/[0-9]/.test(accessCode)) {
+    showToast("Access code must be 8+ characters with letters and numbers.");
+    return;
+  }
 
   const body = {
     first_name: document.getElementById("regFirstName").value.trim(),
@@ -590,7 +697,7 @@ async function handleRegister(event) {
     emoji: regEmoji.value.trim() || null,
     stereotype: document.getElementById("regStereotype").value.trim(),
     interests: document.getElementById("regInterests").value.trim(),
-    access_code: document.getElementById("regAccessCode").value,
+    access_code: accessCode,
   };
 
   try {
@@ -614,6 +721,12 @@ async function handleLogout() {
   }
   state.user = null;
   state.selectedPnmId = null;
+  state.pnms = [];
+  state.members = [];
+  animateCounter(heroPnmCount, 0);
+  animateCounter(heroRatingCount, 0);
+  animateCounter(heroLunchCount, 0);
+  stopLiveRefresh();
   setAuthView(false);
   showToast("Logged out.");
 }
@@ -696,6 +809,7 @@ async function handleRatingSave(event) {
     await loadPnmDetail(selectedId);
 
     if (payload.change && Number(payload.change.delta_total) > 0) {
+      spawnSuccessBurst();
       showToast(`Rating increased to ${payload.change.new_total}/45 (+${payload.change.delta_total}).`);
     } else {
       showToast("Rating saved.");
@@ -747,6 +861,7 @@ async function handlePnmTableClick(event) {
   }
 
   state.selectedPnmId = pnmId;
+  renderPnmTable();
   applyRatingFormForSelected();
   await loadPnmDetail(pnmId);
 }
@@ -818,6 +933,7 @@ function attachEvents() {
       return;
     }
     state.selectedPnmId = selectedId;
+    renderPnmTable();
     applyRatingFormForSelected();
     await loadPnmDetail(selectedId);
   });
@@ -826,6 +942,7 @@ function attachEvents() {
     const selectedId = Number(event.target.value || 0);
     if (selectedId) {
       state.selectedPnmId = selectedId;
+      renderPnmTable();
       applyRatingFormForSelected();
     }
   });

@@ -108,6 +108,7 @@
           <a href="{{ app_config.mobile_base if app_config else '/mobile' }}" class="quick-nav-link">Phone View</a>
           <a href="#createSection" class="quick-nav-link">Add Rushee</a>
           <a href="#pnmSection" class="quick-nav-link">PNMs</a>
+          <a href="#leaderboardSection" class="quick-nav-link">Leaderboard</a>
           <a href="#detailSection" class="quick-nav-link">Rate & Notes</a>
           <a href="#membersSection" class="quick-nav-link">Members</a>
           <a id="adminNavLink" href="#adminPanel" class="quick-nav-link">Admin</a>
@@ -248,7 +249,15 @@
           <div id="pnmTable" class="table-wrap"></div>
         </section>
 
-        <section id="detailSection" class="panel reveal delay-5">
+        <section id="leaderboardSection" class="panel reveal delay-5">
+          <div class="section-head">
+            <h2>PNM Leaderboard</h2>
+            <p class="muted">Overall rankings across all PNMs by weighted total score, then participation metrics.</p>
+          </div>
+          <div id="leaderboardTable" class="table-wrap"></div>
+        </section>
+
+        <section id="detailSection" class="panel reveal delay-6">
           <div class="section-head">
             <h2>Selected PNM Detail</h2>
             <p id="selectedPnmLabel" class="muted">Select a PNM to rate and review rating/lunch history.</p>
@@ -309,12 +318,12 @@
           </div>
         </section>
 
-        <section id="membersSection" class="panel reveal delay-5">
+        <section id="membersSection" class="panel reveal delay-6">
           <h2>Members</h2>
           <div id="memberTable" class="table-wrap"></div>
         </section>
 
-        <section id="matchingSection" class="panel reveal delay-6">
+        <section id="matchingSection" class="panel reveal delay-7">
           <h2>Matching View</h2>
           <p class="muted">Apply shared filters above to pair PNMs and members intentionally.</p>
           <div class="grid-two matching-grid">

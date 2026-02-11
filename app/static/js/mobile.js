@@ -89,7 +89,7 @@ async function ensureSession() {
   try {
     await api("/api/auth/me");
   } catch {
-    window.location.href = `${BASE_PATH || "/"}?desktop=1`;
+    window.location.href = BASE_PATH || "/";
     throw new Error("Not authenticated");
   }
 }
@@ -107,6 +107,33 @@ function renderHomeStats(pnms) {
   pnmCountEl.textContent = String(pnmCount);
   ratingCountEl.textContent = String(ratingCount);
   lunchCountEl.textContent = String(lunchCount);
+}
+
+function renderHomeLeaderboard(rows) {
+  const listEl = document.getElementById("mobileLeaderboard");
+  if (!listEl) {
+    return;
+  }
+  if (!rows.length) {
+    listEl.innerHTML = '<p class="muted">No ranked PNMs yet.</p>';
+    return;
+  }
+  listEl.innerHTML = rows
+    .slice(0, 10)
+    .map((entry) => {
+      const assigned = entry.assigned_officer_username || "Unassigned";
+      return `
+        <article class="entry mobile-card">
+          <div class="entry-title">
+            <strong>#${entry.rank} ${escapeHtml(entry.pnm_code)} | ${escapeHtml(entry.name)}</strong>
+            <span>${entry.weighted_total.toFixed(2)}</span>
+          </div>
+          <div class="muted">Ratings: ${entry.rating_count} | Lunches: ${entry.total_lunches} | Days: ${entry.days_since_first_event}</div>
+          <div class="muted">Assigned: ${escapeHtml(assigned)}</div>
+        </article>
+      `;
+    })
+    .join("");
 }
 
 function renderPnmCards(pnms) {
@@ -176,8 +203,12 @@ function renderMembers(members) {
 }
 
 async function loadHomePage() {
-  const payload = await api("/api/pnms");
-  renderHomeStats(payload.pnms || []);
+  const [pnmPayload, boardPayload] = await Promise.all([
+    api("/api/pnms"),
+    api("/api/leaderboard/pnms?limit=15"),
+  ]);
+  renderHomeStats(pnmPayload.pnms || []);
+  renderHomeLeaderboard(boardPayload.leaderboard || []);
 }
 
 async function loadPnmsPage() {

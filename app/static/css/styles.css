@@ -628,6 +628,38 @@ td strong {
   font-family: "Space Grotesk", sans-serif;
 }
 
+.rank-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid rgba(138, 21, 56, 0.24);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.75rem;
+}
+
+.rank-gold {
+  border-color: rgba(191, 144, 22, 0.45);
+  background: linear-gradient(140deg, rgba(251, 233, 168, 0.96), rgba(232, 197, 87, 0.95));
+  color: #5f3f00;
+}
+
+.rank-silver {
+  border-color: rgba(127, 130, 145, 0.38);
+  background: linear-gradient(140deg, rgba(238, 240, 246, 0.97), rgba(207, 214, 228, 0.95));
+  color: #293040;
+}
+
+.rank-bronze {
+  border-color: rgba(145, 98, 51, 0.35);
+  background: linear-gradient(140deg, rgba(244, 214, 186, 0.98), rgba(224, 168, 121, 0.95));
+  color: #522f16;
+}
+
 .list-box {
   border: 1px solid rgba(138, 21, 56, 0.16);
   border-radius: 12px;

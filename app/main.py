@@ -334,12 +334,26 @@ def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
 def request_prefers_mobile(request: Request) -> bool:
     if request.query_params.get("desktop") == "1":
         return False
+    if request.query_params.get("mobile") == "1":
+        return True
 
     sec_mobile = (request.headers.get("sec-ch-ua-mobile") or "").strip()
     if sec_mobile == "?1":
         return True
 
-    user_agent = (request.headers.get("user-agent") or "").lower()
+    cloudfront_mobile = (request.headers.get("cloudfront-is-mobile-viewer") or "").strip().lower()
+    if cloudfront_mobile == "true":
+        return True
+
+    forwarded_mobile = (request.headers.get("x-mobile-view") or "").strip().lower()
+    if forwarded_mobile in {"1", "true", "yes"}:
+        return True
+
+    user_agent = (
+        request.headers.get("x-device-user-agent")
+        or request.headers.get("user-agent")
+        or ""
+    ).lower()
     mobile_markers = ["iphone", "android", "mobile", "ipad", "ipod"]
     return any(marker in user_agent for marker in mobile_markers)
 
@@ -1570,6 +1584,27 @@ def current_user(request: Request) -> sqlite3.Row:
         return row
 
 
+def request_has_active_session(request: Request) -> bool:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return False
+
+    with db_session() as conn:
+        row = conn.execute("SELECT last_seen_at FROM sessions WHERE token = ?", (token,)).fetchone()
+        if not row:
+            return False
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return False
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > SESSION_TTL_SECONDS:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return False
+    return True
+
+
 def require_head(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
     if user["role"] != ROLE_HEAD:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Head Rush Officer permission required.")
@@ -1705,7 +1740,7 @@ def startup() -> None:
 async def home(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if tenant:
-        if request_prefers_mobile(request):
+        if request_prefers_mobile(request) and request_has_active_session(request):
             return RedirectResponse(url=f"/{tenant.slug}/mobile", status_code=307)
         return templates.TemplateResponse(
             "index.html",
@@ -1732,7 +1767,7 @@ async def meeting_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
-    if request_prefers_mobile(request):
+    if request_prefers_mobile(request) and request_has_active_session(request):
         return RedirectResponse(url=f"/{tenant.slug}/mobile/meeting", status_code=307)
     return templates.TemplateResponse(
         "meeting.html",
@@ -3252,6 +3287,57 @@ def analytics_overview(user: sqlite3.Row = Depends(current_user)) -> dict[str, A
             for row in top_pnms
         ],
         "member_participation": [user_payload(row, user["role"], user["id"]) for row in members],
+    }
+
+
+@app.get("/api/leaderboard/pnms")
+def pnm_leaderboard(limit: int = 100, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    safe_limit = max(1, min(int(limit), 500))
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                p.id,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                p.weighted_total,
+                p.rating_count,
+                p.total_lunches,
+                p.first_event_date,
+                ao.username AS assigned_officer_username
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.rating_count DESC, p.total_lunches DESC, p.last_name ASC, p.first_name ASC
+            LIMIT ?
+            """,
+            (safe_limit,),
+        ).fetchall()
+
+    leaderboard: list[dict[str, Any]] = []
+    leader_score = round(float(rows[0]["weighted_total"]), 2) if rows else 0.0
+    for index, row in enumerate(rows, start=1):
+        weighted_total = round(float(row["weighted_total"]), 2)
+        days_since = (date.today() - date.fromisoformat(row["first_event_date"])).days
+        leaderboard.append(
+            {
+                "rank": index,
+                "pnm_id": row["id"],
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "weighted_total": weighted_total,
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+                "days_since_first_event": days_since,
+                "assigned_officer_username": row["assigned_officer_username"] or "",
+                "points_from_leader": round(leader_score - weighted_total, 2),
+            }
+        )
+
+    return {
+        "leaderboard": leaderboard,
+        "leader_score": leader_score,
+        "count": len(leaderboard),
     }
 
 

@@ -90,6 +90,7 @@ const adminPnmTable = document.getElementById("adminPnmTable");
 const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
 const matchingMembers = document.getElementById("matchingMembers");
+const leaderboardTable = document.getElementById("leaderboardTable");
 
 const state = {
   user: null,
@@ -286,7 +287,7 @@ function startLiveRefresh() {
       return;
     }
     try {
-      await Promise.all([loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadApprovals()]);
+      await Promise.all([loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadLeaderboard(), loadApprovals()]);
     } catch {
       // Passive sync should fail silently; explicit actions already report errors.
     }
@@ -338,6 +339,21 @@ function shouldPreferMobileUi() {
   }
   const ua = navigator.userAgent.toLowerCase();
   return /iphone|ipad|ipod|android|mobile/.test(ua);
+}
+
+function shouldRedirectToMobileNow() {
+  if (!APP_CONFIG.mobile_base || !shouldPreferMobileUi()) {
+    return false;
+  }
+  const currentPath = window.location.pathname.replace(/\/$/, "");
+  const mobilePath = APP_CONFIG.mobile_base.replace(/\/$/, "");
+  if (!mobilePath) {
+    return false;
+  }
+  if (currentPath === mobilePath || currentPath.startsWith(`${mobilePath}/`)) {
+    return false;
+  }
+  return true;
 }
 
 function renderSelectedPnmPhoto(pnm) {
@@ -578,6 +594,65 @@ function renderAnalytics(overview) {
     .join("");
 
   analyticsCards.innerHTML = `${pnmCards}${memberCards}` || '<p class="muted">No analytics yet.</p>';
+}
+
+function renderLeaderboard(rows) {
+  if (!leaderboardTable) {
+    return;
+  }
+  if (!rows.length) {
+    leaderboardTable.innerHTML = '<p class="muted">No PNM rankings available yet.</p>';
+    return;
+  }
+
+  const rankBadge = (rank) => {
+    if (rank === 1) {
+      return '<span class="rank-chip rank-gold">#1</span>';
+    }
+    if (rank === 2) {
+      return '<span class="rank-chip rank-silver">#2</span>';
+    }
+    if (rank === 3) {
+      return '<span class="rank-chip rank-bronze">#3</span>';
+    }
+    return `<span class="rank-chip">#${rank}</span>`;
+  };
+
+  const tableRows = rows
+    .map((item) => {
+      const assigned = item.assigned_officer_username || "Unassigned";
+      return `
+        <tr>
+          <td>${rankBadge(item.rank)}</td>
+          <td><strong>${escapeHtml(item.pnm_code)}</strong></td>
+          <td>${escapeHtml(item.name)}</td>
+          <td>${item.weighted_total.toFixed(2)}</td>
+          <td>${item.rating_count}</td>
+          <td>${item.total_lunches}</td>
+          <td>${item.days_since_first_event}</td>
+          <td>${escapeHtml(assigned)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  leaderboardTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Rank</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Weighted Total</th>
+          <th>Ratings</th>
+          <th>Lunches</th>
+          <th>Days</th>
+          <th>Assigned Officer</th>
+        </tr>
+      </thead>
+      <tbody>${tableRows}</tbody>
+    </table>
+  `;
 }
 
 function renderMatching(data) {
@@ -971,6 +1046,11 @@ async function loadAnalytics() {
   renderAnalytics(payload);
 }
 
+async function loadLeaderboard() {
+  const payload = await api("/api/leaderboard/pnms?limit=250");
+  renderLeaderboard(payload.leaderboard || []);
+}
+
 async function loadApprovals() {
   if (!state.user || state.user.role !== "Head Rush Officer") {
     approvalsPanel.classList.add("hidden");
@@ -982,13 +1062,17 @@ async function loadApprovals() {
 }
 
 async function refreshAll() {
-  await Promise.all([loadInterestHints(), loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadApprovals()]);
+  await Promise.all([loadInterestHints(), loadPnms(), loadMembers(), loadMatching(), loadAnalytics(), loadLeaderboard(), loadApprovals()]);
 }
 
 async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
     state.user = payload.user;
+    if (shouldRedirectToMobileNow()) {
+      window.location.replace(APP_CONFIG.mobile_base);
+      return;
+    }
     setAuthView(true);
     setSessionHeading();
     updateTopbarActions();

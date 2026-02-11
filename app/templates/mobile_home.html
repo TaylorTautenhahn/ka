@@ -21,7 +21,7 @@
         <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
         {% endif %}
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
-        <h1>Mobile Command</h1>
+        <h1>Mobile Dashboard</h1>
         <p>{{ app_config.tenant_name }} rush operations, optimized for iPhone use during events.</p>
       </header>
 
@@ -42,6 +42,11 @@
           <a href="{{ app_config.mobile_base }}/pnms" class="quick-nav-link">PNM Directory</a>
           <a href="{{ app_config.mobile_base }}/create" class="quick-nav-link">Add Rushee</a>
         </div>
+      </section>
+
+      <section class="panel mobile-panel">
+        <h2>Top PNM Leaderboard</h2>
+        <div id="mobileLeaderboard" class="mobile-list"></div>
       </section>
     </main>
 

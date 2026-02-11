@@ -10,7 +10,7 @@ The app pulls data from Yahoo Finance, normalizes performance for representative
 ## Tech Stack
 - FastAPI backend
 - Custom HTML/CSS/JavaScript frontend
-- Yahoo Finance data via direct Yahoo spark API requests
+- Yahoo Finance data via Spark API with `yfinance` fallback
 - PDF generation via `reportlab`
 
 ## Features

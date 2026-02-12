@@ -13,7 +13,7 @@ import sqlite3
 import time
 import zipfile
 import contextvars
-from urllib.parse import quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -31,6 +31,11 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as URLRequest, urlopen
+
+try:
+    import segno
+except Exception:  # pragma: no cover - optional dependency in local dev before install
+    segno = None
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -85,6 +90,7 @@ CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "America/Chicago").strip() or
 MAX_GOOGLE_FORM_IMPORT_BYTES = int(os.getenv("MAX_GOOGLE_FORM_IMPORT_BYTES", str(3 * 1024 * 1024)))
 INSTAGRAM_AVATAR_TIMEOUT_SECONDS = float(os.getenv("INSTAGRAM_AVATAR_TIMEOUT_SECONDS", "4.0"))
 INSTAGRAM_PROFILE_HTML_MAX_BYTES = int(os.getenv("INSTAGRAM_PROFILE_HTML_MAX_BYTES", "1200000"))
+INSTAGRAM_WEB_APP_ID = os.getenv("INSTAGRAM_WEB_APP_ID", "936619743392459").strip() or "936619743392459"
 SEASON_RESET_CONFIRMATION_PHRASE = os.getenv("SEASON_RESET_CONFIRMATION_PHRASE", "RESET RUSH SEASON").strip() or "RESET RUSH SEASON"
 SEASON_ARCHIVE_FILENAME = "season-archive-latest.sqlite"
 
@@ -105,6 +111,73 @@ RATING_FIELDS = [
     "alcohol_control",
     "instagram_marketability",
 ]
+RATING_FIELD_LIMITS: dict[str, int] = {
+    "good_with_girls": 10,
+    "will_make_it": 10,
+    "personable": 10,
+    "alcohol_control": 10,
+    "instagram_marketability": 5,
+}
+DEFAULT_RATING_CRITERIA: list[dict[str, Any]] = [
+    {
+        "field": "good_with_girls",
+        "label": "Good with girls",
+        "short_label": "Girls",
+        "max": 10,
+    },
+    {
+        "field": "will_make_it",
+        "label": "Will make it through process",
+        "short_label": "Process",
+        "max": 10,
+    },
+    {
+        "field": "personable",
+        "label": "Personable",
+        "short_label": "Personable",
+        "max": 10,
+    },
+    {
+        "field": "alcohol_control",
+        "label": "Alcohol control",
+        "short_label": "Alcohol",
+        "max": 10,
+    },
+    {
+        "field": "instagram_marketability",
+        "label": "Instagram marketability",
+        "short_label": "IG",
+        "max": 5,
+    },
+]
+DEFAULT_INTEREST_TAG_SUGGESTIONS = [
+    "Leadership",
+    "Sports",
+    "Fitness",
+    "Finance",
+    "Outdoors",
+    "Music",
+    "Faith",
+    "Academics",
+    "Entrepreneurship",
+    "Philanthropy",
+    "Gaming",
+    "Travel",
+]
+DEFAULT_STEREOTYPE_TAG_SUGGESTIONS = [
+    "Leader",
+    "Connector",
+    "Scholar",
+    "Athlete",
+    "Social",
+    "Creative",
+    "Mentor",
+    "Builder",
+]
+DEFAULT_THEME_PRIMARY = "#8a1538"
+DEFAULT_THEME_SECONDARY = "#c99a2b"
+DEFAULT_THEME_TERTIARY = "#1d7a4b"
+DEFAULT_ORG_TYPE = "Fraternity"
 ALLOWED_PHOTO_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
@@ -193,9 +266,18 @@ class TenantContext:
     slug: str
     display_name: str
     chapter_name: str
+    org_type: str
+    setup_tagline: str
     logo_path: str | None
     theme_primary: str
     theme_secondary: str
+    theme_tertiary: str
+    role_weight_officer: float
+    role_weight_rusher: float
+    rating_criteria: tuple[dict[str, Any], ...]
+    rating_total_max: int
+    default_interest_tags: tuple[str, ...]
+    default_stereotype_tags: tuple[str, ...]
     db_path: Path
     pnm_uploads_dir: Path
     backup_dir: Path
@@ -295,6 +377,164 @@ def normalize_theme_color(value: str, fallback: str) -> str:
     return raw.lower()
 
 
+def sanitize_short_text(value: str | None, fallback: str, *, max_length: int = 96) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return fallback
+    normalized = re.sub(r"\s+", " ", raw)
+    if len(normalized) > max_length:
+        normalized = normalized[:max_length].strip()
+    return normalized or fallback
+
+
+def parse_json_array(raw: Any) -> list[Any]:
+    if isinstance(raw, list):
+        return list(raw)
+    if not isinstance(raw, str):
+        return []
+    token = raw.strip()
+    if not token:
+        return []
+    try:
+        decoded = json.loads(token)
+    except (TypeError, ValueError):
+        return []
+    return list(decoded) if isinstance(decoded, list) else []
+
+
+def default_rating_criteria() -> list[dict[str, Any]]:
+    return [dict(item) for item in DEFAULT_RATING_CRITERIA]
+
+
+def rating_criteria_by_field(criteria: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    return {str(item["field"]): item for item in criteria if isinstance(item, dict) and "field" in item}
+
+
+def normalize_rating_criteria_config(raw: Any) -> list[dict[str, Any]]:
+    by_field: dict[str, dict[str, Any]] = {}
+    if isinstance(raw, dict):
+        for key, value in raw.items():
+            if isinstance(value, dict):
+                by_field[str(key)] = value
+    else:
+        for item in parse_json_array(raw) if isinstance(raw, str) else (raw if isinstance(raw, list) else []):
+            if isinstance(item, dict) and item.get("field"):
+                by_field[str(item["field"])] = item
+
+    normalized: list[dict[str, Any]] = []
+    for base in DEFAULT_RATING_CRITERIA:
+        field = str(base["field"])
+        candidate = by_field.get(field, {})
+        max_limit = int(RATING_FIELD_LIMITS[field])
+        max_value_raw = candidate.get("max", base["max"]) if isinstance(candidate, dict) else base["max"]
+        try:
+            max_value = int(max_value_raw)
+        except (TypeError, ValueError):
+            max_value = int(base["max"])
+        max_value = max(1, min(max_limit, max_value))
+        label = sanitize_short_text(
+            candidate.get("label") if isinstance(candidate, dict) else None,
+            str(base["label"]),
+            max_length=60,
+        )
+        short_label = sanitize_short_text(
+            candidate.get("short_label") if isinstance(candidate, dict) else None,
+            str(base["short_label"]),
+            max_length=20,
+        )
+        normalized.append(
+            {
+                "field": field,
+                "label": label,
+                "short_label": short_label,
+                "max": max_value,
+            }
+        )
+    return normalized
+
+
+def rating_total_max(criteria: list[dict[str, Any]]) -> int:
+    if not criteria:
+        return int(sum(item["max"] for item in DEFAULT_RATING_CRITERIA))
+    total = 0
+    for item in criteria:
+        try:
+            total += int(item.get("max", 0))
+        except (TypeError, ValueError):
+            continue
+    return max(1, total)
+
+
+def parse_default_interest_tags(raw: Any) -> list[str]:
+    source: list[Any]
+    if isinstance(raw, list):
+        source = raw
+    else:
+        source = parse_json_array(raw)
+        if not source and isinstance(raw, str):
+            source = [part.strip() for part in re.split(r"[,;\n]+", raw) if part.strip()]
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in source:
+        try:
+            value = normalize_interest(str(item))
+        except Exception:
+            continue
+        lowered = value.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        normalized.append(value)
+    if not normalized:
+        return list(DEFAULT_INTEREST_TAG_SUGGESTIONS)
+    return normalized[:20]
+
+
+def parse_default_stereotype_tags(raw: Any) -> list[str]:
+    source: list[Any]
+    if isinstance(raw, list):
+        source = raw
+    else:
+        source = parse_json_array(raw)
+        if not source and isinstance(raw, str):
+            source = [part.strip() for part in re.split(r"[,;\n]+", raw) if part.strip()]
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for item in source:
+        token = sanitize_short_text(str(item), "", max_length=32)
+        if not token:
+            continue
+        lowered = token.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        normalized.append(token)
+    if not normalized:
+        return list(DEFAULT_STEREOTYPE_TAG_SUGGESTIONS)
+    return normalized[:20]
+
+
+def normalize_org_type(value: str | None) -> str:
+    return sanitize_short_text(value, DEFAULT_ORG_TYPE, max_length=40)
+
+
+def normalize_role_weights(officer: Any, rusher: Any) -> tuple[float, float]:
+    def _parse(raw: Any, fallback: float) -> float:
+        try:
+            parsed = float(raw)
+        except (TypeError, ValueError):
+            parsed = fallback
+        if parsed <= 0:
+            return fallback
+        return min(parsed, 1.0)
+
+    officer_weight = _parse(officer, 0.6)
+    rusher_weight = _parse(rusher, 0.4)
+    if officer_weight + rusher_weight <= 0:
+        return 0.6, 0.4
+    return officer_weight, rusher_weight
+
+
 def default_tenant_db_path(slug: str) -> Path:
     if slug == DEFAULT_TENANT_SLUG:
         return DB_PATH
@@ -375,13 +615,38 @@ def tenant_context_from_row(row: sqlite3.Row) -> TenantContext:
     calendar_share_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
     if not calendar_share_token:
         calendar_share_token = secrets.token_urlsafe(24)
+    criteria = normalize_rating_criteria_config(row["rating_criteria_json"] if "rating_criteria_json" in row.keys() else "")
+    officer_weight, rusher_weight = normalize_role_weights(
+        row["officer_weight"] if "officer_weight" in row.keys() else 0.6,
+        row["rusher_weight"] if "rusher_weight" in row.keys() else 0.4,
+    )
+    default_interest_tags = parse_default_interest_tags(row["default_interest_tags"] if "default_interest_tags" in row.keys() else "")
+    default_stereotype_tags = parse_default_stereotype_tags(
+        row["default_stereotype_tags"] if "default_stereotype_tags" in row.keys() else ""
+    )
     return TenantContext(
         slug=slug,
         display_name=row["display_name"],
         chapter_name=row["chapter_name"] or "",
+        org_type=normalize_org_type(row["org_type"] if "org_type" in row.keys() else None),
+        setup_tagline=sanitize_short_text(
+            row["setup_tagline"] if "setup_tagline" in row.keys() else "",
+            "",
+            max_length=180,
+        ),
         logo_path=row["logo_path"],
-        theme_primary=normalize_theme_color(row["theme_primary"] or "", "#8a1538"),
-        theme_secondary=normalize_theme_color(row["theme_secondary"] or "", "#c99a2b"),
+        theme_primary=normalize_theme_color(row["theme_primary"] or "", DEFAULT_THEME_PRIMARY),
+        theme_secondary=normalize_theme_color(row["theme_secondary"] or "", DEFAULT_THEME_SECONDARY),
+        theme_tertiary=normalize_theme_color(
+            row["theme_tertiary"] if "theme_tertiary" in row.keys() else "",
+            DEFAULT_THEME_TERTIARY,
+        ),
+        role_weight_officer=officer_weight,
+        role_weight_rusher=rusher_weight,
+        rating_criteria=tuple(criteria),
+        rating_total_max=rating_total_max(criteria),
+        default_interest_tags=tuple(default_interest_tags),
+        default_stereotype_tags=tuple(default_stereotype_tags),
         db_path=db_path,
         pnm_uploads_dir=TENANT_UPLOADS_ROOT / slug / "pnms",
         backup_dir=TENANT_UPLOADS_ROOT / slug / "backups",
@@ -424,20 +689,36 @@ def require_tenant_exists(slug: str) -> sqlite3.Row:
     return row
 
 
-def app_config_for_tenant(tenant: TenantContext) -> dict[str, str | None]:
+def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
+    base_path = f"/{tenant.slug}"
+    member_base = f"{base_path}/member"
+    member_signup_qr_path = f"{base_path}/member-signup-qr.svg"
     return {
-        "base_path": f"/{tenant.slug}",
-        "api_base": f"/{tenant.slug}/api",
-        "meeting_base": f"/{tenant.slug}/meeting",
-        "member_base": f"/{tenant.slug}/member",
+        "base_path": base_path,
+        "api_base": f"{base_path}/api",
+        "meeting_base": f"{base_path}/meeting",
+        "member_base": member_base,
         "platform_base": "/platform",
-        "mobile_base": f"/{tenant.slug}/mobile",
+        "mobile_base": f"{base_path}/mobile",
         "tenant_slug": tenant.slug,
         "tenant_name": tenant.display_name,
         "chapter_name": tenant.chapter_name,
+        "org_type": tenant.org_type,
+        "setup_tagline": tenant.setup_tagline,
         "logo_path": tenant.logo_path,
         "theme_primary": tenant.theme_primary,
         "theme_secondary": tenant.theme_secondary,
+        "theme_tertiary": tenant.theme_tertiary,
+        "rating_criteria": list(tenant.rating_criteria),
+        "rating_total_max": tenant.rating_total_max,
+        "role_weights": {
+            "officer": tenant.role_weight_officer,
+            "rusher": tenant.role_weight_rusher,
+        },
+        "default_interest_tags": list(tenant.default_interest_tags),
+        "default_stereotype_tags": list(tenant.default_stereotype_tags),
+        "member_signup_path": member_base,
+        "member_signup_qr_path": member_signup_qr_path,
         "calendar_timezone": CALENDAR_TIMEZONE,
         "calendar_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
     }
@@ -952,10 +1233,13 @@ def has_interest_match(normalized_csv: str, required: set[str]) -> bool:
     return bool(candidate & required)
 
 
-def role_weight(role: str) -> float:
+def role_weight(role: str, tenant: TenantContext | None = None) -> float:
+    resolved = tenant if tenant is not None else CURRENT_TENANT.get()
+    officer_weight = resolved.role_weight_officer if resolved else 0.6
+    rusher_weight = resolved.role_weight_rusher if resolved else 0.4
     if role in {ROLE_RUSH_OFFICER, ROLE_HEAD}:
-        return 0.6
-    return 0.4
+        return float(officer_weight)
+    return float(rusher_weight)
 
 
 def score_total(payload: dict[str, int]) -> int:
@@ -966,6 +1250,19 @@ def score_total(payload: dict[str, int]) -> int:
         + payload["alcohol_control"]
         + payload["instagram_marketability"]
     )
+
+
+def validate_score_data_against_criteria(score_data: dict[str, int], criteria: list[dict[str, Any]]) -> None:
+    criteria_map = rating_criteria_by_field(criteria)
+    for field in RATING_FIELDS:
+        value = int(score_data.get(field, 0))
+        field_limit = int(RATING_FIELD_LIMITS[field])
+        configured = criteria_map.get(field)
+        configured_max = int(configured["max"]) if configured and "max" in configured else field_limit
+        max_allowed = max(1, min(field_limit, configured_max))
+        if value < 0 or value > max_allowed:
+            label = configured["label"] if configured and "label" in configured else field
+            raise HTTPException(status_code=400, detail=f"{label} must be between 0 and {max_allowed}.")
 
 
 def count_words(text: str) -> int:
@@ -1135,9 +1432,68 @@ def fetch_instagram_og_image_url(username: str) -> str | None:
         match = re.search(pattern, page, flags=re.IGNORECASE)
         if not match:
             continue
-        candidate = html.unescape(match.group(1)).strip()
+        candidate = normalize_instagram_image_url(html.unescape(match.group(1)).strip())
         if candidate.startswith("http://") or candidate.startswith("https://"):
             return candidate
+    return None
+
+
+def normalize_instagram_image_url(url: str) -> str:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return url
+
+    if not parsed.netloc:
+        return url
+
+    query_items = parse_qsl(parsed.query, keep_blank_values=True)
+    normalized_items: list[tuple[str, str]] = []
+    for key, value in query_items:
+        if key.lower() == "stp" and re.search(r"_s\d+x\d+", value):
+            reduced = re.sub(r"_s\d+x\d+", "", value)
+            reduced = re.sub(r"__+", "_", reduced).strip("_")
+            if reduced and reduced != "dst-jpg":
+                normalized_items.append((key, reduced))
+            continue
+        normalized_items.append((key, value))
+
+    normalized_query = urlencode(normalized_items, doseq=True)
+    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, normalized_query, parsed.fragment))
+
+
+def fetch_instagram_api_image_url(username: str) -> str | None:
+    api_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={quote(username, safe='')}"
+    request = URLRequest(
+        api_url,
+        headers={
+            "User-Agent": HTTP_USER_AGENT,
+            "Accept": "application/json",
+            "X-IG-App-ID": INSTAGRAM_WEB_APP_ID,
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": f"https://www.instagram.com/{quote(username, safe='')}/",
+        },
+    )
+    try:
+        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
+            payload = response.read(300000)
+    except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+        return None
+
+    try:
+        decoded = json.loads(payload.decode("utf-8", errors="ignore"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+    user = ((decoded.get("data") or {}).get("user") or {}) if isinstance(decoded, dict) else {}
+    if not isinstance(user, dict):
+        return None
+    url = user.get("profile_pic_url_hd") or user.get("profile_pic_url")
+    if not isinstance(url, str):
+        return None
+    candidate = normalize_instagram_image_url(html.unescape(url).strip())
+    if candidate.startswith("http://") or candidate.startswith("https://"):
+        return candidate
     return None
 
 
@@ -1145,13 +1501,20 @@ def try_fetch_instagram_profile_photo(instagram_handle: str) -> tuple[bytes, str
     username = instagram_username_from_handle(instagram_handle)
     if not username:
         return None
-    primary_url = f"https://unavatar.io/instagram/{quote(username, safe='')}?fallback=false"
-    image = fetch_image_from_url(primary_url)
-    if image:
-        return image
-    fallback_url = fetch_instagram_og_image_url(username)
-    if not fallback_url:
-        return None
+
+    high_res_url = fetch_instagram_api_image_url(username)
+    if high_res_url:
+        image = fetch_image_from_url(high_res_url)
+        if image:
+            return image
+
+    og_url = fetch_instagram_og_image_url(username)
+    if og_url:
+        image = fetch_image_from_url(og_url)
+        if image:
+            return image
+
+    fallback_url = f"https://unavatar.io/instagram/{quote(username, safe='')}?fallback=false"
     return fetch_image_from_url(fallback_url)
 
 
@@ -2018,9 +2381,17 @@ def setup_platform_schema(conn: sqlite3.Connection) -> None:
             slug TEXT NOT NULL UNIQUE,
             display_name TEXT NOT NULL,
             chapter_name TEXT NOT NULL DEFAULT '',
+            org_type TEXT NOT NULL DEFAULT 'Fraternity',
+            setup_tagline TEXT NOT NULL DEFAULT '',
             logo_path TEXT,
             theme_primary TEXT NOT NULL DEFAULT '#8a1538',
             theme_secondary TEXT NOT NULL DEFAULT '#c99a2b',
+            theme_tertiary TEXT NOT NULL DEFAULT '#1d7a4b',
+            rating_criteria_json TEXT NOT NULL DEFAULT '',
+            officer_weight REAL NOT NULL DEFAULT 0.6,
+            rusher_weight REAL NOT NULL DEFAULT 0.4,
+            default_interest_tags TEXT NOT NULL DEFAULT '',
+            default_stereotype_tags TEXT NOT NULL DEFAULT '',
             calendar_share_token TEXT NOT NULL DEFAULT '',
             db_path TEXT NOT NULL,
             head_seed_username TEXT NOT NULL,
@@ -2041,6 +2412,51 @@ def ensure_platform_schema_upgrades(conn: sqlite3.Connection) -> None:
     tenant_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tenants)").fetchall()}
     if "calendar_share_token" not in tenant_columns:
         conn.execute("ALTER TABLE tenants ADD COLUMN calendar_share_token TEXT NOT NULL DEFAULT ''")
+    if "org_type" not in tenant_columns:
+        conn.execute(f"ALTER TABLE tenants ADD COLUMN org_type TEXT NOT NULL DEFAULT '{DEFAULT_ORG_TYPE}'")
+    if "setup_tagline" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN setup_tagline TEXT NOT NULL DEFAULT ''")
+    if "theme_tertiary" not in tenant_columns:
+        conn.execute(f"ALTER TABLE tenants ADD COLUMN theme_tertiary TEXT NOT NULL DEFAULT '{DEFAULT_THEME_TERTIARY}'")
+    if "rating_criteria_json" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN rating_criteria_json TEXT NOT NULL DEFAULT ''")
+    if "officer_weight" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN officer_weight REAL NOT NULL DEFAULT 0.6")
+    if "rusher_weight" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN rusher_weight REAL NOT NULL DEFAULT 0.4")
+    if "default_interest_tags" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN default_interest_tags TEXT NOT NULL DEFAULT ''")
+    if "default_stereotype_tags" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN default_stereotype_tags TEXT NOT NULL DEFAULT ''")
+
+    default_criteria_json = json.dumps(default_rating_criteria(), separators=(",", ":"))
+    default_interest_tags_json = json.dumps(DEFAULT_INTEREST_TAG_SUGGESTIONS, separators=(",", ":"))
+    default_stereotype_tags_json = json.dumps(DEFAULT_STEREOTYPE_TAG_SUGGESTIONS, separators=(",", ":"))
+    conn.execute(
+        """
+        UPDATE tenants
+        SET
+            org_type = COALESCE(NULLIF(trim(org_type), ''), ?),
+            setup_tagline = COALESCE(setup_tagline, ''),
+            theme_primary = COALESCE(NULLIF(trim(theme_primary), ''), ?),
+            theme_secondary = COALESCE(NULLIF(trim(theme_secondary), ''), ?),
+            theme_tertiary = COALESCE(NULLIF(trim(theme_tertiary), ''), ?),
+            rating_criteria_json = COALESCE(NULLIF(trim(rating_criteria_json), ''), ?),
+            officer_weight = CASE WHEN officer_weight > 0 THEN officer_weight ELSE 0.6 END,
+            rusher_weight = CASE WHEN rusher_weight > 0 THEN rusher_weight ELSE 0.4 END,
+            default_interest_tags = COALESCE(NULLIF(trim(default_interest_tags), ''), ?),
+            default_stereotype_tags = COALESCE(NULLIF(trim(default_stereotype_tags), ''), ?)
+        """,
+        (
+            DEFAULT_ORG_TYPE,
+            DEFAULT_THEME_PRIMARY,
+            DEFAULT_THEME_SECONDARY,
+            DEFAULT_THEME_TERTIARY,
+            default_criteria_json,
+            default_interest_tags_json,
+            default_stereotype_tags_json,
+        ),
+    )
 
     rows = conn.execute("SELECT id, calendar_share_token FROM tenants").fetchall()
     for row in rows:
@@ -2622,10 +3038,19 @@ class PlatformLoginRequest(BaseModel):
         return data
 
 
+class TenantRatingCriterionInput(BaseModel):
+    field: str
+    label: str | None = Field(default=None, max_length=60)
+    short_label: str | None = Field(default=None, max_length=20)
+    max: int | None = Field(default=None, ge=1, le=10)
+
+
 class TenantCreateRequest(BaseModel):
     slug: str
     display_name: str = Field(..., min_length=3, max_length=120)
     chapter_name: str = Field(..., min_length=2, max_length=24)
+    org_type: str | None = Field(default=None, max_length=40)
+    setup_tagline: str | None = Field(default=None, max_length=180)
     head_seed_username: str = Field(..., min_length=3, max_length=120)
     head_seed_first_name: str = Field(..., min_length=1, max_length=48)
     head_seed_last_name: str = Field(..., min_length=1, max_length=48)
@@ -2633,6 +3058,12 @@ class TenantCreateRequest(BaseModel):
     head_seed_access_code: str = Field(..., min_length=8, max_length=128)
     theme_primary: str | None = None
     theme_secondary: str | None = None
+    theme_tertiary: str | None = None
+    officer_weight: float | None = Field(default=None, gt=0, le=1)
+    rusher_weight: float | None = Field(default=None, gt=0, le=1)
+    default_interest_tags: str | list[str] | None = None
+    default_stereotype_tags: str | list[str] | None = None
+    rating_criteria: list[TenantRatingCriterionInput] | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -2642,6 +3073,21 @@ class TenantCreateRequest(BaseModel):
             merged["head_seed_access_code"] = merged.get("head_seed_password")
             return merged
         return data
+
+
+class TenantUpdateRequest(BaseModel):
+    display_name: str | None = Field(default=None, min_length=3, max_length=120)
+    chapter_name: str | None = Field(default=None, min_length=2, max_length=24)
+    org_type: str | None = Field(default=None, max_length=40)
+    setup_tagline: str | None = Field(default=None, max_length=180)
+    theme_primary: str | None = None
+    theme_secondary: str | None = None
+    theme_tertiary: str | None = None
+    officer_weight: float | None = Field(default=None, gt=0, le=1)
+    rusher_weight: float | None = Field(default=None, gt=0, le=1)
+    default_interest_tags: str | list[str] | None = None
+    default_stereotype_tags: str | list[str] | None = None
+    rating_criteria: list[TenantRatingCriterionInput] | None = None
 
 
 @app.on_event("startup")
@@ -2855,6 +3301,33 @@ async def mobile_meeting_page(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/member-signup-qr.svg")
+async def member_signup_qr(request: Request) -> Response:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    if segno is None:
+        raise HTTPException(status_code=503, detail="QR generator is not available on this deployment.")
+
+    base_url = str(request.base_url).rstrip("/")
+    signup_url = f"{base_url}/{tenant.slug}/member"
+    qr = segno.make(signup_url, error="m", micro=False)
+    output = io.BytesIO()
+    qr.save(
+        output,
+        kind="svg",
+        border=2,
+        scale=6,
+        dark=tenant.theme_primary,
+        light="#ffffff",
+    )
+    return Response(
+        content=output.getvalue(),
+        media_type="image/svg+xml",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_page(request: Request) -> HTMLResponse:
     return templates.TemplateResponse("platform_admin.html", {"request": request})
@@ -2862,17 +3335,33 @@ async def platform_page(request: Request) -> HTMLResponse:
 
 def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
     calendar_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
+    tenant = tenant_context_from_row(row)
+    base_path = f"/{tenant.slug}"
     return {
-        "slug": row["slug"],
-        "display_name": row["display_name"],
-        "chapter_name": row["chapter_name"],
+        "slug": tenant.slug,
+        "display_name": tenant.display_name,
+        "chapter_name": tenant.chapter_name,
+        "org_type": tenant.org_type,
+        "setup_tagline": tenant.setup_tagline,
         "logo_path": row["logo_path"],
-        "theme_primary": row["theme_primary"],
-        "theme_secondary": row["theme_secondary"],
+        "theme_primary": tenant.theme_primary,
+        "theme_secondary": tenant.theme_secondary,
+        "theme_tertiary": tenant.theme_tertiary,
+        "rating_criteria": list(tenant.rating_criteria),
+        "rating_total_max": tenant.rating_total_max,
+        "role_weights": {
+            "officer": tenant.role_weight_officer,
+            "rusher": tenant.role_weight_rusher,
+        },
+        "default_interest_tags": list(tenant.default_interest_tags),
+        "default_stereotype_tags": list(tenant.default_stereotype_tags),
         "db_path": row["db_path"],
         "head_seed_username": row["head_seed_username"],
         "is_active": bool(row["is_active"]),
-        "calendar_feed_path": f"/{row['slug']}/calendar/lunches.ics?token={calendar_token}" if calendar_token else None,
+        "is_default": tenant.slug == DEFAULT_TENANT_SLUG,
+        "calendar_feed_path": f"{base_path}/calendar/lunches.ics?token={calendar_token}" if calendar_token else None,
+        "member_signup_path": f"{base_path}/member",
+        "member_signup_qr_path": f"{base_path}/member-signup-qr.svg",
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
@@ -2949,6 +3438,20 @@ def platform_list_tenants(_: sqlite3.Row = Depends(current_platform_admin)) -> d
     return {"tenants": [tenant_admin_payload(row) for row in rows]}
 
 
+def criteria_payload_list(raw: list[TenantRatingCriterionInput] | None) -> list[dict[str, Any]]:
+    if not raw:
+        return default_rating_criteria()
+    return [
+        {
+            "field": item.field,
+            "label": item.label,
+            "short_label": item.short_label,
+            "max": item.max,
+        }
+        for item in raw
+    ]
+
+
 @app.post("/platform/api/tenants")
 def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
     slug = normalize_slug(payload.slug)
@@ -2959,8 +3462,18 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
     if not chapter_name:
         raise HTTPException(status_code=400, detail="Chapter name is required.")
 
-    theme_primary = normalize_theme_color(payload.theme_primary or "", "#8a1538")
-    theme_secondary = normalize_theme_color(payload.theme_secondary or "", "#c99a2b")
+    org_type = normalize_org_type(payload.org_type)
+    setup_tagline = sanitize_short_text(payload.setup_tagline, "", max_length=180)
+    theme_primary = normalize_theme_color(payload.theme_primary or "", DEFAULT_THEME_PRIMARY)
+    theme_secondary = normalize_theme_color(payload.theme_secondary or "", DEFAULT_THEME_SECONDARY)
+    theme_tertiary = normalize_theme_color(payload.theme_tertiary or "", DEFAULT_THEME_TERTIARY)
+    officer_weight, rusher_weight = normalize_role_weights(payload.officer_weight, payload.rusher_weight)
+    rating_criteria = normalize_rating_criteria_config(criteria_payload_list(payload.rating_criteria))
+    rating_criteria_json = json.dumps(rating_criteria, separators=(",", ":"))
+    default_interest_tags = parse_default_interest_tags(payload.default_interest_tags or DEFAULT_INTEREST_TAG_SUGGESTIONS)
+    default_stereotype_tags = parse_default_stereotype_tags(payload.default_stereotype_tags or DEFAULT_STEREOTYPE_TAG_SUGGESTIONS)
+    default_interest_tags_json = json.dumps(default_interest_tags, separators=(",", ":"))
+    default_stereotype_tags_json = json.dumps(default_stereotype_tags, separators=(",", ":"))
     head_username = payload.head_seed_username.strip()
     if not head_username:
         raise HTTPException(status_code=400, detail="Head username is required.")
@@ -2981,9 +3494,17 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
                 slug,
                 display_name,
                 chapter_name,
+                org_type,
+                setup_tagline,
                 logo_path,
                 theme_primary,
                 theme_secondary,
+                theme_tertiary,
+                rating_criteria_json,
+                officer_weight,
+                rusher_weight,
+                default_interest_tags,
+                default_stereotype_tags,
                 calendar_share_token,
                 db_path,
                 head_seed_username,
@@ -2994,14 +3515,46 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
                 updated_at,
                 is_active
             )
-            VALUES (?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            VALUES (
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                NULL,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                ?,
+                1
+            )
             """,
             (
                 slug,
                 display_name,
                 chapter_name,
+                org_type,
+                setup_tagline,
                 theme_primary,
                 theme_secondary,
+                theme_tertiary,
+                rating_criteria_json,
+                officer_weight,
+                rusher_weight,
+                default_interest_tags_json,
+                default_stereotype_tags_json,
                 secrets.token_urlsafe(24),
                 str(tenant_db_path),
                 head_username,
@@ -3016,6 +3569,113 @@ def platform_create_tenant(payload: TenantCreateRequest, _: sqlite3.Row = Depend
 
     initialize_tenant_datastore(row, seed_access_code=payload.head_seed_access_code.strip())
     return {"tenant": tenant_admin_payload(row), "message": "Organization created."}
+
+
+@app.patch("/platform/api/tenants/{slug}")
+def platform_update_tenant(
+    slug: str,
+    payload: TenantUpdateRequest,
+    _: sqlite3.Row = Depends(current_platform_admin),
+) -> dict[str, Any]:
+    normalized_slug = normalize_slug(slug)
+    with platform_db_session() as conn:
+        row = conn.execute("SELECT * FROM tenants WHERE slug = ?", (normalized_slug,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Organization not found.")
+
+        display_name = payload.display_name.strip() if payload.display_name is not None else row["display_name"]
+        chapter_name = payload.chapter_name.strip() if payload.chapter_name is not None else row["chapter_name"]
+        if not display_name:
+            raise HTTPException(status_code=400, detail="Display name is required.")
+        if not chapter_name:
+            raise HTTPException(status_code=400, detail="Chapter name is required.")
+
+        org_type = normalize_org_type(payload.org_type if payload.org_type is not None else row["org_type"])
+        setup_tagline = sanitize_short_text(
+            payload.setup_tagline if payload.setup_tagline is not None else row["setup_tagline"],
+            "",
+            max_length=180,
+        )
+        theme_primary = normalize_theme_color(
+            payload.theme_primary if payload.theme_primary is not None else row["theme_primary"],
+            DEFAULT_THEME_PRIMARY,
+        )
+        theme_secondary = normalize_theme_color(
+            payload.theme_secondary if payload.theme_secondary is not None else row["theme_secondary"],
+            DEFAULT_THEME_SECONDARY,
+        )
+        theme_tertiary = normalize_theme_color(
+            payload.theme_tertiary
+            if payload.theme_tertiary is not None
+            else (row["theme_tertiary"] if "theme_tertiary" in row.keys() else DEFAULT_THEME_TERTIARY),
+            DEFAULT_THEME_TERTIARY,
+        )
+
+        current_officer = row["officer_weight"] if "officer_weight" in row.keys() else 0.6
+        current_rusher = row["rusher_weight"] if "rusher_weight" in row.keys() else 0.4
+        officer_weight, rusher_weight = normalize_role_weights(
+            payload.officer_weight if payload.officer_weight is not None else current_officer,
+            payload.rusher_weight if payload.rusher_weight is not None else current_rusher,
+        )
+
+        if payload.rating_criteria is not None:
+            rating_criteria = normalize_rating_criteria_config(criteria_payload_list(payload.rating_criteria))
+        else:
+            rating_criteria = normalize_rating_criteria_config(row["rating_criteria_json"] if "rating_criteria_json" in row.keys() else "")
+        rating_criteria_json = json.dumps(rating_criteria, separators=(",", ":"))
+
+        interest_source = (
+            payload.default_interest_tags
+            if payload.default_interest_tags is not None
+            else (row["default_interest_tags"] if "default_interest_tags" in row.keys() else "")
+        )
+        stereotype_source = (
+            payload.default_stereotype_tags
+            if payload.default_stereotype_tags is not None
+            else (row["default_stereotype_tags"] if "default_stereotype_tags" in row.keys() else "")
+        )
+        default_interest_tags_json = json.dumps(parse_default_interest_tags(interest_source), separators=(",", ":"))
+        default_stereotype_tags_json = json.dumps(parse_default_stereotype_tags(stereotype_source), separators=(",", ":"))
+
+        conn.execute(
+            """
+            UPDATE tenants
+            SET
+                display_name = ?,
+                chapter_name = ?,
+                org_type = ?,
+                setup_tagline = ?,
+                theme_primary = ?,
+                theme_secondary = ?,
+                theme_tertiary = ?,
+                rating_criteria_json = ?,
+                officer_weight = ?,
+                rusher_weight = ?,
+                default_interest_tags = ?,
+                default_stereotype_tags = ?,
+                updated_at = ?
+            WHERE slug = ?
+            """,
+            (
+                display_name,
+                chapter_name,
+                org_type,
+                setup_tagline,
+                theme_primary,
+                theme_secondary,
+                theme_tertiary,
+                rating_criteria_json,
+                officer_weight,
+                rusher_weight,
+                default_interest_tags_json,
+                default_stereotype_tags_json,
+                now_iso(),
+                normalized_slug,
+            ),
+        )
+        refreshed = conn.execute("SELECT * FROM tenants WHERE slug = ?", (normalized_slug,)).fetchone()
+
+    return {"tenant": tenant_admin_payload(refreshed), "message": "Organization settings updated."}
 
 
 @app.post("/platform/api/tenants/{slug}/logo")
@@ -4688,6 +5348,7 @@ def delete_pnm(pnm_id: int, _: sqlite3.Row = Depends(require_head)) -> dict[str,
 
 @app.post("/api/ratings")
 def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    tenant = current_tenant()
     score_data = {
         "good_with_girls": payload.good_with_girls,
         "will_make_it": payload.will_make_it,
@@ -4695,6 +5356,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
         "alcohol_control": payload.alcohol_control,
         "instagram_marketability": payload.instagram_marketability,
     }
+    validate_score_data_against_criteria(score_data, list(tenant.rating_criteria))
     new_total = score_total(score_data)
 
     with db_session() as conn:

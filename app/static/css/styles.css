@@ -758,6 +758,53 @@ button:disabled {
   border-radius: 8px;
 }
 
+.signup-qr {
+  display: block;
+  width: min(220px, 100%);
+  max-width: 220px;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 0.35rem;
+  margin-top: 0.6rem;
+}
+
+.signup-qr.tiny {
+  width: 52px;
+  max-width: 52px;
+  margin-top: 0;
+  padding: 0.15rem;
+  border-radius: 10px;
+}
+
+.criteria-builder {
+  border: 1px dashed rgba(var(--accent-rgb), 0.24);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 0.7rem;
+}
+
+.criteria-grid {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.criteria-row {
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1fr) minmax(96px, 120px);
+  align-items: end;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 10px;
+  padding: 0.55rem 0.6rem;
+  background: rgba(255, 255, 255, 0.62);
+}
+
+.criteria-row label {
+  font-size: 0.74rem;
+  gap: 0.25rem;
+}
+
 .table-wrap {
   overflow-x: auto;
   max-width: 100%;
@@ -1109,6 +1156,24 @@ td strong {
   box-shadow: 0 6px 14px rgba(var(--accent-shadow-rgb), 0.2);
 }
 
+#adminPanel {
+  padding: 1.2rem;
+}
+
+#adminPanel .grid-two {
+  gap: 1.2rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  align-items: start;
+}
+
+#adminPanel .divider {
+  margin: 1.35rem 0;
+}
+
+#adminPanel .list-column {
+  padding: 0.85rem;
+}
+
 .hidden {
   display: none !important;
 }
@@ -1423,6 +1488,10 @@ td strong {
 @media (max-width: 760px) {
   .topbar {
     flex-direction: column;
+  }
+
+  .criteria-row {
+    grid-template-columns: 1fr;
   }
 
   .action-row {

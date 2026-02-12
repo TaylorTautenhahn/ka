@@ -56,7 +56,8 @@ function applyTenantTheme(config) {
   const root = document.documentElement;
   const accentBase = hexToRgb(config.theme_primary) || hexToRgb("#8a1538");
   const goldBase = hexToRgb(config.theme_secondary) || hexToRgb("#c99a2b");
-  if (!accentBase || !goldBase) {
+  const tertiaryBase = hexToRgb(config.theme_tertiary) || hexToRgb("#1d7a4b");
+  if (!accentBase || !goldBase || !tertiaryBase) {
     return;
   }
 
@@ -75,9 +76,58 @@ function applyTenantTheme(config) {
   root.style.setProperty("--accent-shadow-rgb", rgbTriplet(accentShadow));
   root.style.setProperty("--gold-rgb", rgbTriplet(goldBase));
   root.style.setProperty("--heading", rgbToHex(heading));
+  root.style.setProperty("--good", rgbToHex(tertiaryBase));
 }
 
 applyTenantTheme(APP_CONFIG);
+
+const BASE_RATING_CRITERIA = [
+  { field: "good_with_girls", label: "Good with girls", short_label: "Girls", max: 10 },
+  { field: "will_make_it", label: "Will make it through process", short_label: "Process", max: 10 },
+  { field: "personable", label: "Personable", short_label: "Personable", max: 10 },
+  { field: "alcohol_control", label: "Alcohol control", short_label: "Alcohol", max: 10 },
+  { field: "instagram_marketability", label: "Instagram marketability", short_label: "IG", max: 5 },
+];
+const RATING_FIELD_LIMITS = {
+  good_with_girls: 10,
+  will_make_it: 10,
+  personable: 10,
+  alcohol_control: 10,
+  instagram_marketability: 5,
+};
+
+function parseRatingCriteria(raw) {
+  const byField = new Map();
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (!item || typeof item !== "object" || !item.field) {
+        return;
+      }
+      byField.set(String(item.field), item);
+    });
+  }
+  return BASE_RATING_CRITERIA.map((base) => {
+    const incoming = byField.get(base.field) || {};
+    const limit = RATING_FIELD_LIMITS[base.field] || base.max;
+    const parsedMax = Number.parseInt(String(incoming.max ?? base.max), 10);
+    const max = Number.isFinite(parsedMax) ? Math.max(1, Math.min(limit, parsedMax)) : base.max;
+    const label = String(incoming.label || base.label).trim() || base.label;
+    const shortLabel = String(incoming.short_label || base.short_label).trim() || base.short_label;
+    return {
+      field: base.field,
+      label,
+      short_label: shortLabel,
+      max,
+    };
+  });
+}
+
+const RATING_CRITERIA = parseRatingCriteria(APP_CONFIG.rating_criteria);
+const RATING_CRITERIA_BY_FIELD = new Map(RATING_CRITERIA.map((item) => [item.field, item]));
+const RATING_TOTAL_MAX =
+  Number.isFinite(Number(APP_CONFIG.rating_total_max)) && Number(APP_CONFIG.rating_total_max) > 0
+    ? Number(APP_CONFIG.rating_total_max)
+    : RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0);
 
 const authSection = document.getElementById("memberAuthSection");
 const appSection = document.getElementById("memberAppSection");
@@ -111,6 +161,47 @@ const state = {
   selectedRatings: [],
   toastTimer: null,
 };
+
+function ratingCriteriaForField(field) {
+  return RATING_CRITERIA_BY_FIELD.get(field) || BASE_RATING_CRITERIA.find((item) => item.field === field);
+}
+
+function ratingLabelWithRange(field) {
+  const criterion = ratingCriteriaForField(field);
+  if (!criterion) {
+    return `${field} (0-10)`;
+  }
+  return `${criterion.short_label} (0-${criterion.max})`;
+}
+
+function applyRatingCriteriaUi() {
+  const fields = [
+    { field: "good_with_girls", inputId: "memberRateGirls", labelId: "memberRateGirlsLabel" },
+    { field: "will_make_it", inputId: "memberRateProcess", labelId: "memberRateProcessLabel" },
+    { field: "personable", inputId: "memberRatePersonable", labelId: "memberRatePersonableLabel" },
+    { field: "alcohol_control", inputId: "memberRateAlcohol", labelId: "memberRateAlcoholLabel" },
+    { field: "instagram_marketability", inputId: "memberRateIg", labelId: "memberRateIgLabel" },
+  ];
+  fields.forEach(({ field, inputId, labelId }) => {
+    const criterion = ratingCriteriaForField(field);
+    const input = document.getElementById(inputId);
+    const label = document.getElementById(labelId);
+    if (input && criterion) {
+      input.min = "0";
+      input.max = String(criterion.max);
+    }
+    if (label) {
+      label.textContent = ratingLabelWithRange(field);
+    }
+  });
+}
+
+function formatScoreBreakdown(row) {
+  return RATING_CRITERIA.map((criterion) => {
+    const value = Number(row[criterion.field] || 0);
+    return `${criterion.short_label} ${value}`;
+  }).join(" | ");
+}
 
 function escapeHtml(input) {
   return String(input)
@@ -311,11 +402,16 @@ function renderSelectedPnm() {
   `;
 
   const own = pnm.own_rating;
-  document.getElementById("memberRateGirls").value = own ? own.good_with_girls : 0;
-  document.getElementById("memberRateProcess").value = own ? own.will_make_it : 0;
-  document.getElementById("memberRatePersonable").value = own ? own.personable : 0;
-  document.getElementById("memberRateAlcohol").value = own ? own.alcohol_control : 0;
-  document.getElementById("memberRateIg").value = own ? own.instagram_marketability : 0;
+  const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
+  const processMax = ratingCriteriaForField("will_make_it")?.max || 10;
+  const personableMax = ratingCriteriaForField("personable")?.max || 10;
+  const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
+  const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
+  document.getElementById("memberRateGirls").value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
+  document.getElementById("memberRateProcess").value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
+  document.getElementById("memberRatePersonable").value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
+  document.getElementById("memberRateAlcohol").value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
+  document.getElementById("memberRateIg").value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
   document.getElementById("memberRateComment").value = own ? own.comment || "" : "";
 
   renderRatingHistory();
@@ -341,8 +437,9 @@ function renderRatingHistory() {
         <div class="entry">
           <div class="entry-title">
             <strong>Your rating</strong>
-            <span>Score ${row.total_score}/45${delta}</span>
+            <span>Score ${row.total_score}/${RATING_TOTAL_MAX}${delta}</span>
           </div>
+          <div class="muted">${escapeHtml(formatScoreBreakdown(row))}</div>
           <div class="muted">Updated ${escapeHtml(formatDateLabel(row.updated_at))}</div>
           ${comment}
         </div>
@@ -659,6 +756,7 @@ function attachEvents() {
 }
 
 async function init() {
+  applyRatingCriteriaUi();
   attachEvents();
   await ensureSession();
 }

@@ -4,9 +4,28 @@ const loginForm = document.getElementById("platformLoginForm");
 const logoutBtn = document.getElementById("platformLogoutBtn");
 const refreshBtn = document.getElementById("platformRefreshBtn");
 const createTenantForm = document.getElementById("createTenantForm");
+const editTenantForm = document.getElementById("editTenantForm");
+const editTenantSlug = document.getElementById("editTenantSlug");
 const tenantList = document.getElementById("tenantList");
 const toastEl = document.getElementById("platformToast");
 const sessionTitle = document.getElementById("platformSessionTitle");
+const createCriteriaGrid = document.getElementById("createCriteriaGrid");
+const editCriteriaGrid = document.getElementById("editCriteriaGrid");
+const editMemberSignupLink = document.getElementById("editMemberSignupLink");
+const editMemberSignupQr = document.getElementById("editMemberSignupQr");
+
+const BASE_RATING_CRITERIA = [
+  { field: "good_with_girls", label: "Good with girls", short_label: "Girls", max: 10 },
+  { field: "will_make_it", label: "Will make it through process", short_label: "Process", max: 10 },
+  { field: "personable", label: "Personable", short_label: "Personable", max: 10 },
+  { field: "alcohol_control", label: "Alcohol control", short_label: "Alcohol", max: 10 },
+  { field: "instagram_marketability", label: "Instagram marketability", short_label: "IG", max: 5 },
+];
+
+const state = {
+  tenants: [],
+  activeEditSlug: "",
+};
 
 function escapeHtml(input) {
   return String(input)
@@ -21,7 +40,7 @@ function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.remove("hidden");
   clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2800);
+  showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 3000);
 }
 
 async function api(path, options = {}) {
@@ -42,6 +61,7 @@ async function api(path, options = {}) {
   const payload = contentType.includes("application/json")
     ? await response.json().catch(() => ({}))
     : await response.text().catch(() => "");
+
   if (!response.ok) {
     const detail =
       typeof payload === "object" && payload && "detail" in payload
@@ -59,32 +79,193 @@ function setAuthView(isAuthed) {
   consoleSection.classList.toggle("hidden", !isAuthed);
 }
 
+function parseTagCsv(raw) {
+  return String(raw || "")
+    .split(/[,;\n]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function tagsToCsv(raw) {
+  if (!Array.isArray(raw)) {
+    return "";
+  }
+  return raw.join(",");
+}
+
+function optionalNumber(raw) {
+  const token = String(raw || "").trim();
+  if (!token) {
+    return null;
+  }
+  const parsed = Number(token);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return parsed;
+}
+
+function criteriaByField(raw) {
+  const byField = new Map();
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (!item || typeof item !== "object" || !item.field) {
+        return;
+      }
+      byField.set(String(item.field), item);
+    });
+  }
+  return byField;
+}
+
+function criteriaRowMarkup(criterion) {
+  return `
+    <div class="criteria-row" data-field="${escapeHtml(criterion.field)}">
+      <div class="criteria-label-col">
+        <label>
+          Label
+          <input class="criteria-label" type="text" value="${escapeHtml(criterion.label)}" maxlength="60" />
+        </label>
+      </div>
+      <div class="criteria-short-col">
+        <label>
+          Short label
+          <input class="criteria-short" type="text" value="${escapeHtml(criterion.short_label)}" maxlength="20" />
+        </label>
+      </div>
+      <div class="criteria-max-col">
+        <label>
+          Max
+          <input class="criteria-max" type="number" min="1" max="10" step="1" value="${escapeHtml(criterion.max)}" />
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+function renderCriteriaGrid(container, criteria) {
+  if (!container) {
+    return;
+  }
+  const byField = criteriaByField(criteria);
+  container.innerHTML = BASE_RATING_CRITERIA.map((base) => {
+    const merged = {
+      ...base,
+      ...(byField.get(base.field) || {}),
+    };
+    return criteriaRowMarkup(merged);
+  }).join("");
+}
+
+function readCriteriaGrid(container) {
+  if (!container) {
+    return BASE_RATING_CRITERIA.map((item) => ({ ...item }));
+  }
+  return Array.from(container.querySelectorAll(".criteria-row")).map((row) => {
+    const field = String(row.dataset.field || "").trim();
+    const labelInput = row.querySelector("input.criteria-label");
+    const shortInput = row.querySelector("input.criteria-short");
+    const maxInput = row.querySelector("input.criteria-max");
+    return {
+      field,
+      label: labelInput ? labelInput.value.trim() : "",
+      short_label: shortInput ? shortInput.value.trim() : "",
+      max: maxInput ? Number(maxInput.value || 0) : null,
+    };
+  });
+}
+
+function currentTenantBySlug(slug) {
+  return state.tenants.find((tenant) => tenant.slug === slug) || null;
+}
+
+function fillEditForm(tenant) {
+  if (!tenant) {
+    return;
+  }
+  state.activeEditSlug = tenant.slug;
+  editTenantSlug.value = tenant.slug;
+  document.getElementById("editTenantDisplayName").value = tenant.display_name || "";
+  document.getElementById("editTenantChapterName").value = tenant.chapter_name || "";
+  document.getElementById("editTenantOrgType").value = tenant.org_type || "Fraternity";
+  document.getElementById("editTenantSetupTagline").value = tenant.setup_tagline || "";
+  document.getElementById("editTenantThemePrimary").value = tenant.theme_primary || "";
+  document.getElementById("editTenantThemeSecondary").value = tenant.theme_secondary || "";
+  document.getElementById("editTenantThemeTertiary").value = tenant.theme_tertiary || "";
+  document.getElementById("editTenantOfficerWeight").value = tenant.role_weights ? tenant.role_weights.officer : "";
+  document.getElementById("editTenantRusherWeight").value = tenant.role_weights ? tenant.role_weights.rusher : "";
+  document.getElementById("editTenantInterestTags").value = tagsToCsv(tenant.default_interest_tags);
+  document.getElementById("editTenantStereotypeTags").value = tagsToCsv(tenant.default_stereotype_tags);
+  renderCriteriaGrid(editCriteriaGrid, tenant.rating_criteria || BASE_RATING_CRITERIA);
+
+  if (editMemberSignupLink) {
+    editMemberSignupLink.href = tenant.member_signup_path || "#";
+  }
+  if (editMemberSignupQr) {
+    editMemberSignupQr.src = tenant.member_signup_qr_path || "";
+    editMemberSignupQr.classList.toggle("hidden", !tenant.member_signup_qr_path);
+  }
+}
+
+function populateEditTenantSelector() {
+  if (!editTenantSlug) {
+    return;
+  }
+  if (!state.tenants.length) {
+    editTenantSlug.innerHTML = '<option value="">No organizations available</option>';
+    return;
+  }
+  editTenantSlug.innerHTML = state.tenants
+    .map((tenant) => `<option value="${escapeHtml(tenant.slug)}">${escapeHtml(tenant.display_name)} (${escapeHtml(tenant.slug)})</option>`)
+    .join("");
+
+  const preferred = currentTenantBySlug(state.activeEditSlug) || state.tenants[0];
+  fillEditForm(preferred);
+}
+
 function renderTenantList(rows) {
   if (!rows.length) {
     tenantList.innerHTML = '<p class="muted">No organizations configured.</p>';
     return;
   }
+
   const tableRows = rows
     .map((tenant) => {
-      const logo = tenant.logo_path ? `<img src="${escapeHtml(tenant.logo_path)}" class="mini-photo" alt="logo" />` : "No logo";
+      const logo = tenant.logo_path
+        ? `<img src="${escapeHtml(tenant.logo_path)}" class="mini-photo" alt="logo" />`
+        : "No logo";
       const status = tenant.is_active ? "Active" : "Disabled";
       const path = `/${tenant.slug}`;
+      const qr = tenant.member_signup_qr_path
+        ? `<img src="${escapeHtml(tenant.member_signup_qr_path)}" class="signup-qr tiny" alt="member signup QR" loading="lazy" />`
+        : "";
       return `
         <tr>
           <td>${logo}</td>
-          <td><strong>${escapeHtml(tenant.display_name)}</strong><div class="muted">${escapeHtml(path)}</div></td>
-          <td>${escapeHtml(tenant.chapter_name)}</td>
-          <td>${escapeHtml(tenant.head_seed_username)}</td>
+          <td>
+            <strong>${escapeHtml(tenant.display_name)}</strong>
+            <div class="muted">${escapeHtml(path)} | ${escapeHtml(tenant.org_type || "Organization")}</div>
+          </td>
+          <td>${escapeHtml(tenant.chapter_name || "-")}</td>
+          <td>${escapeHtml(tenant.head_seed_username || "-")}</td>
+          <td>${escapeHtml(String(tenant.rating_total_max || "-"))}</td>
+          <td>
+            <div class="action-row">
+              <a class="quick-nav-link" href="${escapeHtml(tenant.member_signup_path || `${path}/member`)}" target="_blank" rel="noopener">Member Signup</a>
+              ${qr}
+            </div>
+          </td>
           <td>${escapeHtml(status)}</td>
           <td>
             <div class="action-row">
-              <a class="quick-nav-link" href="${escapeHtml(path)}">Open</a>
+              <a class="quick-nav-link" href="${escapeHtml(path)}" target="_blank" rel="noopener">Open</a>
+              <button type="button" class="secondary edit-tenant" data-slug="${escapeHtml(tenant.slug)}">Edit</button>
               <div class="tenant-logo-upload">
                 <input type="file" class="tenant-logo-file" data-slug="${escapeHtml(tenant.slug)}" accept="image/png,image/jpeg,image/webp" />
                 <button type="button" class="secondary upload-tenant-logo" data-slug="${escapeHtml(tenant.slug)}">Upload Logo</button>
               </div>
               ${
-                tenant.slug === "kappaalphaorder"
+                tenant.is_default
                   ? ""
                   : `<button type="button" class="secondary disable-tenant" data-slug="${escapeHtml(tenant.slug)}">Disable</button>`
               }
@@ -103,6 +284,8 @@ function renderTenantList(rows) {
           <th>Name</th>
           <th>Chapter</th>
           <th>Head Login</th>
+          <th>Scale</th>
+          <th>Member QR</th>
           <th>Status</th>
           <th></th>
         </tr>
@@ -115,7 +298,9 @@ function renderTenantList(rows) {
 async function loadTenants() {
   try {
     const payload = await api("/platform/api/tenants");
-    renderTenantList(payload.tenants || []);
+    state.tenants = payload.tenants || [];
+    renderTenantList(state.tenants);
+    populateEditTenantSelector();
   } catch (error) {
     tenantList.innerHTML = '<p class="muted">Unable to load organizations.</p>';
     showToast(error.message || "Unable to load organizations.");
@@ -128,12 +313,41 @@ async function ensureSession() {
     setAuthView(true);
     sessionTitle.textContent = payload.admin.username;
     await loadTenants();
-  } catch (error) {
+  } catch {
     setAuthView(false);
-    if (error && error.message) {
-      showToast(error.message);
-    }
   }
+}
+
+function readCreateCustomizationPayload() {
+  return {
+    org_type: document.getElementById("tenantOrgType").value,
+    setup_tagline: document.getElementById("tenantSetupTagline").value.trim(),
+    theme_primary: document.getElementById("tenantThemePrimary").value.trim() || null,
+    theme_secondary: document.getElementById("tenantThemeSecondary").value.trim() || null,
+    theme_tertiary: document.getElementById("tenantThemeTertiary").value.trim() || null,
+    officer_weight: optionalNumber(document.getElementById("tenantOfficerWeight").value),
+    rusher_weight: optionalNumber(document.getElementById("tenantRusherWeight").value),
+    default_interest_tags: parseTagCsv(document.getElementById("tenantInterestTags").value),
+    default_stereotype_tags: parseTagCsv(document.getElementById("tenantStereotypeTags").value),
+    rating_criteria: readCriteriaGrid(createCriteriaGrid),
+  };
+}
+
+function readEditCustomizationPayload() {
+  return {
+    display_name: document.getElementById("editTenantDisplayName").value.trim(),
+    chapter_name: document.getElementById("editTenantChapterName").value.trim(),
+    org_type: document.getElementById("editTenantOrgType").value,
+    setup_tagline: document.getElementById("editTenantSetupTagline").value.trim(),
+    theme_primary: document.getElementById("editTenantThemePrimary").value.trim() || null,
+    theme_secondary: document.getElementById("editTenantThemeSecondary").value.trim() || null,
+    theme_tertiary: document.getElementById("editTenantThemeTertiary").value.trim() || null,
+    officer_weight: optionalNumber(document.getElementById("editTenantOfficerWeight").value),
+    rusher_weight: optionalNumber(document.getElementById("editTenantRusherWeight").value),
+    default_interest_tags: parseTagCsv(document.getElementById("editTenantInterestTags").value),
+    default_stereotype_tags: parseTagCsv(document.getElementById("editTenantStereotypeTags").value),
+    rating_criteria: readCriteriaGrid(editCriteriaGrid),
+  };
 }
 
 async function handleLogin(event) {
@@ -178,8 +392,7 @@ async function handleCreateTenant(event) {
     head_seed_last_name: document.getElementById("tenantHeadLastName").value.trim(),
     head_seed_pledge_class: document.getElementById("tenantHeadPledgeClass").value.trim(),
     head_seed_password: document.getElementById("tenantHeadAccessCode").value,
-    theme_primary: document.getElementById("tenantThemePrimary").value.trim() || null,
-    theme_secondary: document.getElementById("tenantThemeSecondary").value.trim() || null,
+    ...readCreateCustomizationPayload(),
   };
 
   try {
@@ -200,14 +413,54 @@ async function handleCreateTenant(event) {
     }
 
     createTenantForm.reset();
+    renderCriteriaGrid(createCriteriaGrid, BASE_RATING_CRITERIA);
     showToast(`Created ${payload.tenant.display_name}.`);
     await loadTenants();
+    const created = currentTenantBySlug(payload.tenant.slug);
+    if (created) {
+      fillEditForm(created);
+    }
   } catch (error) {
     showToast(error.message || "Unable to create organization.");
   }
 }
 
+async function handleEditTenant(event) {
+  event.preventDefault();
+  const slug = editTenantSlug.value.trim();
+  if (!slug) {
+    showToast("Select an organization first.");
+    return;
+  }
+
+  try {
+    await api(`/platform/api/tenants/${slug}`, {
+      method: "PATCH",
+      body: readEditCustomizationPayload(),
+    });
+    showToast(`Updated /${slug}.`);
+    await loadTenants();
+    const refreshed = currentTenantBySlug(slug);
+    if (refreshed) {
+      fillEditForm(refreshed);
+    }
+  } catch (error) {
+    showToast(error.message || "Unable to update organization settings.");
+  }
+}
+
 async function handleTenantListClick(event) {
+  const editButton = event.target.closest("button.edit-tenant");
+  if (editButton) {
+    const slug = editButton.dataset.slug;
+    const tenant = currentTenantBySlug(slug);
+    if (tenant) {
+      fillEditForm(tenant);
+      editTenantForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    return;
+  }
+
   const uploadButton = event.target.closest("button.upload-tenant-logo");
   if (uploadButton) {
     const slug = uploadButton.dataset.slug;
@@ -268,8 +521,23 @@ function attachEvents() {
   logoutBtn.addEventListener("click", handleLogout);
   refreshBtn.addEventListener("click", loadTenants);
   createTenantForm.addEventListener("submit", handleCreateTenant);
+  editTenantForm.addEventListener("submit", handleEditTenant);
   tenantList.addEventListener("click", handleTenantListClick);
+
+  editTenantSlug.addEventListener("change", (event) => {
+    const slug = String(event.target.value || "").trim();
+    const tenant = currentTenantBySlug(slug);
+    if (tenant) {
+      fillEditForm(tenant);
+    }
+  });
 }
 
-attachEvents();
-ensureSession();
+function init() {
+  renderCriteriaGrid(createCriteriaGrid, BASE_RATING_CRITERIA);
+  renderCriteriaGrid(editCriteriaGrid, BASE_RATING_CRITERIA);
+  attachEvents();
+  ensureSession();
+}
+
+init();

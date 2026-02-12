@@ -66,7 +66,8 @@ function applyTenantTheme(config) {
   const root = document.documentElement;
   const accentBase = hexToRgb(config.theme_primary) || hexToRgb("#8a1538");
   const goldBase = hexToRgb(config.theme_secondary) || hexToRgb("#c99a2b");
-  if (!accentBase || !goldBase) {
+  const tertiaryBase = hexToRgb(config.theme_tertiary) || hexToRgb("#1d7a4b");
+  if (!accentBase || !goldBase || !tertiaryBase) {
     return;
   }
 
@@ -85,6 +86,7 @@ function applyTenantTheme(config) {
   root.style.setProperty("--accent-shadow-rgb", rgbTriplet(accentShadow));
   root.style.setProperty("--gold-rgb", rgbTriplet(goldBase));
   root.style.setProperty("--heading", rgbToHex(heading));
+  root.style.setProperty("--good", rgbToHex(tertiaryBase));
 }
 
 applyTenantTheme(APP_CONFIG);
@@ -192,7 +194,7 @@ const headAssignClearBtn = document.getElementById("headAssignClearBtn");
 const headAssignmentTable = document.getElementById("headAssignmentTable");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
-const DEFAULT_INTEREST_TAGS = [
+const BASE_DEFAULT_INTEREST_TAGS = [
   "Leadership",
   "Sports",
   "Fitness",
@@ -206,7 +208,7 @@ const DEFAULT_INTEREST_TAGS = [
   "Gaming",
   "Travel",
 ];
-const DEFAULT_STEREOTYPE_TAGS = [
+const BASE_DEFAULT_STEREOTYPE_TAGS = [
   "Leader",
   "Connector",
   "Scholar",
@@ -216,6 +218,93 @@ const DEFAULT_STEREOTYPE_TAGS = [
   "Mentor",
   "Builder",
 ];
+const BASE_RATING_CRITERIA = [
+  { field: "good_with_girls", label: "Good with girls", short_label: "Girls", max: 10 },
+  { field: "will_make_it", label: "Will make it through process", short_label: "Process", max: 10 },
+  { field: "personable", label: "Personable", short_label: "Personable", max: 10 },
+  { field: "alcohol_control", label: "Alcohol control", short_label: "Alcohol", max: 10 },
+  { field: "instagram_marketability", label: "Instagram marketability", short_label: "IG", max: 5 },
+];
+const RATING_FIELD_LIMITS = {
+  good_with_girls: 10,
+  will_make_it: 10,
+  personable: 10,
+  alcohol_control: 10,
+  instagram_marketability: 5,
+};
+const PNM_AVG_FIELD_BY_RATING_FIELD = {
+  good_with_girls: "avg_good_with_girls",
+  will_make_it: "avg_will_make_it",
+  personable: "avg_personable",
+  alcohol_control: "avg_alcohol_control",
+  instagram_marketability: "avg_instagram_marketability",
+};
+
+function toTitleCase(text) {
+  return String(text || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function parseConfiguredTagList(raw, fallback) {
+  if (!Array.isArray(raw)) {
+    return [...fallback];
+  }
+  const out = [];
+  const seen = new Set();
+  raw.forEach((item) => {
+    const token = toTitleCase(item);
+    if (!token) {
+      return;
+    }
+    const key = token.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    out.push(token);
+  });
+  return out.length ? out.slice(0, 20) : [...fallback];
+}
+
+function parseRatingCriteria(raw) {
+  const byField = new Map();
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (!item || typeof item !== "object" || !item.field) {
+        return;
+      }
+      byField.set(String(item.field), item);
+    });
+  }
+  return BASE_RATING_CRITERIA.map((base) => {
+    const incoming = byField.get(base.field) || {};
+    const limit = RATING_FIELD_LIMITS[base.field] || base.max;
+    const parsedMax = Number.parseInt(String(incoming.max ?? base.max), 10);
+    const max = Number.isFinite(parsedMax) ? Math.max(1, Math.min(limit, parsedMax)) : base.max;
+    const label = String(incoming.label || base.label).trim() || base.label;
+    const shortLabel = String(incoming.short_label || base.short_label).trim() || base.short_label;
+    return {
+      field: base.field,
+      label,
+      short_label: shortLabel,
+      max,
+    };
+  });
+}
+
+const RATING_CRITERIA = parseRatingCriteria(APP_CONFIG.rating_criteria);
+const RATING_CRITERIA_BY_FIELD = new Map(RATING_CRITERIA.map((item) => [item.field, item]));
+const RATING_TOTAL_MAX =
+  Number.isFinite(Number(APP_CONFIG.rating_total_max)) && Number(APP_CONFIG.rating_total_max) > 0
+    ? Number(APP_CONFIG.rating_total_max)
+    : RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0);
+const DEFAULT_INTEREST_TAGS = parseConfiguredTagList(APP_CONFIG.default_interest_tags, BASE_DEFAULT_INTEREST_TAGS);
+const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
+  APP_CONFIG.default_stereotype_tags,
+  BASE_DEFAULT_STEREOTYPE_TAGS
+);
 
 const state = {
   user: null,
@@ -246,6 +335,47 @@ const state = {
   headAssignmentPnmId: null,
   seasonArchive: null,
 };
+
+function ratingCriteriaForField(field) {
+  return RATING_CRITERIA_BY_FIELD.get(field) || BASE_RATING_CRITERIA.find((item) => item.field === field);
+}
+
+function ratingLabelWithRange(field) {
+  const criterion = ratingCriteriaForField(field);
+  if (!criterion) {
+    return `${field} (0-10)`;
+  }
+  return `${criterion.short_label} (0-${criterion.max})`;
+}
+
+function formatScoreBreakdown(row) {
+  return RATING_CRITERIA.map((criterion) => {
+    const value = Number(row[criterion.field] || 0);
+    return `${criterion.short_label} ${value}`;
+  }).join(" | ");
+}
+
+function applyRatingCriteriaUi() {
+  const fields = [
+    { field: "good_with_girls", inputId: "rateGirls", labelId: "rateGirlsLabel" },
+    { field: "will_make_it", inputId: "rateProcess", labelId: "rateProcessLabel" },
+    { field: "personable", inputId: "ratePersonable", labelId: "ratePersonableLabel" },
+    { field: "alcohol_control", inputId: "rateAlcohol", labelId: "rateAlcoholLabel" },
+    { field: "instagram_marketability", inputId: "rateIg", labelId: "rateIgLabel" },
+  ];
+  fields.forEach(({ field, inputId, labelId }) => {
+    const criterion = ratingCriteriaForField(field);
+    const input = document.getElementById(inputId);
+    const label = document.getElementById(labelId);
+    if (input && criterion) {
+      input.min = "0";
+      input.max = String(criterion.max);
+    }
+    if (label) {
+      label.textContent = ratingLabelWithRange(field);
+    }
+  });
+}
 
 function parseTagInput(raw) {
   return String(raw || "")
@@ -768,7 +898,7 @@ function renderTrendChart(points) {
   let maxY = Math.max(...values);
   if (maxY - minY < 1) {
     minY = Math.max(0, minY - 0.5);
-    maxY = Math.min(45, maxY + 0.5);
+    maxY = Math.min(RATING_TOTAL_MAX, maxY + 0.5);
   }
   const yRange = Math.max(0.1, maxY - minY);
   const xStep = chartWidth / Math.max(1, points.length - 1);
@@ -1021,11 +1151,16 @@ function renderPnmTable() {
   const rows = state.pnms
     .map((pnm) => {
       const own = pnm.own_rating;
-      const ownDisplay = own ? `${own.total_score}/45` : "Not rated";
+      const ownDisplay = own ? `${own.total_score}/${RATING_TOTAL_MAX}` : "Not rated";
       const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-      const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / 45) * 100));
+      const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / RATING_TOTAL_MAX) * 100));
       const barWidth = Math.round((weightedPct / 100) * 58);
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
+      const categoryCells = RATING_CRITERIA.map((criterion) => {
+        const avgField = PNM_AVG_FIELD_BY_RATING_FIELD[criterion.field];
+        const value = Number(pnm[avgField] || 0);
+        return `<td>${value.toFixed(2)}</td>`;
+      }).join("");
       return `
         <tr class="${selectedClass}">
           <td>${smallPhotoCell(pnm)}</td>
@@ -1044,11 +1179,7 @@ function renderPnmTable() {
               </svg>
             </div>
           </td>
-          <td>${pnm.avg_good_with_girls.toFixed(2)}</td>
-          <td>${pnm.avg_will_make_it.toFixed(2)}</td>
-          <td>${pnm.avg_personable.toFixed(2)}</td>
-          <td>${pnm.avg_alcohol_control.toFixed(2)}</td>
-          <td>${pnm.avg_instagram_marketability.toFixed(2)}</td>
+          ${categoryCells}
           <td>${pnm.total_lunches}</td>
           <td>${escapeHtml(assignedOfficer)}</td>
           <td>${ownDisplay}</td>
@@ -1070,11 +1201,7 @@ function renderPnmTable() {
           <th>Days Since Event</th>
           <th>Ratings</th>
           <th>Weighted Total</th>
-          <th>Girls</th>
-          <th>Process</th>
-          <th>Personable</th>
-          <th>Alcohol</th>
-          <th>IG</th>
+          ${RATING_CRITERIA.map((criterion) => `<th>${escapeHtml(criterion.short_label)}</th>`).join("")}
           <th>Lunches</th>
           <th>Assigned Officer</th>
           <th>My Rating</th>
@@ -1747,11 +1874,16 @@ function applyRatingFormForSelected() {
   lunchPnm.value = String(selected.pnm_id);
 
   const own = selected.own_rating;
-  document.getElementById("rateGirls").value = own ? own.good_with_girls : 0;
-  document.getElementById("rateProcess").value = own ? own.will_make_it : 0;
-  document.getElementById("ratePersonable").value = own ? own.personable : 0;
-  document.getElementById("rateAlcohol").value = own ? own.alcohol_control : 0;
-  document.getElementById("rateIg").value = own ? own.instagram_marketability : 0;
+  const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
+  const processMax = ratingCriteriaForField("will_make_it")?.max || 10;
+  const personableMax = ratingCriteriaForField("personable")?.max || 10;
+  const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
+  const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
+  document.getElementById("rateGirls").value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
+  document.getElementById("rateProcess").value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
+  document.getElementById("ratePersonable").value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
+  document.getElementById("rateAlcohol").value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
+  document.getElementById("rateIg").value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
   document.getElementById("rateComment").value = own ? own.comment || "" : "";
   renderSelectedPnmPhoto(selected);
   photoForm.classList.toggle("hidden", !roleCanManagePhotos());
@@ -1793,9 +1925,9 @@ function renderRatingEntries(data) {
         <div class="entry">
           <div class="entry-title">
             <strong>${rater}</strong>
-            <span>Score ${row.total_score}/45 ${deltaMarkup}</span>
+            <span>Score ${row.total_score}/${RATING_TOTAL_MAX} ${deltaMarkup}</span>
           </div>
-          <div class="muted">Girls ${row.good_with_girls} | Process ${row.will_make_it} | Personable ${row.personable} | Alcohol ${row.alcohol_control} | IG ${row.instagram_marketability}</div>
+          <div class="muted">${escapeHtml(formatScoreBreakdown(row))}</div>
           ${comment}
           ${changeComment}
         </div>
@@ -1854,7 +1986,7 @@ function renderMeetingView(payload) {
           row.last_change && typeof row.last_change.delta_total === "number"
             ? ` | Delta ${row.last_change.delta_total > 0 ? "+" : ""}${row.last_change.delta_total}`
             : "";
-        return `<li><strong>${who}</strong>: ${row.total_score}/45${delta}</li>`;
+        return `<li><strong>${who}</strong>: ${row.total_score}/${RATING_TOTAL_MAX}${delta}</li>`;
       })
       .join("") || "<li>No ratings yet.</li>";
 
@@ -1889,7 +2021,7 @@ function renderMeetingView(payload) {
       </div>
     </div>
     <div class="meeting-metrics">
-      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / 45</p></article>
+      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / ${RATING_TOTAL_MAX}</p></article>
       <article class="card"><strong>Ratings Count</strong><p>${summary.ratings_count}</p></article>
       <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
       <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>
@@ -2410,7 +2542,7 @@ async function handleRatingSave(event) {
 
     if (payload.change && Number(payload.change.delta_total) > 0) {
       spawnSuccessBurst();
-      showToast(`Rating increased to ${payload.change.new_total}/45 (+${payload.change.delta_total}).`);
+      showToast(`Rating increased to ${payload.change.new_total}/${RATING_TOTAL_MAX} (+${payload.change.delta_total}).`);
     } else {
       showToast("Rating saved.");
     }
@@ -3193,6 +3325,7 @@ function attachEvents() {
 
 async function init() {
   setDefaultDates();
+  applyRatingCriteriaUi();
   setRoleEmojiRequirement();
   initializePresetTagPickers();
   attachEvents();

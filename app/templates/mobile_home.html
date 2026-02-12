@@ -22,7 +22,7 @@
         {% endif %}
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Mobile Dashboard</h1>
-        <p>{{ app_config.tenant_name }} rush operations, optimized for iPhone use during events.</p>
+        <p>{{ app_config.setup_tagline if app_config.setup_tagline else app_config.tenant_name ~ ' rush operations, optimized for iPhone use during events.' }}</p>
       </header>
 
       <section class="panel mobile-panel">

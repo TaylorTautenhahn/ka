@@ -26,7 +26,7 @@
         {% endif %}
         <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Fraternity' }}</p>
         <h1>Member Rating Portal</h1>
-        <p>Simple access for fraternity members to search rushees and submit ratings.</p>
+        <p>{{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Simple access for chapter members to search rushees and submit ratings.' }}</p>
         <div class="action-row">
           <a class="quick-nav-link" href="{{ app_config.base_path if app_config else '/' }}">Open Rush Team Console</a>
         </div>
@@ -131,11 +131,11 @@
               <form id="memberRatingForm" class="stack member-rating-form">
                 <h3>Submit Your Rating</h3>
                 <div class="inline-grid five-cols compact-inputs">
-                  <label>Girls (0-10)<input id="memberRateGirls" type="number" min="0" max="10" required /></label>
-                  <label>Process (0-10)<input id="memberRateProcess" type="number" min="0" max="10" required /></label>
-                  <label>Personable (0-10)<input id="memberRatePersonable" type="number" min="0" max="10" required /></label>
-                  <label>Alcohol (0-10)<input id="memberRateAlcohol" type="number" min="0" max="10" required /></label>
-                  <label>IG (0-5)<input id="memberRateIg" type="number" min="0" max="5" required /></label>
+                  <label><span id="memberRateGirlsLabel">Girls (0-10)</span><input id="memberRateGirls" type="number" min="0" max="10" required /></label>
+                  <label><span id="memberRateProcessLabel">Process (0-10)</span><input id="memberRateProcess" type="number" min="0" max="10" required /></label>
+                  <label><span id="memberRatePersonableLabel">Personable (0-10)</span><input id="memberRatePersonable" type="number" min="0" max="10" required /></label>
+                  <label><span id="memberRateAlcoholLabel">Alcohol (0-10)</span><input id="memberRateAlcohol" type="number" min="0" max="10" required /></label>
+                  <label><span id="memberRateIgLabel">IG (0-5)</span><input id="memberRateIg" type="number" min="0" max="5" required /></label>
                 </div>
                 <label>
                   Comment (required when updating an existing rating)

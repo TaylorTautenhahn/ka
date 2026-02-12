@@ -29,7 +29,7 @@
         <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
         <h1>Connected Rush Evaluation</h1>
         <p>
-          Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.
+          {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.' }}
         </p>
         <div id="heroStats" class="hero-stats hidden">
           <article class="stat-card">
@@ -88,6 +88,19 @@
             </label>
             <button type="submit" class="secondary">Submit for Approval</button>
           </form>
+          <div class="divider"></div>
+          <h3>Member Signup QR</h3>
+          <p class="muted">Share this with members so they can open the simplified member login/registration page.</p>
+          <div class="action-row">
+            <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
+          </div>
+          <img
+            id="memberSignupQrImage"
+            class="signup-qr"
+            src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
+            alt="Member signup QR code"
+            loading="lazy"
+          />
         </article>
       </section>
 
@@ -335,11 +348,11 @@
                   <select id="ratingPnm" required></select>
                 </label>
                 <div class="inline-grid five-cols compact-inputs">
-                  <label>Girls (0-10)<input id="rateGirls" type="number" min="0" max="10" required /></label>
-                  <label>Process (0-10)<input id="rateProcess" type="number" min="0" max="10" required /></label>
-                  <label>Personable (0-10)<input id="ratePersonable" type="number" min="0" max="10" required /></label>
-                  <label>Alcohol (0-10)<input id="rateAlcohol" type="number" min="0" max="10" required /></label>
-                  <label>IG (0-5)<input id="rateIg" type="number" min="0" max="5" required /></label>
+                  <label><span id="rateGirlsLabel">Girls (0-10)</span><input id="rateGirls" type="number" min="0" max="10" required /></label>
+                  <label><span id="rateProcessLabel">Process (0-10)</span><input id="rateProcess" type="number" min="0" max="10" required /></label>
+                  <label><span id="ratePersonableLabel">Personable (0-10)</span><input id="ratePersonable" type="number" min="0" max="10" required /></label>
+                  <label><span id="rateAlcoholLabel">Alcohol (0-10)</span><input id="rateAlcohol" type="number" min="0" max="10" required /></label>
+                  <label><span id="rateIgLabel">IG (0-5)</span><input id="rateIg" type="number" min="0" max="5" required /></label>
                 </div>
                 <label>
                   Comment (required on updates; must exceed 5 words)

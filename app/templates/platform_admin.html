@@ -18,7 +18,7 @@
       <header class="hero reveal">
         <p class="eyebrow">Platform Admin</p>
         <h1>Organization Management</h1>
-        <p>Create and manage fraternity workspaces with separate databases, branding, and head accounts.</p>
+        <p>Create and customize chapter workspaces with separate data, rating models, branding, and member signup QR access.</p>
       </header>
 
       <section id="platformAuth" class="panel">
@@ -68,8 +68,30 @@
                 <input id="tenantChapterName" type="text" required placeholder="KAO" />
               </label>
               <label>
+                Organization type
+                <select id="tenantOrgType">
+                  <option>Fraternity</option>
+                  <option>Sorority</option>
+                  <option>Club</option>
+                  <option>Team</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              Setup tagline (optional)
+              <input id="tenantSetupTagline" type="text" placeholder="Recruitment command center" />
+            </label>
+
+            <div class="divider"></div>
+            <h3>Head Account</h3>
+            <div class="inline-grid">
+              <label>
                 Head username
                 <input id="tenantHeadUsername" type="text" required placeholder="chapteradmin" />
+              </label>
+              <label>
+                Head password
+                <input id="tenantHeadAccessCode" type="password" required />
               </label>
             </div>
             <div class="inline-grid">
@@ -82,16 +104,13 @@
                 <input id="tenantHeadLastName" type="text" required placeholder="Officer" />
               </label>
             </div>
-            <div class="inline-grid">
-              <label>
-                Head pledge class
-                <input id="tenantHeadPledgeClass" type="text" required placeholder="Admin" />
-              </label>
-              <label>
-                Head password
-                <input id="tenantHeadAccessCode" type="password" required />
-              </label>
-            </div>
+            <label>
+              Head pledge class
+              <input id="tenantHeadPledgeClass" type="text" required placeholder="Admin" />
+            </label>
+
+            <div class="divider"></div>
+            <h3>Customization</h3>
             <div class="inline-grid">
               <label>
                 Primary color
@@ -102,11 +121,120 @@
                 <input id="tenantThemeSecondary" type="text" placeholder="#c99a2b" />
               </label>
             </div>
+            <div class="inline-grid">
+              <label>
+                Tertiary color
+                <input id="tenantThemeTertiary" type="text" placeholder="#1d7a4b" />
+              </label>
+              <label>
+                Rating weights (Officer / Member)
+                <div class="inline-grid two-cols">
+                  <input id="tenantOfficerWeight" type="number" min="0.1" max="1" step="0.05" placeholder="0.6" />
+                  <input id="tenantRusherWeight" type="number" min="0.1" max="1" step="0.05" placeholder="0.4" />
+                </div>
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Default interest tags (comma-separated)
+                <input id="tenantInterestTags" type="text" placeholder="Leadership,Sports,Outdoors" />
+              </label>
+              <label>
+                Default stereotype tags (comma-separated)
+                <input id="tenantStereotypeTags" type="text" placeholder="Leader,Connector,Scholar" />
+              </label>
+            </div>
+
+            <div class="criteria-builder" data-form="create">
+              <h3>Rating Criteria</h3>
+              <p class="muted">Customize labels and per-category max values for this organization.</p>
+              <div class="criteria-grid" id="createCriteriaGrid"></div>
+            </div>
+
             <label>
               Organization logo (optional)
               <input id="tenantLogoFile" type="file" accept="image/png,image/jpeg,image/webp" />
             </label>
             <button type="submit">Create Organization</button>
+          </form>
+        </section>
+
+        <section class="panel">
+          <h2>Update Organization Settings</h2>
+          <form id="editTenantForm" class="stack">
+            <label>
+              Select organization
+              <select id="editTenantSlug" required></select>
+            </label>
+            <div class="inline-grid">
+              <label>
+                Organization name
+                <input id="editTenantDisplayName" type="text" required />
+              </label>
+              <label>
+                Chapter short name
+                <input id="editTenantChapterName" type="text" required />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Organization type
+                <select id="editTenantOrgType">
+                  <option>Fraternity</option>
+                  <option>Sorority</option>
+                  <option>Club</option>
+                  <option>Team</option>
+                </select>
+              </label>
+              <label>
+                Setup tagline (optional)
+                <input id="editTenantSetupTagline" type="text" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Primary color
+                <input id="editTenantThemePrimary" type="text" />
+              </label>
+              <label>
+                Secondary color
+                <input id="editTenantThemeSecondary" type="text" />
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Tertiary color
+                <input id="editTenantThemeTertiary" type="text" />
+              </label>
+              <label>
+                Rating weights (Officer / Member)
+                <div class="inline-grid two-cols">
+                  <input id="editTenantOfficerWeight" type="number" min="0.1" max="1" step="0.05" />
+                  <input id="editTenantRusherWeight" type="number" min="0.1" max="1" step="0.05" />
+                </div>
+              </label>
+            </div>
+            <div class="inline-grid">
+              <label>
+                Default interest tags (comma-separated)
+                <input id="editTenantInterestTags" type="text" />
+              </label>
+              <label>
+                Default stereotype tags (comma-separated)
+                <input id="editTenantStereotypeTags" type="text" />
+              </label>
+            </div>
+
+            <div class="criteria-builder" data-form="edit">
+              <h3>Rating Criteria</h3>
+              <div class="criteria-grid" id="editCriteriaGrid"></div>
+            </div>
+
+            <div class="action-row">
+              <button id="saveTenantSettingsBtn" type="submit">Save Settings</button>
+              <a id="editMemberSignupLink" class="quick-nav-link" href="#" target="_blank" rel="noopener">Open Member Signup</a>
+            </div>
+            <img id="editMemberSignupQr" class="signup-qr hidden" alt="Member signup QR" loading="lazy" />
           </form>
         </section>
 

@@ -65,7 +65,8 @@ function applyTenantTheme(config) {
   const root = document.documentElement;
   const accentBase = hexToRgb(config.theme_primary) || hexToRgb("#8a1538");
   const goldBase = hexToRgb(config.theme_secondary) || hexToRgb("#c99a2b");
-  if (!accentBase || !goldBase) {
+  const tertiaryBase = hexToRgb(config.theme_tertiary) || hexToRgb("#1d7a4b");
+  if (!accentBase || !goldBase || !tertiaryBase) {
     return;
   }
 
@@ -84,9 +85,57 @@ function applyTenantTheme(config) {
   root.style.setProperty("--accent-shadow-rgb", rgbTriplet(accentShadow));
   root.style.setProperty("--gold-rgb", rgbTriplet(goldBase));
   root.style.setProperty("--heading", rgbToHex(heading));
+  root.style.setProperty("--good", rgbToHex(tertiaryBase));
 }
 
 applyTenantTheme(APP_CONFIG);
+
+const BASE_RATING_CRITERIA = [
+  { field: "good_with_girls", label: "Good with girls", short_label: "Girls", max: 10 },
+  { field: "will_make_it", label: "Will make it through process", short_label: "Process", max: 10 },
+  { field: "personable", label: "Personable", short_label: "Personable", max: 10 },
+  { field: "alcohol_control", label: "Alcohol control", short_label: "Alcohol", max: 10 },
+  { field: "instagram_marketability", label: "Instagram marketability", short_label: "IG", max: 5 },
+];
+const RATING_FIELD_LIMITS = {
+  good_with_girls: 10,
+  will_make_it: 10,
+  personable: 10,
+  alcohol_control: 10,
+  instagram_marketability: 5,
+};
+
+function parseRatingCriteria(raw) {
+  const byField = new Map();
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (!item || typeof item !== "object" || !item.field) {
+        return;
+      }
+      byField.set(String(item.field), item);
+    });
+  }
+  return BASE_RATING_CRITERIA.map((base) => {
+    const incoming = byField.get(base.field) || {};
+    const limit = RATING_FIELD_LIMITS[base.field] || base.max;
+    const parsedMax = Number.parseInt(String(incoming.max ?? base.max), 10);
+    const max = Number.isFinite(parsedMax) ? Math.max(1, Math.min(limit, parsedMax)) : base.max;
+    const label = String(incoming.label || base.label).trim() || base.label;
+    const shortLabel = String(incoming.short_label || base.short_label).trim() || base.short_label;
+    return {
+      field: base.field,
+      label,
+      short_label: shortLabel,
+      max,
+    };
+  });
+}
+
+const RATING_CRITERIA = parseRatingCriteria(APP_CONFIG.rating_criteria);
+const RATING_TOTAL_MAX =
+  Number.isFinite(Number(APP_CONFIG.rating_total_max)) && Number(APP_CONFIG.rating_total_max) > 0
+    ? Number(APP_CONFIG.rating_total_max)
+    : RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0);
 
 const pnmSelect = document.getElementById("meetingPnmSelect");
 const loadBtn = document.getElementById("meetingLoadBtn");
@@ -145,7 +194,7 @@ function renderTrendChart(points) {
   let maxY = Math.max(...values);
   if (maxY - minY < 1) {
     minY = Math.max(0, minY - 0.5);
-    maxY = Math.min(45, maxY + 0.5);
+    maxY = Math.min(RATING_TOTAL_MAX, maxY + 0.5);
   }
   const yRange = Math.max(0.1, maxY - minY);
   const xStep = chartWidth / Math.max(1, points.length - 1);
@@ -260,7 +309,7 @@ function renderPacket(payload) {
           row.last_change && typeof row.last_change.delta_total === "number"
             ? ` | Delta ${row.last_change.delta_total > 0 ? "+" : ""}${row.last_change.delta_total}`
             : "";
-        return `<li><strong>${who}</strong>: ${row.total_score}/45${delta}</li>`;
+        return `<li><strong>${who}</strong>: ${row.total_score}/${RATING_TOTAL_MAX}${delta}</li>`;
       })
       .join("") || "<li>No ratings yet.</li>";
 
@@ -295,7 +344,7 @@ function renderPacket(payload) {
       </div>
     </div>
     <div class="meeting-metrics">
-      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / 45</p></article>
+      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / ${RATING_TOTAL_MAX}</p></article>
       <article class="card"><strong>Ratings Count</strong><p>${summary.ratings_count}</p></article>
       <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
       <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>

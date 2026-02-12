@@ -15,7 +15,7 @@ const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const MOBILE_BASE = (APP_CONFIG.mobile_base || `${BASE_PATH}/mobile`).replace(/\/$/, "");
 const MOBILE_PAGE = (document.body && document.body.dataset.mobilePage) || "";
-const DEFAULT_INTEREST_TAGS = [
+const BASE_DEFAULT_INTEREST_TAGS = [
   "Leadership",
   "Sports",
   "Fitness",
@@ -29,7 +29,7 @@ const DEFAULT_INTEREST_TAGS = [
   "Gaming",
   "Travel",
 ];
-const DEFAULT_STEREOTYPE_TAGS = [
+const BASE_DEFAULT_STEREOTYPE_TAGS = [
   "Leader",
   "Connector",
   "Scholar",
@@ -80,7 +80,8 @@ function applyTenantTheme(config) {
   const root = document.documentElement;
   const accentBase = hexToRgb(config.theme_primary) || hexToRgb("#8a1538");
   const goldBase = hexToRgb(config.theme_secondary) || hexToRgb("#c99a2b");
-  if (!accentBase || !goldBase) {
+  const tertiaryBase = hexToRgb(config.theme_tertiary) || hexToRgb("#1d7a4b");
+  if (!accentBase || !goldBase || !tertiaryBase) {
     return;
   }
 
@@ -99,9 +100,44 @@ function applyTenantTheme(config) {
   root.style.setProperty("--accent-shadow-rgb", rgbTriplet(accentShadow));
   root.style.setProperty("--gold-rgb", rgbTriplet(goldBase));
   root.style.setProperty("--heading", rgbToHex(heading));
+  root.style.setProperty("--good", rgbToHex(tertiaryBase));
 }
 
 applyTenantTheme(APP_CONFIG);
+
+function toTitleCase(text) {
+  return String(text || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function parseConfiguredTagList(raw, fallback) {
+  if (!Array.isArray(raw)) {
+    return [...fallback];
+  }
+  const out = [];
+  const seen = new Set();
+  raw.forEach((item) => {
+    const token = toTitleCase(item);
+    if (!token) {
+      return;
+    }
+    const key = token.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    out.push(token);
+  });
+  return out.length ? out.slice(0, 20) : [...fallback];
+}
+
+const DEFAULT_INTEREST_TAGS = parseConfiguredTagList(APP_CONFIG.default_interest_tags, BASE_DEFAULT_INTEREST_TAGS);
+const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
+  APP_CONFIG.default_stereotype_tags,
+  BASE_DEFAULT_STEREOTYPE_TAGS
+);
 
 const toastEl = document.getElementById("mobileToast");
 let mobileCalendarShare = null;

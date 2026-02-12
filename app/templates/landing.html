@@ -3,6 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      document.documentElement.classList.add("bb-motion");
+    </script>
     <title>BidBoard | Recruitment Intelligence</title>
     <meta
       name="description"
@@ -32,7 +35,7 @@
           <a class="bb-link is-active" href="/">Home</a>
           <a class="bb-link" href="/features">Product</a>
           <a class="bb-link" href="/faq">FAQ</a>
-          <a class="bb-link" href="/platform">Platform Admin</a>
+          <a class="bb-link bb-link-admin" href="/platform">Platform Admin</a>
           <a class="bb-login-btn" href="/organizations">Login</a>
         </nav>
       </header>
@@ -65,6 +68,21 @@
           <div class="bb-metric">
             <strong data-count="1">1</strong>
             <span>System for officers, members, and leadership</span>
+          </div>
+          <div class="bb-mini-flow">
+            <p class="bb-mini-flow-title">Recruitment Flow</p>
+            <div class="bb-mini-step">
+              <span>1</span>
+              <p>Capture candidate profile + context</p>
+            </div>
+            <div class="bb-mini-step">
+              <span>2</span>
+              <p>Evaluate with weighted role scoring</p>
+            </div>
+            <div class="bb-mini-step">
+              <span>3</span>
+              <p>Decide in meeting packets with trend lines</p>
+            </div>
           </div>
         </aside>
       </section>

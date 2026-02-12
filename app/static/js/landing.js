@@ -1,7 +1,20 @@
 (function () {
   const revealNodes = Array.from(document.querySelectorAll(".bb-reveal"));
+  const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const saveData = Boolean(navigator.connection && navigator.connection.saveData);
+  const disableMotion = prefersReducedMotion || saveData;
 
-  if ("IntersectionObserver" in window && revealNodes.length) {
+  if (disableMotion) {
+    revealNodes.forEach((node) => node.classList.add("is-visible"));
+  } else if ("IntersectionObserver" in window && revealNodes.length) {
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    revealNodes.forEach((node) => {
+      const rect = node.getBoundingClientRect();
+      if (rect.top <= viewportHeight * 0.88) {
+        node.classList.add("is-visible");
+      }
+    });
+
     const revealObserver = new IntersectionObserver(
       (entries, observer) => {
         entries.forEach((entry) => {
@@ -24,13 +37,26 @@
       }
     );
 
-    revealNodes.forEach((node) => revealObserver.observe(node));
+    revealNodes.forEach((node) => {
+      if (!node.classList.contains("is-visible")) {
+        revealObserver.observe(node);
+      }
+    });
   } else {
     revealNodes.forEach((node) => node.classList.add("is-visible"));
   }
 
   const counters = Array.from(document.querySelectorAll("[data-count]"));
   if (!counters.length) {
+    return;
+  }
+
+  if (disableMotion) {
+    counters.forEach((counter) => {
+      const raw = Number(counter.getAttribute("data-count") || "0");
+      const value = Number.isFinite(raw) && raw >= 0 ? raw : 0;
+      counter.textContent = String(Math.round(value));
+    });
     return;
   }
 

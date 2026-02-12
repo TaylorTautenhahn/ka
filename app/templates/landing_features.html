@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BidBoard | Product Overview</title>
+    <meta
+      name="description"
+      content="Explore BidBoard product capabilities for fraternity and sorority recruitment operations."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/landing.css" />
+    <script src="/static/js/landing.js" defer></script>
+  </head>
+  <body class="bb-page-features">
+    <div class="bb-orb bb-orb-a"></div>
+    <div class="bb-orb bb-orb-b"></div>
+    <div class="bb-noise"></div>
+
+    <main class="bb-shell">
+      <header class="bb-topbar bb-reveal">
+        <a class="bb-brand" href="/" aria-label="BidBoard home">
+          <span class="bb-brand-dot"></span>
+          <span>BidBoard</span>
+        </a>
+        <nav class="bb-topbar-actions" aria-label="Primary">
+          <a class="bb-link" href="/">Home</a>
+          <a class="bb-link is-active" href="/features">Product</a>
+          <a class="bb-link" href="/faq">FAQ</a>
+          <a class="bb-link" href="/platform">Platform Admin</a>
+          <a class="bb-login-btn" href="/organizations">Login</a>
+        </nav>
+      </header>
+
+      <section class="bb-section bb-reveal">
+        <p class="bb-kicker">Product Overview</p>
+        <h1 class="bb-page-title">
+          <span class="bb-title-shine">The recruitment operating system for modern chapters.</span>
+        </h1>
+        <p class="bb-page-subtitle">
+          BidBoard unifies scoring, accountability, member coordination, and season continuity for fraternities and sororities
+          running serious recruitment operations.
+        </p>
+      </section>
+
+      <section class="bb-section bb-reveal" data-delay="40">
+        <div class="bb-section-head">
+          <p class="bb-kicker">Core Modules</p>
+          <h2>Every workflow connected to one data model</h2>
+        </div>
+        <div class="bb-grid">
+          <article class="bb-card">
+            <h3>Identity + Access</h3>
+            <p>Per-user accounts, role permissions, approvals/disapprovals, and auditable session controls.</p>
+          </article>
+          <article class="bb-card">
+            <h3>Rushee Intelligence</h3>
+            <p>Profiles with photos, contact details, assignment ownership, notes, and interaction history.</p>
+          </article>
+          <article class="bb-card">
+            <h3>Weighted Rating Engine</h3>
+            <p>Custom rubric scoring with update deltas, comment requirements, and role-based weighting logic.</p>
+          </article>
+          <article class="bb-card">
+            <h3>Meeting Command View</h3>
+            <p>Dedicated packet page with trend graph, live context, and PDF export for formal deliberations.</p>
+          </article>
+          <article class="bb-card">
+            <h3>Engagement Tracking</h3>
+            <p>Lunch scheduling, shared calendar feed, and member-level participation metrics in real time.</p>
+          </article>
+          <article class="bb-card">
+            <h3>Data Portability</h3>
+            <p>CSV backup bundles, DB snapshots, Google Form imports, and season archive snapshots.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="bb-section bb-section-alt bb-reveal" data-delay="70">
+        <div class="bb-section-head">
+          <p class="bb-kicker">Operational Flow</p>
+          <h2>How teams run recruitment with BidBoard</h2>
+        </div>
+        <div class="bb-steps">
+          <article class="bb-step">
+            <h4>Capture + Enrich</h4>
+            <p>Import forms, add rushees, assign officers, and attach photos and notes from day one.</p>
+          </article>
+          <article class="bb-step">
+            <h4>Evaluate + Coordinate</h4>
+            <p>Rate each rushee, review deltas, schedule lunches, and monitor leaderboards and matching views.</p>
+          </article>
+          <article class="bb-step">
+            <h4>Decide + Archive</h4>
+            <p>Use meeting packets to decide bids, then archive the season with confirmation safeguards.</p>
+          </article>
+        </div>
+      </section>
+
+      <section class="bb-section bb-reveal" data-delay="80">
+        <div class="bb-cta-banner">
+          <div>
+            <h3>Ready to run your next cycle on BidBoard?</h3>
+            <p>Active organizations on this deployment: <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong></p>
+          </div>
+          <div class="bb-hero-actions">
+            <a class="bb-cta" href="/organizations">Open Organization Login</a>
+            <a class="bb-cta bb-cta-ghost" href="/faq">View FAQ</a>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

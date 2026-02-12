@@ -6,7 +6,7 @@
     <title>BidBoard | Recruitment Intelligence</title>
     <meta
       name="description"
-      content="BidBoard is a connected recruitment workspace for fraternities and sororities with role-aware visibility, real-time scoring, and meeting-ready insights."
+      content="BidBoard is the recruitment operating system for fraternities and sororities. Replace spreadsheets with accountable, real-time decisions."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -15,6 +15,7 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/landing.css" />
+    <script src="/static/js/landing.js" defer></script>
   </head>
   <body>
     <div class="bb-orb bb-orb-a"></div>
@@ -22,88 +23,116 @@
     <div class="bb-noise"></div>
 
     <main class="bb-shell">
-      <header class="bb-topbar">
+      <header class="bb-topbar bb-reveal">
         <a class="bb-brand" href="/" aria-label="BidBoard home">
           <span class="bb-brand-dot"></span>
           <span>BidBoard</span>
         </a>
         <nav class="bb-topbar-actions" aria-label="Primary">
+          <a class="bb-link is-active" href="/">Home</a>
+          <a class="bb-link" href="/features">Product</a>
+          <a class="bb-link" href="/faq">FAQ</a>
           <a class="bb-link" href="/platform">Platform Admin</a>
           <a class="bb-login-btn" href="/organizations">Login</a>
         </nav>
       </header>
 
-      <section class="bb-hero">
-        <p class="bb-kicker">Built For Fraternities + Sororities</p>
-        <h1>Recruitment decisions with clarity, accountability, and speed.</h1>
-        <p class="bb-subtitle">
-          BidBoard replaces spreadsheet chaos with one connected workspace: role-based visibility, real-time score updates,
-          assignment tracking, meeting packets, and season handoff controls.
-        </p>
-        <div class="bb-hero-actions">
-          <a class="bb-cta" href="/organizations">Go To Organization Login</a>
-          <a class="bb-cta bb-cta-ghost" href="#features">Explore Features</a>
+      <section class="bb-hero bb-reveal" data-delay="40">
+        <div class="bb-hero-copy">
+          <p class="bb-kicker">Built For Fraternities + Sororities</p>
+          <h1>
+            <span class="bb-title-shine">BidBoard turns recruitment into a system you can trust.</span>
+          </h1>
+          <p class="bb-subtitle">
+            Replace spreadsheet chaos with one accountable workspace: role-based visibility, real-time scoring,
+            assignments, lunch scheduling, meeting packets, and clean season resets.
+          </p>
+          <div class="bb-hero-actions">
+            <a class="bb-cta" href="/organizations">Go To Organization Login</a>
+            <a class="bb-cta bb-cta-ghost" href="/features">See Product Tour</a>
+          </div>
         </div>
+
+        <aside class="bb-metric-panel bb-reveal" data-delay="120" aria-label="BidBoard summary metrics">
+          <div class="bb-metric">
+            <strong data-count="45">45</strong>
+            <span>Point weighted scoring model</span>
+          </div>
+          <div class="bb-metric">
+            <strong data-count="100">100</strong>
+            <span>Percent real-time sync across views</span>
+          </div>
+          <div class="bb-metric">
+            <strong data-count="1">1</strong>
+            <span>System for officers, members, and leadership</span>
+          </div>
+        </aside>
       </section>
 
-      <section id="features" class="bb-section">
+      <section class="bb-story bb-reveal" data-delay="60">
+        <h3>From first interaction to final bid, every decision has context.</h3>
+        <p>
+          BidBoard gives your recruitment team a shared truth. Every rating change, lunch, assignment, and note is connected,
+          auditable, and available at the exact moment leadership needs it.
+        </p>
+      </section>
+
+      <section class="bb-section bb-reveal" data-delay="80">
         <div class="bb-section-head">
-          <p class="bb-kicker">What Makes It Different</p>
-          <h2>Everything stays linked in real time</h2>
+          <p class="bb-kicker">What Makes It Advanced</p>
+          <h2>Operational depth without operational clutter</h2>
         </div>
         <div class="bb-grid">
           <article class="bb-card">
-            <h3>Role-Aware Visibility</h3>
-            <p>Head chairs, officers, and members each see exactly what they should and nothing they should not.</p>
+            <h3>Role-Aware Decision Layer</h3>
+            <p>Heads, officers, and members each get purpose-built visibility with approval workflows and traceability.</p>
           </article>
           <article class="bb-card">
-            <h3>Live Scoring Engine</h3>
-            <p>Weighted ratings update instantly across rushee views, member stats, analytics, and leaderboard views.</p>
+            <h3>Live Scoring + Trend History</h3>
+            <p>Category and total scores update instantly, with historical rating trend lines for meeting discussions.</p>
           </article>
           <article class="bb-card">
-            <h3>Meeting-Ready Profiles</h3>
-            <p>Open a dedicated meeting packet page with trend lines, notes, assignment context, and one-click PDF export.</p>
+            <h3>Meeting Packet Experience</h3>
+            <p>Run a clean dedicated meeting page per rushee and export that packet as PDF on demand.</p>
           </article>
           <article class="bb-card">
-            <h3>Lunch + Calendar Sync</h3>
-            <p>Track interactions, schedule lunches, and keep the shared calendar aligned so the team moves as one unit.</p>
+            <h3>Shared Lunch Coordination</h3>
+            <p>Track relationship touchpoints, schedule lunches, and publish to your shared calendar feed.</p>
           </article>
           <article class="bb-card">
-            <h3>Season Archive + Reset</h3>
-            <p>Archive one complete season snapshot, confirm leadership approval, and reset cleanly for the next cycle.</p>
+            <h3>Cross-Chapter Multi-Tenant</h3>
+            <p>Fraternities and sororities each get separate branding, isolated databases, and platform-level control.</p>
           </article>
           <article class="bb-card">
-            <h3>Portable + Secure</h3>
-            <p>CSV and database backups, approval workflows, session controls, and persistent storage built for production use.</p>
+            <h3>Production-Ready Data Controls</h3>
+            <p>Persistent storage checks, season archive/reset safeguards, CSV exports, and SQLite snapshots.</p>
           </article>
         </div>
       </section>
 
-      <section class="bb-section bb-section-alt">
+      <section class="bb-section bb-section-alt bb-reveal" data-delay="100">
         <div class="bb-section-head">
-          <p class="bb-kicker">Designed For Adoption</p>
-          <h2>From chapter to chapter, without rework</h2>
+          <p class="bb-kicker">Adoption Velocity</p>
+          <h2>Deploy once, scale across organizations</h2>
         </div>
         <div class="bb-pill-row">
-          <span class="bb-pill">Multi-Organization</span>
-          <span class="bb-pill">Custom Logos + Colors</span>
-          <span class="bb-pill">Mobile-First Pages</span>
+          <span class="bb-pill">Organization Branding</span>
           <span class="bb-pill">Member Portal</span>
-          <span class="bb-pill">Google Form Imports</span>
-          <span class="bb-pill">Analytics + Matching</span>
+          <span class="bb-pill">Mobile-Native Pages</span>
+          <span class="bb-pill">Google Form Import</span>
+          <span class="bb-pill">Assignments + Matching</span>
+          <span class="bb-pill">Leaderboard + Analytics</span>
         </div>
-        <p class="bb-footnote">
-          Active organizations: <strong>{{ tenant_count }}</strong>
-        </p>
+        <p class="bb-footnote">Active organizations: <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong></p>
       </section>
 
-      <section class="bb-section">
+      <section class="bb-section bb-reveal" data-delay="110">
         <div class="bb-section-head">
           <p class="bb-kicker">Organization Access</p>
           <h2>Select your chapter workspace and sign in</h2>
         </div>
         <div class="bb-org-preview">
-          {% for tenant in tenants[:6] %}
+          {% for tenant in tenants[:8] %}
           <a class="bb-org-chip" href="/{{ tenant.slug }}" aria-label="Open {{ tenant.display_name }}">
             {% if tenant.logo_path %}
             <img src="{{ tenant.logo_path }}" alt="{{ tenant.display_name }} logo" />
@@ -119,6 +148,7 @@
         </div>
         <div class="bb-hero-actions">
           <a class="bb-cta" href="/organizations">Open Organization Selection</a>
+          <a class="bb-cta bb-cta-ghost" href="/faq">Read FAQ</a>
         </div>
       </section>
     </main>

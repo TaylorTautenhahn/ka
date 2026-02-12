@@ -422,6 +422,48 @@
           <div class="divider"></div>
           <div class="grid-two">
             <article class="list-column">
+              <h3>Season Archive + Reset</h3>
+              <p class="muted">Archives the current rush season and resets for next season. Only one season archive is retained.</p>
+              <div id="seasonArchiveSummary" class="list-box muted">Loading season archive status...</div>
+              <label>
+                Confirmation phrase
+                <input id="seasonArchivePhrase" type="text" placeholder="Type confirmation phrase exactly" />
+              </label>
+              <label>
+                Archive label (optional)
+                <input id="seasonArchiveLabel" type="text" placeholder="Fall 2026 Rush" />
+              </label>
+              <label class="checkbox-line">
+                <input id="seasonHeadChairConfirm" type="checkbox" />
+                I confirm all head rush chairs approved this reset.
+              </label>
+              <div class="action-row">
+                <button id="seasonResetBtn" type="button">Archive + Reset Season</button>
+                <button id="seasonArchiveDownloadBtn" type="button" class="secondary hidden">Download Archived Season</button>
+              </div>
+            </article>
+            <article class="list-column">
+              <h3>What Gets Reset</h3>
+              <div class="list-box">
+                <div class="entry">
+                  <div class="entry-title"><strong>Archived</strong><span>One season snapshot</span></div>
+                  <p class="muted">A single SQLite archive is kept and replaced on each new season reset.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Cleared</strong><span>Next season clean slate</span></div>
+                  <p class="muted">PNMs, ratings, lunches, and rush-season participation counters reset to zero.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Kept</strong><span>Team accounts + roles</span></div>
+                  <p class="muted">Members and permissions remain so the rush team can continue immediately.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
               <h3>Google Form Import</h3>
               <p class="muted">Have rushees submit this info in a Google Form, then download responses as CSV and import here.</p>
               <div class="action-row">

@@ -82,6 +82,10 @@
           <h2>Pending Account Requests</h2>
           <p class="muted">Rush team can approve new member access here.</p>
           <div id="memberPendingList" class="table-wrap"></div>
+          <div class="divider"></div>
+          <h3>Approved Accounts</h3>
+          <p class="muted">Disapprove to move an account back to pending approval.</p>
+          <div id="memberApprovedList" class="table-wrap"></div>
         </section>
 
         <section class="panel reveal delay-2">
@@ -93,9 +97,9 @@
             <label>
               Sort
               <select id="memberSortSelect">
-                <option value="rank">Highest Ranked</option>
                 <option value="name">Name A-Z</option>
                 <option value="recent">Most Recent Event</option>
+                <option value="code">Code</option>
               </select>
             </label>
           </div>
@@ -141,7 +145,7 @@
               </form>
 
               <div class="divider"></div>
-              <h3>Recent Rating Activity</h3>
+              <h3>Your Rating Record</h3>
               <div id="memberRatingHistory" class="list-box muted">No ratings yet.</div>
             </div>
           </article>

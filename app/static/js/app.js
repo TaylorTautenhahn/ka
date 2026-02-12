@@ -158,6 +158,12 @@ const googleImportFile = document.getElementById("googleImportFile");
 const googleImportResult = document.getElementById("googleImportResult");
 const googleImportBtn = document.getElementById("googleImportBtn");
 const downloadGoogleImportTemplateBtn = document.getElementById("downloadGoogleImportTemplateBtn");
+const seasonArchiveSummary = document.getElementById("seasonArchiveSummary");
+const seasonArchivePhrase = document.getElementById("seasonArchivePhrase");
+const seasonArchiveLabel = document.getElementById("seasonArchiveLabel");
+const seasonHeadChairConfirm = document.getElementById("seasonHeadChairConfirm");
+const seasonResetBtn = document.getElementById("seasonResetBtn");
+const seasonArchiveDownloadBtn = document.getElementById("seasonArchiveDownloadBtn");
 
 const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
@@ -238,6 +244,7 @@ const state = {
   scheduledLunches: [],
   adminEditPnmId: null,
   headAssignmentPnmId: null,
+  seasonArchive: null,
 };
 
 function parseTagInput(raw) {
@@ -632,6 +639,7 @@ function startLiveRefresh() {
         loadScheduledLunches(),
         loadApprovals(),
         loadHeadAdminData(),
+        loadSeasonArchiveStatus(),
       ]);
     } catch {
       // Passive sync should fail silently; explicit actions already report errors.
@@ -1084,10 +1092,19 @@ function renderMemberTable() {
     return;
   }
 
+  const canDisapproveUsers = roleCanApproveUsers();
   const rows = state.members
     .map((member) => {
       const avgRating = member.avg_rating_given == null ? "Hidden" : member.avg_rating_given.toFixed(2);
       const ratingCount = member.rating_count == null ? "Hidden" : member.rating_count;
+      const canDisapprove =
+        canDisapproveUsers &&
+        state.user &&
+        member.user_id !== state.user.user_id &&
+        member.role !== "Head Rush Officer";
+      const actionCell = canDisapprove
+        ? `<button type="button" class="secondary disapprove-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Disapprove</button>`
+        : "-";
       return `
         <tr>
           <td>${escapeHtml(member.username)}</td>
@@ -1099,6 +1116,7 @@ function renderMemberTable() {
           <td>${member.lunches_per_week.toFixed(2)}</td>
           <td>${ratingCount}</td>
           <td>${avgRating}</td>
+          <td>${actionCell}</td>
         </tr>
       `;
     })
@@ -1117,6 +1135,7 @@ function renderMemberTable() {
           <th>Lunches / Week</th>
           <th>Ratings Given</th>
           <th>Avg Rating Given</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -1427,6 +1446,55 @@ function renderOfficerMetrics() {
   `;
 }
 
+function renderSeasonArchiveStatusPanel() {
+  if (!seasonArchiveSummary || !seasonArchivePhrase || !seasonArchiveDownloadBtn) {
+    return;
+  }
+  if (!roleCanUseAdminPanel()) {
+    seasonArchiveSummary.innerHTML = '<p class="muted">Head Rush Officer access required.</p>';
+    seasonArchiveDownloadBtn.classList.add("hidden");
+    return;
+  }
+  const payload = state.seasonArchive;
+  if (!payload) {
+    seasonArchiveSummary.innerHTML = '<p class="muted">Loading season archive status...</p>';
+    seasonArchiveDownloadBtn.classList.add("hidden");
+    return;
+  }
+
+  const phrase = payload.confirmation_phrase || "RESET RUSH SEASON";
+  seasonArchivePhrase.placeholder = `Type: ${phrase}`;
+
+  const current = payload.current_counts || { pnm_count: 0, rating_count: 0, lunch_count: 0 };
+  const archive = payload.archive || null;
+  const archiveMeta = archive
+    ? `
+      <div class="entry">
+        <div class="entry-title">
+          <strong>Last Archive</strong>
+          <span>${escapeHtml(archive.archive_label || "Season Archive")}</span>
+        </div>
+        <p class="muted">Created: ${escapeHtml(formatLastSeen(archive.archived_at))} by ${escapeHtml(archive.archived_by_username || "Unknown")}</p>
+        <p class="muted">Archived counts: PNMs ${archive.pnm_count}, Ratings ${archive.rating_count}, Lunches ${archive.lunch_count}</p>
+      </div>
+    `
+    : '<p class="muted">No archived season yet.</p>';
+
+  seasonArchiveSummary.innerHTML = `
+    <div class="entry">
+      <div class="entry-title">
+        <strong>Current Live Data</strong>
+        <span>Before Reset</span>
+      </div>
+      <p class="muted">PNMs: ${current.pnm_count} | Ratings: ${current.rating_count} | Lunches: ${current.lunch_count}</p>
+      <p class="muted">Confirmation phrase: <strong>${escapeHtml(phrase)}</strong></p>
+    </div>
+    ${archiveMeta}
+  `;
+
+  seasonArchiveDownloadBtn.classList.toggle("hidden", !payload.archive_download_path);
+}
+
 function renderAdminPnmEditorOptions() {
   if (!adminEditPnmSelect || !adminPnmEditorForm) {
     return;
@@ -1640,6 +1708,7 @@ function renderAdminPanel() {
     if (headAssignmentTable) {
       headAssignmentTable.innerHTML = "";
     }
+    renderSeasonArchiveStatusPanel();
     return;
   }
 
@@ -1647,6 +1716,7 @@ function renderAdminPanel() {
   renderHeadAdminSummary();
   renderCurrentHeadsList();
   renderPromotionControls();
+  renderSeasonArchiveStatusPanel();
   renderHeadAssignmentManager();
   renderOfficerMetrics();
   renderAdminPnmEditorOptions();
@@ -2007,6 +2077,27 @@ async function loadHeadAdminData() {
   renderAdminPanel();
 }
 
+async function loadSeasonArchiveStatus() {
+  if (!roleCanUseAdminPanel()) {
+    state.seasonArchive = null;
+    renderSeasonArchiveStatusPanel();
+    return;
+  }
+  try {
+    const payload = await api("/api/admin/season/archive");
+    state.seasonArchive = payload;
+  } catch (error) {
+    state.seasonArchive = {
+      confirmation_phrase: "RESET RUSH SEASON",
+      archive_download_path: null,
+      archive: null,
+      current_counts: { pnm_count: 0, rating_count: 0, lunch_count: 0 },
+    };
+    showToast(error.message || "Unable to load season archive status.");
+  }
+  renderSeasonArchiveStatusPanel();
+}
+
 async function refreshAll() {
   await Promise.all([
     loadInterestHints(),
@@ -2019,6 +2110,7 @@ async function refreshAll() {
     loadScheduledLunches(),
     loadApprovals(),
     loadHeadAdminData(),
+    loadSeasonArchiveStatus(),
   ]);
 }
 
@@ -2138,6 +2230,7 @@ async function handleLogout() {
     currentHeads: [],
     rushOfficers: [],
   };
+  state.seasonArchive = null;
   state.adminEditPnmId = null;
   state.headAssignmentPnmId = null;
   animateCounter(heroPnmCount, 0);
@@ -2161,6 +2254,18 @@ async function handleLogout() {
   }
   if (meetingView) {
     meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
+  }
+  if (seasonArchivePhrase) {
+    seasonArchivePhrase.value = "";
+  }
+  if (seasonArchiveLabel) {
+    seasonArchiveLabel.value = "";
+  }
+  if (seasonHeadChairConfirm) {
+    seasonHeadChairConfirm.checked = false;
+  }
+  if (seasonArchiveDownloadBtn) {
+    seasonArchiveDownloadBtn.classList.add("hidden");
   }
   renderSelectedPnmPhoto(null);
   renderAdminPanel();
@@ -2198,6 +2303,7 @@ async function handlePnmCreate(event) {
     showToast("Select or type at least one interest.");
     return;
   }
+  const photoFile = pnmPhotoInput.files && pnmPhotoInput.files.length ? pnmPhotoInput.files[0] : null;
   const body = {
     first_name: document.getElementById("pnmFirstName").value.trim(),
     last_name: document.getElementById("pnmLastName").value.trim(),
@@ -2210,6 +2316,7 @@ async function handlePnmCreate(event) {
     stereotype: document.getElementById("pnmStereotype").value.trim(),
     lunch_stats: document.getElementById("pnmLunchStats").value.trim(),
     notes: document.getElementById("pnmNotes").value.trim(),
+    auto_photo_from_instagram: !photoFile,
   };
 
   try {
@@ -2218,7 +2325,6 @@ async function handlePnmCreate(event) {
       body,
     });
     pnmForm.reset();
-    const photoFile = pnmPhotoInput.files && pnmPhotoInput.files.length ? pnmPhotoInput.files[0] : null;
     if (photoFile) {
       const formData = new FormData();
       formData.append("photo", photoFile);
@@ -2495,6 +2601,33 @@ async function handlePendingClick(event) {
   }
 }
 
+async function handleMemberTableClick(event) {
+  const button = event.target.closest("button.disapprove-user");
+  if (!button) {
+    return;
+  }
+
+  const userId = Number(button.dataset.userId || 0);
+  if (!userId) {
+    return;
+  }
+  const username = button.dataset.username || "this user";
+  const confirmed = window.confirm(`Disapprove ${username}? They will be moved back to pending and signed out.`);
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await api(`/api/users/${userId}/disapprove`, {
+      method: "POST",
+    });
+    showToast("User disapproved.");
+    await Promise.all([loadApprovals(), loadMembers(), loadMatching(), loadHeadAdminData()]);
+  } catch (error) {
+    showToast(error.message || "Unable to disapprove user.");
+  }
+}
+
 async function handlePromoteOfficer() {
   if (!roleCanUseAdminPanel()) {
     showToast("Head Rush Officer access required.");
@@ -2741,6 +2874,90 @@ async function handleDbBackupDownload() {
   }
 }
 
+async function handleSeasonArchiveDownload() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const downloadPath = (state.seasonArchive && state.seasonArchive.archive_download_path) || "/api/admin/season/archive/download";
+  if (seasonArchiveDownloadBtn) {
+    seasonArchiveDownloadBtn.disabled = true;
+    seasonArchiveDownloadBtn.textContent = "Preparing...";
+  }
+  try {
+    await downloadFile(downloadPath, "rush-season-archive.sqlite");
+    showToast("Season archive downloaded.");
+  } catch (error) {
+    showToast(error.message || "Unable to download season archive.");
+  } finally {
+    if (seasonArchiveDownloadBtn) {
+      seasonArchiveDownloadBtn.disabled = false;
+      seasonArchiveDownloadBtn.textContent = "Download Archived Season";
+    }
+  }
+}
+
+async function handleSeasonReset() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const expectedPhrase = (state.seasonArchive && state.seasonArchive.confirmation_phrase) || "RESET RUSH SEASON";
+  const typedPhrase = seasonArchivePhrase ? seasonArchivePhrase.value.trim() : "";
+  if (!typedPhrase) {
+    showToast(`Type the confirmation phrase: ${expectedPhrase}`);
+    return;
+  }
+  if (typedPhrase.toUpperCase() !== expectedPhrase.toUpperCase()) {
+    showToast(`Phrase mismatch. Type exactly: ${expectedPhrase}`);
+    return;
+  }
+  if (!seasonHeadChairConfirm || !seasonHeadChairConfirm.checked) {
+    showToast("Confirm that all head rush chairs approved before resetting.");
+    return;
+  }
+  const confirmed = window.confirm(
+    "Archive the current rush season and reset PNMs, ratings, lunches, and participation counters for next season?"
+  );
+  if (!confirmed) {
+    return;
+  }
+
+  if (seasonResetBtn) {
+    seasonResetBtn.disabled = true;
+    seasonResetBtn.textContent = "Archiving...";
+  }
+  try {
+    const payload = await api("/api/admin/season/reset", {
+      method: "POST",
+      body: {
+        confirm_phrase: typedPhrase,
+        archive_label: seasonArchiveLabel && seasonArchiveLabel.value.trim() ? seasonArchiveLabel.value.trim() : null,
+        head_chair_confirmation: true,
+      },
+    });
+    if (seasonArchivePhrase) {
+      seasonArchivePhrase.value = "";
+    }
+    if (seasonArchiveLabel) {
+      seasonArchiveLabel.value = "";
+    }
+    if (seasonHeadChairConfirm) {
+      seasonHeadChairConfirm.checked = false;
+    }
+    showToast(payload.message || "Season reset completed.");
+    await refreshAll();
+    setActiveDesktopPage("admin", false);
+  } catch (error) {
+    showToast(error.message || "Unable to reset rush season.");
+  } finally {
+    if (seasonResetBtn) {
+      seasonResetBtn.disabled = false;
+      seasonResetBtn.textContent = "Archive + Reset Season";
+    }
+  }
+}
+
 function renderGoogleImportResult(payload) {
   if (!googleImportResult) {
     return;
@@ -2867,6 +3084,12 @@ function attachEvents() {
   logoutBtn.addEventListener("click", handleLogout);
   backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
   backupDbBtn.addEventListener("click", handleDbBackupDownload);
+  if (seasonResetBtn) {
+    seasonResetBtn.addEventListener("click", handleSeasonReset);
+  }
+  if (seasonArchiveDownloadBtn) {
+    seasonArchiveDownloadBtn.addEventListener("click", handleSeasonArchiveDownload);
+  }
   if (googleImportForm) {
     googleImportForm.addEventListener("submit", handleGoogleImport);
   }
@@ -2902,6 +3125,7 @@ function attachEvents() {
 
   pnmTable.addEventListener("click", handlePnmTableClick);
   pendingList.addEventListener("click", handlePendingClick);
+  memberTable.addEventListener("click", handleMemberTableClick);
   adminPnmTable.addEventListener("click", handleAdminPanelClick);
   if (promoteOfficerBtn) {
     promoteOfficerBtn.addEventListener("click", handlePromoteOfficer);

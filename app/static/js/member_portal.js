@@ -101,6 +101,7 @@ const memberRatingForm = document.getElementById("memberRatingForm");
 const memberRatingHistory = document.getElementById("memberRatingHistory");
 const memberApprovalsPanel = document.getElementById("memberApprovalsPanel");
 const memberPendingList = document.getElementById("memberPendingList");
+const memberApprovedList = document.getElementById("memberApprovedList");
 
 const state = {
   user: null,
@@ -209,18 +210,8 @@ function formatDateLabel(value) {
   return parsed.toLocaleString();
 }
 
-function scoreBadgeClass(score) {
-  if (score >= 34) {
-    return "good";
-  }
-  if (score >= 24) {
-    return "warn";
-  }
-  return "bad";
-}
-
 function sortPnms(rows) {
-  const mode = memberSortSelect ? memberSortSelect.value : "rank";
+  const mode = memberSortSelect ? memberSortSelect.value : "name";
   const sorted = [...rows];
   if (mode === "name") {
     sorted.sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
@@ -230,13 +221,7 @@ function sortPnms(rows) {
     sorted.sort((a, b) => (b.first_event_date || "").localeCompare(a.first_event_date || ""));
     return sorted;
   }
-  sorted.sort((a, b) => {
-    const diff = Number(b.weighted_total || 0) - Number(a.weighted_total || 0);
-    if (diff !== 0) {
-      return diff;
-    }
-    return Number(b.rating_count || 0) - Number(a.rating_count || 0);
-  });
+  sorted.sort((a, b) => `${a.pnm_code}`.localeCompare(`${b.pnm_code}`));
   return sorted;
 }
 
@@ -282,14 +267,13 @@ function renderPnmList() {
   memberPnmList.innerHTML = state.visiblePnms
     .map((pnm) => {
       const selectedClass = pnm.pnm_id === state.selectedPnmId ? " is-active" : "";
-      const ownScore = pnm.own_rating ? `${pnm.own_rating.total_score}/45` : "Not rated";
       return `
         <button class="member-pnm-row${selectedClass}" data-pnm-id="${pnm.pnm_id}" type="button">
           <div class="member-pnm-row-main">
             <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
-            <span class="${scoreBadgeClass(Number(pnm.weighted_total || 0))}">${Number(pnm.weighted_total || 0).toFixed(2)}</span>
+            <span>${escapeHtml(pnm.class_year || "")}</span>
           </div>
-          <div class="muted">Ratings: ${pnm.rating_count} | My Score: ${escapeHtml(ownScore)} | ${escapeHtml(pnm.instagram_handle || "")}</div>
+          <div class="muted">${escapeHtml(pnm.hometown || "")} | ${escapeHtml(pnm.instagram_handle || "")}</div>
         </button>
       `;
     })
@@ -320,10 +304,10 @@ function renderSelectedPnm() {
   }
 
   memberPnmKpis.innerHTML = `
-    <article class="card"><strong>${Number(pnm.weighted_total || 0).toFixed(2)}</strong><p>Weighted Total</p></article>
-    <article class="card"><strong>${pnm.rating_count}</strong><p>Total Ratings</p></article>
-    <article class="card"><strong>${pnm.total_lunches}</strong><p>Total Lunches</p></article>
     <article class="card"><strong>${pnm.days_since_first_event}</strong><p>Days Since First Event</p></article>
+    <article class="card"><strong>${pnm.total_lunches}</strong><p>Total Lunches</p></article>
+    <article class="card"><strong>${escapeHtml(pnm.class_year || "-")}</strong><p>Class Year</p></article>
+    <article class="card"><strong>${escapeHtml(pnm.phone_number || "None")}</strong><p>Phone</p></article>
   `;
 
   const own = pnm.own_rating;
@@ -349,7 +333,6 @@ function renderRatingHistory() {
   memberRatingHistory.innerHTML = state.selectedRatings
     .slice(0, 10)
     .map((row) => {
-      const who = row.from_me ? "Your rating" : "Member rating";
       const comment = row.comment ? `<div class="muted">Comment: ${escapeHtml(row.comment)}</div>` : "";
       const delta = row.last_change && typeof row.last_change.delta_total === "number"
         ? ` | Delta ${row.last_change.delta_total > 0 ? "+" : ""}${row.last_change.delta_total}`
@@ -357,7 +340,7 @@ function renderRatingHistory() {
       return `
         <div class="entry">
           <div class="entry-title">
-            <strong>${who}</strong>
+            <strong>Your rating</strong>
             <span>Score ${row.total_score}/45${delta}</span>
           </div>
           <div class="muted">Updated ${escapeHtml(formatDateLabel(row.updated_at))}</div>
@@ -377,7 +360,7 @@ async function loadSelectedRatings() {
   }
   try {
     const payload = await api(`/api/pnms/${pnm.pnm_id}/ratings`);
-    state.selectedRatings = payload.ratings || [];
+    state.selectedRatings = (payload.ratings || []).filter((row) => row.from_me);
     renderRatingHistory();
   } catch (error) {
     state.selectedRatings = [];
@@ -431,14 +414,51 @@ function renderPendingApprovals(payload) {
   `;
 }
 
+function renderApprovedUsers(payload) {
+  if (!memberApprovedList) {
+    return;
+  }
+  const users = (payload.users || []).filter((item) => item.role !== "Head Rush Officer");
+  if (!users.length) {
+    memberApprovedList.innerHTML = '<p class="muted">No approved users available for disapproval.</p>';
+    return;
+  }
+
+  const rows = users
+    .map(
+      (item) => `
+        <tr>
+          <td>${escapeHtml(item.username)}</td>
+          <td>${escapeHtml(item.role)}</td>
+          <td><button type="button" class="secondary disapprove-user" data-user-id="${item.user_id}" data-username="${escapeHtml(item.username)}">Disapprove</button></td>
+        </tr>
+      `
+    )
+    .join("");
+
+  memberApprovedList.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Username</th>
+          <th>Role</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
 async function loadApprovals() {
   if (!state.user || !isRushTeamRole(state.user.role)) {
     memberApprovalsPanel.classList.add("hidden");
     return;
   }
   memberApprovalsPanel.classList.remove("hidden");
-  const payload = await api("/api/users/pending");
-  renderPendingApprovals(payload);
+  const [pendingPayload, approvedPayload] = await Promise.all([api("/api/users/pending"), api("/api/users")]);
+  renderPendingApprovals(pendingPayload);
+  renderApprovedUsers(approvedPayload);
 }
 
 async function refreshPortal() {
@@ -523,6 +543,12 @@ async function handleLogout() {
   state.selectedRatings = [];
   memberPnmList.innerHTML = "";
   memberApprovalsPanel.classList.add("hidden");
+  if (memberPendingList) {
+    memberPendingList.innerHTML = "";
+  }
+  if (memberApprovedList) {
+    memberApprovedList.innerHTML = "";
+  }
   setAuthView(false);
   showToast("Logged out.");
 }
@@ -573,23 +599,47 @@ async function handlePnmListClick(event) {
 }
 
 async function handlePendingClick(event) {
-  const button = event.target.closest("button.approve-user");
-  if (!button) {
+  const approveButton = event.target.closest("button.approve-user");
+  if (approveButton) {
+    const userId = Number(approveButton.dataset.userId || 0);
+    if (!userId) {
+      return;
+    }
+
+    try {
+      await api(`/api/users/pending/${userId}/approve`, {
+        method: "POST",
+      });
+      showToast("User approved.");
+      await loadApprovals();
+    } catch (error) {
+      showToast(error.message || "Unable to approve user.");
+    }
     return;
   }
-  const userId = Number(button.dataset.userId || 0);
+
+  const disapproveButton = event.target.closest("button.disapprove-user");
+  if (!disapproveButton) {
+    return;
+  }
+  const userId = Number(disapproveButton.dataset.userId || 0);
   if (!userId) {
+    return;
+  }
+  const username = disapproveButton.dataset.username || "this user";
+  const confirmed = window.confirm(`Disapprove ${username}? They will be moved back to pending and signed out.`);
+  if (!confirmed) {
     return;
   }
 
   try {
-    await api(`/api/users/pending/${userId}/approve`, {
+    await api(`/api/users/${userId}/disapprove`, {
       method: "POST",
     });
-    showToast("User approved.");
+    showToast("User disapproved.");
     await loadApprovals();
   } catch (error) {
-    showToast(error.message || "Unable to approve user.");
+    showToast(error.message || "Unable to disapprove user.");
   }
 }
 
@@ -600,6 +650,9 @@ function attachEvents() {
   memberRatingForm.addEventListener("submit", handleRatingSave);
   memberPnmList.addEventListener("click", handlePnmListClick);
   memberPendingList.addEventListener("click", handlePendingClick);
+  if (memberApprovedList) {
+    memberApprovedList.addEventListener("click", handlePendingClick);
+  }
 
   memberSearchInput.addEventListener("input", applySearchAndRender);
   memberSortSelect.addEventListener("change", applySearchAndRender);

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import hashlib
+import html
 import io
 import json
 import base64
@@ -28,6 +29,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from urllib.error import HTTPError, URLError
+from urllib.request import Request as URLRequest, urlopen
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -80,6 +83,10 @@ HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or
 AUTO_CREATE_HEAD_SEED = os.getenv("AUTO_CREATE_HEAD_SEED", "1").strip().lower() in {"1", "true", "yes"}
 CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "America/Chicago").strip() or "America/Chicago"
 MAX_GOOGLE_FORM_IMPORT_BYTES = int(os.getenv("MAX_GOOGLE_FORM_IMPORT_BYTES", str(3 * 1024 * 1024)))
+INSTAGRAM_AVATAR_TIMEOUT_SECONDS = float(os.getenv("INSTAGRAM_AVATAR_TIMEOUT_SECONDS", "4.0"))
+INSTAGRAM_PROFILE_HTML_MAX_BYTES = int(os.getenv("INSTAGRAM_PROFILE_HTML_MAX_BYTES", "1200000"))
+SEASON_RESET_CONFIRMATION_PHRASE = os.getenv("SEASON_RESET_CONFIRMATION_PHRASE", "RESET RUSH SEASON").strip() or "RESET RUSH SEASON"
+SEASON_ARCHIVE_FILENAME = "season-archive-latest.sqlite"
 
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -111,6 +118,7 @@ GOOGLE_FORM_TEMPLATE_COLUMNS = [
     "Phone Number",
     "Instagram Handle",
 ]
+HTTP_USER_AGENT = os.getenv("HTTP_USER_AGENT", "Mozilla/5.0").strip() or "Mozilla/5.0"
 GOOGLE_FORM_COLUMN_ALIASES = {
     "first_name": {
         "first name",
@@ -1041,6 +1049,112 @@ def remove_photo_if_present(photo_path: str | None) -> None:
         target.unlink(missing_ok=True)
 
 
+def detect_image_extension(content_type: str | None, content: bytes) -> str | None:
+    normalized = (content_type or "").split(";")[0].strip().lower()
+    extension = ALLOWED_PHOTO_TYPES.get(normalized)
+    if extension:
+        return extension
+    if content.startswith(b"\xff\xd8\xff"):
+        return ".jpg"
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png"
+    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        return ".webp"
+    return None
+
+
+def write_pnm_photo_bytes(pnm_id: int, content: bytes, extension: str) -> tuple[str, Path]:
+    tenant = current_tenant()
+    uploads_dir = active_pnm_uploads_dir()
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"pnm-{pnm_id}-{secrets.token_hex(10)}{extension}"
+    target_path = uploads_dir / filename
+    target_path.write_bytes(content)
+    public_path = f"/uploads/tenants/{tenant.slug}/pnms/{filename}"
+    return public_path, target_path
+
+
+def instagram_username_from_handle(handle: str) -> str:
+    token = handle.strip()
+    if token.startswith("@"):
+        token = token[1:]
+    return token.strip()
+
+
+def fetch_image_from_url(request_url: str) -> tuple[bytes, str] | None:
+    request = URLRequest(
+        request_url,
+        headers={
+            "User-Agent": HTTP_USER_AGENT,
+            "Accept": "image/*",
+        },
+    )
+    try:
+        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
+            content = response.read(MAX_PNM_PHOTO_BYTES + 1)
+            if not content:
+                return None
+            if len(content) > MAX_PNM_PHOTO_BYTES:
+                return None
+            content_type = response.headers.get("Content-Type", "")
+    except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+        return None
+
+    extension = detect_image_extension(content_type, content)
+    if not extension:
+        return None
+    return content, extension
+
+
+def fetch_instagram_og_image_url(username: str) -> str | None:
+    request_url = f"https://www.instagram.com/{quote(username, safe='')}/"
+    request = URLRequest(
+        request_url,
+        headers={
+            "User-Agent": HTTP_USER_AGENT,
+            "Accept": "text/html,application/xhtml+xml",
+        },
+    )
+    try:
+        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
+            content = response.read(INSTAGRAM_PROFILE_HTML_MAX_BYTES + 1)
+    except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+        return None
+
+    if not content:
+        return None
+    if len(content) > INSTAGRAM_PROFILE_HTML_MAX_BYTES:
+        content = content[:INSTAGRAM_PROFILE_HTML_MAX_BYTES]
+
+    page = content.decode("utf-8", errors="ignore")
+    patterns = [
+        r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+        r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, page, flags=re.IGNORECASE)
+        if not match:
+            continue
+        candidate = html.unescape(match.group(1)).strip()
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            return candidate
+    return None
+
+
+def try_fetch_instagram_profile_photo(instagram_handle: str) -> tuple[bytes, str] | None:
+    username = instagram_username_from_handle(instagram_handle)
+    if not username:
+        return None
+    primary_url = f"https://unavatar.io/instagram/{quote(username, safe='')}?fallback=false"
+    image = fetch_image_from_url(primary_url)
+    if image:
+        return image
+    fallback_url = fetch_instagram_og_image_url(username)
+    if not fallback_url:
+        return None
+    return fetch_image_from_url(fallback_url)
+
+
 def split_normalized_csv(value: str) -> set[str]:
     return {token for token in value.split(",") if token}
 
@@ -1091,6 +1205,33 @@ def copy_sqlite_database(source: Path, destination: Path) -> bool:
     destination_conn.close()
     source_conn.close()
     return True
+
+
+def season_archive_path() -> Path:
+    return active_backup_dir() / SEASON_ARCHIVE_FILENAME
+
+
+def write_sqlite_snapshot(source_db: Path, destination_db: Path) -> None:
+    destination_db.parent.mkdir(parents=True, exist_ok=True)
+    temp_path = destination_db.with_suffix(f"{destination_db.suffix}.tmp")
+    source_conn = sqlite3.connect(source_db)
+    destination_conn = sqlite3.connect(temp_path)
+    try:
+        with destination_conn:
+            source_conn.backup(destination_conn)
+    finally:
+        destination_conn.close()
+        source_conn.close()
+    temp_path.replace(destination_db)
+
+
+def purge_pnm_uploads_dir() -> None:
+    uploads_dir = active_pnm_uploads_dir()
+    if not uploads_dir.exists():
+        return
+    for candidate in uploads_dir.glob("*"):
+        if candidate.is_file():
+            candidate.unlink(missing_ok=True)
 
 
 def csv_bytes_from_rows(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
@@ -1616,6 +1757,17 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             last_seen_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS season_archive_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            archive_path TEXT NOT NULL,
+            archived_at TEXT NOT NULL,
+            archived_by INTEGER NOT NULL REFERENCES users(id),
+            archive_label TEXT NOT NULL DEFAULT '',
+            pnm_count INTEGER NOT NULL DEFAULT 0,
+            rating_count INTEGER NOT NULL DEFAULT 0,
+            lunch_count INTEGER NOT NULL DEFAULT 0
+        );
+
         CREATE INDEX IF NOT EXISTS idx_users_stereotype ON users(stereotype);
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
@@ -1678,6 +1830,30 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
         """
     )
+
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS season_archive_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            archive_path TEXT NOT NULL,
+            archived_at TEXT NOT NULL,
+            archived_by INTEGER NOT NULL REFERENCES users(id),
+            archive_label TEXT NOT NULL DEFAULT '',
+            pnm_count INTEGER NOT NULL DEFAULT 0,
+            rating_count INTEGER NOT NULL DEFAULT 0,
+            lunch_count INTEGER NOT NULL DEFAULT 0
+        );
+        """
+    )
+    season_columns = {row["name"] for row in conn.execute("PRAGMA table_info(season_archive_state)").fetchall()}
+    if "archive_label" not in season_columns:
+        conn.execute("ALTER TABLE season_archive_state ADD COLUMN archive_label TEXT NOT NULL DEFAULT ''")
+    if "pnm_count" not in season_columns:
+        conn.execute("ALTER TABLE season_archive_state ADD COLUMN pnm_count INTEGER NOT NULL DEFAULT 0")
+    if "rating_count" not in season_columns:
+        conn.execute("ALTER TABLE season_archive_state ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0")
+    if "lunch_count" not in season_columns:
+        conn.execute("ALTER TABLE season_archive_state ADD COLUMN lunch_count INTEGER NOT NULL DEFAULT 0")
 
     # Backfill a baseline seed event for legacy ratings so trend charts can start from current stored state.
     conn.execute(
@@ -2313,6 +2489,7 @@ class PNMCreateRequest(BaseModel):
     stereotype: str = Field(..., min_length=1, max_length=48)
     lunch_stats: str = Field(default="", max_length=256)
     notes: str = Field(default="", max_length=2000)
+    auto_photo_from_instagram: bool = True
 
     @field_validator("class_year")
     @classmethod
@@ -2406,6 +2583,25 @@ class PromoteHeadRequest(BaseModel):
     @field_validator("demoted_head_emoji")
     @classmethod
     def normalize_optional_demoted_head_emoji(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        return token or None
+
+
+class SeasonResetRequest(BaseModel):
+    confirm_phrase: str = Field(..., min_length=4, max_length=120)
+    archive_label: str | None = Field(default=None, max_length=120)
+    head_chair_confirmation: bool = False
+
+    @field_validator("confirm_phrase")
+    @classmethod
+    def normalize_confirm_phrase(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("archive_label")
+    @classmethod
+    def normalize_archive_label(cls, value: str | None) -> str | None:
         if value is None:
             return None
         token = value.strip()
@@ -2910,6 +3106,175 @@ def export_sqlite_backup(_: sqlite3.Row = Depends(require_head)) -> FileResponse
     )
 
 
+@app.get("/api/admin/season/archive")
+def season_archive_status(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    archive_file = season_archive_path()
+    with db_session() as conn:
+        counts_row = conn.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM pnms) AS pnm_count,
+                (SELECT COUNT(*) FROM ratings) AS rating_count,
+                (SELECT COUNT(*) FROM lunches) AS lunch_count
+            """
+        ).fetchone()
+        archive_row = conn.execute(
+            """
+            SELECT
+                s.archive_path,
+                s.archived_at,
+                s.archived_by,
+                s.archive_label,
+                s.pnm_count,
+                s.rating_count,
+                s.lunch_count,
+                u.username AS archived_by_username
+            FROM season_archive_state s
+            LEFT JOIN users u ON u.id = s.archived_by
+            WHERE s.id = 1
+            """
+        ).fetchone()
+
+    archive_payload = None
+    if archive_row:
+        archive_payload = {
+            "archive_path": archive_row["archive_path"],
+            "archived_at": archive_row["archived_at"],
+            "archived_by": archive_row["archived_by"],
+            "archived_by_username": archive_row["archived_by_username"],
+            "archive_label": archive_row["archive_label"],
+            "pnm_count": int(archive_row["pnm_count"]),
+            "rating_count": int(archive_row["rating_count"]),
+            "lunch_count": int(archive_row["lunch_count"]),
+            "file": file_metadata(archive_file),
+        }
+
+    return {
+        "confirmation_phrase": SEASON_RESET_CONFIRMATION_PHRASE,
+        "archive_download_path": "/api/admin/season/archive/download" if archive_file.exists() else None,
+        "archive": archive_payload,
+        "current_counts": {
+            "pnm_count": int(counts_row["pnm_count"]),
+            "rating_count": int(counts_row["rating_count"]),
+            "lunch_count": int(counts_row["lunch_count"]),
+        },
+    }
+
+
+@app.get("/api/admin/season/archive/download")
+def download_season_archive(_: sqlite3.Row = Depends(require_head)) -> FileResponse:
+    archive_file = season_archive_path()
+    if not archive_file.exists():
+        raise HTTPException(status_code=404, detail="No archived season is available yet.")
+    tenant = current_tenant()
+    filename = f"{tenant.slug}-season-archive.sqlite"
+    return FileResponse(
+        archive_file,
+        media_type="application/x-sqlite3",
+        filename=filename,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@app.post("/api/admin/season/reset")
+def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    if payload.confirm_phrase.strip().upper() != SEASON_RESET_CONFIRMATION_PHRASE.upper():
+        raise HTTPException(
+            status_code=400,
+            detail=f"Confirmation phrase mismatch. Type exactly: {SEASON_RESET_CONFIRMATION_PHRASE}",
+        )
+    if not payload.head_chair_confirmation:
+        raise HTTPException(
+            status_code=400,
+            detail="Head-chair confirmation is required before resetting the season.",
+        )
+
+    archive_file = season_archive_path()
+    write_sqlite_snapshot(active_db_path(), archive_file)
+    for stale in archive_file.parent.glob("season-archive-*.sqlite"):
+        if stale == archive_file:
+            continue
+        stale.unlink(missing_ok=True)
+
+    reset_at = now_iso()
+    label = payload.archive_label or f"Rush Season Archived {date.today().isoformat()}"
+
+    with db_session() as conn:
+        counts_row = conn.execute(
+            """
+            SELECT
+                (SELECT COUNT(*) FROM pnms) AS pnm_count,
+                (SELECT COUNT(*) FROM ratings) AS rating_count,
+                (SELECT COUNT(*) FROM lunches) AS lunch_count
+            """
+        ).fetchone()
+        pnm_count = int(counts_row["pnm_count"])
+        rating_count = int(counts_row["rating_count"])
+        lunch_count = int(counts_row["lunch_count"])
+
+        conn.execute("DELETE FROM rating_changes")
+        conn.execute("DELETE FROM rating_history")
+        conn.execute("DELETE FROM ratings")
+        conn.execute("DELETE FROM lunches")
+        conn.execute("DELETE FROM pnms")
+        conn.execute(
+            """
+            UPDATE users
+            SET rating_count = 0, avg_rating_given = 0, total_lunches = 0, lunches_per_week = 0, updated_at = ?
+            """,
+            (reset_at,),
+        )
+        conn.execute(
+            """
+            INSERT INTO season_archive_state (
+                id,
+                archive_path,
+                archived_at,
+                archived_by,
+                archive_label,
+                pnm_count,
+                rating_count,
+                lunch_count
+            )
+            VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                archive_path = excluded.archive_path,
+                archived_at = excluded.archived_at,
+                archived_by = excluded.archived_by,
+                archive_label = excluded.archive_label,
+                pnm_count = excluded.pnm_count,
+                rating_count = excluded.rating_count,
+                lunch_count = excluded.lunch_count
+            """,
+            (
+                str(archive_file),
+                reset_at,
+                head_user["id"],
+                label,
+                pnm_count,
+                rating_count,
+                lunch_count,
+            ),
+        )
+
+    purge_pnm_uploads_dir()
+
+    return {
+        "message": "Rush season archived and reset for next season.",
+        "archive": {
+            "archive_path": str(archive_file),
+            "archive_download_path": "/api/admin/season/archive/download",
+            "archive_label": label,
+            "archived_at": reset_at,
+            "archived_by": head_user["id"],
+            "archived_by_username": head_user["username"],
+            "pnm_count": pnm_count,
+            "rating_count": rating_count,
+            "lunch_count": lunch_count,
+        },
+    }
+
+
 @app.get("/api/admin/import/google-form/template")
 def export_google_form_template(_: sqlite3.Row = Depends(require_head)) -> Response:
     buffer = io.StringIO()
@@ -3075,6 +3440,28 @@ async def import_google_form_csv(
             pnm_id = int(cursor.lastrowid)
             code = ensure_unique_pnm_code(conn, pnm_id, pnm_code_base(first_name, last_name, first_event_date))
             conn.execute("UPDATE pnms SET pnm_code = ?, updated_at = ? WHERE id = ?", (code, now_iso(), pnm_id))
+            fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
+            if fetched_photo:
+                photo_bytes, extension = fetched_photo
+                try:
+                    public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
+                except OSError:
+                    public_path = None
+                    target_path = None
+                if public_path and target_path:
+                    try:
+                        now = now_iso()
+                        conn.execute(
+                            """
+                            UPDATE pnms
+                            SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
+                            WHERE id = ?
+                            """,
+                            (public_path, now, head_user["id"], now, pnm_id),
+                        )
+                    except Exception:
+                        target_path.unlink(missing_ok=True)
+                        raise
             existing_instagrams.add(instagram_norm)
             created_count += 1
 
@@ -3365,6 +3752,28 @@ def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_officer))
     return {"message": "User approved."}
 
 
+@app.post("/api/users/{user_id}/disapprove")
+def disapprove_user(user_id: int, actor: sqlite3.Row = Depends(require_officer)) -> dict[str, str]:
+    with db_session() as conn:
+        row = conn.execute("SELECT id, username, role, is_approved FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if int(row["id"]) == int(actor["id"]):
+            raise HTTPException(status_code=400, detail="You cannot disapprove your own account.")
+        if row["role"] == ROLE_HEAD:
+            raise HTTPException(status_code=400, detail="Head Rush Officer accounts cannot be disapproved.")
+        if not bool(row["is_approved"]):
+            return {"message": "User already pending approval."}
+
+        conn.execute(
+            "UPDATE users SET is_approved = 0, approved_by = NULL, approved_at = NULL, updated_at = ? WHERE id = ?",
+            (now_iso(), user_id),
+        )
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+    return {"message": f"{row['username']} has been disapproved and moved to pending approval."}
+
+
 @app.get("/api/admin/rush-officers")
 def head_admin_officer_metrics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
     with db_session() as conn:
@@ -3649,6 +4058,30 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
         code = ensure_unique_pnm_code(conn, pnm_id, base)
         conn.execute("UPDATE pnms SET pnm_code = ?, updated_at = ? WHERE id = ?", (code, now_iso(), pnm_id))
 
+        if payload.auto_photo_from_instagram:
+            fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
+            if fetched_photo:
+                photo_bytes, extension = fetched_photo
+                try:
+                    public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
+                except OSError:
+                    public_path = None
+                    target_path = None
+                if public_path and target_path:
+                    try:
+                        now = now_iso()
+                        conn.execute(
+                            """
+                            UPDATE pnms
+                            SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
+                            WHERE id = ?
+                            """,
+                            (public_path, now, user["id"], now, pnm_id),
+                        )
+                    except Exception:
+                        target_path.unlink(missing_ok=True)
+                        raise
+
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
 
     return {"pnm": pnm_payload(row, own_rating=None, assigned_officer=None)}
@@ -3832,6 +4265,30 @@ def update_pnm_details(
                 pnm_id,
             ),
         )
+        existing_photo_path = row["photo_path"] if "photo_path" in row.keys() else None
+        if not existing_photo_path:
+            fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
+            if fetched_photo:
+                photo_bytes, extension = fetched_photo
+                try:
+                    public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
+                except OSError:
+                    public_path = None
+                    target_path = None
+                if public_path and target_path:
+                    try:
+                        now = now_iso()
+                        conn.execute(
+                            """
+                            UPDATE pnms
+                            SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
+                            WHERE id = ?
+                            """,
+                            (public_path, now, head_user["id"], now, pnm_id),
+                        )
+                    except Exception:
+                        target_path.unlink(missing_ok=True)
+                        raise
         refreshed = conn.execute(
             """
             SELECT
@@ -3922,29 +4379,21 @@ async def upload_pnm_photo(
     photo: UploadFile = File(...),
     user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
-    tenant = current_tenant()
-    content_type = (photo.content_type or "").lower().strip()
-    extension = ALLOWED_PHOTO_TYPES.get(content_type)
-    if extension is None:
-        raise HTTPException(status_code=400, detail="Unsupported image type. Use JPG, PNG, or WEBP.")
-
     content = await photo.read(MAX_PNM_PHOTO_BYTES + 1)
     if not content:
         raise HTTPException(status_code=400, detail="Image file cannot be empty.")
     if len(content) > MAX_PNM_PHOTO_BYTES:
         raise HTTPException(status_code=413, detail=f"Image too large. Max size is {MAX_PNM_PHOTO_BYTES // (1024 * 1024)} MB.")
-
-    filename = f"pnm-{pnm_id}-{secrets.token_hex(10)}{extension}"
-    uploads_dir = active_pnm_uploads_dir()
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    target_path = uploads_dir / filename
-    public_path = f"/uploads/tenants/{tenant.slug}/pnms/{filename}"
-    old_photo_path: str | None = None
+    extension = detect_image_extension(photo.content_type, content)
+    if extension is None:
+        raise HTTPException(status_code=400, detail="Unsupported image type. Use JPG, PNG, or WEBP.")
 
     try:
-        target_path.write_bytes(content)
+        public_path, target_path = write_pnm_photo_bytes(pnm_id, content, extension)
     except OSError as exc:
         raise HTTPException(status_code=500, detail=f"Unable to save photo: {exc}") from exc
+
+    old_photo_path: str | None = None
 
     try:
         with db_session() as conn:
@@ -4454,6 +4903,8 @@ def pnm_ratings(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[
     response_rows: list[dict[str, Any]] = []
 
     for row in rows:
+        if user["role"] == ROLE_RUSHER and row["user_id"] != user["id"]:
+            continue
         entry = {
             "rating_id": row["id"],
             "pnm_id": row["pnm_id"],

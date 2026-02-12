@@ -110,10 +110,6 @@ GOOGLE_FORM_TEMPLATE_COLUMNS = [
     "Hometown",
     "Phone Number",
     "Instagram Handle",
-    "Interests (comma-separated)",
-    "Stereotype",
-    "First Event Date (YYYY-MM-DD, optional)",
-    "Notes (optional)",
 ]
 GOOGLE_FORM_COLUMN_ALIASES = {
     "first_name": {
@@ -162,28 +158,6 @@ GOOGLE_FORM_COLUMN_ALIASES = {
         "ig",
         "ig handle",
         "instagram username",
-    },
-    "interests": {
-        "interests",
-        "interest",
-        "hobbies",
-    },
-    "stereotype": {
-        "stereotype",
-        "archetype",
-        "type",
-    },
-    "first_event_date": {
-        "first event date",
-        "firsteventdate",
-        "event date",
-    },
-    "notes": {
-        "notes",
-        "additional notes",
-        "comments",
-        "about",
-        "bio",
     },
 }
 
@@ -2949,10 +2923,6 @@ def export_google_form_template(_: sqlite3.Row = Depends(require_head)) -> Respo
             "Nashville",
             "+1 615 555 0110",
             "@johnsmith",
-            "Leadership,Sports",
-            "Connector",
-            date.today().isoformat(),
-            "Met at first event and wants to stay involved.",
         ]
     )
     payload = buffer.getvalue().encode("utf-8")
@@ -3033,10 +3003,7 @@ async def import_google_form_csv(
             hometown_raw = csv_row_value(row, column_map["hometown"]) or "Unknown"
             phone_raw = csv_row_value(row, column_map["phone_number"])
             instagram_raw = csv_row_value(row, column_map["instagram_handle"])
-            interests_raw = csv_row_value(row, column_map["interests"]) or "Recruitment"
-            stereotype_raw = csv_row_value(row, column_map["stereotype"]) or "Unassigned"
-            first_event_raw = csv_row_value(row, column_map["first_event_date"]) or date.today().isoformat()
-            notes_raw = csv_row_value(row, column_map["notes"])
+            first_event_raw = date.today().isoformat()
 
             try:
                 first_name = normalize_name(first_raw)
@@ -3049,11 +3016,11 @@ async def import_google_form_csv(
                 instagram_handle = normalize_instagram_handle(instagram_raw)
                 phone_number = normalize_phone_number(phone_raw)
                 first_event_date = verify_iso_date(first_event_raw, "First event date")
-                interests = parse_interests(interests_raw)
+                interests = parse_interests("Recruitment")
                 interests_csv, interests_norm = encode_interests(interests)
-                stereotype = stereotype_raw.strip() or "Unassigned"
+                stereotype = "Unassigned"
                 stereotype = stereotype[:48]
-                notes = notes_raw[:2000]
+                notes = ""
             except ValueError as exc:
                 total_errors += 1
                 if len(errors) < error_limit:

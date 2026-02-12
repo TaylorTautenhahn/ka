@@ -373,7 +373,10 @@
                   Update photo
                   <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
                 </label>
-                <button type="submit" class="secondary">Upload Photo</button>
+                <div class="action-row">
+                  <button type="submit" class="secondary">Upload Photo</button>
+                  <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                </div>
               </form>
               <h3>Ratings View</h3>
               <div id="ratingList" class="list-box muted">Select a PNM to view rating entries.</div>

@@ -123,6 +123,7 @@ const ratingForm = document.getElementById("ratingForm");
 const photoForm = document.getElementById("photoForm");
 const pnmPhotoInput = document.getElementById("pnmPhoto");
 const selectedPnmPhotoFile = document.getElementById("selectedPnmPhotoFile");
+const refreshInstagramPhotoBtn = document.getElementById("refreshInstagramPhotoBtn");
 const selectedPnmPhoto = document.getElementById("selectedPnmPhoto");
 const selectedPnmPhotoPlaceholder = document.getElementById("selectedPnmPhotoPlaceholder");
 
@@ -2512,6 +2513,39 @@ async function handlePhotoUpload(event) {
   }
 }
 
+async function handleRefreshInstagramPhoto() {
+  const selectedId = Number(state.selectedPnmId || ratingPnm.value || 0);
+  if (!selectedId) {
+    showToast("Select a PNM first.");
+    return;
+  }
+  if (!roleCanManagePhotos()) {
+    showToast("Only Rush Officers and Head Rush Officer can refresh photos.");
+    return;
+  }
+
+  if (refreshInstagramPhotoBtn) {
+    refreshInstagramPhotoBtn.disabled = true;
+    refreshInstagramPhotoBtn.textContent = "Refreshing...";
+  }
+
+  try {
+    await api(`/api/pnms/${selectedId}/photo/refresh-instagram`, {
+      method: "POST",
+    });
+    await loadPnms();
+    await loadPnmDetail(selectedId);
+    showToast("Instagram photo refreshed.");
+  } catch (error) {
+    showToast(error.message || "Unable to refresh from Instagram right now.");
+  } finally {
+    if (refreshInstagramPhotoBtn) {
+      refreshInstagramPhotoBtn.disabled = false;
+      refreshInstagramPhotoBtn.textContent = "Pull From Instagram";
+    }
+  }
+}
+
 async function handleRatingSave(event) {
   event.preventDefault();
   const selectedId = Number(ratingPnm.value || state.selectedPnmId || 0);
@@ -3254,6 +3288,9 @@ function attachEvents() {
   ratingForm.addEventListener("submit", handleRatingSave);
   lunchForm.addEventListener("submit", handleLunchLog);
   photoForm.addEventListener("submit", handlePhotoUpload);
+  if (refreshInstagramPhotoBtn) {
+    refreshInstagramPhotoBtn.addEventListener("click", handleRefreshInstagramPhoto);
+  }
 
   pnmTable.addEventListener("click", handlePnmTableClick);
   pendingList.addEventListener("click", handlePendingClick);

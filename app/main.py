@@ -1327,6 +1327,15 @@ def public_photo_url(photo_path: str | None) -> str | None:
     return None
 
 
+def instagram_avatar_fallback_url(instagram_handle: str | None) -> str | None:
+    if not instagram_handle:
+        return None
+    username = instagram_username_from_handle(instagram_handle)
+    if not username:
+        return None
+    return f"https://unavatar.io/instagram/{quote(username, safe='')}"
+
+
 def photo_fs_path(photo_path: str | None) -> Path | None:
     tenant = CURRENT_TENANT.get()
     if not photo_path:
@@ -1339,6 +1348,23 @@ def photo_fs_path(photo_path: str | None) -> Path | None:
     if photo_path.startswith("/uploads/pnms/"):
         return UPLOADS_DIR / "pnms" / name
     return None
+
+
+def has_local_photo_file(photo_path: str | None) -> bool:
+    local_url = public_photo_url(photo_path)
+    if not local_url:
+        return False
+    fs_path = photo_fs_path(local_url)
+    if fs_path is None:
+        return False
+    return fs_path.exists() and fs_path.is_file()
+
+
+def resolve_pnm_photo_url(photo_path: str | None, instagram_handle: str | None) -> str | None:
+    local_url = public_photo_url(photo_path)
+    if local_url and has_local_photo_file(local_url):
+        return local_url
+    return instagram_avatar_fallback_url(instagram_handle)
 
 
 def remove_photo_if_present(photo_path: str | None) -> None:
@@ -2665,7 +2691,7 @@ def pnm_payload(
         "days_since_first_event": days_since_event,
         "interests": decode_interests(row["interests"]),
         "stereotype": row["stereotype"],
-        "photo_url": public_photo_url(row["photo_path"]),
+        "photo_url": resolve_pnm_photo_url(row["photo_path"], row["instagram_handle"]),
         "photo_uploaded_at": row["photo_uploaded_at"],
         "lunch_stats": row["lunch_stats"],
         "notes": row["notes"] if "notes" in row.keys() else "",
@@ -4965,7 +4991,7 @@ def update_pnm_details(
             ),
         )
         existing_photo_path = row["photo_path"] if "photo_path" in row.keys() else None
-        if not existing_photo_path:
+        if not has_local_photo_file(existing_photo_path):
             fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
             if fetched_photo:
                 photo_bytes, extension = fetched_photo
@@ -5135,6 +5161,73 @@ async def upload_pnm_photo(
 
     return {
         "message": "PNM photo uploaded.",
+        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+    }
+
+
+@app.post("/api/pnms/{pnm_id}/photo/refresh-instagram")
+def refresh_pnm_photo_from_instagram(
+    pnm_id: int,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    old_photo_path: str | None = None
+
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+        instagram_handle = row["instagram_handle"]
+        if not instagram_handle:
+            raise HTTPException(status_code=400, detail="PNM does not have an Instagram handle.")
+        old_photo_path = row["photo_path"]
+
+        fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
+        if not fetched_photo:
+            raise HTTPException(
+                status_code=502,
+                detail="Could not fetch Instagram profile image right now. Try again in a minute.",
+            )
+
+        photo_bytes, extension = fetched_photo
+        try:
+            public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
+        except OSError as exc:
+            raise HTTPException(status_code=500, detail=f"Unable to save image: {exc}") from exc
+
+        try:
+            now = now_iso()
+            conn.execute(
+                """
+                UPDATE pnms
+                SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
+                WHERE id = ?
+                """,
+                (public_path, now, user["id"], now, pnm_id),
+            )
+            refreshed = conn.execute(
+                """
+                SELECT
+                    p.*,
+                    ao.id AS assigned_officer_id,
+                    ao.username AS assigned_officer_username,
+                    ao.role AS assigned_officer_role,
+                    ao.emoji AS assigned_officer_emoji
+                FROM pnms p
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                WHERE p.id = ?
+                """,
+                (pnm_id,),
+            ).fetchone()
+            own = fetch_own_rating(conn, pnm_id, user["id"])
+        except Exception:
+            target_path.unlink(missing_ok=True)
+            raise
+
+    if old_photo_path and old_photo_path != refreshed["photo_path"]:
+        remove_photo_if_present(old_photo_path)
+
+    return {
+        "message": "Instagram photo refreshed.",
         "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
     }
 
@@ -5984,7 +6077,7 @@ def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any
                 "rating_count": int(row["rating_count"]),
                 "total_lunches": int(row["total_lunches"]),
                 "days_since_first_event": (date.today() - date.fromisoformat(row["first_event_date"])).days,
-                "photo_url": public_photo_url(row["photo_path"]),
+                "photo_url": resolve_pnm_photo_url(row["photo_path"], row["instagram_handle"]),
                 "assigned_officer": (
                     {"username": row["assigned_officer_username"]}
                     if row["assigned_officer_username"]

@@ -771,6 +771,13 @@ td strong {
   backdrop-filter: blur(10px);
 }
 
+.import-error-list {
+  margin: 0.55rem 0 0;
+  padding-left: 1.1rem;
+  color: var(--bad);
+  font-size: 0.82rem;
+}
+
 .meeting-photo-wrap {
   margin-bottom: 0.65rem;
 }

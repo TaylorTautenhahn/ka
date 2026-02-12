@@ -415,6 +415,48 @@
 
           <div id="headAdminSummary" class="cards"></div>
 
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Google Form Import</h3>
+              <p class="muted">Have rushees submit this info in a Google Form, then download responses as CSV and import here.</p>
+              <div class="action-row">
+                <button id="downloadGoogleImportTemplateBtn" type="button" class="secondary">Download Google Form Template CSV</button>
+              </div>
+              <p class="muted">Recommended questions: First Name, Last Name, Class Year (F/S/J), Hometown, Phone Number, Instagram Handle, Interests, Stereotype, Notes.</p>
+              <form id="googleImportForm" class="stack">
+                <label>
+                  Google Form responses CSV
+                  <input id="googleImportFile" type="file" accept=".csv,text/csv" required />
+                </label>
+                <button id="googleImportBtn" type="submit">Import Google Form CSV</button>
+              </form>
+              <div id="googleImportResult" class="list-box muted">No imports yet.</div>
+            </article>
+            <article class="list-column">
+              <h3>Google Form Setup (1-Min)</h3>
+              <div class="list-box">
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 1</strong><span>Create Form</span></div>
+                  <p class="muted">Create a Google Form with the recommended questions.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 2</strong><span>Collect Responses</span></div>
+                  <p class="muted">Open the Responses sheet and keep one row per rushee.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 3</strong><span>Download CSV</span></div>
+                  <p class="muted">In Google Sheets: File > Download > Comma Separated Values (.csv).</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 4</strong><span>Import</span></div>
+                  <p class="muted">Upload that CSV above. Duplicates by Instagram handle are skipped automatically.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="divider"></div>
           <div class="grid-two">
             <article class="list-column">
               <h3>Leadership Management</h3>

@@ -153,6 +153,11 @@ const demoteExistingHeads = document.getElementById("demoteExistingHeads");
 const promoteOfficerBtn = document.getElementById("promoteOfficerBtn");
 const adminPnmEditorForm = document.getElementById("adminPnmEditorForm");
 const adminEditPnmSelect = document.getElementById("adminEditPnmSelect");
+const googleImportForm = document.getElementById("googleImportForm");
+const googleImportFile = document.getElementById("googleImportFile");
+const googleImportResult = document.getElementById("googleImportResult");
+const googleImportBtn = document.getElementById("googleImportBtn");
+const downloadGoogleImportTemplateBtn = document.getElementById("downloadGoogleImportTemplateBtn");
 
 const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
@@ -2054,6 +2059,7 @@ async function handleLogout() {
   renderAdminPanel();
   renderAssignmentControls();
   renderAssignedRushSection();
+  renderGoogleImportResult(null);
   stopLiveRefresh();
   setAuthView(false);
   updateTopbarActions();
@@ -2628,6 +2634,80 @@ async function handleDbBackupDownload() {
   }
 }
 
+function renderGoogleImportResult(payload) {
+  if (!googleImportResult) {
+    return;
+  }
+  if (!payload) {
+    googleImportResult.innerHTML = '<p class="muted">No imports yet.</p>';
+    return;
+  }
+  const issues = (payload.errors || [])
+    .map((item) => `<li>Row ${item.row}: ${escapeHtml(item.reason)}</li>`)
+    .join("");
+  const truncated = payload.errors_truncated ? '<p class="muted">Only the first set of errors are shown.</p>' : "";
+  googleImportResult.innerHTML = `
+    <div class="entry">
+      <div class="entry-title">
+        <strong>Last Import Result</strong>
+        <span>${escapeHtml(payload.created_count || 0)} created</span>
+      </div>
+      <p class="muted">Rows processed: ${payload.rows_processed || 0} | Created: ${payload.created_count || 0} | Duplicates skipped: ${payload.skipped_duplicates || 0} | Errors: ${payload.error_count || 0}</p>
+      <p class="muted">${escapeHtml(payload.message || "")}</p>
+      ${issues ? `<ul class="import-error-list">${issues}</ul>${truncated}` : '<p class="muted">No row-level errors.</p>'}
+    </div>
+  `;
+}
+
+async function handleGoogleImport(event) {
+  event.preventDefault();
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const file = googleImportFile && googleImportFile.files && googleImportFile.files.length ? googleImportFile.files[0] : null;
+  if (!file) {
+    showToast("Choose a Google Form CSV file first.");
+    return;
+  }
+
+  if (googleImportBtn) {
+    googleImportBtn.disabled = true;
+    googleImportBtn.textContent = "Importing...";
+  }
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const payload = await api("/api/admin/import/google-form", {
+      method: "POST",
+      body: formData,
+    });
+    renderGoogleImportResult(payload);
+    if (googleImportForm) {
+      googleImportForm.reset();
+    }
+    if (Number(payload.created_count || 0) > 0) {
+      await refreshAll();
+    }
+    showToast(payload.message || "Google Form CSV imported.");
+  } catch (error) {
+    showToast(error.message || "Unable to import Google Form CSV.");
+  } finally {
+    if (googleImportBtn) {
+      googleImportBtn.disabled = false;
+      googleImportBtn.textContent = "Import Google Form CSV";
+    }
+  }
+}
+
+function handleDownloadGoogleImportTemplate() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  window.location.href = resolveApiPath("/api/admin/import/google-form/template");
+}
+
 async function handleCopyCalendarFeed() {
   if (!state.calendarShare || !state.calendarShare.feed_url) {
     showToast("Shared calendar link is not ready yet.");
@@ -2680,6 +2760,12 @@ function attachEvents() {
   logoutBtn.addEventListener("click", handleLogout);
   backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
   backupDbBtn.addEventListener("click", handleDbBackupDownload);
+  if (googleImportForm) {
+    googleImportForm.addEventListener("submit", handleGoogleImport);
+  }
+  if (downloadGoogleImportTemplateBtn) {
+    downloadGoogleImportTemplateBtn.addEventListener("click", handleDownloadGoogleImportTemplate);
+  }
   if (copyCalendarFeedBtn) {
     copyCalendarFeedBtn.addEventListener("click", handleCopyCalendarFeed);
   }

@@ -79,6 +79,7 @@ HEAD_SEED_LAST_NAME = os.getenv("HEAD_SEED_LAST_NAME", "Officer").strip() or "Of
 HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or "Admin"
 AUTO_CREATE_HEAD_SEED = os.getenv("AUTO_CREATE_HEAD_SEED", "1").strip().lower() in {"1", "true", "yes"}
 CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "America/Chicago").strip() or "America/Chicago"
+MAX_GOOGLE_FORM_IMPORT_BYTES = int(os.getenv("MAX_GOOGLE_FORM_IMPORT_BYTES", str(3 * 1024 * 1024)))
 
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -101,6 +102,89 @@ ALLOWED_PHOTO_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",
     "image/webp": ".webp",
+}
+GOOGLE_FORM_TEMPLATE_COLUMNS = [
+    "First Name",
+    "Last Name",
+    "Class Year (F/S/J)",
+    "Hometown",
+    "Phone Number",
+    "Instagram Handle",
+    "Interests (comma-separated)",
+    "Stereotype",
+    "First Event Date (YYYY-MM-DD, optional)",
+    "Notes (optional)",
+]
+GOOGLE_FORM_COLUMN_ALIASES = {
+    "first_name": {
+        "first name",
+        "firstname",
+        "first",
+        "what is your first name",
+    },
+    "last_name": {
+        "last name",
+        "lastname",
+        "last",
+        "what is your last name",
+    },
+    "full_name": {
+        "name",
+        "full name",
+        "fullname",
+        "your name",
+    },
+    "class_year": {
+        "class year",
+        "classyear",
+        "year",
+        "classification",
+        "grade",
+        "what is your class year",
+    },
+    "hometown": {
+        "hometown",
+        "home town",
+        "city",
+        "where are you from",
+    },
+    "phone_number": {
+        "phone",
+        "phone number",
+        "phonenumber",
+        "mobile",
+        "cell",
+    },
+    "instagram_handle": {
+        "instagram",
+        "instagram handle",
+        "instagramhandle",
+        "ig",
+        "ig handle",
+        "instagram username",
+    },
+    "interests": {
+        "interests",
+        "interest",
+        "hobbies",
+    },
+    "stereotype": {
+        "stereotype",
+        "archetype",
+        "type",
+    },
+    "first_event_date": {
+        "first event date",
+        "firsteventdate",
+        "event date",
+    },
+    "notes": {
+        "notes",
+        "additional notes",
+        "comments",
+        "about",
+        "bio",
+    },
 }
 
 app = FastAPI(
@@ -488,6 +572,65 @@ def build_webcal_url(http_url: str) -> str:
 
 def build_google_subscribe_url(http_url: str) -> str:
     return f"https://calendar.google.com/calendar/u/0/r?cid={quote(http_url, safe='')}"
+
+
+def normalize_csv_column_name(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "", value.strip().lower())
+
+
+def resolve_google_form_columns(headers: list[str]) -> dict[str, str | None]:
+    normalized_to_original: dict[str, str] = {}
+    for header in headers:
+        normalized = normalize_csv_column_name(header)
+        if normalized and normalized not in normalized_to_original:
+            normalized_to_original[normalized] = header
+
+    resolved: dict[str, str | None] = {}
+    for field, aliases in GOOGLE_FORM_COLUMN_ALIASES.items():
+        found: str | None = None
+        normalized_aliases = [normalize_csv_column_name(alias) for alias in aliases]
+        for alias in normalized_aliases:
+            candidate = normalized_to_original.get(alias)
+            if candidate:
+                found = candidate
+                break
+        if not found:
+            for normalized_header, original in normalized_to_original.items():
+                if any(alias and alias in normalized_header for alias in normalized_aliases):
+                    found = original
+                    break
+        resolved[field] = found
+    return resolved
+
+
+def csv_row_value(row: dict[str, Any], column: str | None) -> str:
+    if not column:
+        return ""
+    return str(row.get(column, "")).strip()
+
+
+def split_full_name(raw: str) -> tuple[str, str]:
+    tokens = [token for token in re.split(r"\s+", raw.strip()) if token]
+    if not tokens:
+        return "", ""
+    if len(tokens) == 1:
+        return tokens[0], "Unknown"
+    return tokens[0], " ".join(tokens[1:])
+
+
+def normalize_import_class_year(raw: str) -> str:
+    token = raw.strip().lower()
+    if not token:
+        return "F"
+    if token in {"f", "freshman", "freshmen", "firstyear", "first-year", "1", "1st"}:
+        return "F"
+    if token in {"s", "sophomore", "sophomores", "secondyear", "second-year", "2", "2nd"}:
+        return "S"
+    if token in {"j", "junior", "juniors", "thirdyear", "third-year", "3", "3rd"}:
+        return "J"
+    if token[:1] in {"f", "s", "j"}:
+        return token[:1].upper()
+    raise ValueError("Class year must be F, S, or J.")
 
 
 def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
@@ -2545,6 +2688,199 @@ def export_sqlite_backup(_: sqlite3.Row = Depends(require_head)) -> FileResponse
         filename=snapshot.name,
         headers={"Cache-Control": "no-store"},
     )
+
+
+@app.get("/api/admin/import/google-form/template")
+def export_google_form_template(_: sqlite3.Row = Depends(require_head)) -> Response:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(GOOGLE_FORM_TEMPLATE_COLUMNS)
+    writer.writerow(
+        [
+            "John",
+            "Smith",
+            "F",
+            "Nashville",
+            "+1 615 555 0110",
+            "@johnsmith",
+            "Leadership,Sports",
+            "Connector",
+            date.today().isoformat(),
+            "Met at first event and wants to stay involved.",
+        ]
+    )
+    payload = buffer.getvalue().encode("utf-8")
+    filename = f"google-form-rushee-template-{timestamp_slug()}.csv"
+    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    return Response(content=payload, media_type="text/csv; charset=utf-8", headers=headers)
+
+
+@app.post("/api/admin/import/google-form")
+async def import_google_form_csv(
+    file: UploadFile = File(...),
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    filename = (file.filename or "").strip()
+    if filename and not filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Upload a CSV file exported from Google Forms.")
+
+    raw = await file.read(MAX_GOOGLE_FORM_IMPORT_BYTES + 1)
+    if not raw:
+        raise HTTPException(status_code=400, detail="CSV file cannot be empty.")
+    if len(raw) > MAX_GOOGLE_FORM_IMPORT_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"CSV too large. Max size is {MAX_GOOGLE_FORM_IMPORT_BYTES // (1024 * 1024)} MB.",
+        )
+
+    try:
+        decoded = raw.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        decoded = raw.decode("latin-1")
+
+    reader = csv.DictReader(io.StringIO(decoded))
+    headers = [header.strip() for header in (reader.fieldnames or []) if header and header.strip()]
+    if not headers:
+        raise HTTPException(status_code=400, detail="CSV is missing a header row.")
+
+    column_map = resolve_google_form_columns(headers)
+    missing: list[str] = []
+    if not (column_map["first_name"] or column_map["full_name"]):
+        missing.append("First Name or Full Name")
+    if not (column_map["last_name"] or column_map["full_name"]):
+        missing.append("Last Name or Full Name")
+    if not column_map["instagram_handle"]:
+        missing.append("Instagram Handle")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"CSV missing required column(s): {', '.join(missing)}.",
+        )
+
+    created_count = 0
+    skipped_duplicates = 0
+    total_errors = 0
+    row_count = 0
+    error_limit = 80
+    errors: list[dict[str, Any]] = []
+
+    with db_session() as conn:
+        existing_instagrams = {
+            str(row["instagram_norm"]).strip()
+            for row in conn.execute("SELECT lower(instagram_handle) AS instagram_norm FROM pnms").fetchall()
+            if row["instagram_norm"]
+        }
+
+        for row_number, row in enumerate(reader, start=2):
+            row_count += 1
+            first_raw = csv_row_value(row, column_map["first_name"])
+            last_raw = csv_row_value(row, column_map["last_name"])
+            full_name_raw = csv_row_value(row, column_map["full_name"])
+            if full_name_raw and (not first_raw or not last_raw):
+                first_guess, last_guess = split_full_name(full_name_raw)
+                if not first_raw:
+                    first_raw = first_guess
+                if not last_raw:
+                    last_raw = last_guess
+
+            class_year_raw = csv_row_value(row, column_map["class_year"])
+            hometown_raw = csv_row_value(row, column_map["hometown"]) or "Unknown"
+            phone_raw = csv_row_value(row, column_map["phone_number"])
+            instagram_raw = csv_row_value(row, column_map["instagram_handle"])
+            interests_raw = csv_row_value(row, column_map["interests"]) or "Recruitment"
+            stereotype_raw = csv_row_value(row, column_map["stereotype"]) or "Unassigned"
+            first_event_raw = csv_row_value(row, column_map["first_event_date"]) or date.today().isoformat()
+            notes_raw = csv_row_value(row, column_map["notes"])
+
+            try:
+                first_name = normalize_name(first_raw)
+                last_name = normalize_name(last_raw)
+                class_year = normalize_import_class_year(class_year_raw)
+                hometown = hometown_raw.strip()
+                if not hometown:
+                    hometown = "Unknown"
+                hometown = hometown[:80]
+                instagram_handle = normalize_instagram_handle(instagram_raw)
+                phone_number = normalize_phone_number(phone_raw)
+                first_event_date = verify_iso_date(first_event_raw, "First event date")
+                interests = parse_interests(interests_raw)
+                interests_csv, interests_norm = encode_interests(interests)
+                stereotype = stereotype_raw.strip() or "Unassigned"
+                stereotype = stereotype[:48]
+                notes = notes_raw[:2000]
+            except ValueError as exc:
+                total_errors += 1
+                if len(errors) < error_limit:
+                    errors.append({"row": row_number, "reason": str(exc)})
+                continue
+
+            instagram_norm = instagram_handle.lower()
+            if instagram_norm in existing_instagrams:
+                skipped_duplicates += 1
+                continue
+
+            created_at = now_iso()
+            cursor = conn.execute(
+                """
+                INSERT INTO pnms (
+                    pnm_code,
+                    first_name,
+                    last_name,
+                    class_year,
+                    hometown,
+                    phone_number,
+                    instagram_handle,
+                    first_event_date,
+                    interests,
+                    interests_norm,
+                    stereotype,
+                    lunch_stats,
+                    notes,
+                    created_by,
+                    created_at,
+                    updated_at
+                )
+                VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+                """,
+                (
+                    first_name,
+                    last_name,
+                    class_year,
+                    hometown,
+                    phone_number,
+                    instagram_handle,
+                    first_event_date,
+                    interests_csv,
+                    interests_norm,
+                    stereotype,
+                    notes,
+                    head_user["id"],
+                    created_at,
+                    created_at,
+                ),
+            )
+            pnm_id = int(cursor.lastrowid)
+            code = ensure_unique_pnm_code(conn, pnm_id, pnm_code_base(first_name, last_name, first_event_date))
+            conn.execute("UPDATE pnms SET pnm_code = ?, updated_at = ? WHERE id = ?", (code, now_iso(), pnm_id))
+            existing_instagrams.add(instagram_norm)
+            created_count += 1
+
+    imported_message = f"Imported {created_count} rushee(s)."
+    if skipped_duplicates:
+        imported_message += f" Skipped {skipped_duplicates} duplicate instagram handle(s)."
+    if total_errors:
+        imported_message += f" {total_errors} row(s) had validation issues."
+
+    return {
+        "message": imported_message,
+        "rows_processed": row_count,
+        "created_count": created_count,
+        "skipped_duplicates": skipped_duplicates,
+        "error_count": total_errors,
+        "errors_truncated": total_errors > len(errors),
+        "errors": errors,
+        "column_mapping": column_map,
+    }
 
 
 @app.get("/api/export/contacts.vcf")

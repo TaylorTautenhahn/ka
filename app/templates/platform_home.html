@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Rush Platform</title>
+    <title>BidBoard | Organization Selection</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -15,15 +15,16 @@
   <body>
     <main class="shell">
       <header class="hero reveal">
-        <p class="eyebrow">Multi-Organization</p>
-        <h1>Select A Fraternity Workspace</h1>
-        <p>Choose the chapter you want to manage. Each workspace has isolated data, branding, and access control.</p>
+        <p class="eyebrow">BidBoard Multi-Organization</p>
+        <h1>Select An Organization Workspace</h1>
+        <p>Choose your fraternity or sorority chapter. Each workspace has isolated data, branding, and role-based access.</p>
       </header>
 
       <section class="panel">
         <div class="section-head">
           <h2>Organizations</h2>
           <div class="action-row platform-home-actions">
+            <a href="/" class="quick-nav-link">Back To BidBoard</a>
             <a href="/platform" class="quick-nav-link">Open Platform Admin</a>
           </div>
         </div>
@@ -53,7 +54,7 @@
           {% if not tenants %}
           <article class="tenant-card">
             <strong>No organizations configured yet</strong>
-            <p class="muted">Use Platform Admin to create your first fraternity workspace and upload its logo.</p>
+            <p class="muted">Use Platform Admin to create your first organization workspace and upload its logo.</p>
             <div class="action-row platform-card-actions">
               <a class="quick-nav-link" href="/platform">Open Platform Admin</a>
             </div>

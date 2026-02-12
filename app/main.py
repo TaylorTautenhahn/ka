@@ -741,7 +741,7 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
 @app.middleware("http")
 async def tenant_resolution(request: Request, call_next):  # type: ignore[no-untyped-def]
     path = request.scope.get("path", "/")
-    bypass_prefixes = ("/static", "/uploads", "/platform", "/health")
+    bypass_prefixes = ("/static", "/uploads", "/platform", "/organizations", "/health")
     if path == "/" or path.startswith(bypass_prefixes):
         return await call_next(request)
 
@@ -2688,6 +2688,19 @@ async def home(request: Request) -> HTMLResponse:
             },
         )
 
+    tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
+    return templates.TemplateResponse(
+        "landing.html",
+        {
+            "request": request,
+            "tenants": tenants,
+            "tenant_count": len(tenants),
+        },
+    )
+
+
+@app.get("/organizations", response_class=HTMLResponse)
+async def organizations_page(request: Request) -> HTMLResponse:
     tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
     return templates.TemplateResponse(
         "platform_home.html",

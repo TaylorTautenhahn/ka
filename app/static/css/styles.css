@@ -858,6 +858,52 @@ td strong {
   font-size: 0.84rem;
 }
 
+.trend-chart-wrap {
+  margin-top: 0.6rem;
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  border-radius: 10px;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.trend-chart {
+  width: 100%;
+  height: 200px;
+  display: block;
+}
+
+.trend-grid {
+  stroke: rgba(var(--accent-rgb), 0.13);
+  stroke-width: 1;
+}
+
+.trend-area {
+  fill: rgba(var(--gold-rgb), 0.2);
+}
+
+.trend-line {
+  fill: none;
+  stroke: rgba(var(--accent-rgb), 0.92);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.trend-point {
+  fill: #fff;
+  stroke: rgba(var(--accent-rgb), 0.92);
+  stroke-width: 1.2;
+}
+
+.trend-axis {
+  margin-top: 0.35rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  font-size: 0.73rem;
+  color: var(--ink-soft);
+}
+
 .entry {
   padding: 0.5rem;
   border-radius: 9px;

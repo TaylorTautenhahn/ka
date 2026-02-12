@@ -716,6 +716,75 @@ function formatLunchWindow(row) {
   return parts.join(" | ");
 }
 
+function formatTrendTimestamp(value) {
+  if (!value) {
+    return "Unknown";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
+function renderTrendChart(points) {
+  if (!points || points.length < 2) {
+    return '<p class="muted">Trend chart appears after at least two rating updates.</p>';
+  }
+  const width = 760;
+  const height = 220;
+  const left = 40;
+  const right = 14;
+  const top = 14;
+  const bottom = 26;
+  const chartWidth = width - left - right;
+  const chartHeight = height - top - bottom;
+  const values = points.map((point) => Number(point.weighted_total || 0));
+  let minY = Math.min(...values);
+  let maxY = Math.max(...values);
+  if (maxY - minY < 1) {
+    minY = Math.max(0, minY - 0.5);
+    maxY = Math.min(45, maxY + 0.5);
+  }
+  const yRange = Math.max(0.1, maxY - minY);
+  const xStep = chartWidth / Math.max(1, points.length - 1);
+  const toX = (index) => left + index * xStep;
+  const toY = (value) => top + ((maxY - value) / yRange) * chartHeight;
+
+  const polyline = points
+    .map((point, index) => `${toX(index).toFixed(2)},${toY(Number(point.weighted_total || 0)).toFixed(2)}`)
+    .join(" ");
+  const areaPath = `M ${left},${height - bottom} L ${polyline.replaceAll(" ", " L ")} L ${left + chartWidth},${height - bottom} Z`;
+  const horizontalGuides = [0, 1, 2, 3, 4]
+    .map((step) => {
+      const y = top + (chartHeight / 4) * step;
+      return `<line x1="${left}" y1="${y.toFixed(2)}" x2="${(left + chartWidth).toFixed(2)}" y2="${y.toFixed(2)}" class="trend-grid"></line>`;
+    })
+    .join("");
+  const markers = points
+    .map((point, index) => {
+      const x = toX(index);
+      const y = toY(Number(point.weighted_total || 0));
+      return `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.7" class="trend-point"></circle>`;
+    })
+    .join("");
+
+  return `
+    <div class="trend-chart-wrap">
+      <svg class="trend-chart" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" aria-hidden="true">
+        ${horizontalGuides}
+        <path d="${areaPath}" class="trend-area"></path>
+        <polyline points="${polyline}" class="trend-line"></polyline>
+        ${markers}
+      </svg>
+      <div class="trend-axis">
+        <span>${escapeHtml(formatTrendTimestamp(points[0].changed_at))}</span>
+        <span>${escapeHtml(formatTrendTimestamp(points[points.length - 1].changed_at))}</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderScheduledLunches() {
   if (!scheduledLunchesList) {
     return;
@@ -1675,8 +1744,13 @@ function renderMeetingView(payload) {
   if (!meetingView) {
     return;
   }
-  const { pnm, summary, ratings, lunches, matches, can_view_rater_identity: canSeeRaters } = payload;
+  const { pnm, summary, ratings, lunches, matches, rating_trend: trend, can_view_rater_identity: canSeeRaters } = payload;
   const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+  const trendPoints = trend && Array.isArray(trend.points) ? trend.points : [];
+  const trendDelta = trend && typeof trend.delta_weighted_total === "number" ? trend.delta_weighted_total : null;
+  const trendDeltaClass = trendDelta == null ? "warn" : trendDelta > 0 ? "good" : trendDelta < 0 ? "bad" : "warn";
+  const trendDeltaLabel = trendDelta == null ? "N/A" : `${trendDelta > 0 ? "+" : ""}${trendDelta.toFixed(2)}`;
+  const trendEvents = trend && typeof trend.events_count === "number" ? trend.events_count : trendPoints.length;
   const photoMarkup = pnm.photo_url
     ? `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}" class="meeting-photo large" loading="lazy" />`
     : '<div class="photo-placeholder large">No photo uploaded.</div>';
@@ -1734,6 +1808,14 @@ function renderMeetingView(payload) {
       <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
       <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>
     </div>
+    <article class="list-column">
+      <div class="entry-title">
+        <h3>Long-Term Rating Trend</h3>
+        <span class="${trendDeltaClass}">${trendDeltaLabel}</span>
+      </div>
+      <p class="muted">Weighted total trajectory over time from rating history events: ${trendEvents}</p>
+      ${renderTrendChart(trendPoints)}
+    </article>
     <div class="grid-two">
       <article class="list-column">
         <h3>Top Ratings</h3>

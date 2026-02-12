@@ -1160,6 +1160,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
         pnm_rows = [dict(row) for row in conn.execute("SELECT * FROM pnms ORDER BY id ASC").fetchall()]
         rating_rows = [dict(row) for row in conn.execute("SELECT * FROM ratings ORDER BY id ASC").fetchall()]
         rating_change_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_changes ORDER BY id ASC").fetchall()]
+        rating_history_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_history ORDER BY id ASC").fetchall()]
         lunch_rows = [dict(row) for row in conn.execute("SELECT * FROM lunches ORDER BY id ASC").fetchall()]
 
     export_ts = timestamp_slug()
@@ -1247,6 +1248,20 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "comment",
             "changed_at",
         ], rating_change_rows))
+        zf.writestr("rating_history.csv", csv_bytes_from_rows(list(rating_history_rows[0].keys()) if rating_history_rows else [
+            "id",
+            "rating_id",
+            "pnm_id",
+            "user_id",
+            "event_type",
+            "total_score",
+            "good_with_girls",
+            "will_make_it",
+            "personable",
+            "alcohol_control",
+            "instagram_marketability",
+            "changed_at",
+        ], rating_history_rows))
         zf.writestr("lunches.csv", csv_bytes_from_rows(list(lunch_rows[0].keys()) if lunch_rows else [
             "id",
             "pnm_id",
@@ -1262,7 +1277,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "KAO Rush Backup Export\n"
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
             f"Database path: {db_path}\n"
-            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, lunches.csv\n"
+            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, lunches.csv\n"
             "Password hashes are intentionally excluded from users.csv for security.\n"
         )
         zf.writestr("README.txt", readme.encode("utf-8"))
@@ -1411,6 +1426,91 @@ def recalc_pnm_rating_stats(conn: sqlite3.Connection, pnm_id: int) -> None:
     )
 
 
+def write_rating_history_event(
+    conn: sqlite3.Connection,
+    *,
+    rating_id: int,
+    pnm_id: int,
+    user_id: int,
+    event_type: str,
+    scores: dict[str, int],
+    changed_at: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO rating_history (
+            rating_id,
+            pnm_id,
+            user_id,
+            event_type,
+            total_score,
+            good_with_girls,
+            will_make_it,
+            personable,
+            alcohol_control,
+            instagram_marketability,
+            changed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            rating_id,
+            pnm_id,
+            user_id,
+            event_type,
+            scores["total_score"],
+            scores["good_with_girls"],
+            scores["will_make_it"],
+            scores["personable"],
+            scores["alcohol_control"],
+            scores["instagram_marketability"],
+            changed_at,
+        ),
+    )
+
+
+def build_rating_trend_points(history_rows: list[sqlite3.Row], max_points: int = 240) -> list[dict[str, Any]]:
+    latest_by_user: dict[int, tuple[int, str]] = {}
+    points: list[dict[str, Any]] = []
+
+    for row in history_rows:
+        user_id = int(row["user_id"])
+        total_score = int(row["total_score"])
+        role = row["role"]
+        latest_by_user[user_id] = (total_score, role)
+
+        weighted_sum = 0.0
+        total_weight = 0.0
+        raw_sum = 0
+        for score, user_role in latest_by_user.values():
+            weight = role_weight(user_role)
+            weighted_sum += score * weight
+            total_weight += weight
+            raw_sum += score
+
+        count = len(latest_by_user)
+        weighted_total = (weighted_sum / total_weight) if total_weight else 0.0
+        avg_total = (raw_sum / count) if count else 0.0
+        point = {
+            "changed_at": row["changed_at"],
+            "weighted_total": round(weighted_total, 2),
+            "avg_total": round(avg_total, 2),
+            "ratings_count": count,
+            "event_type": row["event_type"],
+        }
+        points.append(point)
+
+    if len(points) <= max_points:
+        return points
+
+    # Preserve trend shape by regular sampling and always keep final point.
+    step = max(1, len(points) // max_points)
+    sampled = [points[idx] for idx in range(0, len(points), step)]
+    if sampled[-1] != points[-1]:
+        sampled.append(points[-1])
+    return sampled[-max_points:]
+
+
 def setup_schema(conn: sqlite3.Connection) -> None:
     conn.executescript(
         """
@@ -1506,6 +1606,21 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             changed_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS rating_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rating_id INTEGER NOT NULL REFERENCES ratings(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL CHECK (event_type IN ('seed', 'create', 'update')),
+            total_score INTEGER NOT NULL CHECK (total_score BETWEEN 0 AND 45),
+            good_with_girls INTEGER NOT NULL CHECK (good_with_girls BETWEEN 0 AND 10),
+            will_make_it INTEGER NOT NULL CHECK (will_make_it BETWEEN 0 AND 10),
+            personable INTEGER NOT NULL CHECK (personable BETWEEN 0 AND 10),
+            alcohol_control INTEGER NOT NULL CHECK (alcohol_control BETWEEN 0 AND 10),
+            instagram_marketability INTEGER NOT NULL CHECK (instagram_marketability BETWEEN 0 AND 5),
+            changed_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS lunches (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
@@ -1532,6 +1647,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_pnms_interests ON pnms(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_ratings_pnm ON ratings(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
+        CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
         """
@@ -1565,6 +1682,65 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE lunches ADD COLUMN end_time TEXT")
     if "location" not in lunch_columns:
         conn.execute("ALTER TABLE lunches ADD COLUMN location TEXT NOT NULL DEFAULT ''")
+
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS rating_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rating_id INTEGER NOT NULL REFERENCES ratings(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL CHECK (event_type IN ('seed', 'create', 'update')),
+            total_score INTEGER NOT NULL CHECK (total_score BETWEEN 0 AND 45),
+            good_with_girls INTEGER NOT NULL CHECK (good_with_girls BETWEEN 0 AND 10),
+            will_make_it INTEGER NOT NULL CHECK (will_make_it BETWEEN 0 AND 10),
+            personable INTEGER NOT NULL CHECK (personable BETWEEN 0 AND 10),
+            alcohol_control INTEGER NOT NULL CHECK (alcohol_control BETWEEN 0 AND 10),
+            instagram_marketability INTEGER NOT NULL CHECK (instagram_marketability BETWEEN 0 AND 5),
+            changed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
+        """
+    )
+
+    # Backfill a baseline seed event for legacy ratings so trend charts can start from current stored state.
+    conn.execute(
+        """
+        INSERT INTO rating_history (
+            rating_id,
+            pnm_id,
+            user_id,
+            event_type,
+            total_score,
+            good_with_girls,
+            will_make_it,
+            personable,
+            alcohol_control,
+            instagram_marketability,
+            changed_at
+        )
+        SELECT
+            r.id,
+            r.pnm_id,
+            r.user_id,
+            'seed',
+            r.total_score,
+            r.good_with_girls,
+            r.will_make_it,
+            r.personable,
+            r.alcohol_control,
+            r.instagram_marketability,
+            COALESCE(r.updated_at, r.created_at, ?)
+        FROM ratings r
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM rating_history rh
+            WHERE rh.rating_id = r.id
+        )
+        """,
+        (now_iso(),),
+    )
 
 
 def ensure_seed_data(
@@ -3775,6 +3951,22 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             ORDER BY username ASC
             """
         ).fetchall()
+        trend_rows = conn.execute(
+            """
+            SELECT
+                rh.id,
+                rh.user_id,
+                rh.total_score,
+                rh.event_type,
+                rh.changed_at,
+                u.role
+            FROM rating_history rh
+            JOIN users u ON u.id = rh.user_id
+            WHERE rh.pnm_id = ?
+            ORDER BY rh.changed_at ASC, rh.id ASC
+            """,
+            (pnm_id,),
+        ).fetchall()
 
     can_view_identity = user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
     ratings: list[dict[str, Any]] = []
@@ -3848,11 +4040,22 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
         "weighted_total": round(float(pnm_row["weighted_total"]), 2),
         "total_lunches": int(pnm_row["total_lunches"]),
     }
+    trend_points = build_rating_trend_points(trend_rows)
+    trend_start = trend_points[0]["weighted_total"] if trend_points else None
+    trend_end = trend_points[-1]["weighted_total"] if trend_points else None
+    trend_delta = (trend_end - trend_start) if trend_start is not None and trend_end is not None else None
 
     return {
         "pnm": pnm_payload(pnm_row, own, assigned_officer=assigned_officer_payload_from_row(pnm_row)),
         "can_view_rater_identity": can_view_identity,
         "summary": summary,
+        "rating_trend": {
+            "points": trend_points,
+            "events_count": len(trend_rows),
+            "start_weighted_total": trend_start,
+            "end_weighted_total": trend_end,
+            "delta_weighted_total": round(float(trend_delta), 2) if trend_delta is not None else None,
+        },
         "ratings": ratings,
         "lunches": [
             {
@@ -4021,8 +4224,17 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                     "comment": comment,
                     "changed_at": now,
                 }
+                write_rating_history_event(
+                    conn,
+                    rating_id=int(existing["id"]),
+                    pnm_id=payload.pnm_id,
+                    user_id=int(user["id"]),
+                    event_type="update",
+                    scores=new_payload,
+                    changed_at=now,
+                )
         else:
-            conn.execute(
+            cursor = conn.execute(
                 """
                 INSERT INTO ratings (
                     pnm_id,
@@ -4052,6 +4264,24 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                     now,
                     now,
                 ),
+            )
+            rating_id = int(cursor.lastrowid or 0)
+            create_payload = {
+                "good_with_girls": payload.good_with_girls,
+                "will_make_it": payload.will_make_it,
+                "personable": payload.personable,
+                "alcohol_control": payload.alcohol_control,
+                "instagram_marketability": payload.instagram_marketability,
+                "total_score": new_total,
+            }
+            write_rating_history_event(
+                conn,
+                rating_id=rating_id,
+                pnm_id=payload.pnm_id,
+                user_id=int(user["id"]),
+                event_type="create",
+                scores=create_payload,
+                changed_at=now,
             )
 
         recalc_pnm_rating_stats(conn, payload.pnm_id)

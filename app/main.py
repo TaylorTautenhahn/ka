@@ -13,7 +13,7 @@ import sqlite3
 import time
 import zipfile
 import contextvars
-from urllib.parse import parse_qsl, quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -90,6 +90,7 @@ CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "America/Chicago").strip() or
 MAX_GOOGLE_FORM_IMPORT_BYTES = int(os.getenv("MAX_GOOGLE_FORM_IMPORT_BYTES", str(3 * 1024 * 1024)))
 INSTAGRAM_AVATAR_TIMEOUT_SECONDS = float(os.getenv("INSTAGRAM_AVATAR_TIMEOUT_SECONDS", "4.0"))
 INSTAGRAM_PROFILE_HTML_MAX_BYTES = int(os.getenv("INSTAGRAM_PROFILE_HTML_MAX_BYTES", "1200000"))
+INSTAGRAM_API_RESPONSE_MAX_BYTES = int(os.getenv("INSTAGRAM_API_RESPONSE_MAX_BYTES", "1200000"))
 INSTAGRAM_WEB_APP_ID = os.getenv("INSTAGRAM_WEB_APP_ID", "936619743392459").strip() or "936619743392459"
 SEASON_RESET_CONFIRMATION_PHRASE = os.getenv("SEASON_RESET_CONFIRMATION_PHRASE", "RESET RUSH SEASON").strip() or "RESET RUSH SEASON"
 SEASON_ARCHIVE_FILENAME = "season-archive-latest.sqlite"
@@ -1378,13 +1379,19 @@ def instagram_username_from_handle(handle: str) -> str:
     return token.strip()
 
 
-def fetch_image_from_url(request_url: str) -> tuple[bytes, str] | None:
+def fetch_image_from_url(request_url: str, referer: str | None = None) -> tuple[bytes, str] | None:
+    headers = {
+        "User-Agent": HTTP_USER_AGENT,
+        "Accept": "image/*",
+    }
+    if referer:
+        headers["Referer"] = referer
+        parsed = urlsplit(referer)
+        if parsed.scheme and parsed.netloc:
+            headers["Origin"] = f"{parsed.scheme}://{parsed.netloc}"
     request = URLRequest(
         request_url,
-        headers={
-            "User-Agent": HTTP_USER_AGENT,
-            "Accept": "image/*",
-        },
+        headers=headers,
     )
     try:
         with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
@@ -1444,22 +1451,12 @@ def normalize_instagram_image_url(url: str) -> str:
     except ValueError:
         return url
 
-    if not parsed.netloc:
+    # Keep Instagram-signed URLs byte-for-byte intact. Re-encoding query params
+    # can invalidate signed CDN links ("URL signature mismatch" 403).
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return url
 
-    query_items = parse_qsl(parsed.query, keep_blank_values=True)
-    normalized_items: list[tuple[str, str]] = []
-    for key, value in query_items:
-        if key.lower() == "stp" and re.search(r"_s\d+x\d+", value):
-            reduced = re.sub(r"_s\d+x\d+", "", value)
-            reduced = re.sub(r"__+", "_", reduced).strip("_")
-            if reduced and reduced != "dst-jpg":
-                normalized_items.append((key, reduced))
-            continue
-        normalized_items.append((key, value))
-
-    normalized_query = urlencode(normalized_items, doseq=True)
-    return urlunsplit((parsed.scheme, parsed.netloc, parsed.path, normalized_query, parsed.fragment))
+    return url.strip()
 
 
 def fetch_instagram_api_image_url(username: str) -> str | None:
@@ -1476,8 +1473,10 @@ def fetch_instagram_api_image_url(username: str) -> str | None:
     )
     try:
         with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
-            payload = response.read(300000)
+            payload = response.read(INSTAGRAM_API_RESPONSE_MAX_BYTES + 1)
     except (HTTPError, URLError, TimeoutError, ValueError, OSError):
+        return None
+    if not payload or len(payload) > INSTAGRAM_API_RESPONSE_MAX_BYTES:
         return None
 
     try:
@@ -1501,16 +1500,17 @@ def try_fetch_instagram_profile_photo(instagram_handle: str) -> tuple[bytes, str
     username = instagram_username_from_handle(instagram_handle)
     if not username:
         return None
+    profile_referer = f"https://www.instagram.com/{quote(username, safe='')}/"
 
     high_res_url = fetch_instagram_api_image_url(username)
     if high_res_url:
-        image = fetch_image_from_url(high_res_url)
+        image = fetch_image_from_url(high_res_url, referer=profile_referer)
         if image:
             return image
 
     og_url = fetch_instagram_og_image_url(username)
     if og_url:
-        image = fetch_image_from_url(og_url)
+        image = fetch_image_from_url(og_url, referer=profile_referer)
         if image:
             return image
 

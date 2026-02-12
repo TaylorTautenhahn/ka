@@ -1,7 +1,8 @@
-const CACHE_NAME = "kao-rush-shell-v3";
+const CACHE_NAME = "kao-rush-shell-v4";
 const APP_SHELL = [
   "/static/css/styles.css",
   "/static/js/app.js",
+  "/static/js/member_portal.js",
   "/static/js/meeting.js",
   "/static/js/mobile.js",
   "/static/js/platform_admin.js",

@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="{{ app_config.theme_primary if app_config else '#8a1538' }}" />
+    <title>{{ app_config.tenant_name if app_config else 'Fraternity' }} Member Portal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/member_portal.js" defer></script>
+  </head>
+  <body{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
+    <div class="aura aura-one"></div>
+    <div class="aura aura-two"></div>
+    <div class="noise"></div>
+
+    <main class="shell member-shell">
+      <header class="hero reveal">
+        {% if app_config.logo_path %}
+        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+        {% endif %}
+        <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Fraternity' }}</p>
+        <h1>Member Rating Portal</h1>
+        <p>Simple access for fraternity members to search rushees and submit ratings.</p>
+        <div class="action-row">
+          <a class="quick-nav-link" href="{{ app_config.base_path if app_config else '/' }}">Open Rush Team Console</a>
+        </div>
+      </header>
+
+      <section id="memberAuthSection" class="panel auth-grid reveal delay-1">
+        <article>
+          <h2>Member Login</h2>
+          <form id="memberLoginForm" class="stack">
+            <label>
+              Username
+              <input id="memberLoginUsername" type="text" required placeholder="Your approved username" />
+            </label>
+            <label>
+              Password
+              <input id="memberLoginPassword" type="password" required placeholder="Enter password" />
+            </label>
+            <button type="submit">Sign In</button>
+          </form>
+          <p class="muted">Use your approved member account to view and rate rushees.</p>
+        </article>
+
+        <article>
+          <h2>New Member Request</h2>
+          <form id="memberRegisterForm" class="stack">
+            <label>
+              Username
+              <input id="memberRegisterUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
+            </label>
+            <label>
+              Password
+              <input id="memberRegisterPassword" type="password" required placeholder="At least 8 characters with letters and numbers" />
+            </label>
+            <button type="submit" class="secondary">Request Access</button>
+          </form>
+          <p class="muted">Requests are approved by the rush team.</p>
+        </article>
+      </section>
+
+      <section id="memberAppSection" class="hidden">
+        <div class="panel topbar reveal delay-1">
+          <div>
+            <p class="eyebrow">Logged In</p>
+            <h2 id="memberSessionTitle">Member Portal</h2>
+            <p id="memberSessionSubtitle" class="muted"></p>
+          </div>
+          <div class="action-row">
+            <button id="memberLogoutBtn" type="button" class="secondary">Logout</button>
+          </div>
+        </div>
+
+        <section id="memberApprovalsPanel" class="panel hidden reveal delay-2">
+          <h2>Pending Account Requests</h2>
+          <p class="muted">Rush team can approve new member access here.</p>
+          <div id="memberPendingList" class="table-wrap"></div>
+        </section>
+
+        <section class="panel reveal delay-2">
+          <div class="member-search-row">
+            <label>
+              Search Rushees
+              <input id="memberSearchInput" type="text" placeholder="Search by name, code, hometown, instagram" />
+            </label>
+            <label>
+              Sort
+              <select id="memberSortSelect">
+                <option value="rank">Highest Ranked</option>
+                <option value="name">Name A-Z</option>
+                <option value="recent">Most Recent Event</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        <section class="member-layout reveal delay-3">
+          <article class="panel member-list-panel">
+            <div class="section-head">
+              <h2>Rushees</h2>
+              <p id="memberResultCount" class="muted">0 results</p>
+            </div>
+            <div id="memberPnmList" class="member-list"></div>
+          </article>
+
+          <article class="panel member-detail-panel">
+            <div id="memberEmptyState" class="list-box muted">Select a rushee to view details and rate.</div>
+
+            <div id="memberPnmDetail" class="hidden">
+              <div class="member-detail-head">
+                <img id="memberPnmPhoto" class="mini-photo member-hero-photo hidden" alt="Selected rushee" />
+                <div>
+                  <h2 id="memberPnmName"></h2>
+                  <p id="memberPnmMeta" class="muted"></p>
+                </div>
+              </div>
+
+              <div class="cards member-kpis" id="memberPnmKpis"></div>
+
+              <form id="memberRatingForm" class="stack member-rating-form">
+                <h3>Submit Your Rating</h3>
+                <div class="inline-grid five-cols compact-inputs">
+                  <label>Girls (0-10)<input id="memberRateGirls" type="number" min="0" max="10" required /></label>
+                  <label>Process (0-10)<input id="memberRateProcess" type="number" min="0" max="10" required /></label>
+                  <label>Personable (0-10)<input id="memberRatePersonable" type="number" min="0" max="10" required /></label>
+                  <label>Alcohol (0-10)<input id="memberRateAlcohol" type="number" min="0" max="10" required /></label>
+                  <label>IG (0-5)<input id="memberRateIg" type="number" min="0" max="5" required /></label>
+                </div>
+                <label>
+                  Comment (required when updating an existing rating)
+                  <textarea id="memberRateComment" rows="3" placeholder="Explain any rating changes"></textarea>
+                </label>
+                <button type="submit">Save Rating</button>
+              </form>
+
+              <div class="divider"></div>
+              <h3>Recent Rating Activity</h3>
+              <div id="memberRatingHistory" class="list-box muted">No ratings yet.</div>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+
+    <div id="memberToast" class="toast hidden"></div>
+  </body>
+</html>

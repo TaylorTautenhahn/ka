@@ -670,6 +670,10 @@ function roleCanUseAdminPanel() {
   return state.user && state.user.role === "Head Rush Officer";
 }
 
+function roleCanApproveUsers() {
+  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
 function roleCanAssignOfficer() {
   return state.user && state.user.role === "Head Rush Officer";
 }
@@ -703,6 +707,18 @@ function shouldRedirectToMobileNow() {
     return false;
   }
   return true;
+}
+
+function shouldRedirectToMemberPortal(user) {
+  if (!user || user.role !== "Rusher" || !APP_CONFIG.member_base) {
+    return false;
+  }
+  const currentPath = window.location.pathname.replace(/\/$/, "");
+  const memberPath = APP_CONFIG.member_base.replace(/\/$/, "");
+  if (!memberPath) {
+    return false;
+  }
+  return currentPath !== memberPath;
 }
 
 function formatLunchWindow(row) {
@@ -1230,7 +1246,7 @@ function renderMatching(data) {
 }
 
 function renderPendingApprovals(data) {
-  if (!state.user || state.user.role !== "Head Rush Officer") {
+  if (!roleCanApproveUsers()) {
     approvalsPanel.classList.add("hidden");
     return;
   }
@@ -1238,7 +1254,7 @@ function renderPendingApprovals(data) {
   approvalsPanel.classList.remove("hidden");
 
   if (!data.pending.length) {
-    pendingList.innerHTML = '<p class="muted">No pending usernames.</p>';
+    pendingList.innerHTML = '<p class="muted">No pending requests.</p>';
     return;
   }
 
@@ -1962,7 +1978,7 @@ async function loadScheduledLunches() {
 }
 
 async function loadApprovals() {
-  if (!state.user || state.user.role !== "Head Rush Officer") {
+  if (!roleCanApproveUsers()) {
     approvalsPanel.classList.add("hidden");
     return;
   }
@@ -2010,6 +2026,10 @@ async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
     state.user = payload.user;
+    if (shouldRedirectToMemberPortal(state.user)) {
+      window.location.replace(APP_CONFIG.member_base);
+      return;
+    }
     if (shouldRedirectToMobileNow()) {
       window.location.replace(APP_CONFIG.mobile_base);
       return;
@@ -2045,6 +2065,11 @@ async function handleLogin(event) {
         password,
       },
     });
+
+    if (shouldRedirectToMemberPortal(payload.user)) {
+      window.location.href = APP_CONFIG.member_base;
+      return;
+    }
 
     if (APP_CONFIG.mobile_base && shouldPreferMobileUi()) {
       window.location.href = APP_CONFIG.mobile_base;

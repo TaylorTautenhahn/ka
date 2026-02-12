@@ -64,6 +64,10 @@
           <p class="muted">
             Sign in with your approved username and password.
           </p>
+          <p class="muted">
+            Fraternity member and not on rush team?
+            <a href="{{ app_config.member_base if app_config else '/member' }}">Use the Member Portal</a>.
+          </p>
         </article>
 
         <article>
@@ -390,7 +394,7 @@
 
           <div class="desktop-page" data-page="members">
         <section id="approvalsPanel" class="panel hidden reveal delay-4">
-          <h2>Pending Username Approvals</h2>
+          <h2>Pending Account Approvals</h2>
           <div id="pendingList" class="table-wrap"></div>
         </section>
 

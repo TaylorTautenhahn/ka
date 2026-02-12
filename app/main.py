@@ -447,6 +447,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, str | None]:
         "base_path": f"/{tenant.slug}",
         "api_base": f"/{tenant.slug}/api",
         "meeting_base": f"/{tenant.slug}/meeting",
+        "member_base": f"/{tenant.slug}/member",
         "platform_base": "/platform",
         "mobile_base": f"/{tenant.slug}/mobile",
         "tenant_slug": tenant.slug,
@@ -2212,6 +2213,35 @@ def request_has_active_session(request: Request) -> bool:
     return True
 
 
+def request_session_role(request: Request) -> str | None:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return None
+
+    with db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT u.role, s.last_seen_at
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            return None
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return None
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > SESSION_TTL_SECONDS:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return None
+    return str(row["role"])
+
+
 def require_head(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
     if user["role"] != ROLE_HEAD:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Head Rush Officer permission required.")
@@ -2253,6 +2283,28 @@ class RegisterRequest(BaseModel):
             return None
         emoji = value.strip()
         return emoji or None
+
+
+class MemberRegisterRequest(BaseModel):
+    username: str = Field(..., min_length=3, max_length=64)
+    access_code: str = Field(..., min_length=8, max_length=128)
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_password_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "access_code" not in data and "password" in data:
+            merged = dict(data)
+            merged["access_code"] = merged.get("password")
+            return merged
+        return data
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str) -> str:
+        username = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9._-]{3,64}", username):
+            raise ValueError("Username may only include letters, numbers, dots, underscores, and hyphens.")
+        return username
 
 
 class LoginRequest(BaseModel):
@@ -2452,7 +2504,10 @@ def startup() -> None:
 async def home(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if tenant:
-        if request_prefers_mobile(request) and request_has_active_session(request):
+        session_role = request_session_role(request)
+        if session_role == ROLE_RUSHER:
+            return RedirectResponse(url=f"/{tenant.slug}/member", status_code=307)
+        if request_prefers_mobile(request) and bool(session_role):
             return RedirectResponse(url=f"/{tenant.slug}/mobile", status_code=307)
         return templates.TemplateResponse(
             "index.html",
@@ -2488,6 +2543,21 @@ async def meeting_page(request: Request) -> HTMLResponse:
         return RedirectResponse(url=f"/{tenant.slug}/mobile/meeting", status_code=307)
     return templates.TemplateResponse(
         "meeting.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+        },
+    )
+
+
+@app.get("/member", response_class=HTMLResponse)
+async def member_portal_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "member_portal.html",
         {
             "request": request,
             "tenant": tenant,
@@ -3143,7 +3213,72 @@ def register(payload: RegisterRequest) -> dict[str, str]:
             raise HTTPException(status_code=400, detail=f"Could not register user: {exc}") from exc
 
     return {
-        "message": "Registration submitted. Head Rush Officer approval is required before login.",
+        "message": "Registration submitted. Rush team approval is required before login.",
+        "username": username,
+    }
+
+
+@app.post("/api/auth/register-member")
+def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
+    try:
+        validate_access_code_strength(payload.access_code)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    username = payload.username.strip()
+    parts = [token for token in re.split(r"[._-]+", username) if token]
+    first_name = normalize_name((parts[0] if parts else "Fraternity")[:48])
+    last_name = normalize_name((parts[1] if len(parts) > 1 else "Member")[:48])
+    pledge_class = "Brotherhood"
+    stereotype = "Member"
+    interests_csv, interests_norm = encode_interests(["Brotherhood"])
+
+    with db_session() as conn:
+        existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
+        if existing:
+            raise HTTPException(status_code=409, detail="Username already exists.")
+
+        created_at = now_iso()
+        try:
+            conn.execute(
+                """
+                INSERT INTO users (
+                    username,
+                    first_name,
+                    last_name,
+                    pledge_class,
+                    role,
+                    emoji,
+                    stereotype,
+                    interests,
+                    interests_norm,
+                    access_code_hash,
+                    is_approved,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                """,
+                (
+                    username,
+                    first_name,
+                    last_name,
+                    pledge_class,
+                    ROLE_RUSHER,
+                    None,
+                    stereotype,
+                    interests_csv,
+                    interests_norm,
+                    hash_access_code(payload.access_code),
+                    created_at,
+                    created_at,
+                ),
+            )
+        except sqlite3.IntegrityError as exc:
+            raise HTTPException(status_code=400, detail=f"Could not register member: {exc}") from exc
+
+    return {
+        "message": "Registration submitted. A rush team member must approve this account before login.",
         "username": username,
     }
 
@@ -3165,7 +3300,7 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
             raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         if not bool(row["is_approved"]):
-            raise HTTPException(status_code=403, detail="Username pending Head Rush Officer approval.")
+            raise HTTPException(status_code=403, detail="Username pending rush team approval.")
 
         token = secrets.token_urlsafe(32)
         now = now_iso()
@@ -3220,7 +3355,7 @@ def auth_me(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
 
 
 @app.get("/api/users/pending")
-def pending_users(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+def pending_users(_: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         rows = conn.execute(
             """
@@ -3247,7 +3382,7 @@ def pending_users(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
 
 
 @app.post("/api/users/pending/{user_id}/approve")
-def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
+def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_officer)) -> dict[str, str]:
     with db_session() as conn:
         row = conn.execute("SELECT id, is_approved FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row:
@@ -3481,7 +3616,7 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
 
 
 @app.post("/api/pnms")
-def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     try:
         interests = parse_interests(payload.interests)
         instagram_handle = normalize_instagram_handle(payload.instagram_handle)

@@ -189,6 +189,7 @@ const rushEventEndTime = document.getElementById("rushEventEndTime");
 const rushEventLocation = document.getElementById("rushEventLocation");
 const rushEventDetails = document.getElementById("rushEventDetails");
 const rushEventOfficial = document.getElementById("rushEventOfficial");
+const rushEventPermissionNotice = document.getElementById("rushEventPermissionNotice");
 const rushCalendarStats = document.getElementById("rushCalendarStats");
 const rushCalendarTable = document.getElementById("rushCalendarTable");
 const copyRushCalendarFeedBtn = document.getElementById("copyRushCalendarFeedBtn");
@@ -1045,8 +1046,12 @@ function renderRushCalendar() {
   if (!rushCalendarTable || !rushCalendarStats) {
     return;
   }
+  const canManageEvents = roleCanUseAdminPanel();
   if (rushEventForm) {
-    rushEventForm.classList.toggle("hidden", !roleCanManageOperations());
+    rushEventForm.classList.toggle("hidden", !canManageEvents);
+  }
+  if (rushEventPermissionNotice) {
+    rushEventPermissionNotice.classList.toggle("hidden", canManageEvents);
   }
   const items = state.rushCalendarItems || [];
   const stats = state.rushCalendarStats || { total_count: 0, official_event_count: 0, lunch_count: 0, this_week_count: 0 };
@@ -1062,7 +1067,6 @@ function renderRushCalendar() {
     return;
   }
 
-  const canManage = roleCanManageOperations();
   const rows = items
     .map((item) => {
       const isEvent = item.item_type === "rush_event";
@@ -1074,7 +1078,7 @@ function renderRushCalendar() {
       const googleAction = item.google_calendar_url
         ? `<a class="quick-nav-link" href="${escapeHtml(item.google_calendar_url)}" target="_blank" rel="noopener">Open</a>`
         : "";
-      const deleteAction = canManage && isEvent
+      const deleteAction = canManageEvents && isEvent
         ? `<button type="button" class="secondary calendar-remove-btn" data-rush-event-delete="${item.event_id}">Remove</button>`
         : "";
       return `
@@ -3763,8 +3767,8 @@ async function handleCopyLunchOnlyFeed() {
 
 async function handleRushEventCreate(event) {
   event.preventDefault();
-  if (!roleCanManageOperations()) {
-    showToast("Rush Officer access required.");
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
     return;
   }
   const body = {
@@ -3812,8 +3816,8 @@ async function handleRushCalendarTableClick(event) {
   if (!removeBtn) {
     return;
   }
-  if (!roleCanManageOperations()) {
-    showToast("Rush Officer access required.");
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
     return;
   }
   const eventId = Number(removeBtn.dataset.rushEventDelete || 0);

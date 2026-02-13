@@ -7222,7 +7222,7 @@ def list_rush_events(
 
 
 @app.post("/api/rush-events")
-def create_rush_event(payload: RushEventCreateRequest, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
+def create_rush_event(payload: RushEventCreateRequest, user: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
     if payload.end_time and not payload.start_time:
         raise HTTPException(status_code=400, detail="End time requires a start time.")
     if payload.start_time and payload.end_time and payload.end_time <= payload.start_time:
@@ -7302,14 +7302,12 @@ def create_rush_event(payload: RushEventCreateRequest, user: sqlite3.Row = Depen
 def update_rush_event(
     event_id: int,
     payload: RushEventUpdateRequest,
-    user: sqlite3.Row = Depends(require_officer),
+    user: sqlite3.Row = Depends(require_head),
 ) -> dict[str, Any]:
     with db_session() as conn:
         row = conn.execute("SELECT * FROM rush_events WHERE id = ?", (event_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Rush event not found.")
-        if user["role"] != ROLE_HEAD and int(row["created_by"]) != int(user["id"]):
-            raise HTTPException(status_code=403, detail="Only heads or the creator can edit this event.")
 
         title = payload.title.strip() if payload.title is not None else row["title"]
         event_type = payload.event_type if payload.event_type is not None else row["event_type"]
@@ -7372,13 +7370,11 @@ def update_rush_event(
 
 
 @app.delete("/api/rush-events/{event_id}")
-def delete_rush_event(event_id: int, user: sqlite3.Row = Depends(require_officer)) -> dict[str, str]:
+def delete_rush_event(event_id: int, _: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
     with db_session() as conn:
         row = conn.execute("SELECT * FROM rush_events WHERE id = ?", (event_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Rush event not found.")
-        if user["role"] != ROLE_HEAD and int(row["created_by"]) != int(user["id"]):
-            raise HTTPException(status_code=403, detail="Only heads or the creator can remove this event.")
         conn.execute("UPDATE rush_events SET is_cancelled = 1, updated_at = ? WHERE id = ?", (now_iso(), event_id))
     return {"message": "Rush event removed."}
 

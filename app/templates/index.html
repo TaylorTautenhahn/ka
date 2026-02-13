@@ -196,11 +196,12 @@
         <section class="panel reveal delay-2">
           <div class="section-head">
             <h2>Rush Operations Calendar</h2>
-            <p class="muted">Track all official rush events and lunches in one shared timeline.</p>
+            <p class="muted">One shared calendar for all rush events and scheduled lunches.</p>
           </div>
           <div class="grid-two">
             <article class="list-column">
-              <h3>Create Rush Event</h3>
+              <h3>Head Rush Event Controls</h3>
+              <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove non-lunch events. Use the Schedule Lunch section to add lunch items.</p>
               <form id="rushEventForm" class="stack">
                 <label>
                   Event title
@@ -253,18 +254,12 @@
             </article>
             <article class="list-column">
               <h3>Shared Calendar Links</h3>
-              <p class="muted">Subscribe once to the full rush calendar feed (events + lunches).</p>
+              <p class="muted">Subscribe once to the chapter rush calendar (events + lunches).</p>
               <div class="action-row">
                 <button id="copyRushCalendarFeedBtn" type="button" class="secondary">Copy Rush Feed URL</button>
                 <a id="openRushGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
               </div>
               <p id="rushCalendarFeedPreview" class="muted breakable">Loading rush calendar link...</p>
-              <div class="divider"></div>
-              <p class="muted">Lunch-only feed (legacy)</p>
-              <div class="action-row">
-                <button id="copyLunchOnlyFeedBtn" type="button" class="secondary">Copy Lunch Feed URL</button>
-              </div>
-              <p id="lunchOnlyFeedPreview" class="muted breakable">Loading lunch feed link...</p>
               <div class="divider"></div>
               <h3>Calendar Snapshot</h3>
               <div id="rushCalendarStats" class="cards"></div>
@@ -479,8 +474,8 @@
             </div>
 
             <div id="sharedCalendarPanel" class="calendar-share">
-              <h3>Shared Lunch Calendar</h3>
-              <p class="muted">Subscribe once and everyone can view the same chapter lunch calendar.</p>
+              <h3>Shared Rush Calendar</h3>
+              <p class="muted">Subscribe once and everyone can view the same chapter rush calendar.</p>
               <p class="muted">Google can delay external calendar sync. Use "Open In Google Calendar" for immediate event creation.</p>
               <div class="action-row">
                 <button id="copyCalendarFeedBtn" type="button" class="secondary">Copy Calendar URL</button>

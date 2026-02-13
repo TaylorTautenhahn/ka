@@ -333,35 +333,51 @@
             <h2>Officer Chat + Notifications</h2>
             <p class="muted">Live officer communication with mentions, tags, and engagement stats.</p>
           </div>
-          <div class="grid-two">
-            <article class="list-column">
+          <div class="officer-chat-layout">
+            <aside class="list-column officer-chat-rail">
               <div class="section-head">
                 <h3>Notifications</h3>
                 <button id="notificationsReadAllBtn" type="button" class="secondary">Mark All Read</button>
               </div>
-              <div id="notificationsList" class="list-box muted">Loading notifications...</div>
-            </article>
-            <article class="list-column">
-              <h3>Officer Chat</h3>
-              <form id="officerChatForm" class="stack">
+              <div id="notificationsList" class="list-box muted officer-notification-list">Loading notifications...</div>
+              <div class="divider"></div>
+              <h3>Thread Stats</h3>
+              <div id="officerChatStats" class="cards officer-chat-stats"></div>
+            </aside>
+
+            <article class="list-column officer-chat-room">
+              <div class="officer-chat-head">
+                <div>
+                  <h3># rush-team-thread</h3>
+                  <p class="muted">Discord-style rush coordination. Use @username for mentions and Shift+Enter for new lines.</p>
+                </div>
+                <div class="officer-chat-hint">Live updates every few seconds</div>
+              </div>
+
+              <div id="officerChatList" class="list-box muted officer-chat-feed" aria-live="polite">Loading chat...</div>
+
+              <form id="officerChatForm" class="officer-chat-composer">
                 <label>
                   Message
-                  <textarea id="officerChatMessage" rows="3" placeholder="Use @username to tag a rush officer"></textarea>
+                  <textarea id="officerChatMessage" rows="3" placeholder="Type a message... Enter to send"></textarea>
                 </label>
-                <label>
-                  Tags (optional)
-                  <input id="officerChatTags" type="text" placeholder="events, followup, concerns" />
-                </label>
-                <button id="officerChatSubmitBtn" type="submit">Send Message</button>
+                <div id="officerChatQuickTags" class="officer-chat-quick-tags">
+                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="events">#events</button>
+                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="followup">#followup</button>
+                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="priority">#priority</button>
+                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="concerns">#concerns</button>
+                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="wins">#wins</button>
+                </div>
+                <div class="officer-chat-composer-foot">
+                  <label>
+                    Tags (optional)
+                    <input id="officerChatTags" type="text" placeholder="events, followup, concerns" />
+                  </label>
+                  <button id="officerChatSubmitBtn" type="submit">Send Message</button>
+                </div>
               </form>
-              <div class="divider"></div>
-              <h3>Chat Stats</h3>
-              <div id="officerChatStats" class="cards"></div>
             </article>
           </div>
-          <div class="divider"></div>
-          <h3>Officer Thread</h3>
-          <div id="officerChatList" class="list-box muted">Loading chat...</div>
         </section>
           </div>
 

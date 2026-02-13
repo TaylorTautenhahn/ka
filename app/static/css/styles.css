@@ -1178,8 +1178,251 @@ td strong {
   max-height: 360px;
 }
 
-#officerChatList {
-  max-height: 420px;
+.officer-chat-layout {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
+  align-items: stretch;
+}
+
+.officer-chat-rail,
+.officer-chat-room {
+  display: grid;
+  gap: 0.62rem;
+  align-content: start;
+}
+
+.officer-chat-room {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+}
+
+.officer-chat-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+  align-items: center;
+}
+
+.officer-chat-head h3 {
+  margin-bottom: 0.2rem;
+}
+
+.officer-chat-hint {
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  background: rgba(255, 255, 255, 0.76);
+  padding: 0.25rem 0.58rem;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+#notificationsList.officer-notification-list {
+  max-height: 320px;
+}
+
+#officerChatStats.officer-chat-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+#officerChatList.officer-chat-feed {
+  max-height: none;
+  min-height: 390px;
+  height: clamp(390px, 54vh, 540px);
+  padding: 0.58rem 0.52rem;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.8), rgba(248, 242, 234, 0.92));
+  border-color: rgba(var(--accent-rgb), 0.2);
+}
+
+.chat-day-separator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0.16rem 0 0.28rem;
+}
+
+.chat-day-separator span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.62rem;
+  border-radius: 999px;
+  background: rgba(var(--accent-rgb), 0.14);
+  color: var(--ink-soft);
+  font-size: 0.69rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.chat-welcome {
+  border: 1px dashed rgba(var(--accent-rgb), 0.28);
+  border-radius: 12px;
+  padding: 0.72rem;
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.chat-welcome strong {
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.discord-message {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 0.56rem;
+  align-items: start;
+  padding: 0.22rem 0.24rem;
+  border-radius: 10px;
+  transition: background-color 0.15s ease;
+}
+
+.discord-message:hover {
+  background: rgba(255, 255, 255, 0.48);
+}
+
+.chat-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(var(--accent-rgb), 0.26);
+  background: linear-gradient(160deg, rgba(var(--accent-soft-rgb), 0.22), rgba(var(--gold-rgb), 0.22));
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.chat-avatar.is-fallback {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.chat-bubble {
+  border: 1px solid rgba(var(--accent-rgb), 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 0.44rem 0.56rem;
+}
+
+.discord-message.is-own .chat-bubble {
+  border-color: rgba(29, 122, 75, 0.3);
+  background: linear-gradient(180deg, rgba(231, 248, 238, 0.86), rgba(242, 252, 245, 0.9));
+}
+
+.discord-message.is-mention .chat-bubble {
+  border-color: rgba(var(--gold-rgb), 0.55);
+  box-shadow: 0 0 0 1px rgba(var(--gold-rgb), 0.24);
+}
+
+.chat-head-row {
+  display: flex;
+  align-items: center;
+  gap: 0.34rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.2rem;
+}
+
+.chat-user {
+  font-size: 0.84rem;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.chat-role-pill {
+  padding: 0.1rem 0.34rem;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  background: rgba(var(--accent-rgb), 0.1);
+  color: var(--accent);
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.chat-time {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--ink-soft);
+  white-space: nowrap;
+}
+
+.chat-message-body {
+  margin: 0;
+  color: var(--ink);
+  line-height: 1.46;
+  white-space: normal;
+}
+
+.chat-meta-row {
+  margin-top: 0.35rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.chat-meta-row .pill {
+  margin: 0;
+}
+
+.chat-pill-tag {
+  background: rgba(var(--accent-rgb), 0.1);
+}
+
+.chat-pill-mention {
+  border-color: rgba(var(--gold-rgb), 0.46);
+  background: rgba(var(--gold-rgb), 0.22);
+  color: #5e450f;
+}
+
+.chat-edited {
+  font-size: 0.66rem;
+  color: var(--ink-soft);
+}
+
+.officer-chat-composer {
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 0.62rem;
+  display: grid;
+  gap: 0.52rem;
+}
+
+.officer-chat-composer textarea {
+  min-height: 84px;
+}
+
+.officer-chat-quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.officer-chat-quick-tags .chat-tag-btn {
+  min-height: 30px;
+  padding: 0.26rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.officer-chat-quick-tags .chat-tag-btn.is-selected {
+  border-color: rgba(var(--accent-rgb), 0.58);
+  background: rgba(var(--accent-rgb), 0.15);
+}
+
+.officer-chat-composer-foot {
+  display: grid;
+  gap: 0.52rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.officer-chat-composer-foot > label {
+  margin: 0;
+}
+
+.officer-chat-composer-foot button {
+  min-width: 130px;
 }
 
 #rushCalendarTable table {
@@ -1189,31 +1432,6 @@ td strong {
 .notification-unread {
   border-color: rgba(var(--gold-rgb), 0.42);
   background: linear-gradient(130deg, rgba(255, 255, 255, 0.76), rgba(255, 244, 210, 0.74));
-}
-
-.chat-entry {
-  border-left: 3px solid rgba(var(--accent-rgb), 0.2);
-}
-
-.chat-entry.is-own {
-  border-left-color: var(--good);
-}
-
-.chat-entry.is-mention {
-  border-left-color: rgba(var(--gold-rgb), 0.8);
-}
-
-.chat-message-body {
-  color: var(--ink);
-  line-height: 1.4;
-  white-space: normal;
-}
-
-.chat-meta-row {
-  margin-top: 0.4rem;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.3rem;
 }
 
 .hidden {
@@ -1493,6 +1711,15 @@ td strong {
     grid-template-columns: 1fr;
   }
 
+  .officer-chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #officerChatList.officer-chat-feed {
+    height: clamp(360px, 48vh, 480px);
+    min-height: 360px;
+  }
+
   .meeting-header {
     grid-template-columns: 180px 1fr;
   }
@@ -1549,6 +1776,32 @@ td strong {
     flex-wrap: nowrap;
     white-space: nowrap;
     top: 8px;
+  }
+
+  .officer-chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .officer-chat-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .officer-chat-hint {
+    white-space: normal;
+  }
+
+  #officerChatList.officer-chat-feed {
+    min-height: 300px;
+    height: clamp(300px, 50vh, 420px);
+  }
+
+  .officer-chat-composer-foot {
+    grid-template-columns: 1fr;
+  }
+
+  .officer-chat-composer-foot button {
+    width: 100%;
   }
 
   table {

@@ -216,6 +216,7 @@ const officerChatMessage = document.getElementById("officerChatMessage");
 const officerChatTags = document.getElementById("officerChatTags");
 const officerChatStats = document.getElementById("officerChatStats");
 const officerChatList = document.getElementById("officerChatList");
+const officerChatQuickTags = document.getElementById("officerChatQuickTags");
 
 const desktopPageNav = document.getElementById("desktopPageNav");
 const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
@@ -1280,6 +1281,56 @@ function renderOfficerChatStats() {
   `;
 }
 
+function formatChatClock(value) {
+  if (!value) {
+    return "--:--";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "--:--";
+  }
+  return parsed.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatChatDayLabel(value) {
+  if (!value) {
+    return "Recent";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return "Recent";
+  }
+  const dayStart = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diffDays = Math.round((dayStart.getTime() - todayStart.getTime()) / 86400000);
+  if (diffDays === 0) {
+    return "Today";
+  }
+  if (diffDays === -1) {
+    return "Yesterday";
+  }
+  return parsed.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
+}
+
+function chatRoleLabel(role) {
+  if (role === "Head Rush Officer") {
+    return "Head";
+  }
+  if (role === "Rush Officer") {
+    return "Officer";
+  }
+  return "Member";
+}
+
+function shouldAutoScrollChatFeed() {
+  if (!officerChatList) {
+    return true;
+  }
+  const remaining = officerChatList.scrollHeight - officerChatList.scrollTop - officerChatList.clientHeight;
+  return remaining <= 120;
+}
+
 function renderOfficerChat() {
   if (!officerChatList || !officerChatForm) {
     return;
@@ -1287,47 +1338,74 @@ function renderOfficerChat() {
   const canUse = roleCanManageOperations();
   officerChatForm.classList.toggle("hidden", !canUse);
   if (!canUse) {
-    officerChatList.innerHTML = '<p class="muted">Rush Officer access required for officer chat.</p>';
+    officerChatList.innerHTML = '<div class="chat-welcome"><strong>Rush Officer access required.</strong><p class="muted">Only approved Rush Officers and Head Rush Officers can access this thread.</p></div>';
     return;
   }
 
   const rows = state.officerChatMessages || [];
   if (!rows.length) {
-    officerChatList.innerHTML = '<p class="muted">No messages yet. Start the officer thread.</p>';
+    officerChatList.innerHTML = '<div class="chat-welcome"><strong>No messages yet.</strong><p class="muted">Start the thread with a kickoff update, assignment, or concern.</p></div>';
     return;
   }
 
-  officerChatList.innerHTML = rows
-    .map((message) => {
-      const classes = ["entry", "chat-entry"];
-      if (message.from_me) {
-        classes.push("is-own");
+  const keepPinnedToBottom = shouldAutoScrollChatFeed();
+  const parts = [];
+  let lastDayKey = "";
+
+  rows.forEach((message) => {
+    const createdAt = message.created_at || "";
+    const parsed = new Date(createdAt);
+    if (!Number.isNaN(parsed.getTime())) {
+      const nextDayKey = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, "0")}-${String(parsed.getDate()).padStart(2, "0")}`;
+      if (nextDayKey !== lastDayKey) {
+        parts.push(`<div class="chat-day-separator"><span>${escapeHtml(formatChatDayLabel(createdAt))}</span></div>`);
+        lastDayKey = nextDayKey;
       }
-      if (message.mentions_me) {
-        classes.push("is-mention");
-      }
-      const tags = (message.tags || []).map((tag) => `<span class="pill">#${escapeHtml(tag)}</span>`).join("");
-      const mentions = (message.mentions || [])
-        .map((item) => `<span class="pill">@${escapeHtml(item.username)}</span>`)
-        .join("");
-      const text = escapeHtml(message.message || "").replace(/\n/g, "<br />");
-      const senderPrefix = message.sender && message.sender.emoji ? `${message.sender.emoji} ` : "";
-      return `
-        <div class="${classes.join(" ")}">
-          <div class="entry-title">
-            <strong>${escapeHtml(`${senderPrefix}${message.sender ? message.sender.username : "Unknown"}`)}</strong>
-            <span>${escapeHtml(formatLastSeen(message.created_at))}</span>
+    }
+
+    const sender = message.sender || {};
+    const username = sender.username || "Unknown";
+    const emoji = sender.emoji ? String(sender.emoji).trim() : "";
+    const avatarText = emoji || username.charAt(0).toUpperCase() || "?";
+    const role = chatRoleLabel(sender.role);
+    const classes = ["discord-message"];
+    if (message.from_me) {
+      classes.push("is-own");
+    }
+    if (message.mentions_me) {
+      classes.push("is-mention");
+    }
+    const tags = (message.tags || [])
+      .map((tag) => `<span class="pill chat-pill-tag">#${escapeHtml(tag)}</span>`)
+      .join("");
+    const mentions = (message.mentions || [])
+      .map((item) => `<span class="pill chat-pill-mention">@${escapeHtml(item.username)}</span>`)
+      .join("");
+    const edited = message.edited_at ? '<span class="chat-edited">(edited)</span>' : "";
+    const text = escapeHtml(message.message || "").replace(/\n/g, "<br />");
+    const metadata = `${tags}${mentions}${edited}`;
+    parts.push(`
+      <article class="${classes.join(" ")}">
+        <div class="chat-avatar${emoji ? "" : " is-fallback"}">${escapeHtml(avatarText)}</div>
+        <div class="chat-bubble">
+          <div class="chat-head-row">
+            <strong class="chat-user">${escapeHtml(username)}</strong>
+            <span class="chat-role-pill">${escapeHtml(role)}</span>
+            <time class="chat-time" datetime="${escapeHtml(createdAt)}" title="${escapeHtml(formatLastSeen(createdAt))}">
+              ${escapeHtml(formatChatClock(createdAt))}
+            </time>
           </div>
-          <div class="chat-message-body">${text}</div>
-          <div class="chat-meta-row">
-            ${tags}
-            ${mentions}
-          </div>
+          <p class="chat-message-body">${text}</p>
+          ${metadata ? `<div class="chat-meta-row">${metadata}</div>` : ""}
         </div>
-      `;
-    })
-    .join("");
-  officerChatList.scrollTop = officerChatList.scrollHeight;
+      </article>
+    `);
+  });
+
+  officerChatList.innerHTML = parts.join("");
+  if (keepPinnedToBottom || rows.length <= 12) {
+    officerChatList.scrollTop = officerChatList.scrollHeight;
+  }
 }
 
 function renderAssignedRushSection() {
@@ -3988,6 +4066,56 @@ async function handleNotificationsReadAll() {
   }
 }
 
+function sanitizeChatTagToken(raw) {
+  return String(raw || "")
+    .trim()
+    .replace(/^#+/, "")
+    .replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+function appendQuickChatTag(rawTag) {
+  if (!officerChatTags) {
+    return;
+  }
+  const tag = sanitizeChatTagToken(rawTag);
+  if (!tag) {
+    return;
+  }
+  const tokens = parseTagInput(officerChatTags.value).map(sanitizeChatTagToken).filter(Boolean);
+  tokens.push(tag);
+  officerChatTags.value = uniqueNormalized(tokens).join(", ");
+}
+
+function handleOfficerChatQuickTagClick(event) {
+  const button = event.target.closest("[data-chat-quick-tag]");
+  if (!button) {
+    return;
+  }
+  const tag = button.dataset.chatQuickTag || "";
+  appendQuickChatTag(tag);
+  button.classList.add("is-selected");
+  clearTimeout(button._flashTimer);
+  button._flashTimer = setTimeout(() => button.classList.remove("is-selected"), 520);
+  if (officerChatMessage) {
+    officerChatMessage.focus();
+  }
+}
+
+function handleOfficerChatMessageKeydown(event) {
+  if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
+    return;
+  }
+  event.preventDefault();
+  if (!officerChatForm) {
+    return;
+  }
+  if (typeof officerChatForm.requestSubmit === "function") {
+    officerChatForm.requestSubmit();
+    return;
+  }
+  officerChatForm.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+}
+
 async function handleOfficerChatSubmit(event) {
   event.preventDefault();
   if (!roleCanManageOperations()) {
@@ -4012,6 +4140,9 @@ async function handleOfficerChatSubmit(event) {
     });
     if (officerChatForm) {
       officerChatForm.reset();
+    }
+    if (officerChatMessage) {
+      officerChatMessage.focus();
     }
     await Promise.all([loadOfficerChat(), loadOfficerChatStats(), loadWeeklyGoals(), loadNotifications()]);
     showToast("Message sent.");
@@ -4119,6 +4250,12 @@ function attachEvents() {
   }
   if (officerChatForm) {
     officerChatForm.addEventListener("submit", handleOfficerChatSubmit);
+  }
+  if (officerChatQuickTags) {
+    officerChatQuickTags.addEventListener("click", handleOfficerChatQuickTagClick);
+  }
+  if (officerChatMessage) {
+    officerChatMessage.addEventListener("keydown", handleOfficerChatMessageKeydown);
   }
   if (refreshInstagramPhotoBtn) {
     refreshInstagramPhotoBtn.addEventListener("click", handleRefreshInstagramPhoto);

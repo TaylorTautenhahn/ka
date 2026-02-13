@@ -39,8 +39,27 @@
       <section class="panel mobile-panel">
         <div class="action-row">
           <button id="mobileRefreshPnmsBtn" type="button" class="secondary">Refresh</button>
-          <button id="mobileDownloadContactsBtn" type="button" class="secondary">Download iPhone Contacts</button>
         </div>
+      </section>
+
+      <section class="panel mobile-panel">
+        <h2>iPhone Contacts Panel</h2>
+        <p class="muted">Download one rushee at a time or export all. Checkmarks are saved per account.</p>
+        <div class="inline-grid">
+          <label>
+            Select rushee
+            <select id="mobileContactPnmSelect"></select>
+          </label>
+          <label class="btn-wrap">
+            <span>&nbsp;</span>
+            <button id="mobileDownloadSelectedContactBtn" type="button">Download Selected Contact</button>
+          </label>
+        </div>
+        <div class="action-row">
+          <button id="mobileDownloadContactsBtn" type="button" class="secondary">Download All Contacts (.vcf)</button>
+        </div>
+        <p id="mobileContactProgress" class="muted">Loading download status...</p>
+        <div id="mobileContactStatusList" class="list-box"></div>
       </section>
 
       <section class="panel mobile-panel">

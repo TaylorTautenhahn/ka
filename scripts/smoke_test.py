@@ -329,6 +329,29 @@ def main() -> None:
             expect_status(response, 200, "Analytics overview API")
             checks.append("Analytics API works")
 
+            response = client.get("/kappaalphaorder/api/export/contacts/status")
+            expect_status(response, 200, "Contacts status API before export")
+            status_payload = response.json()
+            if int(status_payload.get("downloaded_count", -1)) != 0:
+                raise AssertionError("Contacts status should be empty before any export.")
+            checks.append("Per-user contact download status starts empty")
+
+            response = client.get(f"/kappaalphaorder/api/export/contacts/{pnm_id}.vcf")
+            expect_status(response, 200, "Single contact VCF export API")
+            single_contact_text = response.content.decode("utf-8", errors="ignore")
+            if "BEGIN:VCARD" not in single_contact_text or "FN:Alex Carter" not in single_contact_text:
+                raise AssertionError("Single contact export missing required vCard data.")
+            checks.append("Single PNM contact export works")
+
+            response = client.get("/kappaalphaorder/api/export/contacts/status")
+            expect_status(response, 200, "Contacts status API after single export")
+            status_payload = response.json()
+            downloads = status_payload.get("downloads", [])
+            downloaded_ids = {int(item.get("pnm_id")) for item in downloads if isinstance(item, dict) and item.get("pnm_id")}
+            if pnm_id not in downloaded_ids:
+                raise AssertionError("Single contact export did not persist per-user download checkmark state.")
+            checks.append("Per-user contact download status persists after single export")
+
             response = client.get("/kappaalphaorder/api/export/contacts.vcf")
             expect_status(response, 200, "Contacts VCF export API")
             contacts_content_type = (response.headers.get("content-type", "") or "").lower()
@@ -338,6 +361,13 @@ def main() -> None:
             if "BEGIN:VCARD" not in contacts_text or "ORG:PNM (Kappa Alpha Order)" not in contacts_text:
                 raise AssertionError("Contacts export missing required vCard fields.")
             checks.append("Contacts VCF export works")
+
+            response = client.get("/kappaalphaorder/api/export/contacts/status")
+            expect_status(response, 200, "Contacts status API after bulk export")
+            status_payload = response.json()
+            if int(status_payload.get("downloaded_count", 0)) < 1:
+                raise AssertionError("Bulk contact export should leave at least one per-user download status record.")
+            checks.append("Bulk contact export updates per-user contact status")
 
             response = client.get("/kappaalphaorder/api/export/csv")
             expect_status(response, 200, "CSV export API")

@@ -1241,6 +1241,53 @@ def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
     return "\r\n".join(lines)
 
 
+def upsert_contact_download_records(
+    conn: sqlite3.Connection,
+    *,
+    user_id: int,
+    pnm_ids: list[int],
+    downloaded_at: str | None = None,
+) -> None:
+    normalized_ids: list[int] = []
+    seen: set[int] = set()
+    for raw_id in pnm_ids:
+        pnm_id = int(raw_id)
+        if pnm_id <= 0 or pnm_id in seen:
+            continue
+        seen.add(pnm_id)
+        normalized_ids.append(pnm_id)
+    if not normalized_ids:
+        return
+    stamp = downloaded_at or now_iso()
+    conn.executemany(
+        """
+        INSERT INTO user_contact_downloads (user_id, pnm_id, downloaded_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id, pnm_id) DO UPDATE SET downloaded_at = excluded.downloaded_at
+        """,
+        [(int(user_id), pnm_id, stamp) for pnm_id in normalized_ids],
+    )
+
+
+def contact_download_status_records(conn: sqlite3.Connection, *, user_id: int) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT pnm_id, downloaded_at
+        FROM user_contact_downloads
+        WHERE user_id = ?
+        ORDER BY downloaded_at DESC
+        """,
+        (int(user_id),),
+    ).fetchall()
+    return [
+        {
+            "pnm_id": int(row["pnm_id"]),
+            "downloaded_at": row["downloaded_at"],
+        }
+        for row in rows
+    ]
+
+
 def request_prefers_mobile(request: Request) -> bool:
     if request.query_params.get("desktop") == "1":
         return False
@@ -2859,6 +2906,14 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS user_contact_downloads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            downloaded_at TEXT NOT NULL,
+            UNIQUE (user_id, pnm_id)
+        );
+
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2897,6 +2952,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_officer_chat_tags_tag ON officer_chat_tags(tag);
         CREATE INDEX IF NOT EXISTS idx_officer_chat_mentions_user ON officer_chat_mentions(user_id);
         CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
+        CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_user ON user_contact_downloads(user_id, downloaded_at);
+        CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_pnm ON user_contact_downloads(pnm_id);
         """
     )
 
@@ -3061,6 +3118,16 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
+
+        CREATE TABLE IF NOT EXISTS user_contact_downloads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            downloaded_at TEXT NOT NULL,
+            UNIQUE (user_id, pnm_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_user ON user_contact_downloads(user_id, downloaded_at);
+        CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_pnm ON user_contact_downloads(pnm_id);
         """
     )
     weekly_goal_columns = {row["name"] for row in conn.execute("PRAGMA table_info(weekly_goals)").fetchall()}
@@ -5206,8 +5273,55 @@ async def import_google_form_csv(
     }
 
 
+@app.get("/api/export/contacts/status")
+def export_contacts_download_status(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        downloads = contact_download_status_records(conn, user_id=int(user["id"]))
+    return {
+        "downloads": downloads,
+        "downloaded_count": len(downloads),
+    }
+
+
+@app.get("/api/export/contacts/{pnm_id}.vcf")
+def export_single_contact_vcf(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> Response:
+    tenant = CURRENT_TENANT.get()
+    if tenant is None:
+        default_row = require_tenant_exists(DEFAULT_TENANT_SLUG)
+        tenant = tenant_context_from_row(default_row)
+
+    with db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT id, first_name, last_name, pnm_code, phone_number, instagram_handle, photo_path
+            FROM pnms
+            WHERE id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        if row is None:
+            raise HTTPException(status_code=404, detail="Rushee not found.")
+        stamp = now_iso()
+        upsert_contact_download_records(
+            conn,
+            user_id=int(user["id"]),
+            pnm_ids=[int(row["id"])],
+            downloaded_at=stamp,
+        )
+
+    card = build_pnm_vcard(row, tenant.display_name)
+    payload = f"{card}\r\n".encode("utf-8")
+    safe_code = re.sub(r"[^A-Za-z0-9_-]+", "-", row["pnm_code"] or "pnm").strip("-") or "pnm"
+    filename = f"pnm-contact-{safe_code}.vcf"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    return Response(content=payload, media_type="text/x-vcard; charset=utf-8", headers=headers)
+
+
 @app.get("/api/export/contacts.vcf")
-def export_contacts_vcf(_: sqlite3.Row = Depends(current_user)) -> Response:
+def export_contacts_vcf(user: sqlite3.Row = Depends(current_user)) -> Response:
     tenant = CURRENT_TENANT.get()
     if tenant is None:
         default_row = require_tenant_exists(DEFAULT_TENANT_SLUG)
@@ -5216,13 +5330,19 @@ def export_contacts_vcf(_: sqlite3.Row = Depends(current_user)) -> Response:
     with db_session() as conn:
         rows = conn.execute(
             """
-            SELECT first_name, last_name, pnm_code, phone_number, instagram_handle, photo_path
+            SELECT id, first_name, last_name, pnm_code, phone_number, instagram_handle, photo_path
             FROM pnms
             ORDER BY last_name ASC, first_name ASC
             """
         ).fetchall()
-    if not rows:
-        raise HTTPException(status_code=404, detail="No rushees available to export yet.")
+        if not rows:
+            raise HTTPException(status_code=404, detail="No rushees available to export yet.")
+        upsert_contact_download_records(
+            conn,
+            user_id=int(user["id"]),
+            pnm_ids=[int(row["id"]) for row in rows],
+            downloaded_at=now_iso(),
+        )
 
     cards = [build_pnm_vcard(row, tenant.display_name) for row in rows]
     payload = ("\r\n".join(cards) + ("\r\n" if cards else "")).encode("utf-8")

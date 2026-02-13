@@ -141,6 +141,9 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
 
 const toastEl = document.getElementById("mobileToast");
 let mobileCalendarShare = null;
+let mobilePnmRows = [];
+const mobileContactDownloads = new Map();
+let mobileSelectedContactPnmId = null;
 
 function escapeHtml(input) {
   return String(input)
@@ -159,6 +162,47 @@ function showToast(message) {
   toastEl.classList.remove("hidden");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2500);
+}
+
+function contactDownloadedAt(pnmId) {
+  const normalized = Number(pnmId || 0);
+  if (!normalized) {
+    return null;
+  }
+  return mobileContactDownloads.get(normalized) || null;
+}
+
+function isContactDownloaded(pnmId) {
+  return Boolean(contactDownloadedAt(pnmId));
+}
+
+function setContactDownloadStatus(pnmId, downloadedAt) {
+  const normalized = Number(pnmId || 0);
+  if (!normalized) {
+    return;
+  }
+  const stamp = String(downloadedAt || "").trim();
+  if (!stamp) {
+    mobileContactDownloads.delete(normalized);
+    return;
+  }
+  mobileContactDownloads.set(normalized, stamp);
+}
+
+function formatDownloadStamp(value) {
+  if (!value) {
+    return "Not downloaded yet";
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+  return parsed.toLocaleString();
+}
+
+function contactSelectDisplayName(pnm) {
+  const downloaded = isContactDownloaded(pnm.pnm_id) ? " ✓" : "";
+  return `${pnm.first_name} ${pnm.last_name} (${pnm.pnm_code})${downloaded}`;
 }
 
 function parseTagInput(raw) {
@@ -380,7 +424,77 @@ function fileNameFromDisposition(value, fallback) {
   return plainMatch[1].trim() || fallback;
 }
 
-async function handleContactsDownload(button) {
+async function loadContactDownloadStatuses() {
+  const payload = await api("/api/export/contacts/status");
+  mobileContactDownloads.clear();
+  const rows = Array.isArray(payload.downloads) ? payload.downloads : [];
+  rows.forEach((row) => {
+    if (!row) {
+      return;
+    }
+    setContactDownloadStatus(row.pnm_id, row.downloaded_at);
+  });
+}
+
+function renderContactsPanel() {
+  const select = document.getElementById("mobileContactPnmSelect");
+  const progress = document.getElementById("mobileContactProgress");
+  const statusList = document.getElementById("mobileContactStatusList");
+  if (!select || !progress || !statusList) {
+    return;
+  }
+
+  if (!mobilePnmRows.length) {
+    select.innerHTML = '<option value="">No rushees available</option>';
+    select.disabled = true;
+    progress.textContent = "No contacts available to download yet.";
+    statusList.innerHTML = '<p class="muted">Add rushees to start building contact exports.</p>';
+    return;
+  }
+
+  const availableIds = new Set(mobilePnmRows.map((pnm) => Number(pnm.pnm_id)));
+  if (!mobileSelectedContactPnmId || !availableIds.has(Number(mobileSelectedContactPnmId))) {
+    mobileSelectedContactPnmId = Number(mobilePnmRows[0].pnm_id);
+  }
+
+  select.disabled = false;
+  select.innerHTML = mobilePnmRows
+    .map(
+      (pnm) =>
+        `<option value="${pnm.pnm_id}"${Number(pnm.pnm_id) === Number(mobileSelectedContactPnmId) ? " selected" : ""}>${escapeHtml(
+          contactSelectDisplayName(pnm)
+        )}</option>`
+    )
+    .join("");
+
+  const downloadedCount = mobilePnmRows.filter((pnm) => isContactDownloaded(pnm.pnm_id)).length;
+  progress.textContent = `Downloaded ${downloadedCount} of ${mobilePnmRows.length} rushee contacts for this account.`;
+
+  statusList.classList.add("contact-status-list");
+  statusList.innerHTML = mobilePnmRows
+    .map((pnm) => {
+      const downloadedAt = contactDownloadedAt(pnm.pnm_id);
+      const checkClass = downloadedAt ? "contact-check is-downloaded" : "contact-check";
+      const checkLabel = downloadedAt ? "✓ Downloaded" : "○ Pending";
+      return `
+        <article class="entry">
+          <div class="entry-title">
+            <strong>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+            <span class="${checkClass}">${checkLabel}</span>
+          </div>
+          <p class="muted">${escapeHtml(pnm.pnm_code)} | ${escapeHtml(formatDownloadStamp(downloadedAt))}</p>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function updateContactsUi() {
+  renderPnmCards(mobilePnmRows);
+  renderContactsPanel();
+}
+
+async function downloadContactsFile(button, apiPath, fallbackFileName) {
   if (!button) {
     return;
   }
@@ -388,7 +502,7 @@ async function handleContactsDownload(button) {
   const originalLabel = button.textContent;
   button.textContent = "Preparing...";
   try {
-    const response = await fetch(resolveApiPath("/api/export/contacts.vcf"), {
+    const response = await fetch(resolveApiPath(apiPath), {
       method: "GET",
       credentials: "same-origin",
       headers: {
@@ -409,7 +523,7 @@ async function handleContactsDownload(button) {
       throw new Error("No contacts available yet.");
     }
     const disposition = response.headers.get("content-disposition") || "";
-    const filename = fileNameFromDisposition(disposition, `bidboard-contacts-${new Date().toISOString().slice(0, 10)}.vcf`);
+    const filename = fileNameFromDisposition(disposition, fallbackFileName);
     const objectUrl = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = objectUrl;
@@ -420,12 +534,49 @@ async function handleContactsDownload(button) {
     anchor.remove();
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
     showToast("Contacts export started.");
+    return true;
   } catch (error) {
     showToast(error.message || "Unable to export contacts.");
+    return false;
   } finally {
     button.disabled = false;
     button.textContent = originalLabel;
   }
+}
+
+async function handleDownloadAllContacts(button) {
+  const exported = await downloadContactsFile(
+    button,
+    "/api/export/contacts.vcf",
+    `bidboard-contacts-${new Date().toISOString().slice(0, 10)}.vcf`
+  );
+  if (!exported) {
+    return;
+  }
+  await loadContactDownloadStatuses();
+  updateContactsUi();
+}
+
+async function handleDownloadSelectedContact(button) {
+  const selectedId = Number(
+    (document.getElementById("mobileContactPnmSelect") && document.getElementById("mobileContactPnmSelect").value) || 0
+  );
+  if (!selectedId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  const selectedPnm = mobilePnmRows.find((pnm) => Number(pnm.pnm_id) === selectedId);
+  const safeCode = selectedPnm ? String(selectedPnm.pnm_code || "pnm").replace(/[^A-Za-z0-9_-]+/g, "-") : "pnm";
+  const exported = await downloadContactsFile(
+    button,
+    `/api/export/contacts/${selectedId}.vcf`,
+    `pnm-contact-${safeCode}.vcf`
+  );
+  if (!exported) {
+    return;
+  }
+  await loadContactDownloadStatuses();
+  updateContactsUi();
 }
 
 async function ensureSession() {
@@ -526,6 +677,7 @@ function renderPnmCards(pnms) {
         ? `<img src="${escapeHtml(pnm.photo_url)}" class="mini-photo" alt="${escapeHtml(pnm.first_name)}" loading="lazy" />`
         : '<div class="mini-photo empty">No photo</div>';
       const assigned = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+      const downloaded = isContactDownloaded(pnm.pnm_id);
       return `
         <article class="entry mobile-card">
           <div class="entry-title">
@@ -537,6 +689,7 @@ function renderPnmCards(pnms) {
             <div>
               <div class="muted">${escapeHtml(pnm.phone_number || "No phone")} | ${escapeHtml(pnm.instagram_handle)}</div>
               <div class="muted">Assigned: ${escapeHtml(assigned)}</div>
+              <div class="muted">Contact export: ${downloaded ? "✓ Downloaded" : "○ Pending"}</div>
               <div class="muted">Interests: ${pnm.interests.map((x) => escapeHtml(x)).join(", ")}</div>
             </div>
           </div>
@@ -587,8 +740,9 @@ async function loadHomePage() {
 }
 
 async function loadPnmsPage() {
-  const payload = await api("/api/mobile/pnms");
-  renderPnmCards(payload.pnms || []);
+  const [pnmPayload] = await Promise.all([api("/api/mobile/pnms"), loadContactDownloadStatuses()]);
+  mobilePnmRows = Array.isArray(pnmPayload.pnms) ? pnmPayload.pnms : [];
+  updateContactsUi();
 }
 
 async function loadMembersPage() {
@@ -663,6 +817,8 @@ function attachPageEvents() {
   if (MOBILE_PAGE === "pnms") {
     const refreshBtn = document.getElementById("mobileRefreshPnmsBtn");
     const downloadBtn = document.getElementById("mobileDownloadContactsBtn");
+    const downloadSelectedBtn = document.getElementById("mobileDownloadSelectedContactBtn");
+    const contactSelect = document.getElementById("mobileContactPnmSelect");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
         try {
@@ -675,7 +831,17 @@ function attachPageEvents() {
     }
     if (downloadBtn) {
       downloadBtn.addEventListener("click", () => {
-        handleContactsDownload(downloadBtn);
+        handleDownloadAllContacts(downloadBtn);
+      });
+    }
+    if (downloadSelectedBtn) {
+      downloadSelectedBtn.addEventListener("click", () => {
+        handleDownloadSelectedContact(downloadSelectedBtn);
+      });
+    }
+    if (contactSelect) {
+      contactSelect.addEventListener("change", () => {
+        mobileSelectedContactPnmId = Number(contactSelect.value || 0) || null;
       });
     }
   }

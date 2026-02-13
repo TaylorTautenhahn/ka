@@ -1227,6 +1227,29 @@ td strong {
   margin-right: 0.2rem;
 }
 
+.contact-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  padding: 0.12rem 0.42rem;
+  background: rgba(255, 255, 255, 0.75);
+  color: var(--ink-soft);
+}
+
+.contact-check.is-downloaded {
+  border-color: rgba(29, 122, 75, 0.46);
+  background: rgba(29, 122, 75, 0.14);
+  color: #15593a;
+  font-weight: 700;
+}
+
+.contact-status-list .entry {
+  margin-bottom: 0.34rem;
+}
+
 .tag-picker {
   display: flex;
   flex-wrap: wrap;

@@ -37,6 +37,11 @@ try:
 except Exception:  # pragma: no cover - optional dependency in local dev before install
     segno = None
 
+try:
+    from PIL import Image
+except Exception:  # pragma: no cover - optional dependency
+    Image = None
+
 
 BASE_DIR = Path(__file__).resolve().parent
 
@@ -99,6 +104,7 @@ INSTAGRAM_API_RESPONSE_MAX_BYTES = int(os.getenv("INSTAGRAM_API_RESPONSE_MAX_BYT
 INSTAGRAM_WEB_APP_ID = os.getenv("INSTAGRAM_WEB_APP_ID", "936619743392459").strip() or "936619743392459"
 SEASON_RESET_CONFIRMATION_PHRASE = os.getenv("SEASON_RESET_CONFIRMATION_PHRASE", "RESET RUSH SEASON").strip() or "RESET RUSH SEASON"
 SEASON_ARCHIVE_FILENAME = "season-archive-latest.sqlite"
+VCARD_PHOTO_MAX_BYTES = int(os.getenv("VCARD_PHOTO_MAX_BYTES", str(550_000)))
 
 DATA_ROOT.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1155,6 +1161,55 @@ def normalize_import_class_year(raw: str) -> str:
     raise ValueError("Class year must be F, S, or J.")
 
 
+def normalize_vcard_photo_bytes(raw: bytes, suffix: str) -> tuple[bytes, str] | None:
+    token = suffix.strip().lower()
+    if token in {".jpg", ".jpeg"}:
+        if len(raw) <= VCARD_PHOTO_MAX_BYTES:
+            return raw, "JPEG"
+        token = ".jpeg"  # nosec B105
+    elif token == ".png" and len(raw) <= VCARD_PHOTO_MAX_BYTES:  # nosec B105
+        return raw, "PNG"
+
+    if Image is None:
+        return None
+
+    try:
+        with Image.open(io.BytesIO(raw)) as image:
+            converted = image.convert("RGB")
+            max_edge = 640
+            if max(converted.size) > max_edge:
+                converted.thumbnail((max_edge, max_edge))
+            output = io.BytesIO()
+            quality = 86
+            for _ in range(3):
+                output.seek(0)
+                output.truncate(0)
+                converted.save(output, format="JPEG", optimize=True, quality=quality)
+                converted_bytes = output.getvalue()
+                if len(converted_bytes) <= VCARD_PHOTO_MAX_BYTES or quality <= 60:
+                    return converted_bytes, "JPEG"
+                quality -= 12
+    except Exception:
+        return None
+    return None
+
+
+def build_vcard_photo_line(photo_path: str | None) -> str | None:
+    fs_path = photo_fs_path(photo_path)
+    if fs_path is None or not fs_path.exists() or not fs_path.is_file():
+        return None
+
+    raw = fs_path.read_bytes()
+    if not raw:
+        return None
+    normalized = normalize_vcard_photo_bytes(raw, fs_path.suffix)
+    if not normalized:
+        return None
+    content, photo_type = normalized
+    encoded = base64.b64encode(content).decode("ascii")
+    return fold_vcard_line(f"PHOTO;ENCODING=b;TYPE={photo_type}:{encoded}")
+
+
 def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
     first_name = row["first_name"] or ""
     last_name = row["last_name"] or ""
@@ -1178,18 +1233,9 @@ def build_pnm_vcard(row: sqlite3.Row, tenant_name: str) -> str:
         lines.append(fold_vcard_line(f"item1.URL:https://instagram.com/{vcard_escape(ig_name)}"))
         lines.append("item1.X-ABLabel:Instagram")
 
-    photo_path = row["photo_path"]
-    fs_path = photo_fs_path(photo_path)
-    if fs_path and fs_path.exists() and fs_path.is_file():
-        raw = fs_path.read_bytes()
-        photo_type = "JPEG"
-        suffix = fs_path.suffix.lower()
-        if suffix == ".png":
-            photo_type = "PNG"
-        elif suffix == ".webp":
-            photo_type = "WEBP"
-        encoded = base64.b64encode(raw).decode("ascii")
-        lines.append(fold_vcard_line(f"PHOTO;ENCODING=b;TYPE={photo_type}:{encoded}"))
+    photo_line = build_vcard_photo_line(row["photo_path"])
+    if photo_line:
+        lines.append(photo_line)
 
     lines.append("END:VCARD")
     return "\r\n".join(lines)
@@ -5175,12 +5221,17 @@ def export_contacts_vcf(_: sqlite3.Row = Depends(current_user)) -> Response:
             ORDER BY last_name ASC, first_name ASC
             """
         ).fetchall()
+    if not rows:
+        raise HTTPException(status_code=404, detail="No rushees available to export yet.")
 
     cards = [build_pnm_vcard(row, tenant.display_name) for row in rows]
     payload = ("\r\n".join(cards) + ("\r\n" if cards else "")).encode("utf-8")
     filename = f"pnm-contacts-{tenant.slug}-{timestamp_slug()}.vcf"
-    headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
-    return Response(content=payload, media_type="text/vcard; charset=utf-8", headers=headers)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    return Response(content=payload, media_type="text/x-vcard; charset=utf-8", headers=headers)
 
 
 @app.post("/api/auth/register")

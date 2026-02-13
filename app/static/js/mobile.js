@@ -360,6 +360,74 @@ async function api(path, options = {}) {
   return payload;
 }
 
+function fileNameFromDisposition(value, fallback) {
+  const source = String(value || "");
+  if (!source) {
+    return fallback;
+  }
+  const utfMatch = source.match(/filename\\*=UTF-8''([^;]+)/i);
+  if (utfMatch && utfMatch[1]) {
+    try {
+      return decodeURIComponent(utfMatch[1].replace(/['"]/g, "")).trim() || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  const plainMatch = source.match(/filename=\"?([^\";]+)\"?/i);
+  if (!plainMatch || !plainMatch[1]) {
+    return fallback;
+  }
+  return plainMatch[1].trim() || fallback;
+}
+
+async function handleContactsDownload(button) {
+  if (!button) {
+    return;
+  }
+  button.disabled = true;
+  const originalLabel = button.textContent;
+  button.textContent = "Preparing...";
+  try {
+    const response = await fetch(resolveApiPath("/api/export/contacts.vcf"), {
+      method: "GET",
+      credentials: "same-origin",
+      headers: {
+        Accept: "text/x-vcard,text/vcard,text/plain,*/*",
+      },
+    });
+    if (!response.ok) {
+      const contentType = response.headers.get("content-type") || "";
+      let detail = "Unable to export contacts.";
+      if (contentType.includes("application/json")) {
+        const payload = await response.json().catch(() => ({}));
+        detail = String(payload.detail || detail);
+      }
+      throw new Error(detail);
+    }
+    const blob = await response.blob();
+    if (!blob || blob.size <= 0) {
+      throw new Error("No contacts available yet.");
+    }
+    const disposition = response.headers.get("content-disposition") || "";
+    const filename = fileNameFromDisposition(disposition, `bidboard-contacts-${new Date().toISOString().slice(0, 10)}.vcf`);
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    showToast("Contacts export started.");
+  } catch (error) {
+    showToast(error.message || "Unable to export contacts.");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
 async function ensureSession() {
   try {
     await api("/api/auth/me");
@@ -607,7 +675,7 @@ function attachPageEvents() {
     }
     if (downloadBtn) {
       downloadBtn.addEventListener("click", () => {
-        window.location.href = resolveApiPath("/api/export/contacts.vcf");
+        handleContactsDownload(downloadBtn);
       });
     }
   }

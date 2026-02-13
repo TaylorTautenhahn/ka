@@ -329,6 +329,16 @@ def main() -> None:
             expect_status(response, 200, "Analytics overview API")
             checks.append("Analytics API works")
 
+            response = client.get("/kappaalphaorder/api/export/contacts.vcf")
+            expect_status(response, 200, "Contacts VCF export API")
+            contacts_content_type = (response.headers.get("content-type", "") or "").lower()
+            if "vcard" not in contacts_content_type:
+                raise AssertionError(f"Contacts export returned unexpected content-type: {contacts_content_type}")
+            contacts_text = response.content.decode("utf-8", errors="ignore")
+            if "BEGIN:VCARD" not in contacts_text or "ORG:PNM (Kappa Alpha Order)" not in contacts_text:
+                raise AssertionError("Contacts export missing required vCard fields.")
+            checks.append("Contacts VCF export works")
+
             response = client.get("/kappaalphaorder/api/export/csv")
             expect_status(response, 200, "CSV export API")
             content_type = response.headers.get("content-type", "")

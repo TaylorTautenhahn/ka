@@ -46,6 +46,7 @@ def main() -> None:
         configure_env(Path(tmpdir))
 
         from fastapi.testclient import TestClient
+        from app import main as main_module
         from app.main import app
 
         checks: list[str] = []
@@ -54,13 +55,39 @@ def main() -> None:
             expect_status(response, 200, "Landing page")
             checks.append("Landing route responds")
 
+            response = client.get("/features")
+            expect_status(response, 200, "Features page")
+            checks.append("Features route responds")
+
+            response = client.get("/faq")
+            expect_status(response, 200, "FAQ page")
+            checks.append("FAQ route responds")
+
+            response = client.get("/demo")
+            expect_status(response, 200, "Demo page")
+            checks.append("Demo route responds")
+
             response = client.head("/")
             expect_status(response, 200, "HEAD root")
             checks.append("HEAD / health probe path responds")
 
+            response = client.get("/manifest.webmanifest")
+            expect_status(response, 200, "Root manifest")
+            manifest = response.json()
+            if manifest.get("short_name") != "BidBoard":
+                raise AssertionError("Root manifest short_name should be BidBoard.")
+            checks.append("Root web manifest responds")
+
             response = client.get("/kappaalphaorder")
             expect_status(response, 200, "Tenant web app page")
             checks.append("Tenant route responds")
+
+            response = client.get("/kappaalphaorder/manifest.webmanifest")
+            expect_status(response, 200, "Tenant manifest")
+            tenant_manifest = response.json()
+            if tenant_manifest.get("start_url") != "/kappaalphaorder/":
+                raise AssertionError("Tenant manifest start_url is incorrect.")
+            checks.append("Tenant web manifest responds")
 
             response = client.get("/kappaalphaorder/mobile")
             expect_status(response, 200, "Tenant mobile page")
@@ -96,10 +123,27 @@ def main() -> None:
 
             response = client.post(
                 "/kappaalphaorder/api/auth/login",
-                json={"username": "headseed", "access_code": "HeadSeed123!"},
+                json={"username": "headseed", "access_code": "HeadSeed123!", "remember_me": True},
             )
             expect_status(response, 200, "Head login")
+            session_cookie = client.cookies.get(main_module.SESSION_COOKIE)
+            if not session_cookie:
+                raise AssertionError("Head login did not set rush session cookie.")
+            tenant_row = main_module.fetch_tenant_row("kappaalphaorder")
+            if tenant_row is None:
+                raise AssertionError("Missing tenant row for kappaalphaorder.")
+            tenant_ctx = main_module.tenant_context_from_row(tenant_row)
+            with main_module.db_session(tenant_ctx.db_path) as conn:
+                session_row = conn.execute(
+                    "SELECT max_idle_seconds FROM sessions WHERE token = ?",
+                    (session_cookie,),
+                ).fetchone()
+            if session_row is None:
+                raise AssertionError("Could not find persisted session record for head login.")
+            if int(session_row["max_idle_seconds"]) != int(main_module.SESSION_REMEMBER_TTL_SECONDS):
+                raise AssertionError("Remember-me login did not store remember session TTL.")
             checks.append("Head login works")
+            checks.append("Remember-me session TTL stored for tenant user")
 
             response = client.get("/kappaalphaorder/api/users/pending")
             expect_status(response, 200, "Pending users list")
@@ -298,10 +342,23 @@ def main() -> None:
 
             response = client.post(
                 "/platform/api/auth/login",
-                json={"username": "platformadmin", "access_code": "Platform123!"},
+                json={"username": "platformadmin", "access_code": "Platform123!", "remember_me": True},
             )
             expect_status(response, 200, "Platform admin login")
+            platform_cookie = client.cookies.get(main_module.PLATFORM_SESSION_COOKIE)
+            if not platform_cookie:
+                raise AssertionError("Platform login did not set platform session cookie.")
+            with main_module.platform_db_session() as conn:
+                platform_session = conn.execute(
+                    "SELECT max_idle_seconds FROM platform_sessions WHERE token = ?",
+                    (platform_cookie,),
+                ).fetchone()
+            if platform_session is None:
+                raise AssertionError("Could not find persisted platform session record.")
+            if int(platform_session["max_idle_seconds"]) != int(main_module.PLATFORM_SESSION_REMEMBER_TTL_SECONDS):
+                raise AssertionError("Platform remember-me login did not store remember session TTL.")
             checks.append("Platform admin login works")
+            checks.append("Remember-me session TTL stored for platform admin")
 
             response = client.get("/platform/api/tenants")
             expect_status(response, 200, "Platform tenant list")

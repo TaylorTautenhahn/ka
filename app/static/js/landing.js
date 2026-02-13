@@ -1,4 +1,5 @@
 (function () {
+  document.documentElement.classList.add("bb-motion");
   const revealNodes = Array.from(document.querySelectorAll(".bb-reveal"));
   const prefersReducedMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const saveData = Boolean(navigator.connection && navigator.connection.saveData);

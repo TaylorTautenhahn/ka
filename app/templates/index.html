@@ -4,8 +4,12 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="{{ app_config.theme_primary if app_config else '#8a1538' }}" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name if app_config else 'BidBoard' }}" />
     <title>{{ app_config.tenant_name if app_config else 'KAO' }} Rush Evaluation</title>
-    <link rel="manifest" href="/static/manifest.webmanifest" />
+    <link rel="manifest" href="{{ app_config.base_path if app_config else '' }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -14,12 +18,20 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/app.js" defer></script>
   </head>
   <body{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
     <div class="noise"></div>
+    <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
+      <div class="pwa-splash-card">
+        <p class="eyebrow">{{ app_config.chapter_name if app_config else "BidBoard" }}</p>
+        <h2>BidBoard</h2>
+        <p>Opening your recruitment workspace...</p>
+      </div>
+    </div>
 
     <main class="shell">
       <header class="hero reveal">
@@ -58,6 +70,10 @@
             <label>
               Password
               <input id="loginAccessCode" type="password" required placeholder="Enter password" />
+            </label>
+            <label class="checkbox-line">
+              <input id="loginRememberMe" type="checkbox" />
+              Keep me signed in on this device
             </label>
             <button type="submit">Sign In</button>
           </form>

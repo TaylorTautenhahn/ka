@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8a1538" />
+    <title>BidBoard | Interactive Demo</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/pwa_shell.js" defer></script>
+    <script src="/static/js/demo.js" defer></script>
+  </head>
+  <body>
+    <div class="aura aura-one"></div>
+    <div class="aura aura-two"></div>
+    <div class="noise"></div>
+    <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
+      <div class="pwa-splash-card">
+        <p class="eyebrow">BidBoard Demo</p>
+        <h2>Interactive Sandbox</h2>
+        <p>Loading sample recruitment data...</p>
+      </div>
+    </div>
+
+    <main class="shell">
+      <header class="hero reveal">
+        <p class="eyebrow">BidBoard Sales Demo</p>
+        <h1>Interactive Demo Workspace</h1>
+        <p>Try core workflows without login. This demo never writes to your real organization data.</p>
+        <div class="action-row">
+          <a href="/organizations" class="quick-nav-link">Open Organization Login</a>
+          <a href="/features" class="quick-nav-link">View Product Tour</a>
+        </div>
+      </header>
+
+      <section class="panel demo-banner reveal delay-1">
+        <strong>Demo Mode Active:</strong>
+        <span>All actions are in-memory only and reset when you refresh.</span>
+      </section>
+
+      <section class="panel reveal delay-1">
+        <div class="cards demo-kpis">
+          <article class="card"><p>Demo PNMs</p><strong id="demoPnmCount">0</strong></article>
+          <article class="card"><p>Ratings Logged</p><strong id="demoRatingCount">0</strong></article>
+          <article class="card"><p>Lunches Scheduled</p><strong id="demoLunchCount">0</strong></article>
+          <article class="card"><p>Avg Total</p><strong id="demoAverageScore">0.0</strong></article>
+        </div>
+      </section>
+
+      <section class="panel reveal delay-2">
+        <div class="inline-grid two-cols">
+          <label>
+            Search Demo PNMs
+            <input id="demoSearch" type="text" placeholder="Name, code, hometown, stereotype" />
+          </label>
+          <label>
+            Sort
+            <select id="demoSort">
+              <option value="score">Highest Score</option>
+              <option value="name">Name A-Z</option>
+              <option value="recent">Most Recent Update</option>
+            </select>
+          </label>
+        </div>
+        <div class="action-row">
+          <button id="demoResetBtn" type="button" class="secondary">Reset Demo Data</button>
+          <button id="demoDownloadBtn" type="button" class="secondary">Download Demo CSV</button>
+        </div>
+      </section>
+
+      <section class="demo-layout reveal delay-2">
+        <article class="panel demo-list-panel">
+          <div class="section-head">
+            <h2>Demo PNM Leaderboard</h2>
+            <p id="demoResultCount" class="muted">0 results</p>
+          </div>
+          <div id="demoPnmTable" class="table-wrap"></div>
+        </article>
+
+        <article class="panel demo-detail-panel">
+          <div id="demoEmptyState" class="list-box muted">Select a demo PNM to explore profile, ratings, and lunches.</div>
+          <div id="demoDetail" class="hidden">
+            <div class="meeting-header">
+              <div>
+                <p class="eyebrow" id="demoSelectedCode"></p>
+                <h2 id="demoSelectedName"></h2>
+                <p class="muted" id="demoSelectedMeta"></p>
+              </div>
+            </div>
+
+            <div id="demoTrend" class="list-box"></div>
+
+            <form id="demoRatingForm" class="stack">
+              <h3>Submit Demo Rating Update</h3>
+              <div class="inline-grid five-cols compact-inputs">
+                <label>Girls (0-10)<input id="demoRateGirls" type="number" min="0" max="10" required /></label>
+                <label>Process (0-10)<input id="demoRateProcess" type="number" min="0" max="10" required /></label>
+                <label>Personable (0-10)<input id="demoRatePersonable" type="number" min="0" max="10" required /></label>
+                <label>Alcohol (0-10)<input id="demoRateAlcohol" type="number" min="0" max="10" required /></label>
+                <label>IG (0-5)<input id="demoRateIg" type="number" min="0" max="5" required /></label>
+              </div>
+              <label>
+                Comment (optional in demo)
+                <textarea id="demoRateComment" rows="2" placeholder="What changed after your latest interaction?"></textarea>
+              </label>
+              <button type="submit">Save Demo Rating</button>
+            </form>
+
+            <div class="divider"></div>
+
+            <form id="demoLunchForm" class="stack">
+              <h3>Schedule Demo Lunch</h3>
+              <div class="inline-grid two-cols">
+                <label>Date<input id="demoLunchDate" type="date" required /></label>
+                <label>Time<input id="demoLunchTime" type="time" /></label>
+              </div>
+              <label>Location<input id="demoLunchLocation" type="text" placeholder="Campus Cafe" /></label>
+              <button type="submit" class="secondary">Add Demo Lunch</button>
+            </form>
+
+            <div class="divider"></div>
+            <h3>Recent Demo Activity</h3>
+            <div id="demoActivity" class="list-box"></div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <div id="demoToast" class="toast hidden"></div>
+  </body>
+</html>

@@ -1,10 +1,11 @@
 {
-  "name": "KAO Rush Evaluation",
-  "short_name": "KAO Rush",
-  "description": "Connected recruitment evaluation platform for Kappa Alpha Order.",
-  "start_url": "/",
+  "name": "BidBoard Recruitment OS",
+  "short_name": "BidBoard",
+  "description": "Recruitment operating system for fraternities and sororities.",
+  "start_url": "/organizations",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
   "background_color": "#f4efe6",
   "theme_color": "#8a1538",
   "icons": [

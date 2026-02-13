@@ -100,6 +100,7 @@ const logoutBtn = document.getElementById("logoutBtn");
 const installBtn = document.getElementById("installBtn");
 const backupCsvBtn = document.getElementById("backupCsvBtn");
 const backupDbBtn = document.getElementById("backupDbBtn");
+const loginRememberMe = document.getElementById("loginRememberMe");
 
 const regEmoji = document.getElementById("regEmoji");
 
@@ -352,7 +353,6 @@ const state = {
   pnms: [],
   members: [],
   selectedPnmId: null,
-  deferredPrompt: null,
   toastTimer: null,
   filters: {
     interest: "",
@@ -2856,6 +2856,7 @@ async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("loginUsername").value.trim();
   const password = document.getElementById("loginAccessCode").value;
+  const rememberMe = Boolean(loginRememberMe && loginRememberMe.checked);
 
   if (!username || !password) {
     showToast("Username and password are required.");
@@ -2868,6 +2869,7 @@ async function handleLogin(event) {
       body: {
         username,
         password,
+        remember_me: rememberMe,
       },
     });
 
@@ -4178,26 +4180,38 @@ async function handleOfficerChatSubmit(event) {
 }
 
 function setupPwaInstall() {
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("/service-worker.js").catch(() => {
-      // service worker registration failure should not block core app.
-    });
+  if (!installBtn) {
+    return;
   }
+  const pwaApi = window.BidBoardPwa || null;
+  const userAgent = (navigator.userAgent || "").toLowerCase();
+  const isIosDevice = /iphone|ipad|ipod/.test(userAgent);
+  const isStandalone =
+    Boolean(pwaApi && typeof pwaApi.isStandaloneMode === "function" && pwaApi.isStandaloneMode()) ||
+    window.navigator.standalone === true;
+  const refreshInstallButton = () => {
+    const hasPrompt = Boolean(pwaApi && typeof pwaApi.getDeferredPrompt === "function" && pwaApi.getDeferredPrompt());
+    const showManualInstallHint = isIosDevice && !isStandalone;
+    installBtn.classList.toggle("hidden", !(hasPrompt || showManualInstallHint));
+  };
+  refreshInstallButton();
 
-  window.addEventListener("beforeinstallprompt", (event) => {
-    event.preventDefault();
-    state.deferredPrompt = event;
-    installBtn.classList.remove("hidden");
+  document.addEventListener("bidboard:install-ready", refreshInstallButton);
+  document.addEventListener("bidboard:installed", () => {
+    installBtn.classList.add("hidden");
   });
 
   installBtn.addEventListener("click", async () => {
-    if (!state.deferredPrompt) {
+    if (!pwaApi || typeof pwaApi.promptInstall !== "function") {
+      showToast("Use Safari Share -> Add to Home Screen.");
       return;
     }
-    state.deferredPrompt.prompt();
-    await state.deferredPrompt.userChoice;
-    state.deferredPrompt = null;
-    installBtn.classList.add("hidden");
+    const promptShown = await pwaApi.promptInstall();
+    if (!promptShown) {
+      showToast("Use Safari Share -> Add to Home Screen.");
+      return;
+    }
+    refreshInstallButton();
   });
 }
 

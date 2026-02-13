@@ -4,7 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="{{ app_config.theme_primary }}" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
     <title>{{ app_config.tenant_name }} Meeting Packets</title>
+    <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -12,9 +18,17 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/meeting.js" defer></script>
   </head>
   <body data-app-config='{{ app_config | tojson | forceescape }}'>
+    <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
+      <div class="pwa-splash-card">
+        <p class="eyebrow">{{ app_config.chapter_name }}</p>
+        <h2>BidBoard</h2>
+        <p>Loading meeting packets...</p>
+      </div>
+    </div>
     <main class="shell">
       <header class="hero reveal">
         {% if app_config.logo_path %}

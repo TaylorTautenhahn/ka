@@ -134,6 +134,7 @@ const appSection = document.getElementById("memberAppSection");
 const memberLoginForm = document.getElementById("memberLoginForm");
 const memberRegisterForm = document.getElementById("memberRegisterForm");
 const memberLogoutBtn = document.getElementById("memberLogoutBtn");
+const memberLoginRememberMe = document.getElementById("memberLoginRememberMe");
 const memberSessionTitle = document.getElementById("memberSessionTitle");
 const memberSessionSubtitle = document.getElementById("memberSessionSubtitle");
 const memberToast = document.getElementById("memberToast");
@@ -580,6 +581,7 @@ async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("memberLoginUsername").value.trim();
   const password = document.getElementById("memberLoginPassword").value;
+  const rememberMe = Boolean(memberLoginRememberMe && memberLoginRememberMe.checked);
 
   if (!username || !password) {
     showToast("Username and password are required.");
@@ -589,7 +591,7 @@ async function handleLogin(event) {
   try {
     const payload = await api("/api/auth/login", {
       method: "POST",
-      body: { username, password },
+      body: { username, password, remember_me: rememberMe },
     });
     state.user = payload.user;
     setAuthView(true);

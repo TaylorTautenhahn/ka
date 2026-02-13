@@ -3,7 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8a1538" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="BidBoard Admin" />
     <title>Platform Admin</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -11,9 +18,17 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/platform_admin.js" defer></script>
   </head>
   <body>
+    <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
+      <div class="pwa-splash-card">
+        <p class="eyebrow">BidBoard</p>
+        <h2>Platform Admin</h2>
+        <p>Loading organization control center...</p>
+      </div>
+    </div>
     <main class="shell">
       <header class="hero reveal">
         <p class="eyebrow">Platform Admin</p>
@@ -31,6 +46,10 @@
           <label>
             Password
             <input id="platformAccessCode" type="password" required />
+          </label>
+          <label class="checkbox-line">
+            <input id="platformRememberMe" type="checkbox" />
+            Keep me signed in on this device
           </label>
           <button type="submit">Sign In</button>
         </form>

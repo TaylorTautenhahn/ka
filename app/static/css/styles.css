@@ -83,6 +83,64 @@ body {
   background-size: 4px 4px;
 }
 
+.pwa-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(circle at 10% 12%, rgba(var(--gold-rgb), 0.2), transparent 38%),
+    radial-gradient(circle at 88% 80%, rgba(var(--accent-rgb), 0.28), transparent 44%),
+    linear-gradient(155deg, rgba(31, 14, 21, 0.86), rgba(66, 16, 35, 0.9));
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.pwa-splash.is-visible {
+  opacity: 1;
+}
+
+.pwa-splash.is-hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pwa-splash-card {
+  width: min(86vw, 360px);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  box-shadow: 0 22px 42px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+}
+
+.pwa-splash-card h2 {
+  color: #fff;
+  margin-bottom: 0.2rem;
+}
+
+.pwa-splash-card p {
+  margin: 0.2rem 0 0;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.pwa-standalone body {
+  overscroll-behavior: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.pwa-standalone input,
+.pwa-standalone textarea,
+.pwa-standalone select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .shell {
   position: relative;
   z-index: 1;
@@ -375,6 +433,43 @@ h3 {
   display: grid;
   grid-template-columns: 1fr;
   gap: 1rem;
+}
+
+.demo-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+}
+
+.demo-list-panel,
+.demo-detail-panel {
+  min-width: 0;
+}
+
+.demo-kpis {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.demo-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem;
+  border: 1px solid rgba(var(--gold-rgb), 0.5);
+  background: linear-gradient(125deg, rgba(255, 255, 255, 0.75), rgba(255, 243, 208, 0.7));
+}
+
+.demo-banner strong {
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--accent);
+}
+
+.demo-banner span {
+  color: var(--ink-soft);
+}
+
+.table-wrap tr.is-active {
+  background: rgba(var(--accent-rgb), 0.15);
 }
 
 .member-list-panel,
@@ -1782,6 +1877,15 @@ td strong {
   .member-layout {
     grid-template-columns: minmax(280px, 34%) minmax(0, 1fr);
     align-items: start;
+  }
+
+  .demo-layout {
+    grid-template-columns: minmax(320px, 42%) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .demo-kpis {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
 

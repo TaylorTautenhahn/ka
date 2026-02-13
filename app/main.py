@@ -24,7 +24,7 @@ import csv
 
 from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -67,10 +67,15 @@ HASH_SCHEME = os.getenv("HASH_SCHEME", "pbkdf2_sha256")
 PASSWORD_ITERATIONS = int(os.getenv("PASSWORD_ITERATIONS", "260000"))
 LEGACY_AUTH_SALT = os.getenv("LEGACY_AUTH_SALT", "kao-rush-v1")
 SESSION_TTL_SECONDS = int(os.getenv("SESSION_TTL_SECONDS", "43200"))
+SESSION_REMEMBER_TTL_SECONDS = int(os.getenv("SESSION_REMEMBER_TTL_SECONDS", str(60 * 60 * 24 * 30)))
 PLATFORM_SESSION_TTL_SECONDS = int(os.getenv("PLATFORM_SESSION_TTL_SECONDS", str(SESSION_TTL_SECONDS)))
+PLATFORM_SESSION_REMEMBER_TTL_SECONDS = int(
+    os.getenv("PLATFORM_SESSION_REMEMBER_TTL_SECONDS", str(60 * 60 * 24 * 14))
+)
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "strict").strip().lower()
 ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "0").strip().lower() in {"1", "true", "yes"}
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
 LOGIN_BLOCK_SECONDS = int(os.getenv("LOGIN_BLOCK_SECONDS", "600"))
@@ -221,6 +226,17 @@ GOOGLE_FORM_TEMPLATE_COLUMNS = [
     "Instagram Handle",
 ]
 HTTP_USER_AGENT = os.getenv("HTTP_USER_AGENT", "Mozilla/5.0").strip() or "Mozilla/5.0"
+ALLOWED_REMOTE_FETCH_HOSTS = {
+    "instagram.com",
+    "www.instagram.com",
+    "i.instagram.com",
+    "unavatar.io",
+}
+ALLOWED_REMOTE_FETCH_HOST_SUFFIXES = (
+    ".instagram.com",
+    ".cdninstagram.com",
+    ".fbcdn.net",
+)
 GOOGLE_FORM_COLUMN_ALIASES = {
     "first_name": {
         "first name",
@@ -275,6 +291,9 @@ app = FastAPI(
     title="KA Recruitment Evaluation",
     description="Connected, role-aware recruitment evaluation platform.",
     version="1.0.0",
+    docs_url="/docs" if ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if ENABLE_API_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_API_DOCS else None,
 )
 app.add_middleware(GZipMiddleware, minimum_size=512)
 if ALLOWED_HOSTS != ["*"]:
@@ -392,6 +411,33 @@ def should_use_secure_cookie(request: Request) -> bool:
     return request.url.scheme == "https"
 
 
+def mark_response_private(response: Response) -> None:
+    response.headers["Cache-Control"] = "no-store, private"
+    response.headers["Pragma"] = "no-cache"
+
+
+def normalized_idle_ttl_seconds(raw_value: Any, fallback_seconds: int) -> int:
+    try:
+        parsed = int(raw_value)
+    except (TypeError, ValueError):
+        parsed = fallback_seconds
+    return max(900, parsed)
+
+
+def user_session_idle_seconds(remember_me: bool) -> int:
+    return normalized_idle_ttl_seconds(
+        SESSION_REMEMBER_TTL_SECONDS if remember_me else SESSION_TTL_SECONDS,
+        SESSION_TTL_SECONDS,
+    )
+
+
+def platform_session_idle_seconds(remember_me: bool) -> int:
+    return normalized_idle_ttl_seconds(
+        PLATFORM_SESSION_REMEMBER_TTL_SECONDS if remember_me else PLATFORM_SESSION_TTL_SECONDS,
+        PLATFORM_SESSION_TTL_SECONDS,
+    )
+
+
 def normalize_slug(value: str) -> str:
     slug = value.strip().lower()
     if not re.fullmatch(r"[a-z0-9-]{3,64}", slug):
@@ -507,7 +553,7 @@ def parse_default_interest_tags(raw: Any) -> list[str]:
     for item in source:
         try:
             value = normalize_interest(str(item))
-        except Exception:
+        except ValueError:
             continue
         lowered = value.lower()
         if lowered in seen:
@@ -751,6 +797,62 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         "calendar_timezone": CALENDAR_TIMEZONE,
         "calendar_feed_path": f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}",
         "calendar_lunch_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
+    }
+
+
+def manifest_payload_for_tenant(tenant: TenantContext | None) -> dict[str, Any]:
+    if tenant:
+        display_name = tenant.display_name.strip() or "BidBoard"
+        chapter_short = (tenant.chapter_name or display_name).strip()
+        start_url = f"/{tenant.slug}/"
+        scope = f"/{tenant.slug}/"
+        return {
+            "name": f"{display_name} | BidBoard",
+            "short_name": chapter_short[:24],
+            "description": f"{display_name} recruitment workspace on BidBoard.",
+            "start_url": start_url,
+            "scope": scope,
+            "display": "standalone",
+            "display_override": ["standalone", "minimal-ui", "browser"],
+            "background_color": "#f4efe6",
+            "theme_color": tenant.theme_primary,
+            "icons": [
+                {
+                    "src": "/static/icons/icon-192.png",
+                    "sizes": "192x192",
+                    "type": "image/png",
+                },
+                {
+                    "src": "/static/icons/icon-512.png",
+                    "sizes": "512x512",
+                    "type": "image/png",
+                    "purpose": "any maskable",
+                },
+            ],
+        }
+    return {
+        "name": "BidBoard Recruitment OS",
+        "short_name": "BidBoard",
+        "description": "Recruitment operating system for fraternities and sororities.",
+        "start_url": "/organizations",
+        "scope": "/",
+        "display": "standalone",
+        "display_override": ["standalone", "minimal-ui", "browser"],
+        "background_color": "#f4efe6",
+        "theme_color": DEFAULT_THEME_PRIMARY,
+        "icons": [
+            {
+                "src": "/static/icons/icon-192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+            },
+            {
+                "src": "/static/icons/icon-512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+                "purpose": "any maskable",
+            },
+        ],
     }
 
 
@@ -1128,7 +1230,7 @@ def current_platform_admin(request: Request) -> sqlite3.Row:
     with platform_db_session() as conn:
         row = conn.execute(
             """
-            SELECT pa.*, ps.last_seen_at
+            SELECT pa.*, ps.last_seen_at, ps.max_idle_seconds
             FROM platform_sessions ps
             JOIN platform_admins pa ON pa.id = ps.admin_id
             WHERE ps.token = ?
@@ -1143,7 +1245,8 @@ def current_platform_admin(request: Request) -> sqlite3.Row:
         except (TypeError, ValueError):
             conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > PLATFORM_SESSION_TTL_SECONDS:
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], PLATFORM_SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
             conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
@@ -1156,6 +1259,8 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
+    response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     response.headers["Content-Security-Policy"] = (
@@ -1178,7 +1283,7 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
 @app.middleware("http")
 async def tenant_resolution(request: Request, call_next):  # type: ignore[no-untyped-def]
     path = request.scope.get("path", "/")
-    bypass_prefixes = ("/static", "/uploads", "/platform", "/organizations", "/features", "/faq", "/health")
+    bypass_prefixes = ("/static", "/uploads", "/platform", "/organizations", "/features", "/faq", "/health", "/demo")
     if path == "/" or path.startswith(bypass_prefixes):
         return await call_next(request)
 
@@ -1560,12 +1665,29 @@ def instagram_username_from_handle(handle: str) -> str:
     return token.strip()
 
 
+def is_allowed_remote_fetch_url(url: str) -> bool:
+    try:
+        parsed = urlsplit(url)
+    except ValueError:
+        return False
+    if parsed.scheme != "https":
+        return False
+    host = (parsed.hostname or "").strip().lower()
+    if not host:
+        return False
+    if host in ALLOWED_REMOTE_FETCH_HOSTS:
+        return True
+    return any(host.endswith(suffix) for suffix in ALLOWED_REMOTE_FETCH_HOST_SUFFIXES)
+
+
 def fetch_image_from_url(request_url: str, referer: str | None = None) -> tuple[bytes, str] | None:
+    if not is_allowed_remote_fetch_url(request_url):
+        return None
     headers = {
         "User-Agent": HTTP_USER_AGENT,
         "Accept": "image/*",
     }
-    if referer:
+    if referer and is_allowed_remote_fetch_url(referer):
         headers["Referer"] = referer
         parsed = urlsplit(referer)
         if parsed.scheme and parsed.netloc:
@@ -1575,7 +1697,7 @@ def fetch_image_from_url(request_url: str, referer: str | None = None) -> tuple[
         headers=headers,
     )
     try:
-        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
+        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:  # nosec B310
             content = response.read(MAX_PNM_PHOTO_BYTES + 1)
             if not content:
                 return None
@@ -1593,6 +1715,8 @@ def fetch_image_from_url(request_url: str, referer: str | None = None) -> tuple[
 
 def fetch_instagram_og_image_url(username: str) -> str | None:
     request_url = f"https://www.instagram.com/{quote(username, safe='')}/"
+    if not is_allowed_remote_fetch_url(request_url):
+        return None
     request = URLRequest(
         request_url,
         headers={
@@ -1601,7 +1725,7 @@ def fetch_instagram_og_image_url(username: str) -> str | None:
         },
     )
     try:
-        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
+        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:  # nosec B310
             content = response.read(INSTAGRAM_PROFILE_HTML_MAX_BYTES + 1)
     except (HTTPError, URLError, TimeoutError, ValueError, OSError):
         return None
@@ -1642,6 +1766,8 @@ def normalize_instagram_image_url(url: str) -> str:
 
 def fetch_instagram_api_image_url(username: str) -> str | None:
     api_url = f"https://www.instagram.com/api/v1/users/web_profile_info/?username={quote(username, safe='')}"
+    if not is_allowed_remote_fetch_url(api_url):
+        return None
     request = URLRequest(
         api_url,
         headers={
@@ -1653,7 +1779,7 @@ def fetch_instagram_api_image_url(username: str) -> str | None:
         },
     )
     try:
-        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:
+        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:  # nosec B310
             payload = response.read(INSTAGRAM_API_RESPONSE_MAX_BYTES + 1)
     except (HTTPError, URLError, TimeoutError, ValueError, OSError):
         return None
@@ -2691,7 +2817,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             created_at TEXT NOT NULL,
-            last_seen_at TEXT NOT NULL
+            last_seen_at TEXT NOT NULL,
+            max_idle_seconds INTEGER NOT NULL DEFAULT 43200
         );
 
         CREATE TABLE IF NOT EXISTS season_archive_state (
@@ -2755,6 +2882,14 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE lunches ADD COLUMN end_time TEXT")
     if "location" not in lunch_columns:
         conn.execute("ALTER TABLE lunches ADD COLUMN location TEXT NOT NULL DEFAULT ''")
+
+    session_columns = {row["name"] for row in conn.execute("PRAGMA table_info(sessions)").fetchall()}
+    if "max_idle_seconds" not in session_columns:
+        conn.execute(f"ALTER TABLE sessions ADD COLUMN max_idle_seconds INTEGER NOT NULL DEFAULT {SESSION_TTL_SECONDS}")
+    conn.execute(
+        "UPDATE sessions SET max_idle_seconds = ? WHERE max_idle_seconds IS NULL OR max_idle_seconds <= 0",
+        (SESSION_TTL_SECONDS,),
+    )
 
     conn.executescript(
         """
@@ -3059,7 +3194,8 @@ def setup_platform_schema(conn: sqlite3.Connection) -> None:
             token TEXT PRIMARY KEY,
             admin_id INTEGER NOT NULL REFERENCES platform_admins(id) ON DELETE CASCADE,
             created_at TEXT NOT NULL,
-            last_seen_at TEXT NOT NULL
+            last_seen_at TEXT NOT NULL,
+            max_idle_seconds INTEGER NOT NULL DEFAULT 43200
         );
 
         CREATE TABLE IF NOT EXISTS tenants (
@@ -3095,6 +3231,16 @@ def setup_platform_schema(conn: sqlite3.Connection) -> None:
 
 
 def ensure_platform_schema_upgrades(conn: sqlite3.Connection) -> None:
+    platform_session_columns = {row["name"] for row in conn.execute("PRAGMA table_info(platform_sessions)").fetchall()}
+    if "max_idle_seconds" not in platform_session_columns:
+        conn.execute(
+            f"ALTER TABLE platform_sessions ADD COLUMN max_idle_seconds INTEGER NOT NULL DEFAULT {PLATFORM_SESSION_TTL_SECONDS}"
+        )
+    conn.execute(
+        "UPDATE platform_sessions SET max_idle_seconds = ? WHERE max_idle_seconds IS NULL OR max_idle_seconds <= 0",
+        (PLATFORM_SESSION_TTL_SECONDS,),
+    )
+
     tenant_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tenants)").fetchall()}
     if "calendar_share_token" not in tenant_columns:
         conn.execute("ALTER TABLE tenants ADD COLUMN calendar_share_token TEXT NOT NULL DEFAULT ''")
@@ -3421,7 +3567,7 @@ def current_user(request: Request) -> sqlite3.Row:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT u.*, s.last_seen_at, s.created_at AS session_created_at
+            SELECT u.*, s.last_seen_at, s.created_at AS session_created_at, s.max_idle_seconds
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token = ?
@@ -3436,7 +3582,8 @@ def current_user(request: Request) -> sqlite3.Row:
         except (TypeError, ValueError):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > SESSION_TTL_SECONDS:
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
@@ -3450,7 +3597,7 @@ def request_has_active_session(request: Request) -> bool:
         return False
 
     with db_session() as conn:
-        row = conn.execute("SELECT last_seen_at FROM sessions WHERE token = ?", (token,)).fetchone()
+        row = conn.execute("SELECT last_seen_at, max_idle_seconds FROM sessions WHERE token = ?", (token,)).fetchone()
         if not row:
             return False
 
@@ -3459,7 +3606,8 @@ def request_has_active_session(request: Request) -> bool:
         except (TypeError, ValueError):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return False
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > SESSION_TTL_SECONDS:
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return False
     return True
@@ -3473,7 +3621,7 @@ def request_session_role(request: Request) -> str | None:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT u.role, s.last_seen_at
+            SELECT u.role, s.last_seen_at, s.max_idle_seconds
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token = ?
@@ -3488,7 +3636,8 @@ def request_session_role(request: Request) -> str | None:
         except (TypeError, ValueError):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return None
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > SESSION_TTL_SECONDS:
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return None
     return str(row["role"])
@@ -3562,6 +3711,7 @@ class MemberRegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=120)
     access_code: str = Field(..., min_length=8, max_length=128)
+    remember_me: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -3814,6 +3964,7 @@ class SeasonResetRequest(BaseModel):
 class PlatformLoginRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=120)
     access_code: str = Field(..., min_length=8, max_length=128)
+    remember_me: bool = False
 
     @model_validator(mode="before")
     @classmethod
@@ -3971,9 +4122,30 @@ async def faq_page(request: Request) -> HTMLResponse:
     )
 
 
+@app.get("/demo", response_class=HTMLResponse)
+async def demo_page(request: Request) -> HTMLResponse:
+    return templates.TemplateResponse(
+        "demo.html",
+        {
+            "request": request,
+        },
+    )
+
+
 @app.head("/", include_in_schema=False)
 async def home_head() -> Response:
     return Response(status_code=200)
+
+
+@app.get("/manifest.webmanifest", include_in_schema=False)
+async def web_manifest(request: Request) -> JSONResponse:
+    tenant = getattr(request.state, "tenant", None)
+    payload = manifest_payload_for_tenant(tenant if isinstance(tenant, TenantContext) else None)
+    return JSONResponse(
+        content=payload,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
 
 
 @app.get("/meeting", response_class=HTMLResponse)
@@ -4173,9 +4345,10 @@ def platform_login(payload: PlatformLoginRequest, request: Request, response: Re
 
         token = secrets.token_urlsafe(32)
         now = now_iso()
+        max_idle_seconds = platform_session_idle_seconds(bool(payload.remember_me))
         conn.execute(
-            "INSERT INTO platform_sessions (token, admin_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)",
-            (token, row["id"], now, now),
+            "INSERT INTO platform_sessions (token, admin_id, created_at, last_seen_at, max_idle_seconds) VALUES (?, ?, ?, ?, ?)",
+            (token, row["id"], now, now, max_idle_seconds),
         )
         conn.execute("UPDATE platform_admins SET last_login_at = ?, updated_at = ? WHERE id = ?", (now, now, row["id"]))
         if needs_upgrade:
@@ -4190,10 +4363,11 @@ def platform_login(payload: PlatformLoginRequest, request: Request, response: Re
         value=token,
         httponly=True,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
-        max_age=PLATFORM_SESSION_TTL_SECONDS,
+        max_age=max_idle_seconds,
         secure=secure_cookie,
         path="/",
     )
+    mark_response_private(response)
     record_login_success(throttle_key)
     return {"admin": platform_user_payload(row), "message": "Platform admin logged in."}
 
@@ -4211,11 +4385,13 @@ def platform_logout(request: Request, response: Response) -> dict[str, str]:
         secure=secure_cookie,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
     )
+    mark_response_private(response)
     return {"message": "Logged out."}
 
 
 @app.get("/platform/api/auth/me")
-def platform_auth_me(admin: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+def platform_auth_me(response: Response, admin: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+    mark_response_private(response)
     return {"authenticated": True, "admin": platform_user_payload(admin)}
 
 
@@ -5159,7 +5335,11 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
 
         token = secrets.token_urlsafe(32)
         now = now_iso()
-        conn.execute("INSERT INTO sessions (token, user_id, created_at, last_seen_at) VALUES (?, ?, ?, ?)", (token, row["id"], now, now))
+        max_idle_seconds = user_session_idle_seconds(bool(payload.remember_me))
+        conn.execute(
+            "INSERT INTO sessions (token, user_id, created_at, last_seen_at, max_idle_seconds) VALUES (?, ?, ?, ?, ?)",
+            (token, row["id"], now, now, max_idle_seconds),
+        )
         conn.execute("UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?", (now, now, row["id"]))
         if needs_upgrade:
             conn.execute(
@@ -5173,10 +5353,11 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
             value=token,
             httponly=True,
             samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
-            max_age=SESSION_TTL_SECONDS,
+            max_age=max_idle_seconds,
             secure=secure_cookie,
             path="/",
         )
+        mark_response_private(response)
         record_login_success(throttle_key)
 
         return {
@@ -5198,11 +5379,13 @@ def logout(request: Request, response: Response) -> dict[str, str]:
         secure=secure_cookie,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
     )
+    mark_response_private(response)
     return {"message": "Logged out."}
 
 
 @app.get("/api/auth/me")
-def auth_me(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def auth_me(response: Response, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    mark_response_private(response)
     return {
         "authenticated": True,
         "user": user_payload(user, user["role"], user["id"]),
@@ -5387,15 +5570,14 @@ def promote_officer_to_head(
             ).fetchall()
             demoted_head_ids = [int(row["id"]) for row in demoted_rows]
             if demoted_head_ids:
-                placeholders = ",".join(["?"] * len(demoted_head_ids))
                 demoted_emoji = payload.demoted_head_emoji or DEFAULT_RUSH_OFFICER_EMOJI
                 conn.execute(
-                    f"""
+                    """
                     UPDATE users
                     SET role = ?, emoji = COALESCE(NULLIF(trim(emoji), ''), ?), updated_at = ?
-                    WHERE id IN ({placeholders})
+                    WHERE id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
                     """,
-                    (ROLE_RUSH_OFFICER, demoted_emoji, now_iso(), *demoted_head_ids),
+                    (ROLE_RUSH_OFFICER, demoted_emoji, now_iso(), json.dumps(demoted_head_ids)),
                 )
 
         conn.execute(
@@ -7912,26 +8094,31 @@ def list_officer_chat_messages(
         tags_by_message: dict[int, list[str]] = {}
         mentions_by_message: dict[int, list[dict[str, Any]]] = {}
         if message_ids:
-            placeholders = ",".join("?" for _ in message_ids)
+            message_ids_json = json.dumps(message_ids)
             tag_rows = conn.execute(
-                f"SELECT message_id, tag FROM officer_chat_tags WHERE message_id IN ({placeholders}) ORDER BY tag ASC",
-                message_ids,
+                """
+                SELECT message_id, tag
+                FROM officer_chat_tags
+                WHERE message_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+                ORDER BY tag ASC
+                """,
+                (message_ids_json,),
             ).fetchall()
             for tag_row in tag_rows:
                 message_id = int(tag_row["message_id"])
                 tags_by_message.setdefault(message_id, []).append(tag_row["tag"])
             mention_rows = conn.execute(
-                f"""
+                """
                 SELECT
                     m.message_id,
                     u.id AS user_id,
                     u.username
                 FROM officer_chat_mentions m
                 JOIN users u ON u.id = m.user_id
-                WHERE m.message_id IN ({placeholders})
+                WHERE m.message_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
                 ORDER BY m.id ASC
                 """,
-                message_ids,
+                (message_ids_json,),
             ).fetchall()
             for mention_row in mention_rows:
                 message_id = int(mention_row["message_id"])
@@ -7995,15 +8182,14 @@ def create_officer_chat_message(
 
         mentioned_rows: list[sqlite3.Row] = []
         if mention_usernames:
-            placeholders = ",".join("?" for _ in mention_usernames)
             mentioned_rows = conn.execute(
-                f"""
+                """
                 SELECT id, username
                 FROM users
                 WHERE is_approved = 1
-                  AND lower(username) IN ({placeholders})
+                  AND lower(username) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
                 """,
-                mention_usernames,
+                (json.dumps(mention_usernames),),
             ).fetchall()
             for mentioned in mentioned_rows:
                 conn.execute(

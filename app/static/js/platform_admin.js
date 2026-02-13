@@ -3,6 +3,7 @@ const consoleSection = document.getElementById("platformConsole");
 const loginForm = document.getElementById("platformLoginForm");
 const logoutBtn = document.getElementById("platformLogoutBtn");
 const refreshBtn = document.getElementById("platformRefreshBtn");
+const platformRememberMe = document.getElementById("platformRememberMe");
 const createTenantForm = document.getElementById("createTenantForm");
 const editTenantForm = document.getElementById("editTenantForm");
 const editTenantSlug = document.getElementById("editTenantSlug");
@@ -354,12 +355,14 @@ async function handleLogin(event) {
   event.preventDefault();
   const username = document.getElementById("platformUsername").value.trim();
   const password = document.getElementById("platformAccessCode").value;
+  const rememberMe = Boolean(platformRememberMe && platformRememberMe.checked);
   try {
     await api("/platform/api/auth/login", {
       method: "POST",
       body: {
         username,
         password,
+        remember_me: rememberMe,
       },
     });
     setAuthView(true);

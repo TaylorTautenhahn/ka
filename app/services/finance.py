@@ -130,7 +130,7 @@ def _fetch_spark_series(tickers: list[str]) -> dict[str, pd.Series]:
         if price_map:
             return price_map
 
-        backoff_seconds = (2**attempt) + random.uniform(0.25, 0.7)
+        backoff_seconds = (2**attempt) + random.uniform(0.25, 0.7)  # nosec B311
         time.sleep(backoff_seconds)
 
     message = str(last_error) if last_error else "Unknown Yahoo Finance error."
@@ -193,7 +193,7 @@ def _fetch_single_yfinance_series(ticker: str) -> pd.Series:
         except Exception as exc:
             last_error = exc
 
-        time.sleep((2**attempt) + random.uniform(0.2, 0.6))
+        time.sleep((2**attempt) + random.uniform(0.2, 0.6))  # nosec B311
 
     message = str(last_error) if last_error else "Unknown Yahoo Finance error."
     raise FinanceDataError(f"Unable to retrieve data for {ticker}: {message}") from last_error

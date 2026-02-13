@@ -221,6 +221,7 @@ const officerChatQuickTags = document.getElementById("officerChatQuickTags");
 const desktopPageNav = document.getElementById("desktopPageNav");
 const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
 const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
+const operationsUnreadBadge = document.getElementById("operationsUnreadBadge");
 
 const assignedRushPanel = document.getElementById("assignedRushPanel");
 const assignedRushTitle = document.getElementById("assignedRushTitle");
@@ -1219,6 +1220,7 @@ function renderWeeklyGoals() {
 
 function renderNotifications() {
   if (!notificationsList || !notificationsReadAllBtn) {
+    renderOperationsUnreadBadge();
     return;
   }
   const unread = Number(state.unreadNotifications || 0);
@@ -1228,6 +1230,7 @@ function renderNotifications() {
   const rows = state.notifications || [];
   if (!rows.length) {
     notificationsList.innerHTML = '<p class="muted">No notifications yet.</p>';
+    renderOperationsUnreadBadge();
     return;
   }
   notificationsList.innerHTML = rows
@@ -1254,6 +1257,22 @@ function renderNotifications() {
       `;
     })
     .join("");
+
+  renderOperationsUnreadBadge();
+}
+
+function renderOperationsUnreadBadge() {
+  if (!operationsUnreadBadge) {
+    return;
+  }
+  const unread = Number(state.unreadNotifications || 0);
+  if (unread <= 0) {
+    operationsUnreadBadge.classList.add("hidden");
+    operationsUnreadBadge.textContent = "0";
+    return;
+  }
+  operationsUnreadBadge.classList.remove("hidden");
+  operationsUnreadBadge.textContent = unread > 99 ? "99+" : String(unread);
 }
 
 function renderOfficerChatStats() {
@@ -2696,6 +2715,7 @@ async function loadNotifications() {
     if (notificationsList) {
       notificationsList.innerHTML = '<p class="muted">Unable to load notifications right now.</p>';
     }
+    renderOperationsUnreadBadge();
   }
 }
 
@@ -2960,7 +2980,7 @@ async function handleLogout() {
     notificationsList.innerHTML = '<p class="muted">Sign in to view notifications.</p>';
   }
   if (officerChatList) {
-    officerChatList.innerHTML = '<p class="muted">Sign in to view officer chat.</p>';
+    officerChatList.innerHTML = '<div class="chat-welcome"><strong>Sign in to view officer chat.</strong><p class="muted">Rush Officer accounts can access the live thread after login.</p></div>';
   }
   if (openGoogleSubscribeBtn) {
     openGoogleSubscribeBtn.href = "#";
@@ -2991,6 +3011,7 @@ async function handleLogout() {
   if (seasonArchiveDownloadBtn) {
     seasonArchiveDownloadBtn.classList.add("hidden");
   }
+  renderOperationsUnreadBadge();
   renderSelectedPnmPhoto(null);
   renderAdminPanel();
   renderAssignmentControls();

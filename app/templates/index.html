@@ -121,7 +121,7 @@
 
         <nav id="desktopPageNav" class="panel quick-nav reveal delay-1" aria-label="Desktop pages">
           <a href="{{ app_config.base_path if app_config else '/' }}?view=overview" class="quick-nav-link desktop-page-link" data-page="overview">Overview</a>
-          <a href="{{ app_config.base_path if app_config else '/' }}?view=operations" class="quick-nav-link desktop-page-link" data-page="operations">Operations</a>
+          <a href="{{ app_config.base_path if app_config else '/' }}?view=operations" class="quick-nav-link desktop-page-link" data-page="operations">Operations <span id="operationsUnreadBadge" class="nav-badge hidden">0</span></a>
           <a href="{{ app_config.base_path if app_config else '/' }}?view=rushees" class="quick-nav-link desktop-page-link" data-page="rushees">Rushees</a>
           <a href="{{ app_config.base_path if app_config else '/' }}?view=members" class="quick-nav-link desktop-page-link" data-page="members">Members</a>
           <a id="adminNavLink" href="{{ app_config.base_path if app_config else '/' }}?view=admin" class="quick-nav-link desktop-page-link" data-page="admin">Head Console</a>

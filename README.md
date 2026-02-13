@@ -104,6 +104,15 @@ uvicorn app.main:app --reload
 http://127.0.0.1:8000
 ```
 
+## Smoke Test Suite
+Run an end-to-end API + route smoke test against an isolated temporary database:
+
+```bash
+.venv/bin/python scripts/smoke_test.py
+```
+
+This validates core auth, approvals, PNMs, ratings, lunches, rush events, chat, exports, platform admin APIs, and health checks.
+
 ## Seed Account Behavior
 Head seed account is environment-driven and production-safe:
 - No personal credentials are displayed in UI.

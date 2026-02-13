@@ -21,6 +21,8 @@
   --shadow: var(--glass-shadow);
   --glow: 0 0 0 1px rgba(var(--accent-soft-rgb), 0.24), 0 16px 38px rgba(var(--accent-shadow-rgb), 0.2);
   --heading: #66142e;
+  --layout-gap: clamp(0.9rem, 1.2vw, 1.2rem);
+  --panel-padding: clamp(0.92rem, 1.2vw, 1.14rem);
 }
 
 * {
@@ -84,7 +86,7 @@ body {
 .shell {
   position: relative;
   z-index: 1;
-  max-width: 1320px;
+  max-width: 1380px;
   margin: 0 auto;
   padding: 1.4rem 0.95rem 2rem;
 }
@@ -280,8 +282,8 @@ h3 {
   box-shadow: var(--shadow);
   backdrop-filter: blur(14px) saturate(130%);
   -webkit-backdrop-filter: blur(14px) saturate(130%);
-  padding: 1rem;
-  margin-bottom: 1rem;
+  padding: var(--panel-padding);
+  margin-bottom: var(--layout-gap);
   transform: translateZ(0);
   position: relative;
   overflow: clip;
@@ -318,6 +320,7 @@ h3 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 0.32rem;
   text-decoration: none;
   color: var(--accent);
   border: 1px solid rgba(var(--accent-rgb), 0.16);
@@ -473,7 +476,7 @@ h3 {
 .auth-grid,
 .grid-two {
   display: grid;
-  gap: 0.95rem;
+  gap: 1.08rem;
   grid-template-columns: 1fr;
 }
 
@@ -973,7 +976,7 @@ td strong {
   border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.58);
-  padding: 0.65rem;
+  padding: 0.78rem;
   backdrop-filter: blur(11px);
 }
 
@@ -1094,10 +1097,26 @@ td strong {
 .section-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: flex-start;
   flex-wrap: wrap;
   gap: 0.8rem;
   margin-bottom: 0.75rem;
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.05rem;
+  height: 1.05rem;
+  padding: 0 0.26rem;
+  border-radius: 999px;
+  background: linear-gradient(145deg, rgba(var(--gold-rgb), 0.94), rgba(var(--accent-rgb), 0.9));
+  color: #fff;
+  font-size: 0.66rem;
+  line-height: 1;
+  font-weight: 800;
+  box-shadow: 0 8px 18px rgba(var(--accent-shadow-rgb), 0.22);
 }
 
 .matching-grid .list-box {
@@ -1180,7 +1199,7 @@ td strong {
 
 .officer-chat-layout {
   display: grid;
-  gap: 0.85rem;
+  gap: 1rem;
   grid-template-columns: minmax(250px, 310px) minmax(0, 1fr);
   align-items: stretch;
 }
@@ -1679,6 +1698,30 @@ td strong {
 
   .member-kpis {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 760px) and (max-width: 1420px) {
+  .shell {
+    max-width: 1220px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .topbar .action-row {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .desktop-page[data-page="operations"] .grid-two,
+  .desktop-page[data-page="operations"] .officer-chat-layout,
+  #createSection.grid-two,
+  #detailSection .grid-two,
+  .desktop-page[data-page="overview"] .matching-grid {
+    grid-template-columns: 1fr;
   }
 }
 

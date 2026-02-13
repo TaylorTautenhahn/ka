@@ -179,6 +179,43 @@ const lastLunchCalendarActions = document.getElementById("lastLunchCalendarActio
 const openLastLunchGoogleLink = document.getElementById("openLastLunchGoogleLink");
 const refreshScheduledLunchesBtn = document.getElementById("refreshScheduledLunchesBtn");
 const scheduledLunchesList = document.getElementById("scheduledLunchesList");
+
+const rushEventForm = document.getElementById("rushEventForm");
+const rushEventTitle = document.getElementById("rushEventTitle");
+const rushEventType = document.getElementById("rushEventType");
+const rushEventDate = document.getElementById("rushEventDate");
+const rushEventStartTime = document.getElementById("rushEventStartTime");
+const rushEventEndTime = document.getElementById("rushEventEndTime");
+const rushEventLocation = document.getElementById("rushEventLocation");
+const rushEventDetails = document.getElementById("rushEventDetails");
+const rushEventOfficial = document.getElementById("rushEventOfficial");
+const rushCalendarStats = document.getElementById("rushCalendarStats");
+const rushCalendarTable = document.getElementById("rushCalendarTable");
+const copyRushCalendarFeedBtn = document.getElementById("copyRushCalendarFeedBtn");
+const openRushGoogleSubscribeBtn = document.getElementById("openRushGoogleSubscribeBtn");
+const rushCalendarFeedPreview = document.getElementById("rushCalendarFeedPreview");
+const copyLunchOnlyFeedBtn = document.getElementById("copyLunchOnlyFeedBtn");
+const lunchOnlyFeedPreview = document.getElementById("lunchOnlyFeedPreview");
+
+const weeklyGoalForm = document.getElementById("weeklyGoalForm");
+const weeklyGoalTitle = document.getElementById("weeklyGoalTitle");
+const weeklyGoalDescription = document.getElementById("weeklyGoalDescription");
+const weeklyGoalMetric = document.getElementById("weeklyGoalMetric");
+const weeklyGoalTarget = document.getElementById("weeklyGoalTarget");
+const weeklyGoalWeekStart = document.getElementById("weeklyGoalWeekStart");
+const weeklyGoalWeekEnd = document.getElementById("weeklyGoalWeekEnd");
+const weeklyGoalAssignedUser = document.getElementById("weeklyGoalAssignedUser");
+const weeklyGoalSummary = document.getElementById("weeklyGoalSummary");
+const weeklyGoalsList = document.getElementById("weeklyGoalsList");
+
+const notificationsReadAllBtn = document.getElementById("notificationsReadAllBtn");
+const notificationsList = document.getElementById("notificationsList");
+const officerChatForm = document.getElementById("officerChatForm");
+const officerChatMessage = document.getElementById("officerChatMessage");
+const officerChatTags = document.getElementById("officerChatTags");
+const officerChatStats = document.getElementById("officerChatStats");
+const officerChatList = document.getElementById("officerChatList");
+
 const desktopPageNav = document.getElementById("desktopPageNav");
 const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
 const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
@@ -332,6 +369,15 @@ const state = {
     rushOfficers: [],
   },
   scheduledLunches: [],
+  rushCalendarItems: [],
+  rushCalendarStats: null,
+  weeklyGoals: [],
+  weeklyGoalSummary: null,
+  weeklyGoalMetricOptions: [],
+  notifications: [],
+  unreadNotifications: 0,
+  officerChatMessages: [],
+  officerChatStats: null,
   adminEditPnmId: null,
   headAssignmentPnmId: null,
   seasonArchive: null,
@@ -768,6 +814,11 @@ function startLiveRefresh() {
         loadLeaderboard(),
         loadCalendarShare(),
         loadScheduledLunches(),
+        loadRushCalendar(),
+        loadWeeklyGoals(),
+        loadNotifications(),
+        loadOfficerChat(),
+        loadOfficerChatStats(),
         loadApprovals(),
         loadHeadAdminData(),
         loadSeasonArchiveStatus(),
@@ -818,6 +869,10 @@ function roleCanAssignOfficer() {
 }
 
 function roleCanViewAssignedRushes() {
+  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
+function roleCanManageOperations() {
   return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
 }
 
@@ -974,6 +1029,303 @@ function renderScheduledLunches() {
     .join("");
 }
 
+function formatCalendarWindow(item) {
+  const start = item.start_time || "";
+  const end = item.end_time || "";
+  if (start && end) {
+    return `${start}-${end}`;
+  }
+  if (start) {
+    return start;
+  }
+  return "All day";
+}
+
+function renderRushCalendar() {
+  if (!rushCalendarTable || !rushCalendarStats) {
+    return;
+  }
+  if (rushEventForm) {
+    rushEventForm.classList.toggle("hidden", !roleCanManageOperations());
+  }
+  const items = state.rushCalendarItems || [];
+  const stats = state.rushCalendarStats || { total_count: 0, official_event_count: 0, lunch_count: 0, this_week_count: 0 };
+  rushCalendarStats.innerHTML = `
+    <div class="card"><strong>${Number(stats.total_count || 0)}</strong><p>Total Timeline Items</p></div>
+    <div class="card"><strong>${Number(stats.official_event_count || 0)}</strong><p>Official Rush Events</p></div>
+    <div class="card"><strong>${Number(stats.lunch_count || 0)}</strong><p>Scheduled Lunches</p></div>
+    <div class="card"><strong>${Number(stats.this_week_count || 0)}</strong><p>This Week</p></div>
+  `;
+
+  if (!items.length) {
+    rushCalendarTable.innerHTML = '<p class="muted">No rush calendar items yet.</p>';
+    return;
+  }
+
+  const canManage = roleCanManageOperations();
+  const rows = items
+    .map((item) => {
+      const isEvent = item.item_type === "rush_event";
+      const typeLabel = isEvent ? (item.event_type || "event") : "lunch";
+      const title = item.title || (item.pnm_name ? `Lunch with ${item.pnm_name}` : "Calendar Item");
+      const creator = item.created_by_username || "-";
+      const official = isEvent && item.is_official ? '<span class="pill">Official</span>' : "";
+      const details = item.details || "-";
+      const googleAction = item.google_calendar_url
+        ? `<a class="quick-nav-link" href="${escapeHtml(item.google_calendar_url)}" target="_blank" rel="noopener">Open</a>`
+        : "";
+      const deleteAction = canManage && isEvent
+        ? `<button type="button" class="secondary calendar-remove-btn" data-rush-event-delete="${item.event_id}">Remove</button>`
+        : "";
+      return `
+        <tr>
+          <td><strong>${escapeHtml(item.event_date || "")}</strong></td>
+          <td>${escapeHtml(formatCalendarWindow(item))}</td>
+          <td><span class="pill">${escapeHtml(typeLabel)}</span> ${official}</td>
+          <td>${escapeHtml(title)}</td>
+          <td>${escapeHtml(item.location || "-")}</td>
+          <td>${escapeHtml(details)}</td>
+          <td>${escapeHtml(creator)}</td>
+          <td>
+            <div class="action-row">
+              ${googleAction}
+              ${deleteAction}
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+
+  rushCalendarTable.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Time</th>
+          <th>Type</th>
+          <th>Title</th>
+          <th>Location</th>
+          <th>Details</th>
+          <th>Created By</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function renderWeeklyGoalMetricOptions() {
+  if (!weeklyGoalMetric) {
+    return;
+  }
+  const options = (state.weeklyGoalMetricOptions || [])
+    .map((item) => `<option value="${escapeHtml(item.value)}">${escapeHtml(item.label)}</option>`)
+    .join("");
+  weeklyGoalMetric.innerHTML = options || `
+    <option value="manual">Manual Progress</option>
+    <option value="ratings_submitted">Ratings Submitted</option>
+    <option value="lunches_logged">Lunches Logged</option>
+    <option value="pnms_created">PNMs Added</option>
+    <option value="chat_messages">Chat Messages</option>
+    <option value="rush_events_created">Rush Events Created</option>
+  `;
+}
+
+function renderWeeklyGoalAssignedUsers() {
+  if (!weeklyGoalAssignedUser) {
+    return;
+  }
+  const options = ['<option value="">Team goal (unassigned)</option>'];
+  const members = state.members || [];
+  members
+    .filter((member) => member && member.user_id && member.username)
+    .forEach((member) => {
+      const emoji = member.emoji ? `${member.emoji} ` : "";
+      options.push(
+        `<option value="${member.user_id}">${escapeHtml(`${emoji}${member.username} (${member.role})`)}</option>`
+      );
+    });
+  weeklyGoalAssignedUser.innerHTML = options.join("");
+}
+
+function renderWeeklyGoals() {
+  if (!weeklyGoalsList || !weeklyGoalSummary) {
+    return;
+  }
+  if (weeklyGoalForm) {
+    weeklyGoalForm.classList.toggle("hidden", !roleCanManageOperations());
+  }
+  const summary = state.weeklyGoalSummary || {
+    total: 0,
+    active: 0,
+    completed: 0,
+    overdue: 0,
+    completion_rate: 0,
+  };
+  weeklyGoalSummary.innerHTML = `
+    <div class="card"><strong>${Number(summary.total || 0)}</strong><p>Total Goals</p></div>
+    <div class="card"><strong>${Number(summary.active || 0)}</strong><p>Active</p></div>
+    <div class="card"><strong>${Number(summary.completed || 0)}</strong><p>Completed</p></div>
+    <div class="card"><strong>${Number(summary.overdue || 0)}</strong><p>Overdue</p></div>
+    <div class="card"><strong>${Number(summary.completion_rate || 0)}%</strong><p>Completion Rate</p></div>
+  `;
+
+  const goals = state.weeklyGoals || [];
+  if (!goals.length) {
+    weeklyGoalsList.innerHTML = '<p class="muted">No weekly goals created yet.</p>';
+    return;
+  }
+
+  const canManage = roleCanManageOperations();
+  const isHead = roleCanUseAdminPanel();
+  weeklyGoalsList.innerHTML = goals
+    .map((goal) => {
+      const statusClass = goal.status === "completed" ? "good" : goal.status === "overdue" ? "bad" : "warn";
+      const assignment = goal.assigned_username ? `Assigned: ${goal.assigned_username}` : "Team Goal";
+      const weekWindow = `${goal.week_start} to ${goal.week_end}`;
+      const actions = [];
+      if (canManage && goal.metric_type === "manual" && !goal.is_completed && !goal.is_archived) {
+        actions.push(`<button type="button" class="secondary" data-goal-progress="${goal.goal_id}">+1 Progress</button>`);
+      }
+      if (canManage && !goal.is_completed && !goal.is_archived) {
+        actions.push(`<button type="button" class="secondary" data-goal-complete="${goal.goal_id}">Mark Complete</button>`);
+      }
+      if (isHead) {
+        const label = goal.is_archived ? "Unarchive" : "Archive";
+        actions.push(`<button type="button" class="secondary" data-goal-archive="${goal.goal_id}" data-goal-archived="${goal.is_archived ? "1" : "0"}">${label}</button>`);
+      }
+      return `
+        <div class="entry">
+          <div class="entry-title">
+            <strong>${escapeHtml(goal.title)}</strong>
+            <span class="${statusClass}">${escapeHtml(goal.status)}</span>
+          </div>
+          <div class="muted">${escapeHtml(goal.metric_label)} | Target ${goal.target_count} | Progress ${goal.progress_count} (${goal.percent_complete}%)</div>
+          <div class="muted">${escapeHtml(assignment)} | ${escapeHtml(weekWindow)}</div>
+          ${goal.description ? `<div class="muted">${escapeHtml(goal.description)}</div>` : ""}
+          ${actions.length ? `<div class="action-row">${actions.join("")}</div>` : ""}
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderNotifications() {
+  if (!notificationsList || !notificationsReadAllBtn) {
+    return;
+  }
+  const unread = Number(state.unreadNotifications || 0);
+  notificationsReadAllBtn.textContent = unread > 0 ? `Mark All Read (${unread})` : "Mark All Read";
+  notificationsReadAllBtn.disabled = unread <= 0;
+
+  const rows = state.notifications || [];
+  if (!rows.length) {
+    notificationsList.innerHTML = '<p class="muted">No notifications yet.</p>';
+    return;
+  }
+  notificationsList.innerHTML = rows
+    .map((item) => {
+      const readClass = item.is_read ? "" : " notification-unread";
+      const markBtn = item.is_read
+        ? ""
+        : `<button type="button" class="secondary" data-notification-read="${item.notification_id}">Mark Read</button>`;
+      const linkBtn = item.link_path
+        ? `<a class="quick-nav-link" href="${escapeHtml(item.link_path)}">Open</a>`
+        : "";
+      return `
+        <div class="entry${readClass}">
+          <div class="entry-title">
+            <strong>${escapeHtml(item.title || "Update")}</strong>
+            <span>${escapeHtml(formatLastSeen(item.created_at))}</span>
+          </div>
+          ${item.body ? `<div class="muted">${escapeHtml(item.body)}</div>` : ""}
+          <div class="action-row">
+            ${markBtn}
+            ${linkBtn}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function renderOfficerChatStats() {
+  if (!officerChatStats) {
+    return;
+  }
+  if (!roleCanManageOperations()) {
+    officerChatStats.innerHTML = '<p class="muted">Rush Officer access required.</p>';
+    return;
+  }
+  const payload = state.officerChatStats;
+  if (!payload || !payload.summary) {
+    officerChatStats.innerHTML = '<p class="muted">Chat stats unavailable.</p>';
+    return;
+  }
+  const summary = payload.summary;
+  const topTag = payload.top_tags && payload.top_tags.length ? `#${payload.top_tags[0].tag}` : "None";
+  const topSender = payload.top_senders && payload.top_senders.length ? payload.top_senders[0].username : "None";
+  officerChatStats.innerHTML = `
+    <div class="card"><strong>${Number(summary.total_messages || 0)}</strong><p>Total Messages</p></div>
+    <div class="card"><strong>${Number(summary.messages_last_24h || 0)}</strong><p>Last 24h</p></div>
+    <div class="card"><strong>${Number(summary.active_senders_7d || 0)}</strong><p>Active Senders (7d)</p></div>
+    <div class="card"><strong>${escapeHtml(topTag)}</strong><p>Top Tag</p></div>
+    <div class="card"><strong>${escapeHtml(topSender)}</strong><p>Top Contributor</p></div>
+  `;
+}
+
+function renderOfficerChat() {
+  if (!officerChatList || !officerChatForm) {
+    return;
+  }
+  const canUse = roleCanManageOperations();
+  officerChatForm.classList.toggle("hidden", !canUse);
+  if (!canUse) {
+    officerChatList.innerHTML = '<p class="muted">Rush Officer access required for officer chat.</p>';
+    return;
+  }
+
+  const rows = state.officerChatMessages || [];
+  if (!rows.length) {
+    officerChatList.innerHTML = '<p class="muted">No messages yet. Start the officer thread.</p>';
+    return;
+  }
+
+  officerChatList.innerHTML = rows
+    .map((message) => {
+      const classes = ["entry", "chat-entry"];
+      if (message.from_me) {
+        classes.push("is-own");
+      }
+      if (message.mentions_me) {
+        classes.push("is-mention");
+      }
+      const tags = (message.tags || []).map((tag) => `<span class="pill">#${escapeHtml(tag)}</span>`).join("");
+      const mentions = (message.mentions || [])
+        .map((item) => `<span class="pill">@${escapeHtml(item.username)}</span>`)
+        .join("");
+      const text = escapeHtml(message.message || "").replace(/\n/g, "<br />");
+      const senderPrefix = message.sender && message.sender.emoji ? `${message.sender.emoji} ` : "";
+      return `
+        <div class="${classes.join(" ")}">
+          <div class="entry-title">
+            <strong>${escapeHtml(`${senderPrefix}${message.sender ? message.sender.username : "Unknown"}`)}</strong>
+            <span>${escapeHtml(formatLastSeen(message.created_at))}</span>
+          </div>
+          <div class="chat-message-body">${text}</div>
+          <div class="chat-meta-row">
+            ${tags}
+            ${mentions}
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+  officerChatList.scrollTop = officerChatList.scrollHeight;
+}
+
 function renderAssignedRushSection() {
   if (!assignedRushPanel || !assignedRushTable || !assignedRushTitle || !assignedRushSubtitle) {
     return;
@@ -1043,12 +1395,21 @@ function renderAssignedRushSection() {
 
 function renderCalendarShareLinks(data) {
   state.calendarShare = data;
-  if (!calendarFeedPreview || !openGoogleSubscribeBtn) {
-    return;
+  if (calendarFeedPreview && openGoogleSubscribeBtn) {
+    calendarFeedPreview.textContent = data.feed_url || "Calendar URL unavailable.";
+    openGoogleSubscribeBtn.href = data.google_subscribe_url || "#";
+    openGoogleSubscribeBtn.classList.toggle("hidden", !data.google_subscribe_url);
   }
-  calendarFeedPreview.textContent = data.feed_url || "Calendar URL unavailable.";
-  openGoogleSubscribeBtn.href = data.google_subscribe_url || "#";
-  openGoogleSubscribeBtn.classList.toggle("hidden", !data.google_subscribe_url);
+  if (rushCalendarFeedPreview) {
+    rushCalendarFeedPreview.textContent = data.rush_feed_url || data.feed_url || "Rush calendar URL unavailable.";
+  }
+  if (openRushGoogleSubscribeBtn) {
+    openRushGoogleSubscribeBtn.href = data.google_subscribe_url || "#";
+    openRushGoogleSubscribeBtn.classList.toggle("hidden", !data.google_subscribe_url);
+  }
+  if (lunchOnlyFeedPreview) {
+    lunchOnlyFeedPreview.textContent = data.lunch_feed_url || "Lunch feed URL unavailable.";
+  }
 }
 
 function renderSelectedPnmPhoto(pnm) {
@@ -1086,6 +1447,20 @@ function setDefaultDates() {
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById("pnmEventDate").value = today;
   document.getElementById("lunchDate").value = today;
+  if (rushEventDate) {
+    rushEventDate.value = today;
+  }
+  if (weeklyGoalWeekStart && weeklyGoalWeekEnd) {
+    const now = new Date();
+    const dayIndex = now.getDay();
+    const mondayOffset = dayIndex === 0 ? -6 : 1 - dayIndex;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    weeklyGoalWeekStart.value = monday.toISOString().slice(0, 10);
+    weeklyGoalWeekEnd.value = sunday.toISOString().slice(0, 10);
+  }
 }
 
 function setRoleEmojiRequirement() {
@@ -2131,6 +2506,7 @@ async function loadMembers() {
   const payload = await api(`/api/users${query}`);
   state.members = payload.users || [];
   renderMemberTable();
+  renderWeeklyGoalAssignedUsers();
   renderAssignmentControls();
   renderAdminPanel();
   renderAssignedRushSection();
@@ -2164,6 +2540,16 @@ async function loadCalendarShare() {
       openGoogleSubscribeBtn.href = "#";
       openGoogleSubscribeBtn.classList.add("hidden");
     }
+    if (rushCalendarFeedPreview) {
+      rushCalendarFeedPreview.textContent = "Unable to load rush calendar link right now.";
+    }
+    if (lunchOnlyFeedPreview) {
+      lunchOnlyFeedPreview.textContent = "Unable to load lunch feed link right now.";
+    }
+    if (openRushGoogleSubscribeBtn) {
+      openRushGoogleSubscribeBtn.href = "#";
+      openRushGoogleSubscribeBtn.classList.add("hidden");
+    }
   }
 }
 
@@ -2176,6 +2562,93 @@ async function loadScheduledLunches() {
     state.scheduledLunches = [];
     if (scheduledLunchesList) {
       scheduledLunchesList.innerHTML = '<p class="muted">Unable to load scheduled lunches right now.</p>';
+    }
+  }
+}
+
+async function loadRushCalendar() {
+  try {
+    const payload = await api("/api/rush-calendar?limit=600");
+    state.rushCalendarItems = payload.items || [];
+    state.rushCalendarStats = payload.stats || null;
+    renderRushCalendar();
+  } catch {
+    state.rushCalendarItems = [];
+    state.rushCalendarStats = null;
+    if (rushCalendarTable) {
+      rushCalendarTable.innerHTML = '<p class="muted">Unable to load rush calendar right now.</p>';
+    }
+    if (rushCalendarStats) {
+      rushCalendarStats.innerHTML = '<p class="muted">Rush calendar metrics unavailable.</p>';
+    }
+  }
+}
+
+async function loadWeeklyGoals() {
+  try {
+    const payload = await api("/api/tasks/weekly");
+    state.weeklyGoals = payload.goals || [];
+    state.weeklyGoalSummary = payload.summary || null;
+    state.weeklyGoalMetricOptions = payload.metric_options || [];
+    renderWeeklyGoalMetricOptions();
+    renderWeeklyGoals();
+  } catch {
+    state.weeklyGoals = [];
+    state.weeklyGoalSummary = null;
+    state.weeklyGoalMetricOptions = [];
+    if (weeklyGoalsList) {
+      weeklyGoalsList.innerHTML = '<p class="muted">Unable to load weekly goals right now.</p>';
+    }
+  }
+}
+
+async function loadNotifications() {
+  try {
+    const payload = await api("/api/notifications?limit=120");
+    state.notifications = payload.notifications || [];
+    state.unreadNotifications = Number(payload.unread_count || 0);
+    renderNotifications();
+  } catch {
+    state.notifications = [];
+    state.unreadNotifications = 0;
+    if (notificationsList) {
+      notificationsList.innerHTML = '<p class="muted">Unable to load notifications right now.</p>';
+    }
+  }
+}
+
+async function loadOfficerChat() {
+  if (!roleCanManageOperations()) {
+    state.officerChatMessages = [];
+    renderOfficerChat();
+    return;
+  }
+  try {
+    const payload = await api("/api/chat/officer?limit=220");
+    state.officerChatMessages = payload.messages || [];
+    renderOfficerChat();
+  } catch {
+    state.officerChatMessages = [];
+    if (officerChatList) {
+      officerChatList.innerHTML = '<p class="muted">Unable to load officer chat right now.</p>';
+    }
+  }
+}
+
+async function loadOfficerChatStats() {
+  if (!roleCanManageOperations()) {
+    state.officerChatStats = null;
+    renderOfficerChatStats();
+    return;
+  }
+  try {
+    const payload = await api("/api/chat/officer/stats");
+    state.officerChatStats = payload;
+    renderOfficerChatStats();
+  } catch {
+    state.officerChatStats = null;
+    if (officerChatStats) {
+      officerChatStats.innerHTML = '<p class="muted">Unable to load chat stats right now.</p>';
     }
   }
 }
@@ -2241,6 +2714,11 @@ async function refreshAll() {
     loadLeaderboard(),
     loadCalendarShare(),
     loadScheduledLunches(),
+    loadRushCalendar(),
+    loadWeeklyGoals(),
+    loadNotifications(),
+    loadOfficerChat(),
+    loadOfficerChatStats(),
     loadApprovals(),
     loadHeadAdminData(),
     loadSeasonArchiveStatus(),
@@ -2358,6 +2836,15 @@ async function handleLogout() {
   state.members = [];
   state.calendarShare = null;
   state.scheduledLunches = [];
+  state.rushCalendarItems = [];
+  state.rushCalendarStats = null;
+  state.weeklyGoals = [];
+  state.weeklyGoalSummary = null;
+  state.weeklyGoalMetricOptions = [];
+  state.notifications = [];
+  state.unreadNotifications = 0;
+  state.officerChatMessages = [];
+  state.officerChatStats = null;
   state.headAdmin = {
     summary: null,
     currentHeads: [],
@@ -2372,12 +2859,34 @@ async function handleLogout() {
   if (calendarFeedPreview) {
     calendarFeedPreview.textContent = "Sign in to load shared calendar link.";
   }
+  if (rushCalendarFeedPreview) {
+    rushCalendarFeedPreview.textContent = "Sign in to load rush calendar link.";
+  }
+  if (lunchOnlyFeedPreview) {
+    lunchOnlyFeedPreview.textContent = "Sign in to load lunch feed link.";
+  }
   if (scheduledLunchesList) {
     scheduledLunchesList.innerHTML = '<p class="muted">Sign in to view scheduled lunches.</p>';
+  }
+  if (rushCalendarTable) {
+    rushCalendarTable.innerHTML = '<p class="muted">Sign in to view rush calendar items.</p>';
+  }
+  if (weeklyGoalsList) {
+    weeklyGoalsList.innerHTML = '<p class="muted">Sign in to view weekly goals.</p>';
+  }
+  if (notificationsList) {
+    notificationsList.innerHTML = '<p class="muted">Sign in to view notifications.</p>';
+  }
+  if (officerChatList) {
+    officerChatList.innerHTML = '<p class="muted">Sign in to view officer chat.</p>';
   }
   if (openGoogleSubscribeBtn) {
     openGoogleSubscribeBtn.href = "#";
     openGoogleSubscribeBtn.classList.add("hidden");
+  }
+  if (openRushGoogleSubscribeBtn) {
+    openRushGoogleSubscribeBtn.href = "#";
+    openRushGoogleSubscribeBtn.classList.add("hidden");
   }
   if (lastLunchCalendarActions) {
     lastLunchCalendarActions.classList.add("hidden");
@@ -3198,25 +3707,317 @@ function handleDownloadGoogleImportTemplate() {
   window.location.href = resolveApiPath("/api/admin/import/google-form/template");
 }
 
+async function copyTextToClipboard(value) {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const input = document.createElement("input");
+  input.value = value;
+  document.body.appendChild(input);
+  input.select();
+  document.execCommand("copy");
+  input.remove();
+}
+
 async function handleCopyCalendarFeed() {
   if (!state.calendarShare || !state.calendarShare.feed_url) {
     showToast("Shared calendar link is not ready yet.");
     return;
   }
   try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(state.calendarShare.feed_url);
-    } else {
-      const input = document.createElement("input");
-      input.value = state.calendarShare.feed_url;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      input.remove();
-    }
+    await copyTextToClipboard(state.calendarShare.feed_url);
     showToast("Shared calendar URL copied.");
   } catch {
     showToast("Unable to copy URL. Use the link shown below the button.");
+  }
+}
+
+async function handleCopyRushCalendarFeed() {
+  const value = state.calendarShare && (state.calendarShare.rush_feed_url || state.calendarShare.feed_url);
+  if (!value) {
+    showToast("Rush calendar link is not ready yet.");
+    return;
+  }
+  try {
+    await copyTextToClipboard(value);
+    showToast("Rush calendar URL copied.");
+  } catch {
+    showToast("Unable to copy rush feed URL right now.");
+  }
+}
+
+async function handleCopyLunchOnlyFeed() {
+  const value = state.calendarShare && state.calendarShare.lunch_feed_url;
+  if (!value) {
+    showToast("Lunch-only feed link is not ready yet.");
+    return;
+  }
+  try {
+    await copyTextToClipboard(value);
+    showToast("Lunch-only calendar URL copied.");
+  } catch {
+    showToast("Unable to copy lunch feed URL right now.");
+  }
+}
+
+async function handleRushEventCreate(event) {
+  event.preventDefault();
+  if (!roleCanManageOperations()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const body = {
+    title: rushEventTitle ? rushEventTitle.value.trim() : "",
+    event_type: rushEventType ? rushEventType.value : "official",
+    event_date: rushEventDate ? rushEventDate.value : "",
+    start_time: rushEventStartTime && rushEventStartTime.value ? rushEventStartTime.value : null,
+    end_time: rushEventEndTime && rushEventEndTime.value ? rushEventEndTime.value : null,
+    location: rushEventLocation ? rushEventLocation.value.trim() : "",
+    details: rushEventDetails ? rushEventDetails.value.trim() : "",
+    is_official: rushEventOfficial ? Boolean(rushEventOfficial.checked) : true,
+  };
+  if (!body.title || !body.event_date) {
+    showToast("Event title and date are required.");
+    return;
+  }
+  const submitBtn = document.getElementById("rushEventSubmitBtn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating...";
+  }
+  try {
+    await api("/api/rush-events", { method: "POST", body });
+    if (rushEventForm) {
+      rushEventForm.reset();
+    }
+    setDefaultDates();
+    if (rushEventOfficial) {
+      rushEventOfficial.checked = true;
+    }
+    showToast("Rush event created.");
+    await Promise.all([loadRushCalendar(), loadCalendarShare(), loadWeeklyGoals(), loadNotifications()]);
+  } catch (error) {
+    showToast(error.message || "Unable to create rush event.");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Create Event";
+    }
+  }
+}
+
+async function handleRushCalendarTableClick(event) {
+  const removeBtn = event.target.closest("[data-rush-event-delete]");
+  if (!removeBtn) {
+    return;
+  }
+  if (!roleCanManageOperations()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const eventId = Number(removeBtn.dataset.rushEventDelete || 0);
+  if (!eventId) {
+    return;
+  }
+  const confirmed = window.confirm("Remove this rush event from the calendar?");
+  if (!confirmed) {
+    return;
+  }
+  removeBtn.disabled = true;
+  try {
+    await api(`/api/rush-events/${eventId}`, { method: "DELETE" });
+    showToast("Rush event removed.");
+    await Promise.all([loadRushCalendar(), loadWeeklyGoals(), loadNotifications()]);
+  } catch (error) {
+    showToast(error.message || "Unable to remove rush event.");
+  } finally {
+    removeBtn.disabled = false;
+  }
+}
+
+async function handleWeeklyGoalCreate(event) {
+  event.preventDefault();
+  if (!roleCanManageOperations()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const body = {
+    title: weeklyGoalTitle ? weeklyGoalTitle.value.trim() : "",
+    description: weeklyGoalDescription ? weeklyGoalDescription.value.trim() : "",
+    metric_type: weeklyGoalMetric ? weeklyGoalMetric.value : "manual",
+    target_count: weeklyGoalTarget ? Number(weeklyGoalTarget.value || 0) : 0,
+    week_start: weeklyGoalWeekStart && weeklyGoalWeekStart.value ? weeklyGoalWeekStart.value : null,
+    week_end: weeklyGoalWeekEnd && weeklyGoalWeekEnd.value ? weeklyGoalWeekEnd.value : null,
+    assigned_user_id: weeklyGoalAssignedUser && weeklyGoalAssignedUser.value ? Number(weeklyGoalAssignedUser.value) : null,
+  };
+  if (!body.title || !body.target_count) {
+    showToast("Goal title and target are required.");
+    return;
+  }
+  const submitBtn = document.getElementById("weeklyGoalSubmitBtn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Creating...";
+  }
+  try {
+    await api("/api/tasks/weekly", { method: "POST", body });
+    if (weeklyGoalForm) {
+      weeklyGoalForm.reset();
+    }
+    setDefaultDates();
+    renderWeeklyGoalMetricOptions();
+    renderWeeklyGoalAssignedUsers();
+    showToast("Weekly goal created.");
+    await Promise.all([loadWeeklyGoals(), loadNotifications()]);
+  } catch (error) {
+    showToast(error.message || "Unable to create weekly goal.");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Create Goal";
+    }
+  }
+}
+
+async function handleWeeklyGoalsActionClick(event) {
+  const progressBtn = event.target.closest("[data-goal-progress]");
+  if (progressBtn) {
+    const goalId = Number(progressBtn.dataset.goalProgress || 0);
+    if (!goalId) {
+      return;
+    }
+    progressBtn.disabled = true;
+    try {
+      await api(`/api/tasks/weekly/${goalId}/progress`, {
+        method: "POST",
+        body: { delta: 1 },
+      });
+      await Promise.all([loadWeeklyGoals(), loadNotifications()]);
+      showToast("Goal progress updated.");
+    } catch (error) {
+      showToast(error.message || "Unable to update goal progress.");
+    } finally {
+      progressBtn.disabled = false;
+    }
+    return;
+  }
+
+  const completeBtn = event.target.closest("[data-goal-complete]");
+  if (completeBtn) {
+    const goalId = Number(completeBtn.dataset.goalComplete || 0);
+    if (!goalId) {
+      return;
+    }
+    completeBtn.disabled = true;
+    try {
+      await api(`/api/tasks/weekly/${goalId}`, {
+        method: "PATCH",
+        body: { complete_now: true },
+      });
+      await Promise.all([loadWeeklyGoals(), loadNotifications()]);
+      showToast("Goal marked complete.");
+    } catch (error) {
+      showToast(error.message || "Unable to mark goal complete.");
+    } finally {
+      completeBtn.disabled = false;
+    }
+    return;
+  }
+
+  const archiveBtn = event.target.closest("[data-goal-archive]");
+  if (archiveBtn) {
+    const goalId = Number(archiveBtn.dataset.goalArchive || 0);
+    if (!goalId) {
+      return;
+    }
+    const archived = archiveBtn.dataset.goalArchived === "1";
+    archiveBtn.disabled = true;
+    try {
+      await api(`/api/tasks/weekly/${goalId}`, {
+        method: "PATCH",
+        body: { is_archived: !archived },
+      });
+      await Promise.all([loadWeeklyGoals(), loadNotifications()]);
+      showToast(archived ? "Goal unarchived." : "Goal archived.");
+    } catch (error) {
+      showToast(error.message || "Unable to update goal archive state.");
+    } finally {
+      archiveBtn.disabled = false;
+    }
+  }
+}
+
+async function handleNotificationListClick(event) {
+  const btn = event.target.closest("[data-notification-read]");
+  if (!btn) {
+    return;
+  }
+  const notificationId = Number(btn.dataset.notificationRead || 0);
+  if (!notificationId) {
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await api(`/api/notifications/${notificationId}/read`, { method: "POST" });
+    await loadNotifications();
+  } catch (error) {
+    showToast(error.message || "Unable to mark notification read.");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function handleNotificationsReadAll() {
+  if (!state.unreadNotifications) {
+    return;
+  }
+  notificationsReadAllBtn.disabled = true;
+  try {
+    await api("/api/notifications/read-all", { method: "POST" });
+    await loadNotifications();
+    showToast("All notifications marked read.");
+  } catch (error) {
+    showToast(error.message || "Unable to mark notifications read.");
+  } finally {
+    notificationsReadAllBtn.disabled = false;
+  }
+}
+
+async function handleOfficerChatSubmit(event) {
+  event.preventDefault();
+  if (!roleCanManageOperations()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const message = officerChatMessage ? officerChatMessage.value.trim() : "";
+  const tags = officerChatTags ? officerChatTags.value.trim() : "";
+  if (!message) {
+    showToast("Enter a chat message first.");
+    return;
+  }
+  const submitBtn = document.getElementById("officerChatSubmitBtn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Sending...";
+  }
+  try {
+    await api("/api/chat/officer", {
+      method: "POST",
+      body: { message, tags: tags || null },
+    });
+    if (officerChatForm) {
+      officerChatForm.reset();
+    }
+    await Promise.all([loadOfficerChat(), loadOfficerChatStats(), loadWeeklyGoals(), loadNotifications()]);
+    showToast("Message sent.");
+  } catch (error) {
+    showToast(error.message || "Unable to send chat message.");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Send Message";
+    }
   }
 }
 
@@ -3265,6 +4066,12 @@ function attachEvents() {
   if (copyCalendarFeedBtn) {
     copyCalendarFeedBtn.addEventListener("click", handleCopyCalendarFeed);
   }
+  if (copyRushCalendarFeedBtn) {
+    copyRushCalendarFeedBtn.addEventListener("click", handleCopyRushCalendarFeed);
+  }
+  if (copyLunchOnlyFeedBtn) {
+    copyLunchOnlyFeedBtn.addEventListener("click", handleCopyLunchOnlyFeed);
+  }
   if (refreshScheduledLunchesBtn) {
     refreshScheduledLunchesBtn.addEventListener("click", async () => {
       try {
@@ -3288,6 +4095,27 @@ function attachEvents() {
   ratingForm.addEventListener("submit", handleRatingSave);
   lunchForm.addEventListener("submit", handleLunchLog);
   photoForm.addEventListener("submit", handlePhotoUpload);
+  if (rushEventForm) {
+    rushEventForm.addEventListener("submit", handleRushEventCreate);
+  }
+  if (rushCalendarTable) {
+    rushCalendarTable.addEventListener("click", handleRushCalendarTableClick);
+  }
+  if (weeklyGoalForm) {
+    weeklyGoalForm.addEventListener("submit", handleWeeklyGoalCreate);
+  }
+  if (weeklyGoalsList) {
+    weeklyGoalsList.addEventListener("click", handleWeeklyGoalsActionClick);
+  }
+  if (notificationsList) {
+    notificationsList.addEventListener("click", handleNotificationListClick);
+  }
+  if (notificationsReadAllBtn) {
+    notificationsReadAllBtn.addEventListener("click", handleNotificationsReadAll);
+  }
+  if (officerChatForm) {
+    officerChatForm.addEventListener("submit", handleOfficerChatSubmit);
+  }
   if (refreshInstagramPhotoBtn) {
     refreshInstagramPhotoBtn.addEventListener("click", handleRefreshInstagramPhoto);
   }
@@ -3368,6 +4196,13 @@ async function init() {
   attachEvents();
   setActiveDesktopPage(currentRequestedDesktopPage(), false);
   updateTopbarActions();
+  renderWeeklyGoalMetricOptions();
+  renderWeeklyGoalAssignedUsers();
+  renderWeeklyGoals();
+  renderNotifications();
+  renderOfficerChat();
+  renderOfficerChatStats();
+  renderRushCalendar();
   setupPwaInstall();
   await ensureSession();
 }

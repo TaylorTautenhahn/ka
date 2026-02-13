@@ -105,6 +105,34 @@ ROLE_RUSH_OFFICER = "Rush Officer"
 ROLE_RUSHER = "Rusher"
 ALLOWED_ROLES = {ROLE_HEAD, ROLE_RUSH_OFFICER, ROLE_RUSHER}
 DEFAULT_RUSH_OFFICER_EMOJI = "⭐"
+RUSH_EVENT_TYPES = {
+    "official",
+    "roundtable",
+    "mixer",
+    "philanthropy",
+    "brotherhood",
+    "interview",
+    "meeting",
+    "social",
+    "other",
+}
+WEEKLY_GOAL_METRIC_TYPES = {
+    "manual",
+    "ratings_submitted",
+    "lunches_logged",
+    "pnms_created",
+    "chat_messages",
+    "rush_events_created",
+}
+WEEKLY_GOAL_METRIC_LABELS: dict[str, str] = {
+    "manual": "Manual Progress",
+    "ratings_submitted": "Ratings Submitted",
+    "lunches_logged": "Lunches Logged",
+    "pnms_created": "PNMs Added",
+    "chat_messages": "Chat Messages",
+    "rush_events_created": "Rush Events Created",
+}
+DEFAULT_WEEKLY_GOAL_METRIC = "manual"
 RATING_FIELDS = [
     "good_with_girls",
     "will_make_it",
@@ -721,7 +749,8 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         "member_signup_path": member_base,
         "member_signup_qr_path": member_signup_qr_path,
         "calendar_timezone": CALENDAR_TIMEZONE,
-        "calendar_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
+        "calendar_feed_path": f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}",
+        "calendar_lunch_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
     }
 
 
@@ -828,6 +857,132 @@ def build_google_calendar_event_url(
         "ctz": CALENDAR_TIMEZONE,
     }
     return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
+
+
+def build_google_calendar_generic_event_url(
+    *,
+    title: str,
+    event_date: str,
+    details: str,
+    location: str,
+    start_time: str | None,
+    end_time: str | None,
+) -> str:
+    event_day = date.fromisoformat(event_date)
+    start_clock = parse_clock_value(start_time)
+    end_clock = parse_clock_value(end_time)
+    if end_clock and not start_clock:
+        raise ValueError("End time requires a start time.")
+
+    if start_clock:
+        start_dt = datetime(event_day.year, event_day.month, event_day.day, start_clock[0], start_clock[1], 0)
+        if end_clock:
+            end_dt = datetime(event_day.year, event_day.month, event_day.day, end_clock[0], end_clock[1], 0)
+            if end_dt <= start_dt:
+                raise ValueError("End time must be after start time.")
+        else:
+            end_dt = start_dt + timedelta(hours=1)
+        dates_value = f"{format_google_event_stamp(start_dt)}/{format_google_event_stamp(end_dt)}"
+    else:
+        end_date = event_day + timedelta(days=1)
+        dates_value = f"{event_day.strftime('%Y%m%d')}/{end_date.strftime('%Y%m%d')}"
+
+    params = {
+        "action": "TEMPLATE",
+        "text": title,
+        "dates": dates_value,
+        "details": details,
+        "location": location,
+        "ctz": CALENDAR_TIMEZONE,
+    }
+    return f"https://calendar.google.com/calendar/render?{urlencode(params)}"
+
+
+def normalize_rush_event_type(value: str) -> str:
+    token = value.strip().lower()
+    if token not in RUSH_EVENT_TYPES:
+        raise ValueError(
+            "Event type must be one of: "
+            + ", ".join(sorted(RUSH_EVENT_TYPES))
+        )
+    return token
+
+
+def normalize_weekly_goal_metric(value: str) -> str:
+    token = value.strip().lower()
+    if token not in WEEKLY_GOAL_METRIC_TYPES:
+        raise ValueError(
+            "Goal metric must be one of: "
+            + ", ".join(sorted(WEEKLY_GOAL_METRIC_TYPES))
+        )
+    return token
+
+
+def week_bounds_for(day_value: date) -> tuple[date, date]:
+    start = day_value - timedelta(days=day_value.weekday())
+    return start, start + timedelta(days=6)
+
+
+def parse_week_date(value: str | None, fallback: date) -> date:
+    if value is None:
+        return fallback
+    token = value.strip()
+    if not token:
+        return fallback
+    return date.fromisoformat(token)
+
+
+def date_within_span(day_value: date, start_day: date, end_day: date) -> bool:
+    return start_day <= day_value <= end_day
+
+
+def normalize_chat_tag(value: str) -> str:
+    token = value.strip().lower()
+    if token.startswith("#"):
+        token = token[1:]
+    if not token:
+        raise ValueError("Tag cannot be empty.")
+    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]{1,23}", token):
+        raise ValueError("Tags must be 2-24 chars and use letters, numbers, dash, underscore.")
+    return token
+
+
+def parse_chat_tags(raw: str | list[str] | None, message: str) -> list[str]:
+    candidates: list[str] = []
+    if isinstance(raw, str):
+        candidates.extend([part.strip() for part in re.split(r"[,;\n]+", raw) if part.strip()])
+    elif isinstance(raw, list):
+        candidates.extend([str(part).strip() for part in raw if str(part).strip()])
+
+    hashtag_tokens = re.findall(r"(?:^|\s)#([A-Za-z0-9_-]{2,24})", message or "")
+    candidates.extend(hashtag_tokens)
+
+    normalized: list[str] = []
+    seen: set[str] = set()
+    for token in candidates:
+        try:
+            cleaned = normalize_chat_tag(token)
+        except ValueError:
+            continue
+        if cleaned in seen:
+            continue
+        seen.add(cleaned)
+        normalized.append(cleaned)
+    return normalized[:12]
+
+
+def extract_message_mentions(message: str) -> list[str]:
+    if not message:
+        return []
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for token in re.findall(r"@([A-Za-z0-9._-]{3,64})", message):
+        lowered = token.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        ordered.append(lowered)
+    return ordered
 
 
 def build_webcal_url(http_url: str) -> str:
@@ -1667,6 +1822,12 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
         rating_change_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_changes ORDER BY id ASC").fetchall()]
         rating_history_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_history ORDER BY id ASC").fetchall()]
         lunch_rows = [dict(row) for row in conn.execute("SELECT * FROM lunches ORDER BY id ASC").fetchall()]
+        rush_event_rows = [dict(row) for row in conn.execute("SELECT * FROM rush_events ORDER BY id ASC").fetchall()]
+        weekly_goal_rows = [dict(row) for row in conn.execute("SELECT * FROM weekly_goals ORDER BY id ASC").fetchall()]
+        chat_rows = [dict(row) for row in conn.execute("SELECT * FROM officer_chat_messages ORDER BY id ASC").fetchall()]
+        chat_tag_rows = [dict(row) for row in conn.execute("SELECT * FROM officer_chat_tags ORDER BY id ASC").fetchall()]
+        chat_mention_rows = [dict(row) for row in conn.execute("SELECT * FROM officer_chat_mentions ORDER BY id ASC").fetchall()]
+        notification_rows = [dict(row) for row in conn.execute("SELECT * FROM notifications ORDER BY id ASC").fetchall()]
 
     export_ts = timestamp_slug()
     archive = io.BytesIO()
@@ -1778,11 +1939,72 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "notes",
             "created_at",
         ], lunch_rows))
+        zf.writestr("rush_events.csv", csv_bytes_from_rows(list(rush_event_rows[0].keys()) if rush_event_rows else [
+            "id",
+            "title",
+            "event_type",
+            "event_date",
+            "start_time",
+            "end_time",
+            "location",
+            "details",
+            "is_official",
+            "is_cancelled",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ], rush_event_rows))
+        zf.writestr("weekly_goals.csv", csv_bytes_from_rows(list(weekly_goal_rows[0].keys()) if weekly_goal_rows else [
+            "id",
+            "title",
+            "description",
+            "metric_type",
+            "target_count",
+            "manual_progress",
+            "week_start",
+            "week_end",
+            "assigned_user_id",
+            "created_by",
+            "is_archived",
+            "completed_at",
+            "created_at",
+            "updated_at",
+        ], weekly_goal_rows))
+        zf.writestr("officer_chat_messages.csv", csv_bytes_from_rows(list(chat_rows[0].keys()) if chat_rows else [
+            "id",
+            "sender_id",
+            "message",
+            "tags",
+            "created_at",
+            "edited_at",
+        ], chat_rows))
+        zf.writestr("officer_chat_tags.csv", csv_bytes_from_rows(list(chat_tag_rows[0].keys()) if chat_tag_rows else [
+            "id",
+            "message_id",
+            "tag",
+            "created_at",
+        ], chat_tag_rows))
+        zf.writestr("officer_chat_mentions.csv", csv_bytes_from_rows(list(chat_mention_rows[0].keys()) if chat_mention_rows else [
+            "id",
+            "message_id",
+            "user_id",
+            "created_at",
+        ], chat_mention_rows))
+        zf.writestr("notifications.csv", csv_bytes_from_rows(list(notification_rows[0].keys()) if notification_rows else [
+            "id",
+            "user_id",
+            "notif_type",
+            "title",
+            "body",
+            "link_path",
+            "is_read",
+            "created_at",
+        ], notification_rows))
         readme = (
             "KAO Rush Backup Export\n"
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
             f"Database path: {db_path}\n"
-            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, lunches.csv\n"
+            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, lunches.csv, rush_events.csv, weekly_goals.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
             "Password hashes are intentionally excluded from users.csv for security.\n"
         )
         zf.writestr("README.txt", readme.encode("utf-8"))
@@ -1834,6 +2056,263 @@ def recalc_pnm_lunch_stats(conn: sqlite3.Connection, pnm_id: int) -> None:
         "UPDATE pnms SET total_lunches = ?, updated_at = ? WHERE id = ?",
         (int(row["c"]), now_iso(), pnm_id),
     )
+
+
+def create_notification(
+    conn: sqlite3.Connection,
+    *,
+    user_id: int,
+    notif_type: str,
+    title: str,
+    body: str = "",
+    link_path: str = "",
+) -> None:
+    if user_id <= 0:
+        return
+    conn.execute(
+        """
+        INSERT INTO notifications (
+            user_id,
+            notif_type,
+            title,
+            body,
+            link_path,
+            is_read,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, 0, ?)
+        """,
+        (
+            user_id,
+            notif_type.strip()[:32] or "info",
+            title.strip()[:160] or "Update",
+            body.strip()[:500],
+            link_path.strip()[:200],
+            now_iso(),
+        ),
+    )
+
+
+def create_notifications_for_users(
+    conn: sqlite3.Connection,
+    user_ids: list[int] | set[int],
+    *,
+    notif_type: str,
+    title: str,
+    body: str = "",
+    link_path: str = "",
+) -> None:
+    unique_ids = {int(item) for item in user_ids if int(item) > 0}
+    for user_id in unique_ids:
+        create_notification(
+            conn,
+            user_id=user_id,
+            notif_type=notif_type,
+            title=title,
+            body=body,
+            link_path=link_path,
+        )
+
+
+def resolve_goal_week_span(week_start_raw: str | None, week_end_raw: str | None) -> tuple[str, str]:
+    today = date.today()
+    default_start, default_end = week_bounds_for(today)
+    week_start = parse_week_date(week_start_raw, default_start)
+    week_end = parse_week_date(week_end_raw, week_start + timedelta(days=6))
+    if week_end < week_start:
+        raise ValueError("Week end must be on or after week start.")
+    if (week_end - week_start).days > 20:
+        raise ValueError("Week range cannot exceed 21 days.")
+    return week_start.isoformat(), week_end.isoformat()
+
+
+def weekly_goal_progress_count(conn: sqlite3.Connection, goal_row: sqlite3.Row) -> int:
+    metric = str(goal_row["metric_type"])
+    week_start = str(goal_row["week_start"])
+    week_end = str(goal_row["week_end"])
+    assigned_user_id = int(goal_row["assigned_user_id"]) if goal_row["assigned_user_id"] is not None else None
+
+    if metric == "manual":
+        return int(goal_row["manual_progress"] or 0)
+
+    if metric == "ratings_submitted":
+        if assigned_user_id:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM rating_history
+                WHERE user_id = ?
+                  AND event_type IN ('create', 'update')
+                  AND date(changed_at) BETWEEN ? AND ?
+                """,
+                (assigned_user_id, week_start, week_end),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM rating_history
+                WHERE event_type IN ('create', 'update')
+                  AND date(changed_at) BETWEEN ? AND ?
+                """,
+                (week_start, week_end),
+            ).fetchone()
+        return int(row["c"])
+
+    if metric == "lunches_logged":
+        if assigned_user_id:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM lunches WHERE user_id = ? AND lunch_date BETWEEN ? AND ?",
+                (assigned_user_id, week_start, week_end),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM lunches WHERE lunch_date BETWEEN ? AND ?",
+                (week_start, week_end),
+            ).fetchone()
+        return int(row["c"])
+
+    if metric == "pnms_created":
+        if assigned_user_id:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM pnms WHERE created_by = ? AND date(created_at) BETWEEN ? AND ?",
+                (assigned_user_id, week_start, week_end),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM pnms WHERE date(created_at) BETWEEN ? AND ?",
+                (week_start, week_end),
+            ).fetchone()
+        return int(row["c"])
+
+    if metric == "chat_messages":
+        if assigned_user_id:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM officer_chat_messages WHERE sender_id = ? AND date(created_at) BETWEEN ? AND ?",
+                (assigned_user_id, week_start, week_end),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                "SELECT COUNT(*) AS c FROM officer_chat_messages WHERE date(created_at) BETWEEN ? AND ?",
+                (week_start, week_end),
+            ).fetchone()
+        return int(row["c"])
+
+    if metric == "rush_events_created":
+        if assigned_user_id:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM rush_events
+                WHERE created_by = ?
+                  AND is_cancelled = 0
+                  AND event_date BETWEEN ? AND ?
+                """,
+                (assigned_user_id, week_start, week_end),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM rush_events
+                WHERE is_cancelled = 0
+                  AND event_date BETWEEN ? AND ?
+                """,
+                (week_start, week_end),
+            ).fetchone()
+        return int(row["c"])
+
+    return 0
+
+
+def weekly_goal_payload(conn: sqlite3.Connection, row: sqlite3.Row) -> dict[str, Any]:
+    progress_count = weekly_goal_progress_count(conn, row)
+    target = max(1, int(row["target_count"]))
+    computed_complete = progress_count >= target
+    completed_at = row["completed_at"] if row["completed_at"] else None
+    is_completed = bool(completed_at) or computed_complete
+    today = date.today()
+    try:
+        week_end = date.fromisoformat(row["week_end"])
+    except ValueError:
+        week_end = today
+    status = "completed" if is_completed else ("overdue" if week_end < today else "active")
+    percent = round(min(100.0, (progress_count / target) * 100), 1)
+
+    return {
+        "goal_id": int(row["id"]),
+        "title": row["title"],
+        "description": row["description"],
+        "metric_type": row["metric_type"],
+        "metric_label": WEEKLY_GOAL_METRIC_LABELS.get(row["metric_type"], row["metric_type"]),
+        "target_count": target,
+        "progress_count": progress_count,
+        "percent_complete": percent,
+        "week_start": row["week_start"],
+        "week_end": row["week_end"],
+        "assigned_user_id": row["assigned_user_id"],
+        "assigned_username": row["assigned_username"] if "assigned_username" in row.keys() else None,
+        "created_by": row["created_by"],
+        "created_by_username": row["created_by_username"] if "created_by_username" in row.keys() else None,
+        "manual_progress": int(row["manual_progress"] or 0),
+        "is_archived": bool(row["is_archived"]),
+        "is_completed": is_completed,
+        "status": status,
+        "completed_at": completed_at,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }
+
+
+def evaluate_weekly_goal_completions(conn: sqlite3.Connection) -> None:
+    rows = conn.execute(
+        """
+        SELECT
+            g.*,
+            assignee.username AS assigned_username,
+            creator.username AS created_by_username
+        FROM weekly_goals g
+        LEFT JOIN users assignee ON assignee.id = g.assigned_user_id
+        LEFT JOIN users creator ON creator.id = g.created_by
+        WHERE g.is_archived = 0
+          AND g.completed_at IS NULL
+        ORDER BY g.week_start ASC, g.id ASC
+        """
+    ).fetchall()
+    for row in rows:
+        progress = weekly_goal_progress_count(conn, row)
+        target = max(1, int(row["target_count"]))
+        if progress < target:
+            continue
+        completed_at = now_iso()
+        cursor = conn.execute(
+            """
+            UPDATE weekly_goals
+            SET completed_at = ?, updated_at = ?
+            WHERE id = ? AND completed_at IS NULL
+            """,
+            (completed_at, completed_at, row["id"]),
+        )
+        if cursor.rowcount <= 0:
+            continue
+
+        recipients: set[int] = {int(row["created_by"])}
+        if row["assigned_user_id"] is not None:
+            recipients.add(int(row["assigned_user_id"]))
+        else:
+            head_rows = conn.execute(
+                "SELECT id FROM users WHERE role = ? AND is_approved = 1",
+                (ROLE_HEAD,),
+            ).fetchall()
+            recipients.update(int(head_row["id"]) for head_row in head_rows)
+        create_notifications_for_users(
+            conn,
+            recipients,
+            notif_type="goal_completed",
+            title=f"Goal Completed: {row['title']}",
+            body=f"Progress reached {progress}/{target}.",
+            link_path="/?view=operations",
+        )
 
 
 def recalc_pnm_rating_stats(conn: sqlite3.Connection, pnm_id: int) -> None:
@@ -2139,6 +2618,75 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             UNIQUE (pnm_id, user_id, lunch_date)
         );
 
+        CREATE TABLE IF NOT EXISTS rush_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN ('official', 'roundtable', 'mixer', 'philanthropy', 'brotherhood', 'interview', 'meeting', 'social', 'other')),
+            event_date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            location TEXT NOT NULL DEFAULT '',
+            details TEXT NOT NULL DEFAULT '',
+            is_official INTEGER NOT NULL DEFAULT 1,
+            is_cancelled INTEGER NOT NULL DEFAULT 0,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS weekly_goals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            metric_type TEXT NOT NULL CHECK (metric_type IN ('manual', 'ratings_submitted', 'lunches_logged', 'pnms_created', 'chat_messages', 'rush_events_created')),
+            target_count INTEGER NOT NULL DEFAULT 1 CHECK (target_count >= 1),
+            manual_progress INTEGER NOT NULL DEFAULT 0 CHECK (manual_progress >= 0),
+            week_start TEXT NOT NULL,
+            week_end TEXT NOT NULL,
+            assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            is_archived INTEGER NOT NULL DEFAULT 0,
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS officer_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            message TEXT NOT NULL,
+            tags TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            edited_at TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS officer_chat_tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER NOT NULL REFERENCES officer_chat_messages(id) ON DELETE CASCADE,
+            tag TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE (message_id, tag)
+        );
+
+        CREATE TABLE IF NOT EXISTS officer_chat_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER NOT NULL REFERENCES officer_chat_messages(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            UNIQUE (message_id, user_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            notif_type TEXT NOT NULL DEFAULT 'info',
+            title TEXT NOT NULL,
+            body TEXT NOT NULL DEFAULT '',
+            link_path TEXT NOT NULL DEFAULT '',
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -2167,6 +2715,15 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
+        CREATE INDEX IF NOT EXISTS idx_rush_events_date ON rush_events(event_date, start_time);
+        CREATE INDEX IF NOT EXISTS idx_rush_events_created_by ON rush_events(created_by);
+        CREATE INDEX IF NOT EXISTS idx_weekly_goals_week ON weekly_goals(week_start, week_end);
+        CREATE INDEX IF NOT EXISTS idx_weekly_goals_assigned_user ON weekly_goals(assigned_user_id);
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_messages_created_at ON officer_chat_messages(created_at);
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_messages_sender ON officer_chat_messages(sender_id);
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_tags_tag ON officer_chat_tags(tag);
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_mentions_user ON officer_chat_mentions(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
         """
     )
 
@@ -2243,6 +2800,109 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE season_archive_state ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0")
     if "lunch_count" not in season_columns:
         conn.execute("ALTER TABLE season_archive_state ADD COLUMN lunch_count INTEGER NOT NULL DEFAULT 0")
+
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS rush_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            event_type TEXT NOT NULL CHECK (event_type IN ('official', 'roundtable', 'mixer', 'philanthropy', 'brotherhood', 'interview', 'meeting', 'social', 'other')),
+            event_date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            location TEXT NOT NULL DEFAULT '',
+            details TEXT NOT NULL DEFAULT '',
+            is_official INTEGER NOT NULL DEFAULT 1,
+            is_cancelled INTEGER NOT NULL DEFAULT 0,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_rush_events_date ON rush_events(event_date, start_time);
+        CREATE INDEX IF NOT EXISTS idx_rush_events_created_by ON rush_events(created_by);
+
+        CREATE TABLE IF NOT EXISTS weekly_goals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            description TEXT NOT NULL DEFAULT '',
+            metric_type TEXT NOT NULL CHECK (metric_type IN ('manual', 'ratings_submitted', 'lunches_logged', 'pnms_created', 'chat_messages', 'rush_events_created')),
+            target_count INTEGER NOT NULL DEFAULT 1 CHECK (target_count >= 1),
+            manual_progress INTEGER NOT NULL DEFAULT 0 CHECK (manual_progress >= 0),
+            week_start TEXT NOT NULL,
+            week_end TEXT NOT NULL,
+            assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            is_archived INTEGER NOT NULL DEFAULT 0,
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_weekly_goals_week ON weekly_goals(week_start, week_end);
+        CREATE INDEX IF NOT EXISTS idx_weekly_goals_assigned_user ON weekly_goals(assigned_user_id);
+
+        CREATE TABLE IF NOT EXISTS officer_chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            message TEXT NOT NULL,
+            tags TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL,
+            edited_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_messages_created_at ON officer_chat_messages(created_at);
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_messages_sender ON officer_chat_messages(sender_id);
+
+        CREATE TABLE IF NOT EXISTS officer_chat_tags (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER NOT NULL REFERENCES officer_chat_messages(id) ON DELETE CASCADE,
+            tag TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE (message_id, tag)
+        );
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_tags_tag ON officer_chat_tags(tag);
+
+        CREATE TABLE IF NOT EXISTS officer_chat_mentions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            message_id INTEGER NOT NULL REFERENCES officer_chat_messages(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            UNIQUE (message_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_officer_chat_mentions_user ON officer_chat_mentions(user_id);
+
+        CREATE TABLE IF NOT EXISTS notifications (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            notif_type TEXT NOT NULL DEFAULT 'info',
+            title TEXT NOT NULL,
+            body TEXT NOT NULL DEFAULT '',
+            link_path TEXT NOT NULL DEFAULT '',
+            is_read INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
+        """
+    )
+    weekly_goal_columns = {row["name"] for row in conn.execute("PRAGMA table_info(weekly_goals)").fetchall()}
+    if "description" not in weekly_goal_columns:
+        conn.execute("ALTER TABLE weekly_goals ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+    if "manual_progress" not in weekly_goal_columns:
+        conn.execute("ALTER TABLE weekly_goals ADD COLUMN manual_progress INTEGER NOT NULL DEFAULT 0")
+    if "assigned_user_id" not in weekly_goal_columns:
+        conn.execute("ALTER TABLE weekly_goals ADD COLUMN assigned_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL")
+    if "is_archived" not in weekly_goal_columns:
+        conn.execute("ALTER TABLE weekly_goals ADD COLUMN is_archived INTEGER NOT NULL DEFAULT 0")
+    if "completed_at" not in weekly_goal_columns:
+        conn.execute("ALTER TABLE weekly_goals ADD COLUMN completed_at TEXT")
+    if "updated_at" not in weekly_goal_columns:
+        conn.execute("ALTER TABLE weekly_goals ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+
+    rush_event_columns = {row["name"] for row in conn.execute("PRAGMA table_info(rush_events)").fetchall()}
+    if "is_cancelled" not in rush_event_columns:
+        conn.execute("ALTER TABLE rush_events ADD COLUMN is_cancelled INTEGER NOT NULL DEFAULT 0")
+    if "details" not in rush_event_columns:
+        conn.execute("ALTER TABLE rush_events ADD COLUMN details TEXT NOT NULL DEFAULT ''")
+    if "location" not in rush_event_columns:
+        conn.execute("ALTER TABLE rush_events ADD COLUMN location TEXT NOT NULL DEFAULT ''")
 
     # Backfill a baseline seed event for legacy ratings so trend charts can start from current stored state.
     conn.execute(
@@ -3014,6 +3674,107 @@ class LunchCreateRequest(BaseModel):
         return token
 
 
+class RushEventCreateRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=120)
+    event_type: str = Field(default="official", min_length=3, max_length=32)
+    event_date: str
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str = Field(default="", max_length=140)
+    details: str = Field(default="", max_length=1200)
+    is_official: bool = True
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, value: str) -> str:
+        return normalize_rush_event_type(value)
+
+    @field_validator("event_date")
+    @classmethod
+    def validate_event_date(cls, value: str) -> str:
+        return verify_iso_date(value, "Event date")
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_time_values(cls, value: str | None) -> str | None:
+        return LunchCreateRequest.validate_time_value(value)
+
+
+class RushEventUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=120)
+    event_type: str | None = Field(default=None, min_length=3, max_length=32)
+    event_date: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = Field(default=None, max_length=140)
+    details: str | None = Field(default=None, max_length=1200)
+    is_official: bool | None = None
+    is_cancelled: bool | None = None
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_optional_event_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_rush_event_type(value)
+
+    @field_validator("event_date")
+    @classmethod
+    def validate_optional_event_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return verify_iso_date(value, "Event date")
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_optional_time_values(cls, value: str | None) -> str | None:
+        return LunchCreateRequest.validate_time_value(value)
+
+
+class WeeklyGoalCreateRequest(BaseModel):
+    title: str = Field(..., min_length=3, max_length=120)
+    description: str = Field(default="", max_length=800)
+    metric_type: str = Field(default=DEFAULT_WEEKLY_GOAL_METRIC, min_length=3, max_length=32)
+    target_count: int = Field(default=1, ge=1, le=1000)
+    week_start: str | None = None
+    week_end: str | None = None
+    assigned_user_id: int | None = None
+
+    @field_validator("metric_type")
+    @classmethod
+    def validate_metric_type(cls, value: str) -> str:
+        return normalize_weekly_goal_metric(value)
+
+
+class WeeklyGoalUpdateRequest(BaseModel):
+    title: str | None = Field(default=None, min_length=3, max_length=120)
+    description: str | None = Field(default=None, max_length=800)
+    metric_type: str | None = Field(default=None, min_length=3, max_length=32)
+    target_count: int | None = Field(default=None, ge=1, le=1000)
+    week_start: str | None = None
+    week_end: str | None = None
+    assigned_user_id: int | None = None
+    is_archived: bool | None = None
+    complete_now: bool | None = None
+
+    @field_validator("metric_type")
+    @classmethod
+    def validate_optional_metric_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_weekly_goal_metric(value)
+
+
+class WeeklyGoalProgressRequest(BaseModel):
+    delta: int = Field(default=1, ge=1, le=1000)
+    note: str = Field(default="", max_length=220)
+
+
+class OfficerChatMessageCreateRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2200)
+    tags: str | list[str] | None = None
+
+
 class AssignOfficerRequest(BaseModel):
     officer_user_id: int | None = None
 
@@ -3385,7 +4146,8 @@ def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
         "head_seed_username": row["head_seed_username"],
         "is_active": bool(row["is_active"]),
         "is_default": tenant.slug == DEFAULT_TENANT_SLUG,
-        "calendar_feed_path": f"{base_path}/calendar/lunches.ics?token={calendar_token}" if calendar_token else None,
+        "calendar_feed_path": f"{base_path}/calendar/rush.ics?token={calendar_token}" if calendar_token else None,
+        "calendar_lunch_feed_path": f"{base_path}/calendar/lunches.ics?token={calendar_token}" if calendar_token else None,
         "member_signup_path": f"{base_path}/member",
         "member_signup_qr_path": f"{base_path}/member-signup-qr.svg",
         "created_at": row["created_at"],
@@ -3774,6 +4536,10 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
         pnms_count = int(conn.execute("SELECT COUNT(*) AS count FROM pnms").fetchone()["count"])
         ratings_count = int(conn.execute("SELECT COUNT(*) AS count FROM ratings").fetchone()["count"])
         lunches_count = int(conn.execute("SELECT COUNT(*) AS count FROM lunches").fetchone()["count"])
+        rush_events_count = int(conn.execute("SELECT COUNT(*) AS count FROM rush_events").fetchone()["count"])
+        weekly_goals_count = int(conn.execute("SELECT COUNT(*) AS count FROM weekly_goals").fetchone()["count"])
+        chat_messages_count = int(conn.execute("SELECT COUNT(*) AS count FROM officer_chat_messages").fetchone()["count"])
+        notifications_count = int(conn.execute("SELECT COUNT(*) AS count FROM notifications").fetchone()["count"])
 
     with platform_db_session() as conn:
         active_tenants = int(conn.execute("SELECT COUNT(*) AS count FROM tenants WHERE is_active = 1").fetchone()["count"])
@@ -3802,6 +4568,10 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
             "pnms": pnms_count,
             "ratings": ratings_count,
             "lunches": lunches_count,
+            "rush_events": rush_events_count,
+            "weekly_goals": weekly_goals_count,
+            "chat_messages": chat_messages_count,
+            "notifications": notifications_count,
         },
         "paths": storage_paths,
         "files": {
@@ -3940,6 +4710,12 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
         conn.execute("DELETE FROM rating_changes")
         conn.execute("DELETE FROM rating_history")
         conn.execute("DELETE FROM ratings")
+        conn.execute("DELETE FROM officer_chat_mentions")
+        conn.execute("DELETE FROM officer_chat_tags")
+        conn.execute("DELETE FROM officer_chat_messages")
+        conn.execute("DELETE FROM weekly_goals")
+        conn.execute("DELETE FROM rush_events")
+        conn.execute("DELETE FROM notifications")
         conn.execute("DELETE FROM lunches")
         conn.execute("DELETE FROM pnms")
         conn.execute(
@@ -4807,6 +5583,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
                         target_path.unlink(missing_ok=True)
                         raise
 
+        evaluate_weekly_goal_completions(conn)
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
 
     return {"pnm": pnm_payload(row, own_rating=None, assigned_officer=None)}
@@ -5631,6 +6408,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
 
         recalc_pnm_rating_stats(conn, payload.pnm_id)
         recalc_member_rating_stats(conn, user["id"])
+        evaluate_weekly_goal_completions(conn)
 
         updated_rating = conn.execute(
             "SELECT * FROM ratings WHERE pnm_id = ? AND user_id = ?",
@@ -5799,6 +6577,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
         lunch_id = int(cursor.lastrowid or 0)
         recalc_member_lunch_stats(conn, user["id"])
         recalc_pnm_lunch_stats(conn, payload.pnm_id)
+        evaluate_weekly_goal_completions(conn)
 
         refreshed_user = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
         refreshed_pnm = conn.execute(
@@ -5847,7 +6626,8 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             "location": payload.location.strip(),
             "notes": payload.notes.strip(),
             "google_calendar_url": google_calendar_url,
-            "calendar_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
+            "calendar_feed_path": f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}",
+            "calendar_lunch_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
         },
     }
 
@@ -5967,11 +6747,17 @@ def scheduled_lunches(
 
 
 def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str, Any]:
-    feed_path = f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}"
+    feed_path = f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}"
+    lunch_feed_path = f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}"
     base_origin = str(request.base_url).rstrip("/")
     feed_url = f"{base_origin}{feed_path}"
+    lunch_feed_url = f"{base_origin}{lunch_feed_path}"
     return {
         "feed_url": feed_url,
+        "rush_feed_url": feed_url,
+        "lunch_feed_url": lunch_feed_url,
+        "lunch_webcal_url": build_webcal_url(lunch_feed_url),
+        "lunch_google_subscribe_url": build_google_subscribe_url(lunch_feed_url),
         "webcal_url": build_webcal_url(feed_url),
         "google_subscribe_url": build_google_subscribe_url(feed_url),
         "timezone": CALENDAR_TIMEZONE,
@@ -6199,6 +6985,1161 @@ def public_lunch_calendar_feed(token: str | None = None) -> Response:
         media_type="text/calendar; charset=utf-8",
         headers={"Cache-Control": "public, max-age=300"},
     )
+
+
+@app.get("/calendar/rush.ics")
+def public_rush_calendar_feed(token: str | None = None) -> Response:
+    tenant = current_tenant()
+    expected_token = tenant.calendar_share_token.strip()
+    if not token or not expected_token or not hmac.compare_digest(token, expected_token):
+        raise HTTPException(status_code=401, detail="Invalid calendar token.")
+
+    with db_session() as conn:
+        lunch_rows = conn.execute(
+            """
+            SELECT
+                l.id,
+                l.lunch_date,
+                l.start_time,
+                l.end_time,
+                l.location,
+                l.notes,
+                l.created_at,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                u.username
+            FROM lunches l
+            JOIN pnms p ON p.id = l.pnm_id
+            JOIN users u ON u.id = l.user_id
+            ORDER BY l.lunch_date ASC, COALESCE(l.start_time, '00:00') ASC, l.id ASC
+            """
+        ).fetchall()
+        event_rows = conn.execute(
+            """
+            SELECT
+                e.id,
+                e.title,
+                e.event_type,
+                e.event_date,
+                e.start_time,
+                e.end_time,
+                e.location,
+                e.details,
+                e.is_official,
+                e.created_at,
+                u.username
+            FROM rush_events e
+            JOIN users u ON u.id = e.created_by
+            WHERE e.is_cancelled = 0
+            ORDER BY e.event_date ASC, COALESCE(e.start_time, '00:00') ASC, e.id ASC
+            """
+        ).fetchall()
+
+    lines = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Rush Evaluation//Rush Calendar//EN",
+        "CALSCALE:GREGORIAN",
+        "METHOD:PUBLISH",
+        fold_ical_line(f"X-WR-CALNAME:{escape_ical_text(f'{tenant.display_name} Rush Calendar')}"),
+        fold_ical_line(f"X-WR-TIMEZONE:{escape_ical_text(CALENDAR_TIMEZONE)}"),
+    ]
+
+    for row in event_rows:
+        event_day = date.fromisoformat(row["event_date"])
+        try:
+            start_clock = parse_clock_value(row["start_time"])
+        except ValueError:
+            start_clock = None
+        try:
+            end_clock = parse_clock_value(row["end_time"])
+        except ValueError:
+            end_clock = None
+        type_label = row["event_type"].replace("_", " ").title()
+        summary = f"{row['title']} ({type_label})"
+        details_parts = [
+            f"Type: {type_label}",
+            f"Official: {'Yes' if bool(row['is_official']) else 'No'}",
+            f"Created by: {row['username']}",
+        ]
+        if row["details"]:
+            details_parts.append(f"Details: {row['details']}")
+        description = "\n".join(details_parts)
+
+        lines.append("BEGIN:VEVENT")
+        lines.append(fold_ical_line(f"UID:rush-event-{tenant.slug}-{row['id']}@rush-evaluation"))
+        lines.append(fold_ical_line(f"DTSTAMP:{format_utc_ical(row['created_at'])}"))
+        lines.append(fold_ical_line(f"SUMMARY:{escape_ical_text(summary)}"))
+        lines.append(fold_ical_line(f"DESCRIPTION:{escape_ical_text(description)}"))
+        if row["location"]:
+            lines.append(fold_ical_line(f"LOCATION:{escape_ical_text(row['location'])}"))
+        lines.append(fold_ical_line(f"CATEGORIES:{escape_ical_text(type_label)}"))
+
+        if start_clock:
+            start_dt = datetime(event_day.year, event_day.month, event_day.day, start_clock[0], start_clock[1], 0)
+            if end_clock:
+                end_dt = datetime(event_day.year, event_day.month, event_day.day, end_clock[0], end_clock[1], 0)
+                if end_dt <= start_dt:
+                    end_dt = start_dt + timedelta(hours=1)
+            else:
+                end_dt = start_dt + timedelta(hours=1)
+            lines.append(fold_ical_line(f"DTSTART;TZID={CALENDAR_TIMEZONE}:{format_google_event_stamp(start_dt)}"))
+            lines.append(fold_ical_line(f"DTEND;TZID={CALENDAR_TIMEZONE}:{format_google_event_stamp(end_dt)}"))
+        else:
+            next_day = event_day + timedelta(days=1)
+            lines.append(fold_ical_line(f"DTSTART;VALUE=DATE:{event_day.strftime('%Y%m%d')}"))
+            lines.append(fold_ical_line(f"DTEND;VALUE=DATE:{next_day.strftime('%Y%m%d')}"))
+
+        lines.append("END:VEVENT")
+
+    for row in lunch_rows:
+        lunch_day = date.fromisoformat(row["lunch_date"])
+        try:
+            start_clock = parse_clock_value(row["start_time"])
+        except ValueError:
+            start_clock = None
+        try:
+            end_clock = parse_clock_value(row["end_time"])
+        except ValueError:
+            end_clock = None
+
+        summary = f"Lunch with {row['first_name']} {row['last_name']}"
+        description_parts = [
+            f"PNM Code: {row['pnm_code']}",
+            f"Logged by: {row['username']}",
+        ]
+        if row["notes"]:
+            description_parts.append(f"Notes: {row['notes']}")
+        description = "\n".join(description_parts)
+
+        lines.append("BEGIN:VEVENT")
+        lines.append(fold_ical_line(f"UID:lunch-{tenant.slug}-{row['id']}@rush-evaluation"))
+        lines.append(fold_ical_line(f"DTSTAMP:{format_utc_ical(row['created_at'])}"))
+        lines.append(fold_ical_line(f"SUMMARY:{escape_ical_text(summary)}"))
+        lines.append(fold_ical_line(f"DESCRIPTION:{escape_ical_text(description)}"))
+        if row["location"]:
+            lines.append(fold_ical_line(f"LOCATION:{escape_ical_text(row['location'])}"))
+        lines.append(fold_ical_line("CATEGORIES:Lunch"))
+
+        if start_clock:
+            start_dt = datetime(lunch_day.year, lunch_day.month, lunch_day.day, start_clock[0], start_clock[1], 0)
+            if end_clock:
+                end_dt = datetime(lunch_day.year, lunch_day.month, lunch_day.day, end_clock[0], end_clock[1], 0)
+                if end_dt <= start_dt:
+                    end_dt = start_dt + timedelta(hours=1)
+            else:
+                end_dt = start_dt + timedelta(hours=1)
+            lines.append(fold_ical_line(f"DTSTART;TZID={CALENDAR_TIMEZONE}:{format_google_event_stamp(start_dt)}"))
+            lines.append(fold_ical_line(f"DTEND;TZID={CALENDAR_TIMEZONE}:{format_google_event_stamp(end_dt)}"))
+        else:
+            next_day = lunch_day + timedelta(days=1)
+            lines.append(fold_ical_line(f"DTSTART;VALUE=DATE:{lunch_day.strftime('%Y%m%d')}"))
+            lines.append(fold_ical_line(f"DTEND;VALUE=DATE:{next_day.strftime('%Y%m%d')}"))
+
+        lines.append("END:VEVENT")
+
+    lines.append("END:VCALENDAR")
+    payload = "\r\n".join(lines) + "\r\n"
+    return Response(
+        content=payload,
+        media_type="text/calendar; charset=utf-8",
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+def rush_event_payload(row: sqlite3.Row) -> dict[str, Any]:
+    details = row["details"] if "details" in row.keys() else ""
+    google_calendar_url = None
+    try:
+        google_calendar_url = build_google_calendar_generic_event_url(
+            title=row["title"],
+            event_date=row["event_date"],
+            details=details,
+            location=row["location"] or "",
+            start_time=row["start_time"],
+            end_time=row["end_time"],
+        )
+    except ValueError:
+        google_calendar_url = None
+    return {
+        "event_id": int(row["id"]),
+        "title": row["title"],
+        "event_type": row["event_type"],
+        "event_date": row["event_date"],
+        "start_time": row["start_time"],
+        "end_time": row["end_time"],
+        "location": row["location"],
+        "details": details,
+        "is_official": bool(row["is_official"]),
+        "is_cancelled": bool(row["is_cancelled"]) if "is_cancelled" in row.keys() else False,
+        "created_by": int(row["created_by"]),
+        "created_by_username": row["created_by_username"] if "created_by_username" in row.keys() else None,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "google_calendar_url": google_calendar_url,
+    }
+
+
+@app.get("/api/rush-events")
+def list_rush_events(
+    include_past: bool = False,
+    limit: int = 300,
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    max_limit = max(1, min(1000, int(limit)))
+    with db_session() as conn:
+        if include_past:
+            rows = conn.execute(
+                """
+                SELECT
+                    e.*,
+                    u.username AS created_by_username
+                FROM rush_events e
+                JOIN users u ON u.id = e.created_by
+                WHERE e.is_cancelled = 0
+                ORDER BY e.event_date ASC, COALESCE(e.start_time, '23:59') ASC, e.id ASC
+                LIMIT ?
+                """,
+                (max_limit,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT
+                    e.*,
+                    u.username AS created_by_username
+                FROM rush_events e
+                JOIN users u ON u.id = e.created_by
+                WHERE e.is_cancelled = 0
+                  AND e.event_date >= date('now', '-3 day')
+                ORDER BY e.event_date ASC, COALESCE(e.start_time, '23:59') ASC, e.id ASC
+                LIMIT ?
+                """,
+                (max_limit,),
+            ).fetchall()
+    return {"events": [rush_event_payload(row) for row in rows]}
+
+
+@app.post("/api/rush-events")
+def create_rush_event(payload: RushEventCreateRequest, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
+    if payload.end_time and not payload.start_time:
+        raise HTTPException(status_code=400, detail="End time requires a start time.")
+    if payload.start_time and payload.end_time and payload.end_time <= payload.start_time:
+        raise HTTPException(status_code=400, detail="End time must be after start time.")
+
+    now = now_iso()
+    title = payload.title.strip()
+    details = payload.details.strip()
+    location = payload.location.strip()
+
+    with db_session() as conn:
+        cursor = conn.execute(
+            """
+            INSERT INTO rush_events (
+                title,
+                event_type,
+                event_date,
+                start_time,
+                end_time,
+                location,
+                details,
+                is_official,
+                is_cancelled,
+                created_by,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+            """,
+            (
+                title,
+                payload.event_type,
+                payload.event_date,
+                payload.start_time,
+                payload.end_time,
+                location,
+                details,
+                1 if payload.is_official else 0,
+                user["id"],
+                now,
+                now,
+            ),
+        )
+        event_id = int(cursor.lastrowid)
+        created = conn.execute(
+            """
+            SELECT
+                e.*,
+                u.username AS created_by_username
+            FROM rush_events e
+            JOIN users u ON u.id = e.created_by
+            WHERE e.id = ?
+            """,
+            (event_id,),
+        ).fetchone()
+        evaluate_weekly_goal_completions(conn)
+
+        recipient_rows = conn.execute(
+            "SELECT id FROM users WHERE is_approved = 1 AND id != ?",
+            (user["id"],),
+        ).fetchall()
+        recipients = [int(row["id"]) for row in recipient_rows]
+        event_clock = payload.start_time or "All Day"
+        create_notifications_for_users(
+            conn,
+            recipients,
+            notif_type="rush_event",
+            title=f"New Rush Event: {title}",
+            body=f"{payload.event_date} | {event_clock}",
+            link_path="/?view=operations",
+        )
+
+    return {"event": rush_event_payload(created)}
+
+
+@app.patch("/api/rush-events/{event_id}")
+def update_rush_event(
+    event_id: int,
+    payload: RushEventUpdateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM rush_events WHERE id = ?", (event_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Rush event not found.")
+        if user["role"] != ROLE_HEAD and int(row["created_by"]) != int(user["id"]):
+            raise HTTPException(status_code=403, detail="Only heads or the creator can edit this event.")
+
+        title = payload.title.strip() if payload.title is not None else row["title"]
+        event_type = payload.event_type if payload.event_type is not None else row["event_type"]
+        event_date = payload.event_date if payload.event_date is not None else row["event_date"]
+        start_time = payload.start_time if payload.start_time is not None else row["start_time"]
+        end_time = payload.end_time if payload.end_time is not None else row["end_time"]
+        location = payload.location.strip() if payload.location is not None else row["location"]
+        details = payload.details.strip() if payload.details is not None else row["details"]
+        is_official = payload.is_official if payload.is_official is not None else bool(row["is_official"])
+        is_cancelled = payload.is_cancelled if payload.is_cancelled is not None else bool(row["is_cancelled"])
+
+        if end_time and not start_time:
+            raise HTTPException(status_code=400, detail="End time requires a start time.")
+        if start_time and end_time and end_time <= start_time:
+            raise HTTPException(status_code=400, detail="End time must be after start time.")
+
+        conn.execute(
+            """
+            UPDATE rush_events
+            SET
+                title = ?,
+                event_type = ?,
+                event_date = ?,
+                start_time = ?,
+                end_time = ?,
+                location = ?,
+                details = ?,
+                is_official = ?,
+                is_cancelled = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                title,
+                event_type,
+                event_date,
+                start_time,
+                end_time,
+                location,
+                details,
+                1 if is_official else 0,
+                1 if is_cancelled else 0,
+                now_iso(),
+                event_id,
+            ),
+        )
+        refreshed = conn.execute(
+            """
+            SELECT
+                e.*,
+                u.username AS created_by_username
+            FROM rush_events e
+            JOIN users u ON u.id = e.created_by
+            WHERE e.id = ?
+            """,
+            (event_id,),
+        ).fetchone()
+
+    return {"event": rush_event_payload(refreshed)}
+
+
+@app.delete("/api/rush-events/{event_id}")
+def delete_rush_event(event_id: int, user: sqlite3.Row = Depends(require_officer)) -> dict[str, str]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM rush_events WHERE id = ?", (event_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Rush event not found.")
+        if user["role"] != ROLE_HEAD and int(row["created_by"]) != int(user["id"]):
+            raise HTTPException(status_code=403, detail="Only heads or the creator can remove this event.")
+        conn.execute("UPDATE rush_events SET is_cancelled = 1, updated_at = ? WHERE id = ?", (now_iso(), event_id))
+    return {"message": "Rush event removed."}
+
+
+@app.get("/api/rush-calendar")
+def rush_calendar(
+    request: Request,
+    include_past: bool = False,
+    limit: int = 500,
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    max_limit = max(20, min(1200, int(limit)))
+    with db_session() as conn:
+        if include_past:
+            event_rows = conn.execute(
+                """
+                SELECT
+                    e.*,
+                    u.username AS created_by_username
+                FROM rush_events e
+                JOIN users u ON u.id = e.created_by
+                WHERE e.is_cancelled = 0
+                ORDER BY e.event_date ASC, COALESCE(e.start_time, '23:59') ASC, e.id ASC
+                LIMIT ?
+                """,
+                (max_limit,),
+            ).fetchall()
+            lunch_rows = conn.execute(
+                """
+                SELECT
+                    l.*,
+                    p.pnm_code,
+                    p.first_name,
+                    p.last_name,
+                    u.username,
+                    ao.username AS assigned_officer_username
+                FROM lunches l
+                JOIN pnms p ON p.id = l.pnm_id
+                JOIN users u ON u.id = l.user_id
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                ORDER BY l.lunch_date ASC, COALESCE(l.start_time, '23:59') ASC, l.id ASC
+                LIMIT ?
+                """,
+                (max_limit,),
+            ).fetchall()
+        else:
+            event_rows = conn.execute(
+                """
+                SELECT
+                    e.*,
+                    u.username AS created_by_username
+                FROM rush_events e
+                JOIN users u ON u.id = e.created_by
+                WHERE e.is_cancelled = 0
+                  AND e.event_date >= date('now', '-3 day')
+                ORDER BY e.event_date ASC, COALESCE(e.start_time, '23:59') ASC, e.id ASC
+                LIMIT ?
+                """,
+                (max_limit,),
+            ).fetchall()
+            lunch_rows = conn.execute(
+                """
+                SELECT
+                    l.*,
+                    p.pnm_code,
+                    p.first_name,
+                    p.last_name,
+                    u.username,
+                    ao.username AS assigned_officer_username
+                FROM lunches l
+                JOIN pnms p ON p.id = l.pnm_id
+                JOIN users u ON u.id = l.user_id
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                WHERE l.lunch_date >= date('now', '-3 day')
+                ORDER BY l.lunch_date ASC, COALESCE(l.start_time, '23:59') ASC, l.id ASC
+                LIMIT ?
+                """,
+                (max_limit,),
+            ).fetchall()
+
+    items: list[dict[str, Any]] = []
+    for row in event_rows:
+        event = rush_event_payload(row)
+        items.append(
+            {
+                "item_type": "rush_event",
+                "event_id": event["event_id"],
+                "title": event["title"],
+                "event_type": event["event_type"],
+                "event_date": event["event_date"],
+                "start_time": event["start_time"],
+                "end_time": event["end_time"],
+                "location": event["location"],
+                "details": event["details"],
+                "is_official": event["is_official"],
+                "created_by_username": event["created_by_username"],
+                "google_calendar_url": event["google_calendar_url"],
+            }
+        )
+
+    for row in lunch_rows:
+        pnm_name = f"{row['first_name']} {row['last_name']}"
+        google_calendar_url = None
+        try:
+            google_calendar_url = build_google_calendar_event_url(
+                pnm_name=pnm_name,
+                pnm_code=row["pnm_code"],
+                lunch_date=row["lunch_date"],
+                notes=row["notes"] or "",
+                location=row["location"] or "",
+                start_time=row["start_time"],
+                end_time=row["end_time"],
+                logged_by_username=row["username"],
+            )
+        except ValueError:
+            google_calendar_url = None
+        items.append(
+            {
+                "item_type": "lunch",
+                "lunch_id": int(row["id"]),
+                "title": f"Lunch with {pnm_name}",
+                "event_type": "lunch",
+                "event_date": row["lunch_date"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "location": row["location"],
+                "details": row["notes"] or "",
+                "is_official": True,
+                "created_by_username": row["username"],
+                "pnm_code": row["pnm_code"],
+                "pnm_name": pnm_name,
+                "assigned_officer_username": row["assigned_officer_username"] or "",
+                "google_calendar_url": google_calendar_url,
+            }
+        )
+
+    items.sort(
+        key=lambda item: (
+            item["event_date"],
+            item["start_time"] or "23:59",
+            0 if item["item_type"] == "rush_event" else 1,
+            item.get("event_id") or item.get("lunch_id") or 0,
+        )
+    )
+    if len(items) > max_limit:
+        items = items[:max_limit]
+
+    today = date.today()
+    week_start, week_end = week_bounds_for(today)
+    week_start_s = week_start.isoformat()
+    week_end_s = week_end.isoformat()
+    official_count = sum(1 for item in items if item["item_type"] == "rush_event" and item["is_official"])
+    lunch_count = sum(1 for item in items if item["item_type"] == "lunch")
+    this_week_count = sum(1 for item in items if week_start_s <= item["event_date"] <= week_end_s)
+
+    return {
+        "items": items,
+        "stats": {
+            "total_count": len(items),
+            "official_event_count": official_count,
+            "lunch_count": lunch_count,
+            "this_week_count": this_week_count,
+        },
+        "calendar_share": calendar_share_payload(request, current_tenant()),
+    }
+
+
+@app.get("/api/tasks/weekly")
+def list_weekly_goals(
+    include_archived: bool = False,
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        if include_archived:
+            rows = conn.execute(
+                """
+                SELECT
+                    g.*,
+                    assignee.username AS assigned_username,
+                    creator.username AS created_by_username
+                FROM weekly_goals g
+                LEFT JOIN users assignee ON assignee.id = g.assigned_user_id
+                LEFT JOIN users creator ON creator.id = g.created_by
+                ORDER BY g.week_start DESC, g.created_at DESC
+                """
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT
+                    g.*,
+                    assignee.username AS assigned_username,
+                    creator.username AS created_by_username
+                FROM weekly_goals g
+                LEFT JOIN users assignee ON assignee.id = g.assigned_user_id
+                LEFT JOIN users creator ON creator.id = g.created_by
+                WHERE g.is_archived = 0
+                ORDER BY g.week_start DESC, g.created_at DESC
+                """
+            ).fetchall()
+        goals = [weekly_goal_payload(conn, row) for row in rows]
+
+    total = len(goals)
+    active_count = sum(1 for goal in goals if goal["status"] == "active")
+    completed_count = sum(1 for goal in goals if goal["is_completed"])
+    overdue_count = sum(1 for goal in goals if goal["status"] == "overdue")
+    completion_rate = round((completed_count / total) * 100, 1) if total else 0.0
+
+    return {
+        "goals": goals,
+        "summary": {
+            "total": total,
+            "active": active_count,
+            "completed": completed_count,
+            "overdue": overdue_count,
+            "completion_rate": completion_rate,
+        },
+        "metric_options": [
+            {"value": metric, "label": label}
+            for metric, label in WEEKLY_GOAL_METRIC_LABELS.items()
+        ],
+    }
+
+
+@app.post("/api/tasks/weekly")
+def create_weekly_goal(payload: WeeklyGoalCreateRequest, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
+    try:
+        week_start, week_end = resolve_goal_week_span(payload.week_start, payload.week_end)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    with db_session() as conn:
+        assigned_user_id = payload.assigned_user_id
+        if assigned_user_id is not None:
+            assigned = conn.execute(
+                "SELECT id, username FROM users WHERE id = ? AND is_approved = 1",
+                (assigned_user_id,),
+            ).fetchone()
+            if not assigned:
+                raise HTTPException(status_code=404, detail="Assigned user not found.")
+        created_at = now_iso()
+        cursor = conn.execute(
+            """
+            INSERT INTO weekly_goals (
+                title,
+                description,
+                metric_type,
+                target_count,
+                manual_progress,
+                week_start,
+                week_end,
+                assigned_user_id,
+                created_by,
+                is_archived,
+                completed_at,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, 0, NULL, ?, ?)
+            """,
+            (
+                payload.title.strip(),
+                payload.description.strip(),
+                payload.metric_type,
+                payload.target_count,
+                week_start,
+                week_end,
+                assigned_user_id,
+                user["id"],
+                created_at,
+                created_at,
+            ),
+        )
+        goal_id = int(cursor.lastrowid)
+        evaluate_weekly_goal_completions(conn)
+        row = conn.execute(
+            """
+            SELECT
+                g.*,
+                assignee.username AS assigned_username,
+                creator.username AS created_by_username
+            FROM weekly_goals g
+            LEFT JOIN users assignee ON assignee.id = g.assigned_user_id
+            LEFT JOIN users creator ON creator.id = g.created_by
+            WHERE g.id = ?
+            """,
+            (goal_id,),
+        ).fetchone()
+
+        if row["assigned_user_id"] is not None and int(row["assigned_user_id"]) != int(user["id"]):
+            create_notification(
+                conn,
+                user_id=int(row["assigned_user_id"]),
+                notif_type="goal_assigned",
+                title=f"New Weekly Goal: {row['title']}",
+                body=f"Target: {row['target_count']} {WEEKLY_GOAL_METRIC_LABELS.get(row['metric_type'], row['metric_type'])}",
+                link_path="/?view=operations",
+            )
+        elif row["assigned_user_id"] is None:
+            officer_rows = conn.execute(
+                "SELECT id FROM users WHERE is_approved = 1 AND role IN (?, ?)",
+                (ROLE_HEAD, ROLE_RUSH_OFFICER),
+            ).fetchall()
+            create_notifications_for_users(
+                conn,
+                [int(item["id"]) for item in officer_rows if int(item["id"]) != int(user["id"])],
+                notif_type="goal_created",
+                title=f"Team Weekly Goal: {row['title']}",
+                body=f"Target: {row['target_count']} {WEEKLY_GOAL_METRIC_LABELS.get(row['metric_type'], row['metric_type'])}",
+                link_path="/?view=operations",
+            )
+
+        goal_payload = weekly_goal_payload(conn, row)
+
+    return {"goal": goal_payload}
+
+
+@app.patch("/api/tasks/weekly/{goal_id}")
+def update_weekly_goal(
+    goal_id: int,
+    payload: WeeklyGoalUpdateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM weekly_goals WHERE id = ?", (goal_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Weekly goal not found.")
+        if user["role"] != ROLE_HEAD and int(row["created_by"]) != int(user["id"]):
+            raise HTTPException(status_code=403, detail="Only heads or goal creators can edit goals.")
+
+        assigned_user_id = row["assigned_user_id"]
+        if payload.assigned_user_id is not None:
+            assigned = conn.execute(
+                "SELECT id FROM users WHERE id = ? AND is_approved = 1",
+                (payload.assigned_user_id,),
+            ).fetchone()
+            if not assigned:
+                raise HTTPException(status_code=404, detail="Assigned user not found.")
+            assigned_user_id = payload.assigned_user_id
+
+        metric_type = payload.metric_type if payload.metric_type is not None else row["metric_type"]
+        target_count = int(payload.target_count) if payload.target_count is not None else int(row["target_count"])
+        title = payload.title.strip() if payload.title is not None else row["title"]
+        description = payload.description.strip() if payload.description is not None else row["description"]
+        week_start_raw = payload.week_start if payload.week_start is not None else row["week_start"]
+        week_end_raw = payload.week_end if payload.week_end is not None else row["week_end"]
+        try:
+            week_start, week_end = resolve_goal_week_span(week_start_raw, week_end_raw)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        is_archived = bool(payload.is_archived) if payload.is_archived is not None else bool(row["is_archived"])
+        completed_at = row["completed_at"]
+        if payload.complete_now is True:
+            completed_at = now_iso()
+        elif payload.complete_now is False:
+            completed_at = None
+
+        conn.execute(
+            """
+            UPDATE weekly_goals
+            SET
+                title = ?,
+                description = ?,
+                metric_type = ?,
+                target_count = ?,
+                week_start = ?,
+                week_end = ?,
+                assigned_user_id = ?,
+                is_archived = ?,
+                completed_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                title,
+                description,
+                metric_type,
+                target_count,
+                week_start,
+                week_end,
+                assigned_user_id,
+                1 if is_archived else 0,
+                completed_at,
+                now_iso(),
+                goal_id,
+            ),
+        )
+        evaluate_weekly_goal_completions(conn)
+        refreshed = conn.execute(
+            """
+            SELECT
+                g.*,
+                assignee.username AS assigned_username,
+                creator.username AS created_by_username
+            FROM weekly_goals g
+            LEFT JOIN users assignee ON assignee.id = g.assigned_user_id
+            LEFT JOIN users creator ON creator.id = g.created_by
+            WHERE g.id = ?
+            """,
+            (goal_id,),
+        ).fetchone()
+        goal_payload = weekly_goal_payload(conn, refreshed)
+
+    return {"goal": goal_payload}
+
+
+@app.post("/api/tasks/weekly/{goal_id}/progress")
+def add_weekly_goal_progress(
+    goal_id: int,
+    payload: WeeklyGoalProgressRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM weekly_goals WHERE id = ?", (goal_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Weekly goal not found.")
+        if row["metric_type"] != "manual":
+            raise HTTPException(status_code=400, detail="Only manual goals support direct progress updates.")
+        if user["role"] != ROLE_HEAD and int(row["created_by"]) != int(user["id"]):
+            if row["assigned_user_id"] is None or int(row["assigned_user_id"]) != int(user["id"]):
+                raise HTTPException(status_code=403, detail="Only heads, creators, or assignees can update this goal.")
+        next_progress = int(row["manual_progress"] or 0) + int(payload.delta)
+        conn.execute(
+            "UPDATE weekly_goals SET manual_progress = ?, updated_at = ? WHERE id = ?",
+            (next_progress, now_iso(), goal_id),
+        )
+        evaluate_weekly_goal_completions(conn)
+        refreshed = conn.execute(
+            """
+            SELECT
+                g.*,
+                assignee.username AS assigned_username,
+                creator.username AS created_by_username
+            FROM weekly_goals g
+            LEFT JOIN users assignee ON assignee.id = g.assigned_user_id
+            LEFT JOIN users creator ON creator.id = g.created_by
+            WHERE g.id = ?
+            """,
+            (goal_id,),
+        ).fetchone()
+        goal_payload = weekly_goal_payload(conn, refreshed)
+    return {"goal": goal_payload}
+
+
+@app.get("/api/notifications")
+def list_notifications(
+    limit: int = 80,
+    user: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    max_limit = max(1, min(250, int(limit)))
+    with db_session() as conn:
+        unread_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0",
+            (user["id"],),
+        ).fetchone()
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM notifications
+            WHERE user_id = ?
+            ORDER BY created_at DESC, id DESC
+            LIMIT ?
+            """,
+            (user["id"], max_limit),
+        ).fetchall()
+    return {
+        "unread_count": int(unread_row["c"]),
+        "notifications": [
+            {
+                "notification_id": int(row["id"]),
+                "notif_type": row["notif_type"],
+                "title": row["title"],
+                "body": row["body"],
+                "link_path": row["link_path"],
+                "is_read": bool(row["is_read"]),
+                "created_at": row["created_at"],
+            }
+            for row in rows
+        ],
+    }
+
+
+@app.post("/api/notifications/{notification_id}/read")
+def mark_notification_read(notification_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        cursor = conn.execute(
+            """
+            UPDATE notifications
+            SET is_read = 1
+            WHERE id = ? AND user_id = ?
+            """,
+            (notification_id, user["id"]),
+        )
+        if cursor.rowcount <= 0:
+            raise HTTPException(status_code=404, detail="Notification not found.")
+        unread_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0",
+            (user["id"],),
+        ).fetchone()
+    return {"message": "Notification marked read.", "unread_count": int(unread_row["c"])}
+
+
+@app.post("/api/notifications/read-all")
+def mark_all_notifications_read(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        conn.execute(
+            "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0",
+            (user["id"],),
+        )
+    return {"message": "All notifications marked read.", "unread_count": 0}
+
+
+@app.get("/api/chat/officer")
+def list_officer_chat_messages(
+    limit: int = 140,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    max_limit = max(10, min(400, int(limit)))
+    with db_session() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                m.*,
+                u.username,
+                u.role,
+                u.emoji
+            FROM officer_chat_messages m
+            JOIN users u ON u.id = m.sender_id
+            ORDER BY m.id DESC
+            LIMIT ?
+            """,
+            (max_limit,),
+        ).fetchall()
+        message_ids = [int(row["id"]) for row in rows]
+        tags_by_message: dict[int, list[str]] = {}
+        mentions_by_message: dict[int, list[dict[str, Any]]] = {}
+        if message_ids:
+            placeholders = ",".join("?" for _ in message_ids)
+            tag_rows = conn.execute(
+                f"SELECT message_id, tag FROM officer_chat_tags WHERE message_id IN ({placeholders}) ORDER BY tag ASC",
+                message_ids,
+            ).fetchall()
+            for tag_row in tag_rows:
+                message_id = int(tag_row["message_id"])
+                tags_by_message.setdefault(message_id, []).append(tag_row["tag"])
+            mention_rows = conn.execute(
+                f"""
+                SELECT
+                    m.message_id,
+                    u.id AS user_id,
+                    u.username
+                FROM officer_chat_mentions m
+                JOIN users u ON u.id = m.user_id
+                WHERE m.message_id IN ({placeholders})
+                ORDER BY m.id ASC
+                """,
+                message_ids,
+            ).fetchall()
+            for mention_row in mention_rows:
+                message_id = int(mention_row["message_id"])
+                mentions_by_message.setdefault(message_id, []).append(
+                    {"user_id": int(mention_row["user_id"]), "username": mention_row["username"]}
+                )
+
+    messages = []
+    for row in reversed(rows):
+        message_id = int(row["id"])
+        mentions = mentions_by_message.get(message_id, [])
+        messages.append(
+            {
+                "message_id": message_id,
+                "message": row["message"],
+                "tags": tags_by_message.get(message_id, []),
+                "mentions": mentions,
+                "mentions_me": any(int(mention["user_id"]) == int(user["id"]) for mention in mentions),
+                "created_at": row["created_at"],
+                "edited_at": row["edited_at"],
+                "from_me": int(row["sender_id"]) == int(user["id"]),
+                "sender": {
+                    "user_id": int(row["sender_id"]),
+                    "username": row["username"],
+                    "role": row["role"],
+                    "emoji": row["emoji"],
+                },
+            }
+        )
+
+    return {"messages": messages}
+
+
+@app.post("/api/chat/officer")
+def create_officer_chat_message(
+    payload: OfficerChatMessageCreateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty.")
+    tags = parse_chat_tags(payload.tags, message)
+    mention_usernames = extract_message_mentions(message)
+    tags_csv = ",".join(tags)
+
+    with db_session() as conn:
+        created_at = now_iso()
+        cursor = conn.execute(
+            """
+            INSERT INTO officer_chat_messages (sender_id, message, tags, created_at, edited_at)
+            VALUES (?, ?, ?, ?, NULL)
+            """,
+            (user["id"], message, tags_csv, created_at),
+        )
+        message_id = int(cursor.lastrowid)
+        for tag in tags:
+            conn.execute(
+                "INSERT OR IGNORE INTO officer_chat_tags (message_id, tag, created_at) VALUES (?, ?, ?)",
+                (message_id, tag, created_at),
+            )
+
+        mentioned_rows: list[sqlite3.Row] = []
+        if mention_usernames:
+            placeholders = ",".join("?" for _ in mention_usernames)
+            mentioned_rows = conn.execute(
+                f"""
+                SELECT id, username
+                FROM users
+                WHERE is_approved = 1
+                  AND lower(username) IN ({placeholders})
+                """,
+                mention_usernames,
+            ).fetchall()
+            for mentioned in mentioned_rows:
+                conn.execute(
+                    "INSERT OR IGNORE INTO officer_chat_mentions (message_id, user_id, created_at) VALUES (?, ?, ?)",
+                    (message_id, int(mentioned["id"]), created_at),
+                )
+                if int(mentioned["id"]) != int(user["id"]):
+                    create_notification(
+                        conn,
+                        user_id=int(mentioned["id"]),
+                        notif_type="chat_mention",
+                        title=f"Mentioned by {user['username']}",
+                        body=message[:220],
+                        link_path="/?view=operations",
+                    )
+
+        evaluate_weekly_goal_completions(conn)
+
+        sender = conn.execute(
+            "SELECT id, username, role, emoji FROM users WHERE id = ?",
+            (user["id"],),
+        ).fetchone()
+
+    mentions = [{"user_id": int(item["id"]), "username": item["username"]} for item in mentioned_rows]
+    return {
+        "message": {
+            "message_id": message_id,
+            "message": message,
+            "tags": tags,
+            "mentions": mentions,
+            "mentions_me": any(int(item["id"]) == int(user["id"]) for item in mentioned_rows),
+            "created_at": created_at,
+            "edited_at": None,
+            "from_me": True,
+            "sender": {
+                "user_id": int(sender["id"]),
+                "username": sender["username"],
+                "role": sender["role"],
+                "emoji": sender["emoji"],
+            },
+        }
+    }
+
+
+@app.get("/api/chat/officer/stats")
+def officer_chat_stats(_: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
+    with db_session() as conn:
+        totals = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS total_messages,
+                SUM(CASE WHEN created_at >= datetime('now', '-1 day') THEN 1 ELSE 0 END) AS messages_last_24h,
+                SUM(CASE WHEN created_at >= datetime('now', '-6 day') THEN 1 ELSE 0 END) AS messages_last_7d,
+                MAX(created_at) AS last_message_at
+            FROM officer_chat_messages
+            """
+        ).fetchone()
+        active_senders = conn.execute(
+            """
+            SELECT COUNT(DISTINCT sender_id) AS c
+            FROM officer_chat_messages
+            WHERE created_at >= datetime('now', '-6 day')
+            """
+        ).fetchone()
+        top_senders = conn.execute(
+            """
+            SELECT
+                u.id,
+                u.username,
+                u.role,
+                COUNT(*) AS message_count
+            FROM officer_chat_messages m
+            JOIN users u ON u.id = m.sender_id
+            WHERE m.created_at >= datetime('now', '-6 day')
+            GROUP BY u.id, u.username, u.role
+            ORDER BY message_count DESC, u.username ASC
+            LIMIT 8
+            """
+        ).fetchall()
+        top_tags = conn.execute(
+            """
+            SELECT tag, COUNT(*) AS usage_count
+            FROM officer_chat_tags
+            GROUP BY tag
+            ORDER BY usage_count DESC, tag ASC
+            LIMIT 12
+            """
+        ).fetchall()
+        top_mentions = conn.execute(
+            """
+            SELECT
+                u.id,
+                u.username,
+                COUNT(*) AS mention_count
+            FROM officer_chat_mentions m
+            JOIN users u ON u.id = m.user_id
+            GROUP BY u.id, u.username
+            ORDER BY mention_count DESC, u.username ASC
+            LIMIT 8
+            """
+        ).fetchall()
+
+    return {
+        "summary": {
+            "total_messages": int(totals["total_messages"] or 0),
+            "messages_last_24h": int(totals["messages_last_24h"] or 0),
+            "messages_last_7d": int(totals["messages_last_7d"] or 0),
+            "active_senders_7d": int(active_senders["c"] or 0),
+            "last_message_at": totals["last_message_at"],
+        },
+        "top_senders": [
+            {
+                "user_id": int(row["id"]),
+                "username": row["username"],
+                "role": row["role"],
+                "message_count": int(row["message_count"]),
+            }
+            for row in top_senders
+        ],
+        "top_tags": [
+            {"tag": row["tag"], "usage_count": int(row["usage_count"])}
+            for row in top_tags
+        ],
+        "top_mentions": [
+            {
+                "user_id": int(row["id"]),
+                "username": row["username"],
+                "mention_count": int(row["mention_count"]),
+            }
+            for row in top_mentions
+        ],
+    }
 
 
 @app.get("/api/matching")

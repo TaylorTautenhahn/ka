@@ -1174,6 +1174,48 @@ td strong {
   padding: 0.85rem;
 }
 
+.desktop-page[data-page="operations"] .list-box {
+  max-height: 360px;
+}
+
+#officerChatList {
+  max-height: 420px;
+}
+
+#rushCalendarTable table {
+  min-width: 920px;
+}
+
+.notification-unread {
+  border-color: rgba(var(--gold-rgb), 0.42);
+  background: linear-gradient(130deg, rgba(255, 255, 255, 0.76), rgba(255, 244, 210, 0.74));
+}
+
+.chat-entry {
+  border-left: 3px solid rgba(var(--accent-rgb), 0.2);
+}
+
+.chat-entry.is-own {
+  border-left-color: var(--good);
+}
+
+.chat-entry.is-mention {
+  border-left-color: rgba(var(--gold-rgb), 0.8);
+}
+
+.chat-message-body {
+  color: var(--ink);
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.chat-meta-row {
+  margin-top: 0.4rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
 .hidden {
   display: none !important;
 }

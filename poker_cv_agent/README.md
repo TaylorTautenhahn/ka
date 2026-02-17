@@ -46,6 +46,20 @@ This prints chosen actions and click coordinates without clicking.
 python -m poker_cv_agent run --config config.yaml --live
 ```
 
+## Run with live debug overlay
+```bash
+python -m poker_cv_agent run --config config.yaml --debug-ui
+```
+
+The debug window shows:
+- ROI boxes for hero cards, board cards, buttons, and pot
+- OCR text per button and pot
+- Parsed card values and card-read notes
+- Available actions
+- Decision + equity + reason
+
+Press `q` (or `Esc`) in the debug window to stop.
+
 ## Quick tuning
 Edit `config.yaml`:
 - `opponents`: estimated active opponents

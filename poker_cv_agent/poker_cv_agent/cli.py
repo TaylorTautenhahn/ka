@@ -38,6 +38,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Enable real clicks. Default is dry-run only.",
     )
+    run_parser.add_argument(
+        "--debug-ui",
+        action="store_true",
+        help="Show live OpenCV overlay with ROI boxes, OCR text, and decisions.",
+    )
 
     return parser
 
@@ -60,7 +65,7 @@ def main() -> None:
             from .runner import run_bot
 
             config = load_config(args.config)
-            run_bot(config=config, dry_run=(not args.live))
+            run_bot(config=config, dry_run=(not args.live), debug_ui=args.debug_ui)
             return
 
         parser.error("Unknown command")

@@ -54,3 +54,10 @@ class Decision:
     action: str
     equity: Optional[float]
     reason: str
+
+
+@dataclass(frozen=True)
+class VisionDebugInfo:
+    card_notes: dict[str, str]
+    button_texts: dict[str, str]
+    pot_text: str

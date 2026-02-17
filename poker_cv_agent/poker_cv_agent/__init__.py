@@ -7,4 +7,5 @@ __all__ = [
     "strategy",
     "controller",
     "capture",
+    "debug_ui",
 ]

@@ -1,0 +1,20 @@
+monitor_index: 1
+loop_interval_seconds: 0.8
+action_cooldown_seconds: 2.0
+opponents: 5
+monte_carlo_iterations: 800
+click_jitter_pixels: 8
+hero_cards:
+  - {x: 572, y: 1268, w: 90, h: 140}
+  - {x: 653, y: 1268, w: 90, h: 140}
+board_cards:
+  - {x: 248, y: 625, w: 90, h: 130}
+  - {x: 339, y: 625, w: 90, h: 130}
+  - {x: 430, y: 625, w: 90, h: 130}
+  - {x: 521, y: 625, w: 90, h: 130}
+  - {x: 612, y: 625, w: 90, h: 130}
+buttons:
+  fold: {x: 32, y: 1540, w: 205, h: 105}
+  call: {x: 247, y: 1540, w: 205, h: 105}
+  raise: {x: 462, y: 1540, w: 205, h: 105}
+pot_roi: {x: 309, y: 610, w: 161, h: 88}

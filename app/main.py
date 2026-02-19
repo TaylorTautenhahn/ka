@@ -3,6 +3,7 @@ from __future__ import annotations
 import hmac
 import hashlib
 import html
+import ipaddress
 import io
 import json
 import base64
@@ -64,10 +65,12 @@ UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(DATA_ROOT / "uploads")))
 TENANT_UPLOADS_ROOT = UPLOADS_DIR / "tenants"
 TENANTS_DB_DIR = Path(os.getenv("TENANTS_DB_DIR", str(DATA_ROOT / "tenants")))
 MAX_PNM_PHOTO_BYTES = int(os.getenv("MAX_PNM_PHOTO_BYTES", str(4 * 1024 * 1024)))
-BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(UPLOADS_DIR / "backups")))
+BACKUP_DIR = Path(os.getenv("BACKUP_DIR", str(DATA_ROOT / "backups")))
 MAX_BACKUP_FILES = int(os.getenv("MAX_BACKUP_FILES", "30"))
 SESSION_COOKIE = "rush_session"
 PLATFORM_SESSION_COOKIE = "platform_session"
+CSRF_COOKIE = "bb_csrf_token"
+CSRF_HEADER = "x-csrf-token"
 HASH_SCHEME = os.getenv("HASH_SCHEME", "pbkdf2_sha256")
 PASSWORD_ITERATIONS = int(os.getenv("PASSWORD_ITERATIONS", "260000"))
 LEGACY_AUTH_SALT = os.getenv("LEGACY_AUTH_SALT", "kao-rush-v1")
@@ -79,7 +82,11 @@ PLATFORM_SESSION_REMEMBER_TTL_SECONDS = int(
 )
 SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "0").strip().lower() in {"1", "true", "yes"}
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "strict").strip().lower()
-ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "*").split(",") if host.strip()]
+ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,::1").split(",") if host.strip()]
+CSRF_TRUSTED_ORIGINS = [origin.strip().rstrip("/") for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
+ENFORCE_CSRF = os.getenv("ENFORCE_CSRF", "1").strip().lower() in {"1", "true", "yes"}
+TRUST_X_FORWARDED_FOR = os.getenv("TRUST_X_FORWARDED_FOR", "0").strip().lower() in {"1", "true", "yes"}
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
 ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "0").strip().lower() in {"1", "true", "yes"}
 LOGIN_WINDOW_SECONDS = int(os.getenv("LOGIN_WINDOW_SECONDS", "300"))
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "8"))
@@ -110,11 +117,13 @@ DATA_ROOT.mkdir(parents=True, exist_ok=True)
 UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 TENANT_UPLOADS_ROOT.mkdir(parents=True, exist_ok=True)
 TENANTS_DB_DIR.mkdir(parents=True, exist_ok=True)
+BACKUP_DIR.mkdir(parents=True, exist_ok=True)
 
 ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
 ROLE_RUSHER = "Rusher"
 ALLOWED_ROLES = {ROLE_HEAD, ROLE_RUSH_OFFICER, ROLE_RUSHER}
+UNSAFE_HTTP_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 DEFAULT_RUSH_OFFICER_EMOJI = "⭐"
 RUSH_EVENT_TYPES = {
     "official",
@@ -305,7 +314,10 @@ app.add_middleware(GZipMiddleware, minimum_size=512)
 if ALLOWED_HOSTS != ["*"]:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+app.mount("/uploads/tenants", StaticFiles(directory=TENANT_UPLOADS_ROOT), name="tenant_uploads")
+LEGACY_PNM_UPLOADS_DIR = UPLOADS_DIR / "pnms"
+LEGACY_PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads/pnms", StaticFiles(directory=LEGACY_PNM_UPLOADS_DIR), name="legacy_pnm_uploads")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 _LOGIN_GUARD = Lock()
@@ -368,6 +380,8 @@ def collect_storage_warnings() -> list[str]:
             warnings.append("DATA_ROOT targets /data but /data does not exist. Persistent disk may not be mounted.")
         elif not os.access(data_mount, os.W_OK):
             warnings.append("DATA_ROOT targets /data but /data is not writable.")
+    if ALLOWED_HOSTS == ["*"]:
+        warnings.append("ALLOWED_HOSTS is wildcard '*'. Configure explicit hostnames in production.")
     return warnings
 
 
@@ -402,6 +416,16 @@ def enforce_persistent_storage_if_required() -> None:
         )
 
 
+def enforce_host_configuration_if_required() -> None:
+    if ALLOWED_HOSTS != ["*"]:
+        return
+    if os.getenv("RENDER") or REQUIRE_PERSISTENT_DATA:
+        raise RuntimeError(
+            "Unsafe host configuration: ALLOWED_HOSTS='*' is not allowed in production. "
+            "Set explicit hostnames, e.g. ALLOWED_HOSTS=ka-d6di.onrender.com,localhost,127.0.0.1."
+        )
+
+
 def normalize_samesite(value: str) -> str:
     if value in {"lax", "strict", "none"}:
         return value
@@ -415,6 +439,96 @@ def should_use_secure_cookie(request: Request) -> bool:
     if forwarded_proto == "https":
         return True
     return request.url.scheme == "https"
+
+
+def request_forwarded_proto(request: Request) -> str:
+    forwarded_proto = (request.headers.get("x-forwarded-proto") or "").split(",")[0].strip().lower()
+    if forwarded_proto in {"http", "https"}:
+        return forwarded_proto
+    return request.url.scheme.lower()
+
+
+def request_host(request: Request) -> str:
+    host = (request.headers.get("host") or "").split(",")[0].strip().lower()
+    if host:
+        return host
+    if request.url.netloc:
+        return request.url.netloc.lower()
+    return ""
+
+
+def request_origin(request: Request) -> str:
+    host = request_host(request)
+    if not host:
+        return ""
+    return f"{request_forwarded_proto(request)}://{host}"
+
+
+def normalized_origin(value: str) -> str:
+    token = (value or "").strip()
+    if not token:
+        return ""
+    try:
+        parsed = urlsplit(token)
+    except ValueError:
+        return ""
+    scheme = parsed.scheme.lower()
+    if scheme not in {"http", "https"}:
+        return ""
+    netloc = (parsed.netloc or "").strip().lower()
+    if not netloc:
+        return ""
+    return f"{scheme}://{netloc}"
+
+
+def allowed_request_origins(request: Request) -> set[str]:
+    allowed: set[str] = set()
+    current = normalized_origin(request_origin(request))
+    if current:
+        allowed.add(current)
+    if PUBLIC_BASE_URL:
+        public = normalized_origin(PUBLIC_BASE_URL)
+        if public:
+            allowed.add(public)
+    for item in CSRF_TRUSTED_ORIGINS:
+        normalized = normalized_origin(item)
+        if normalized:
+            allowed.add(normalized)
+    return allowed
+
+
+def is_csrf_origin_allowed(origin_like: str, request: Request) -> bool:
+    normalized = normalized_origin(origin_like)
+    if not normalized:
+        return False
+    return normalized in allowed_request_origins(request)
+
+
+def app_base_origin(request: Request) -> str:
+    public = normalized_origin(PUBLIC_BASE_URL)
+    if public:
+        return public
+    current = normalized_origin(request_origin(request))
+    if current:
+        return current
+    return f"{request.url.scheme}://{request.url.netloc}".rstrip("/")
+
+
+def issue_csrf_token() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def set_csrf_cookie(response: Response, request: Request, token: str | None = None) -> str:
+    csrf_token = token if token else issue_csrf_token()
+    response.set_cookie(
+        key=CSRF_COOKIE,
+        value=csrf_token,
+        httponly=False,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+        secure=should_use_secure_cookie(request),
+        path="/",
+    )
+    return csrf_token
 
 
 def mark_response_private(response: Response) -> None:
@@ -730,7 +844,7 @@ def tenant_context_from_row(row: sqlite3.Row) -> TenantContext:
         default_stereotype_tags=tuple(default_stereotype_tags),
         db_path=db_path,
         pnm_uploads_dir=TENANT_UPLOADS_ROOT / slug / "pnms",
-        backup_dir=TENANT_UPLOADS_ROOT / slug / "backups",
+        backup_dir=BACKUP_DIR / slug,
         calendar_share_token=calendar_share_token,
     )
 
@@ -1361,16 +1475,44 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
         "script-src 'self'; "
         "style-src 'self' https://fonts.googleapis.com; "
         "font-src 'self' https://fonts.gstatic.com; "
-        "img-src 'self' data:; "
+        "img-src 'self' data: https://unavatar.io https://*.instagram.com https://*.cdninstagram.com https://*.fbcdn.net; "
         "connect-src 'self'; "
         "manifest-src 'self'; "
         "worker-src 'self'; "
         "frame-ancestors 'none'; "
         "base-uri 'self'"
     )
-    if request.url.scheme == "https":
+    if request_forwarded_proto(request) == "https":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
     return response
+
+
+@app.middleware("http")
+async def csrf_protection(request: Request, call_next):  # type: ignore[no-untyped-def]
+    method = request.method.upper()
+    if not ENFORCE_CSRF or method not in UNSAFE_HTTP_METHODS:
+        return await call_next(request)
+
+    has_session_cookie = bool(request.cookies.get(SESSION_COOKIE) or request.cookies.get(PLATFORM_SESSION_COOKIE))
+    origin = (request.headers.get("origin") or "").strip()
+    referer = (request.headers.get("referer") or "").strip()
+
+    if origin:
+        if not is_csrf_origin_allowed(origin, request):
+            return JSONResponse(status_code=403, content={"detail": "CSRF blocked: request origin not allowed."})
+    elif referer:
+        if not is_csrf_origin_allowed(referer, request):
+            return JSONResponse(status_code=403, content={"detail": "CSRF blocked: request origin not allowed."})
+    elif has_session_cookie:
+        return JSONResponse(status_code=403, content={"detail": "CSRF blocked: origin headers required."})
+
+    if has_session_cookie:
+        cookie_token = (request.cookies.get(CSRF_COOKIE) or "").strip()
+        header_token = (request.headers.get(CSRF_HEADER) or "").strip()
+        if not cookie_token or not header_token or not hmac.compare_digest(cookie_token, header_token):
+            return JSONResponse(status_code=403, content={"detail": "CSRF blocked: token missing or invalid."})
+
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -1477,12 +1619,28 @@ def validate_access_code_strength(access_code: str) -> None:
         raise ValueError("Password must include at least one letter and one number.")
 
 
+def normalized_ip_or_empty(raw_ip: str | None) -> str:
+    token = (raw_ip or "").strip()
+    if not token:
+        return ""
+    try:
+        return str(ipaddress.ip_address(token))
+    except ValueError:
+        return ""
+
+
 def client_ip(request: Request) -> str:
-    forwarded_for = request.headers.get("x-forwarded-for")
-    if forwarded_for:
-        return forwarded_for.split(",")[0].strip() or "unknown"
+    if TRUST_X_FORWARDED_FOR:
+        forwarded_for = request.headers.get("x-forwarded-for")
+        if forwarded_for:
+            first_hop = forwarded_for.split(",")[0].strip()
+            normalized = normalized_ip_or_empty(first_hop)
+            if normalized:
+                return normalized
     if request.client and request.client.host:
-        return request.client.host
+        normalized = normalized_ip_or_empty(request.client.host)
+        if normalized:
+            return normalized
     return "unknown"
 
 
@@ -1997,12 +2155,22 @@ def purge_pnm_uploads_dir() -> None:
             candidate.unlink(missing_ok=True)
 
 
+def csv_safe_cell(value: Any) -> Any:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        if value[:1] in {"=", "+", "-", "@", "\t"}:
+            return f"'{value}"
+        return value
+    return value
+
+
 def csv_bytes_from_rows(columns: list[str], rows: list[dict[str, Any]]) -> bytes:
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=columns)
     writer.writeheader()
     for row in rows:
-        writer.writerow({column: row.get(column) for column in columns})
+        writer.writerow({column: csv_safe_cell(row.get(column)) for column in columns})
     return buffer.getvalue().encode("utf-8")
 
 
@@ -2238,10 +2406,8 @@ def resolve_seed_access_code() -> str:
         return GENERATED_HEAD_ACCESS_CODE
     GENERATED_HEAD_ACCESS_CODE = secrets.token_urlsafe(14)
     print(
-        "[startup] HEAD_SEED_ACCESS_CODE not provided. Generated bootstrap credentials for first login:\n"
-        f"          username={HEAD_SEED_USERNAME}\n"
-        f"          password={GENERATED_HEAD_ACCESS_CODE}\n"
-        "          Set HEAD_SEED_ACCESS_CODE in production to disable random generation."
+        "[startup] HEAD_SEED_ACCESS_CODE not provided. Generated an in-memory bootstrap credential. "
+        "Set HEAD_SEED_ACCESS_CODE in production to disable runtime generation."
     )
     return GENERATED_HEAD_ACCESS_CODE
 
@@ -3283,10 +3449,8 @@ def resolve_platform_admin_access_code() -> str:
         return GENERATED_PLATFORM_ADMIN_ACCESS_CODE
     GENERATED_PLATFORM_ADMIN_ACCESS_CODE = secrets.token_urlsafe(16)
     print(
-        "[startup] PLATFORM_ADMIN_ACCESS_CODE not provided. Generated bootstrap platform admin credentials:\n"
-        f"          username={PLATFORM_ADMIN_USERNAME}\n"
-        f"          password={GENERATED_PLATFORM_ADMIN_ACCESS_CODE}\n"
-        "          Set PLATFORM_ADMIN_ACCESS_CODE in production to disable random generation."
+        "[startup] PLATFORM_ADMIN_ACCESS_CODE not provided. Generated an in-memory bootstrap credential. "
+        "Set PLATFORM_ADMIN_ACCESS_CODE in production to disable runtime generation."
     )
     return GENERATED_PLATFORM_ADMIN_ACCESS_CODE
 
@@ -4144,6 +4308,7 @@ class TenantUpdateRequest(BaseModel):
 @app.on_event("startup")
 def startup() -> None:
     enforce_persistent_storage_if_required()
+    enforce_host_configuration_if_required()
     print(
         "[startup] storage config: "
         f"DATA_ROOT={DATA_ROOT} DB_PATH={DB_PATH} PLATFORM_DB_PATH={PLATFORM_DB_PATH} "
@@ -4381,7 +4546,7 @@ async def member_signup_qr(request: Request) -> Response:
     if segno is None:
         raise HTTPException(status_code=503, detail="QR generator is not available on this deployment.")
 
-    base_url = str(request.base_url).rstrip("/")
+    base_url = app_base_origin(request)
     signup_url = f"{base_url}/{tenant.slug}/member"
     qr = segno.make(signup_url, error="m", micro=False)
     output = io.BytesIO()
@@ -4480,6 +4645,7 @@ def platform_login(payload: PlatformLoginRequest, request: Request, response: Re
         secure=secure_cookie,
         path="/",
     )
+    set_csrf_cookie(response, request)
     mark_response_private(response)
     record_login_success(throttle_key)
     return {"admin": platform_user_payload(row), "message": "Platform admin logged in."}
@@ -4498,12 +4664,20 @@ def platform_logout(request: Request, response: Response) -> dict[str, str]:
         secure=secure_cookie,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
     )
+    response.delete_cookie(
+        key=CSRF_COOKIE,
+        path="/",
+        secure=secure_cookie,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+    )
     mark_response_private(response)
     return {"message": "Logged out."}
 
 
 @app.get("/platform/api/auth/me")
-def platform_auth_me(response: Response, admin: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+def platform_auth_me(request: Request, response: Response, admin: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+    if not request.cookies.get(CSRF_COOKIE):
+        set_csrf_cookie(response, request)
     mark_response_private(response)
     return {"authenticated": True, "admin": platform_user_payload(admin)}
 
@@ -5528,6 +5702,7 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
             secure=secure_cookie,
             path="/",
         )
+        set_csrf_cookie(response, request)
         mark_response_private(response)
         record_login_success(throttle_key)
 
@@ -5550,12 +5725,20 @@ def logout(request: Request, response: Response) -> dict[str, str]:
         secure=secure_cookie,
         samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
     )
+    response.delete_cookie(
+        key=CSRF_COOKIE,
+        path="/",
+        secure=secure_cookie,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+    )
     mark_response_private(response)
     return {"message": "Logged out."}
 
 
 @app.get("/api/auth/me")
-def auth_me(response: Response, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def auth_me(request: Request, response: Response, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    if not request.cookies.get(CSRF_COOKIE):
+        set_csrf_cookie(response, request)
     mark_response_private(response)
     return {
         "authenticated": True,
@@ -7102,7 +7285,7 @@ def scheduled_lunches(
 def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str, Any]:
     feed_path = f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}"
     lunch_feed_path = f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}"
-    base_origin = str(request.base_url).rstrip("/")
+    base_origin = app_base_origin(request)
     feed_url = f"{base_origin}{feed_path}"
     lunch_feed_url = f"{base_origin}{lunch_feed_path}"
     return {

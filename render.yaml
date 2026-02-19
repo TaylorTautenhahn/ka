@@ -18,7 +18,7 @@ services:
       - key: REQUIRE_PERSISTENT_DATA
         value: "1"
       - key: ALLOWED_HOSTS
-        value: "*"
+        value: ka-d6di.onrender.com,localhost,127.0.0.1
       - key: DB_PATH
         value: /data/recruitment.db
       - key: PLATFORM_DB_PATH
@@ -28,7 +28,11 @@ services:
       - key: UPLOADS_DIR
         value: /data/uploads
       - key: BACKUP_DIR
-        value: /data/uploads/backups
+        value: /data/backups
+      - key: ENFORCE_CSRF
+        value: "1"
+      - key: TRUST_X_FORWARDED_FOR
+        value: "0"
       - key: DEFAULT_TENANT_SLUG
         value: kappaalphaorder
       - key: DEFAULT_TENANT_NAME

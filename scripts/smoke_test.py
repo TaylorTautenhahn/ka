@@ -51,6 +51,15 @@ def main() -> None:
 
         checks: list[str] = []
         with TestClient(app) as client:
+            client.headers.update({"Origin": "http://testserver"})
+
+            def sync_csrf_header() -> None:
+                token = client.cookies.get(main_module.CSRF_COOKIE, "")
+                if token:
+                    client.headers["X-CSRF-Token"] = token
+                else:
+                    client.headers.pop("X-CSRF-Token", None)
+
             response = client.get("/")
             expect_status(response, 200, "Landing page")
             checks.append("Landing route responds")
@@ -126,6 +135,7 @@ def main() -> None:
                 json={"username": "headseed", "access_code": "HeadSeed123!", "remember_me": True},
             )
             expect_status(response, 200, "Head login")
+            sync_csrf_header()
             session_cookie = client.cookies.get(main_module.SESSION_COOKIE)
             if not session_cookie:
                 raise AssertionError("Head login did not set rush session cookie.")
@@ -182,12 +192,14 @@ def main() -> None:
 
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Head logout")
+            sync_csrf_header()
 
             response = client.post(
                 "/kappaalphaorder/api/auth/login",
                 json={"username": officer_username, "access_code": officer_password},
             )
             expect_status(response, 200, "Approved officer login")
+            sync_csrf_header()
             checks.append("Approved officer login works")
 
             response = client.post(
@@ -294,12 +306,14 @@ def main() -> None:
 
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Officer logout")
+            sync_csrf_header()
 
             response = client.post(
                 "/kappaalphaorder/api/auth/login",
                 json={"username": "headseed", "access_code": "HeadSeed123!"},
             )
             expect_status(response, 200, "Head re-login")
+            sync_csrf_header()
 
             response = client.post(
                 "/kappaalphaorder/api/rush-events",
@@ -385,6 +399,7 @@ def main() -> None:
                 json={"username": "platformadmin", "access_code": "Platform123!", "remember_me": True},
             )
             expect_status(response, 200, "Platform admin login")
+            sync_csrf_header()
             platform_cookie = client.cookies.get(main_module.PLATFORM_SESSION_COOKIE)
             if not platform_cookie:
                 raise AssertionError("Platform login did not set platform session cookie.")

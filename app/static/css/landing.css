@@ -12,6 +12,8 @@
   --bb-glass-strong: rgba(10, 29, 46, 0.84);
   --bb-shadow: 0 34px 80px rgba(1, 9, 17, 0.54);
   --bb-radius: 20px;
+  --bb-cursor-x: -999px;
+  --bb-cursor-y: -999px;
 }
 
 * {
@@ -53,6 +55,22 @@ a {
   background-image: radial-gradient(rgba(255, 255, 255, 0.18) 0.8px, transparent 0.8px);
   background-size: 4px 4px;
   z-index: 0;
+}
+
+.bb-cursor-glow {
+  position: fixed;
+  left: var(--bb-cursor-x);
+  top: var(--bb-cursor-y);
+  width: 320px;
+  height: 320px;
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 0;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle, rgba(86, 214, 255, 0.24) 0%, rgba(86, 214, 255, 0.08) 40%, transparent 72%);
+  filter: blur(6px);
+  opacity: 0.85;
+  transition: opacity 220ms ease;
 }
 
 .bb-orb {
@@ -225,10 +243,14 @@ a {
 .bb-hero-copy h1 {
   margin: 0;
   font-family: "Sora", sans-serif;
-  font-size: clamp(1.75rem, 4.1vw, 3.34rem);
-  line-height: 1.08;
-  max-width: 17.5ch;
-  letter-spacing: -0.015em;
+  font-size: clamp(2.3rem, 6.8vw, 5.15rem);
+  line-height: 0.96;
+  max-width: 12ch;
+  letter-spacing: -0.02em;
+}
+
+.bb-hero-title {
+  text-wrap: balance;
 }
 
 .bb-title-shine {
@@ -242,10 +264,10 @@ a {
 }
 
 .bb-subtitle {
-  margin: 0.86rem 0 0;
+  margin: 1rem 0 0;
   color: var(--bb-muted);
-  max-width: 64ch;
-  line-height: 1.66;
+  max-width: 58ch;
+  line-height: 1.7;
 }
 
 .bb-kicker {
@@ -264,6 +286,10 @@ a {
   gap: 0.72rem;
 }
 
+.bb-hero-pill-row {
+  margin-top: 0.92rem;
+}
+
 .bb-metric-panel {
   border: 1px solid rgba(193, 226, 250, 0.24);
   border-radius: 15px;
@@ -272,6 +298,56 @@ a {
   display: grid;
   gap: 0.58rem;
   align-content: start;
+}
+
+.bb-hero-stage {
+  position: relative;
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transition: transform 180ms ease;
+  will-change: transform;
+}
+
+.bb-stage-top h3 {
+  margin: 0.22rem 0 0;
+  font-family: "Sora", sans-serif;
+  font-size: 1.08rem;
+}
+
+.bb-stage-kicker {
+  margin: 0;
+  color: #cce8fb;
+  font-size: 0.73rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.bb-stage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.bb-stage-card {
+  border: 1px solid rgba(169, 211, 239, 0.24);
+  border-radius: 12px;
+  padding: 0.62rem 0.56rem;
+  background: linear-gradient(158deg, rgba(15, 47, 71, 0.76), rgba(8, 24, 38, 0.7));
+  display: grid;
+  gap: 0.18rem;
+}
+
+.bb-stage-card strong {
+  font-family: "Sora", sans-serif;
+  font-size: 1.34rem;
+  letter-spacing: -0.01em;
+}
+
+.bb-stage-card span {
+  color: var(--bb-muted);
+  font-size: 0.77rem;
+  line-height: 1.35;
 }
 
 .bb-metric {
@@ -617,6 +693,20 @@ a {
     grid-template-columns: 1fr;
   }
 
+  .bb-topbar {
+    flex-wrap: wrap;
+  }
+
+  .bb-topbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .bb-stage-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .bb-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -631,6 +721,10 @@ a {
     width: min(1160px, calc(100% - 1.1rem));
     margin-top: 0.72rem;
     gap: 0.9rem;
+  }
+
+  .bb-cursor-glow {
+    display: none;
   }
 
   .bb-topbar {
@@ -661,6 +755,10 @@ a {
   .bb-grid,
   .bb-grid.two {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .bb-stage-grid {
+    grid-template-columns: 1fr;
   }
 
   .bb-section,
@@ -839,28 +937,6 @@ body {
   font-size: 0.75rem;
 }
 
-.bb-media-slot-image {
-  margin-top: 0.52rem;
-  border-radius: 11px;
-  border: 1px solid rgba(182, 220, 245, 0.34);
-  background: rgba(12, 38, 57, 0.46);
-  overflow: hidden;
-}
-
-.bb-media-slot-image img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-}
-
-.bb-media-slot-image.square img {
-  aspect-ratio: 1 / 1;
-  max-width: 116px;
-  margin: 0.42rem auto;
-  border-radius: 14px;
-}
-
 .bb-media-slot-logo .bb-media-slot-ghost {
   min-height: 88px;
 }
@@ -909,6 +985,10 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .bb-orb {
     animation: none;
+  }
+
+  .bb-cursor-glow {
+    display: none;
   }
 
   .bb-title-shine {

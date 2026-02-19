@@ -51,18 +51,14 @@
                   <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
                 </div>
                 {% else %}
-                <div class="media-slot-preview logo">
-                  <img src="/static/generated/bidboard-logo-mark.webp" alt="Default BidBoard logo preview" loading="lazy" />
-                </div>
+                <div class="media-slot-empty">No logo found. Upload one in Platform Admin.</div>
                 {% endif %}
               </article>
               <article class="media-slot">
                 <p class="media-slot-label">Presentation Visual</p>
                 <h3 class="media-slot-title">Meeting Backdrop Slot</h3>
-                <p class="media-slot-note">Space for generated visual art used in live review sessions.</p>
-                <div class="media-slot-preview">
-                  <img src="/static/generated/bidboard-dashboard-visual.webp" alt="Generated meeting backdrop visual" loading="lazy" />
-                </div>
+                <p class="media-slot-note">Space for chapter visual art used in live review sessions.</p>
+                <div class="media-slot-empty">Use this pane for your own chapter meeting visual.</div>
               </article>
             </div>
           </aside>

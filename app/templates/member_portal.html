@@ -58,18 +58,14 @@
                   <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
                 </div>
                 {% else %}
-                <div class="media-slot-preview logo">
-                  <img src="/static/generated/bidboard-logo-mark.webp" alt="BidBoard default logo" loading="lazy" />
-                </div>
+                <div class="media-slot-empty">Upload your chapter logo to brand this member portal.</div>
                 {% endif %}
               </article>
               <article class="media-slot">
                 <p class="media-slot-label">Recruitment Creative</p>
                 <h3 class="media-slot-title">Member Hero Slot</h3>
-                <p class="media-slot-note">Reserved for a generated image tailored to member onboarding.</p>
-                <div class="media-slot-preview">
-                  <img src="/static/generated/bidboard-features-visual.webp" alt="Member portal creative visual" loading="lazy" />
-                </div>
+                <p class="media-slot-note">Optional: add your own onboarding graphic in your organization settings.</p>
+                <div class="media-slot-empty">No default artwork.</div>
               </article>
             </div>
           </aside>

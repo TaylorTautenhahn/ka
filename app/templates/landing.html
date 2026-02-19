@@ -20,6 +20,7 @@
     <script src="/static/js/landing.js" defer></script>
   </head>
   <body>
+    <div class="bb-cursor-glow" aria-hidden="true"></div>
     <div class="bb-orb bb-orb-a"></div>
     <div class="bb-orb bb-orb-b"></div>
     <div class="bb-noise"></div>
@@ -43,67 +44,58 @@
       <section class="bb-hero bb-reveal" data-delay="40">
         <div class="bb-hero-copy">
           <p class="bb-kicker">Built For Fraternities + Sororities</p>
-          <h1>
-            <span class="bb-title-shine">BidBoard turns recruitment into a system you can trust.</span>
+          <h1 class="bb-hero-title">
+            <span class="bb-title-shine">Recruitment, finally run like a modern command center.</span>
           </h1>
           <p class="bb-subtitle">
-            Replace spreadsheet chaos with one accountable workspace: role-based visibility, real-time scoring,
-            assignments, lunch scheduling, meeting packets, and clean season resets.
+            BidBoard connects scoring, assignments, events, lunches, and meeting packets into one accountable workflow.
+            No more spreadsheet drift, no more hidden decisions.
           </p>
           <div class="bb-hero-actions">
-            <a class="bb-cta" href="/organizations">Go To Organization Login</a>
+            <a class="bb-cta" href="/organizations">Open Organization Login</a>
             <a class="bb-cta bb-cta-ghost" href="/demo">Try Live Demo</a>
             <a class="bb-cta bb-cta-ghost" href="/features">See Product Tour</a>
           </div>
+          <div class="bb-pill-row bb-hero-pill-row">
+            <span class="bb-pill">Role-based visibility</span>
+            <span class="bb-pill">Weighted scoring</span>
+            <span class="bb-pill">Meeting packet export</span>
+            <span class="bb-pill">Season archive + reset</span>
+          </div>
         </div>
 
-        <aside class="bb-metric-panel bb-reveal" data-delay="120" aria-label="BidBoard summary metrics">
-          <div class="bb-metric">
-            <strong data-count="45">45</strong>
-            <span>Point weighted scoring model</span>
+        <aside class="bb-metric-panel bb-reveal bb-hero-stage" data-delay="120" aria-label="BidBoard summary metrics">
+          <div class="bb-stage-top">
+            <p class="bb-stage-kicker">Live Signal Panel</p>
+            <h3>Everything updates in one place</h3>
           </div>
-          <div class="bb-metric">
-            <strong data-count="100">100</strong>
-            <span>Percent real-time sync across views</span>
-          </div>
-          <div class="bb-metric">
-            <strong data-count="1">1</strong>
-            <span>System for officers, members, and leadership</span>
+          <div class="bb-stage-grid">
+            <article class="bb-stage-card">
+              <strong data-count="45">45</strong>
+              <span>Total points in default model</span>
+            </article>
+            <article class="bb-stage-card">
+              <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong>
+              <span>Organizations onboarded</span>
+            </article>
+            <article class="bb-stage-card">
+              <strong data-count="3">3</strong>
+              <span>Role views with clear permissions</span>
+            </article>
           </div>
           <div class="bb-mini-flow">
-            <p class="bb-mini-flow-title">Recruitment Flow</p>
+            <p class="bb-mini-flow-title">Core Flow</p>
             <div class="bb-mini-step">
               <span>1</span>
-              <p>Capture candidate profile + context</p>
+              <p>Capture profile + interactions</p>
             </div>
             <div class="bb-mini-step">
               <span>2</span>
-              <p>Evaluate with weighted role scoring</p>
+              <p>Score with role-weighted criteria</p>
             </div>
             <div class="bb-mini-step">
               <span>3</span>
-              <p>Decide in meeting packets with trend lines</p>
-            </div>
-          </div>
-          <div class="bb-brand-stage">
-            <p class="bb-brand-stage-title">Brand Asset Slots</p>
-            <div class="bb-media-cluster">
-              <article class="bb-media-slot bb-media-slot-logo">
-                <p class="bb-media-slot-label">Logo Slot</p>
-                <h3 class="bb-media-slot-title">Organization Mark</h3>
-                <p class="bb-media-slot-body">Place generated fraternity/sorority logos here next.</p>
-                <div class="bb-media-slot-image square">
-                  <img src="/static/generated/bidboard-org-fraternity-crest.webp" alt="Generated fraternity crest preview" loading="lazy" />
-                </div>
-              </article>
-              <article class="bb-media-slot">
-                <p class="bb-media-slot-label">Hero Slot</p>
-                <h3 class="bb-media-slot-title">Campaign Artwork</h3>
-                <p class="bb-media-slot-body">Reserved for generated hero image and social visual pack.</p>
-                <div class="bb-media-slot-image">
-                  <img src="/static/generated/bidboard-landing-hero.webp" alt="Generated campaign artwork preview" loading="lazy" />
-                </div>
-              </article>
+              <p>Decide using meeting packets + trends</p>
             </div>
           </div>
         </aside>

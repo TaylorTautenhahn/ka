@@ -65,24 +65,20 @@
               <article class="media-slot">
                 <p class="media-slot-label">Organization Branding</p>
                 <h3 class="media-slot-title">Primary Logo Slot</h3>
-                <p class="media-slot-note">Use this area for your generated crest or chapter logo.</p>
+                <p class="media-slot-note">Use this area for your chapter crest or logo.</p>
                 {% if app_config and app_config.logo_path %}
                 <div class="media-slot-preview logo">
                   <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
                 </div>
                 {% else %}
-                <div class="media-slot-preview logo">
-                  <img src="/static/generated/bidboard-logo-mark.webp" alt="BidBoard default logo" loading="lazy" />
-                </div>
+                <div class="media-slot-empty">Upload your chapter crest in Platform Admin.</div>
                 {% endif %}
               </article>
               <article class="media-slot">
                 <p class="media-slot-label">Campaign Visual</p>
                 <h3 class="media-slot-title">Hero Image Slot</h3>
-                <p class="media-slot-note">Reserved space for the next generated recruitment image.</p>
-                <div class="media-slot-preview">
-                  <img src="/static/generated/bidboard-dashboard-visual.webp" alt="BidBoard campaign visual" loading="lazy" />
-                </div>
+                <p class="media-slot-note">Use this space for your own chapter artwork or event announcement card.</p>
+                <div class="media-slot-empty">No stock art shown by default.</div>
               </article>
             </div>
           </aside>

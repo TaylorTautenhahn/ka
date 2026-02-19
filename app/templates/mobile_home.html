@@ -45,24 +45,20 @@
           <article class="media-slot">
             <p class="media-slot-label">Logo Slot</p>
             <h3 class="media-slot-title">Mobile Crest</h3>
-            <p class="media-slot-note">Use your generated chapter logo for fast identity on mobile.</p>
+            <p class="media-slot-note">Use your chapter logo for fast identity on mobile.</p>
             {% if app_config and app_config.logo_path %}
             <div class="media-slot-preview logo">
               <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
             </div>
             {% else %}
-            <div class="media-slot-preview logo">
-              <img src="/static/generated/bidboard-logo-mark.webp" alt="Default chapter logo" loading="lazy" />
-            </div>
+            <div class="media-slot-empty">Upload a chapter logo to fill this slot.</div>
             {% endif %}
           </article>
           <article class="media-slot">
             <p class="media-slot-label">Image Slot</p>
             <h3 class="media-slot-title">Mobile Hero Visual</h3>
-            <p class="media-slot-note">Reserved for generated rush campaign creative.</p>
-            <div class="media-slot-preview">
-              <img src="/static/generated/bidboard-mobile-visual.webp" alt="Generated mobile recruitment visual" loading="lazy" />
-            </div>
+            <p class="media-slot-note">Reserved for rush campaign creative.</p>
+            <div class="media-slot-empty">No default campaign art.</div>
           </article>
         </div>
       </section>

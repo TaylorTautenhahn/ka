@@ -26,18 +26,14 @@
               <article class="media-slot">
                 <p class="media-slot-label">Directory Logo Slot</p>
                 <h3 class="media-slot-title">Organization Crest</h3>
-                <p class="media-slot-note">Each organization card below can display its own generated logo.</p>
-                <div class="media-slot-preview logo">
-                  <img src="/static/generated/bidboard-org-sorority-crest.webp" alt="Generated organization crest sample" loading="lazy" />
-                </div>
+                <p class="media-slot-note">Each organization card below can display its uploaded logo.</p>
+                <div class="media-slot-empty">Upload a logo per organization for stronger recognition.</div>
               </article>
               <article class="media-slot">
                 <p class="media-slot-label">Landing Hero Slot</p>
                 <h3 class="media-slot-title">Recruitment Cover</h3>
-                <p class="media-slot-note">Reserved for generated cover artwork for organization selection.</p>
-                <div class="media-slot-preview">
-                  <img src="/static/generated/bidboard-landing-hero.webp" alt="Generated organization selection cover" loading="lazy" />
-                </div>
+                <p class="media-slot-note">Keep this panel clean and focused on chapter selection.</p>
+                <div class="media-slot-empty">No default image.</div>
               </article>
             </div>
           </aside>
@@ -61,7 +57,7 @@
                 {% if tenant.logo_path %}
                 <img src="{{ tenant.logo_path }}" alt="{{ tenant.display_name }} logo" class="tenant-logo" />
                 {% else %}
-                <img src="/static/generated/bidboard-logo-mark.webp" alt="{{ tenant.display_name }} default logo" class="tenant-logo" loading="lazy" />
+                <div class="tenant-logo tenant-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</div>
                 {% endif %}
                 <div>
                   <strong>{{ tenant.display_name }}</strong>

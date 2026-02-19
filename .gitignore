@@ -17,6 +17,8 @@ env/
 
 # OS
 .DS_Store
+*.swp
+tmp/
 
 
 # App data

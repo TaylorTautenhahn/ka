@@ -252,17 +252,49 @@ function resolveApiPath(path) {
   return path;
 }
 
+function readCookie(name) {
+  const needle = `${name}=`;
+  const parts = document.cookie ? document.cookie.split(";") : [];
+  for (const rawPart of parts) {
+    const part = rawPart.trim();
+    if (part.startsWith(needle)) {
+      return decodeURIComponent(part.slice(needle.length));
+    }
+  }
+  return "";
+}
+
+function csrfHeadersForMethod(method, headers) {
+  const normalizedMethod = String(method || "GET").toUpperCase();
+  if (!["POST", "PUT", "PATCH", "DELETE"].includes(normalizedMethod)) {
+    return headers;
+  }
+  const token = readCookie("bb_csrf_token");
+  if (!token) {
+    return headers;
+  }
+  return {
+    ...headers,
+    "X-CSRF-Token": token,
+  };
+}
+
 async function api(path, options = {}) {
   const isFormData = options.body instanceof FormData;
-  const response = await fetch(resolveApiPath(path), {
-    method: options.method || "GET",
-    credentials: "same-origin",
-    headers: isFormData
+  const method = String(options.method || "GET").toUpperCase();
+  const headers = csrfHeadersForMethod(
+    method,
+    isFormData
       ? { ...(options.headers || {}) }
       : {
           "Content-Type": "application/json",
           ...(options.headers || {}),
-        },
+        }
+  );
+  const response = await fetch(resolveApiPath(path), {
+    method,
+    credentials: "same-origin",
+    headers,
     body: options.body ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
   });
 

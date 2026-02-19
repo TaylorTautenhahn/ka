@@ -151,24 +151,41 @@
 
     const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     const pointer = { x: 0.5, y: 0.5, active: false };
-    const points = [];
-    const count = 34;
-
-    function seedPoints() {
-      points.length = 0;
-      for (let i = 0; i < count; i += 1) {
-        points.push({
-          x: Math.random(),
-          y: Math.random(),
-          z: 0.18 + Math.random() * 0.9,
-          vx: (Math.random() - 0.5) * 0.00024,
-          vy: (Math.random() - 0.5) * 0.00024,
-        });
-      }
-    }
-
-    const rusheeNode = { x: 0.25, y: 0.62, z: 1.25, label: "Rushee" };
-    const orgNode = { x: 0.75, y: 0.38, z: 1.25, label: "Organization" };
+    const nodes = [
+      { id: "r1", label: "Rushee A", type: "rushee", x: 0.16, y: 0.22, radius: 5.3, phase: 0.2, depth: 0.9 },
+      { id: "r2", label: "Rushee B", type: "rushee", x: 0.14, y: 0.5, radius: 5.5, phase: 1.1, depth: 0.9 },
+      { id: "r3", label: "Rushee C", type: "rushee", x: 0.18, y: 0.78, radius: 5.2, phase: 2.3, depth: 0.9 },
+      { id: "off1", label: "Officer", type: "officer", x: 0.36, y: 0.18, radius: 4.4, phase: 0.9, depth: 0.75 },
+      { id: "off2", label: "Officer", type: "officer", x: 0.34, y: 0.84, radius: 4.4, phase: 2.8, depth: 0.75 },
+      { id: "hub", label: "Match Engine", type: "hub", x: 0.5, y: 0.5, radius: 7.6, phase: 1.5, depth: 1.2 },
+      { id: "o1", label: "Org X", type: "org", x: 0.84, y: 0.24, radius: 5.3, phase: 0.4, depth: 0.92 },
+      { id: "o2", label: "Org Y", type: "org", x: 0.86, y: 0.52, radius: 5.4, phase: 1.8, depth: 0.92 },
+      { id: "o3", label: "Org Z", type: "org", x: 0.82, y: 0.8, radius: 5.1, phase: 2.7, depth: 0.92 },
+    ];
+    const edges = [
+      ["r1", "hub"],
+      ["r2", "hub"],
+      ["r3", "hub"],
+      ["off1", "hub"],
+      ["off2", "hub"],
+      ["hub", "o1"],
+      ["hub", "o2"],
+      ["hub", "o3"],
+      ["r1", "off1"],
+      ["r3", "off2"],
+    ];
+    const dust = Array.from({ length: 30 }, (_, idx) => ({
+      x: Math.random(),
+      y: Math.random(),
+      vx: (Math.random() - 0.5) * 0.00012,
+      vy: (Math.random() - 0.5) * 0.00012,
+      phase: idx * 0.37,
+      size: 0.8 + Math.random() * 1.3,
+    }));
+    const rusheeIds = nodes.filter((node) => node.type === "rushee").map((node) => node.id);
+    const orgIds = nodes.filter((node) => node.type === "org").map((node) => node.id);
+    let autoRouteIndex = 0;
+    let lastRouteSwitchAt = 0;
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
@@ -177,46 +194,67 @@
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     }
 
-    function worldToScreen(point, t) {
+    function nodeScreenPosition(node, time) {
       const width = canvas.width / DPR;
       const height = canvas.height / DPR;
-      const tiltX = (pointer.x - 0.5) * 30;
-      const tiltY = (pointer.y - 0.5) * 22;
-      const wobble = Math.sin(t * 0.001 + point.z * 4.2) * 0.005;
+      const tiltX = (pointer.x - 0.5) * 26 * node.depth;
+      const tiltY = (pointer.y - 0.5) * 20 * node.depth;
+      const wobbleX = Math.sin(time * 0.00092 + node.phase * 2.2) * 0.01;
+      const wobbleY = Math.cos(time * 0.00104 + node.phase * 1.6) * 0.012;
       return {
-        x: (point.x + wobble) * width + tiltX * point.z,
-        y: (point.y - wobble) * height + tiltY * point.z,
-        z: point.z,
+        id: node.id,
+        label: node.label,
+        type: node.type,
+        x: (node.x + wobbleX) * width + tiltX,
+        y: (node.y + wobbleY) * height + tiltY,
+        radius: node.radius * (1 + Math.sin(time * 0.0015 + node.phase) * 0.06),
       };
     }
 
-    function drawNode(screen, radius, color, glow) {
+    function nearestNode(type, x, y, map) {
+      let nearest = null;
+      let best = Number.POSITIVE_INFINITY;
+      for (const node of map.values()) {
+        if (node.type !== type) {
+          continue;
+        }
+        const distance = Math.hypot(node.x - x, node.y - y);
+        if (distance < best) {
+          best = distance;
+          nearest = node;
+        }
+      }
+      return nearest;
+    }
+
+    function drawNode(screen, color, glow, isActive) {
       ctx.beginPath();
       ctx.fillStyle = color;
-      ctx.shadowBlur = glow;
+      ctx.shadowBlur = isActive ? glow * 1.55 : glow;
       ctx.shadowColor = color;
-      ctx.arc(screen.x, screen.y, radius, 0, Math.PI * 2);
+      ctx.arc(screen.x, screen.y, screen.radius, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
 
     function drawLabel(screen, text) {
       ctx.save();
-      ctx.fillStyle = "rgba(215, 232, 255, 0.95)";
-      ctx.font = "700 12px Space Grotesk, sans-serif";
+      ctx.fillStyle = "rgba(223, 236, 255, 0.92)";
+      ctx.font = "700 11px Space Grotesk, sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText(text, screen.x, screen.y - 16);
+      ctx.fillText(text, screen.x, screen.y - (screen.radius + 10));
       ctx.restore();
     }
 
-    function drawConnection(a, b, intensity) {
+    function drawConnection(a, b, intensity, active) {
       const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-      gradient.addColorStop(0, `rgba(53, 203, 255, ${0.16 + intensity * 0.5})`);
-      gradient.addColorStop(1, `rgba(132, 102, 255, ${0.12 + intensity * 0.5})`);
+      gradient.addColorStop(0, `rgba(69, 230, 184, ${0.08 + intensity * 0.35})`);
+      gradient.addColorStop(0.52, `rgba(184, 214, 255, ${0.08 + intensity * 0.4})`);
+      gradient.addColorStop(1, `rgba(53, 203, 255, ${0.1 + intensity * 0.45})`);
       ctx.strokeStyle = gradient;
-      ctx.lineWidth = 1.2 + intensity * 1.5;
-      ctx.shadowBlur = 14 + intensity * 12;
-      ctx.shadowColor = "rgba(60, 167, 255, 0.55)";
+      ctx.lineWidth = active ? 2 + intensity * 2.2 : 0.9 + intensity * 1.15;
+      ctx.shadowBlur = active ? 18 + intensity * 16 : 6 + intensity * 5;
+      ctx.shadowColor = active ? "rgba(72, 190, 255, 0.66)" : "rgba(122, 167, 236, 0.24)";
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
@@ -224,69 +262,129 @@
       ctx.shadowBlur = 0;
     }
 
+    function drawPulse(a, b, progress) {
+      const x = a.x + (b.x - a.x) * progress;
+      const y = a.y + (b.y - a.y) * progress;
+      ctx.beginPath();
+      ctx.fillStyle = "rgba(213, 233, 255, 0.95)";
+      ctx.shadowBlur = 16;
+      ctx.shadowColor = "rgba(125, 185, 255, 0.76)";
+      ctx.arc(x, y, 2.6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    function drawGrid(width, height) {
+      const spacing = 36;
+      ctx.strokeStyle = "rgba(94, 132, 194, 0.08)";
+      ctx.lineWidth = 0.8;
+      for (let x = spacing; x < width; x += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+      for (let y = spacing; y < height; y += spacing) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y);
+        ctx.stroke();
+      }
+    }
+
     function tick(time) {
       const width = canvas.width / DPR;
       const height = canvas.height / DPR;
       ctx.clearRect(0, 0, width, height);
+      drawGrid(width, height);
 
-      points.forEach((point) => {
+      dust.forEach((point) => {
         point.x += point.vx;
         point.y += point.vy;
-        if (point.x <= 0.04 || point.x >= 0.96) {
+        if (point.x < 0.04 || point.x > 0.96) {
           point.vx *= -1;
         }
-        if (point.y <= 0.06 || point.y >= 0.94) {
+        if (point.y < 0.04 || point.y > 0.96) {
           point.vy *= -1;
         }
+        const px = point.x * width;
+        const py = point.y * height;
+        const alpha = 0.18 + (Math.sin(time * 0.0012 + point.phase) + 1) * 0.12;
+        ctx.beginPath();
+        ctx.fillStyle = `rgba(154, 188, 243, ${alpha.toFixed(3)})`;
+        ctx.arc(px, py, point.size, 0, Math.PI * 2);
+        ctx.fill();
       });
 
-      const projected = points.map((point) => worldToScreen(point, time));
-
-      for (let i = 0; i < projected.length; i += 1) {
-        for (let j = i + 1; j < projected.length; j += 1) {
-          const a = projected[i];
-          const b = projected[j];
-          const dx = a.x - b.x;
-          const dy = a.y - b.y;
-          const dist = Math.hypot(dx, dy);
-          if (dist > 130) {
-            continue;
-          }
-          const alpha = Math.max(0.02, 1 - dist / 130) * 0.18;
-          ctx.strokeStyle = `rgba(138, 173, 247, ${alpha.toFixed(3)})`;
-          ctx.lineWidth = 0.8;
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(b.x, b.y);
-          ctx.stroke();
-        }
+      const projectedMap = new Map(nodes.map((node) => [node.id, nodeScreenPosition(node, time)]));
+      const hub = projectedMap.get("hub");
+      if (!hub) {
+        window.requestAnimationFrame(tick);
+        return;
       }
 
-      projected.forEach((point) => {
-        const radius = 1.4 + point.z * 1.8;
-        drawNode(point, radius, "rgba(174, 203, 255, 0.82)", 7);
+      let activeRushee = null;
+      let activeOrg = null;
+      if (pointer.active) {
+        const pointerX = pointer.x * width;
+        const pointerY = pointer.y * height;
+        activeRushee = nearestNode("rushee", pointerX, pointerY, projectedMap);
+        activeOrg = nearestNode("org", pointerX, pointerY, projectedMap);
+      } else {
+        if (time - lastRouteSwitchAt > 2600) {
+          autoRouteIndex = (autoRouteIndex + 1) % rusheeIds.length;
+          lastRouteSwitchAt = time;
+        }
+        activeRushee = projectedMap.get(rusheeIds[autoRouteIndex]) || null;
+        activeOrg = projectedMap.get(orgIds[autoRouteIndex % orgIds.length]) || null;
+      }
+
+      const activeLinks = new Set();
+      if (activeRushee && activeOrg) {
+        activeLinks.add(`${activeRushee.id}->hub`);
+        activeLinks.add(`hub->${activeOrg.id}`);
+      }
+
+      edges.forEach(([sourceId, targetId]) => {
+        const source = projectedMap.get(sourceId);
+        const target = projectedMap.get(targetId);
+        if (!source || !target) {
+          return;
+        }
+        const key = `${sourceId}->${targetId}`;
+        const reverseKey = `${targetId}->${sourceId}`;
+        const isActive = activeLinks.has(key) || activeLinks.has(reverseKey);
+        drawConnection(source, target, isActive ? 0.68 : 0.3, isActive);
+        if (isActive) {
+          const progress = (time * 0.0007 + (sourceId.charCodeAt(0) % 4) * 0.19) % 1;
+          drawPulse(source, target, progress);
+        }
       });
 
-      const rusheeScreen = worldToScreen(rusheeNode, time);
-      const orgScreen = worldToScreen(orgNode, time);
-      drawNode(rusheeScreen, 5.2, "rgba(69, 230, 184, 0.96)", 14);
-      drawNode(orgScreen, 5.2, "rgba(53, 203, 255, 0.96)", 14);
-      drawLabel(rusheeScreen, rusheeNode.label);
-      drawLabel(orgScreen, orgNode.label);
+      projectedMap.forEach((node) => {
+        const isActive = (activeRushee && node.id === activeRushee.id) || (activeOrg && node.id === activeOrg.id) || node.id === "hub";
+        if (node.type === "rushee") {
+          drawNode(node, "rgba(69, 230, 184, 0.95)", 16, isActive);
+        } else if (node.type === "org") {
+          drawNode(node, "rgba(53, 203, 255, 0.95)", 16, isActive);
+        } else if (node.type === "hub") {
+          drawNode(node, "rgba(222, 236, 255, 0.96)", 18, true);
+        } else {
+          drawNode(node, "rgba(153, 183, 238, 0.9)", 10, false);
+        }
+      });
 
-      const connectionIntensity = pointer.active
-        ? Math.max(0.22, 1 - Math.hypot(pointer.x - 0.5, pointer.y - 0.5) * 1.35)
-        : 0.18 + Math.sin(time * 0.002) * 0.08;
-      drawConnection(rusheeScreen, orgScreen, connectionIntensity);
+      if (activeRushee) {
+        drawLabel(activeRushee, activeRushee.label);
+      }
+      drawLabel(hub, "Match Engine");
+      if (activeOrg) {
+        drawLabel(activeOrg, activeOrg.label);
+      }
 
       if (pointer.active) {
-        const pointerScreen = {
-          x: pointer.x * width,
-          y: pointer.y * height,
-        };
-        drawNode(pointerScreen, 3.6, "rgba(210, 220, 255, 0.95)", 12);
-        drawConnection(pointerScreen, rusheeScreen, 0.34);
-        drawConnection(pointerScreen, orgScreen, 0.34);
+        const pointerScreen = { x: pointer.x * width, y: pointer.y * height, radius: 3.2 };
+        drawNode(pointerScreen, "rgba(214, 230, 255, 0.94)", 12, true);
       }
 
       window.requestAnimationFrame(tick);
@@ -310,7 +408,6 @@
       pointer.active = false;
     });
 
-    seedPoints();
     resize();
     window.addEventListener("resize", resize, { passive: true });
     window.requestAnimationFrame(tick);

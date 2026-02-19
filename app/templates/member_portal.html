@@ -35,14 +35,44 @@
 
     <main class="shell member-shell">
       <header class="hero reveal">
-        {% if app_config.logo_path %}
-        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-        {% endif %}
-        <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Fraternity' }}</p>
-        <h1>Member Rating Portal</h1>
-        <p>{{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Simple access for chapter members to search rushees and submit ratings.' }}</p>
-        <div class="action-row">
-          <a class="quick-nav-link" href="{{ app_config.base_path if app_config else '/' }}">Open Rush Team Console</a>
+        <div class="hero-shell">
+          <div class="hero-copy">
+            {% if app_config.logo_path %}
+            <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+            {% endif %}
+            <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Fraternity' }}</p>
+            <h1>Member Rating Portal</h1>
+            <p>{{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Simple access for chapter members to search rushees and submit ratings.' }}</p>
+            <div class="action-row">
+              <a class="quick-nav-link" href="{{ app_config.base_path if app_config else '/' }}">Open Rush Team Console</a>
+            </div>
+          </div>
+          <aside class="hero-visuals" aria-label="Brand and media slots">
+            <div class="media-slot-grid">
+              <article class="media-slot">
+                <p class="media-slot-label">Member Branding</p>
+                <h3 class="media-slot-title">Portal Logo Slot</h3>
+                <p class="media-slot-note">Displays your organization logo to members during login.</p>
+                {% if app_config and app_config.logo_path %}
+                <div class="media-slot-preview logo">
+                  <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
+                </div>
+                {% else %}
+                <div class="media-slot-preview logo">
+                  <img src="/static/generated/bidboard-logo-mark.webp" alt="BidBoard default logo" loading="lazy" />
+                </div>
+                {% endif %}
+              </article>
+              <article class="media-slot">
+                <p class="media-slot-label">Recruitment Creative</p>
+                <h3 class="media-slot-title">Member Hero Slot</h3>
+                <p class="media-slot-note">Reserved for a generated image tailored to member onboarding.</p>
+                <div class="media-slot-preview">
+                  <img src="/static/generated/bidboard-features-visual.webp" alt="Member portal creative visual" loading="lazy" />
+                </div>
+              </article>
+            </div>
+          </aside>
         </div>
       </header>
 

@@ -31,9 +31,33 @@
     </div>
     <main class="shell">
       <header class="hero reveal">
-        <p class="eyebrow">Platform Admin</p>
-        <h1>Organization Management</h1>
-        <p>Create and customize chapter workspaces with separate data, rating models, branding, and member signup QR access.</p>
+        <div class="hero-shell">
+          <div class="hero-copy">
+            <p class="eyebrow">Platform Admin</p>
+            <h1>Organization Management</h1>
+            <p>Create and customize chapter workspaces with separate data, rating models, branding, and member signup QR access.</p>
+          </div>
+          <aside class="hero-visuals" aria-label="Brand asset slots">
+            <div class="media-slot-grid">
+              <article class="media-slot">
+                <p class="media-slot-label">Logo Slot</p>
+                <h3 class="media-slot-title">Primary Mark</h3>
+                <p class="media-slot-note">Use this for generated chapter logos before uploading into tenant settings.</p>
+                <div class="media-slot-preview logo">
+                  <img src="/static/generated/bidboard-org-fraternity-crest.webp" alt="Generated organization crest example" loading="lazy" />
+                </div>
+              </article>
+              <article class="media-slot">
+                <p class="media-slot-label">Marketing Slot</p>
+                <h3 class="media-slot-title">Hero Artwork</h3>
+                <p class="media-slot-note">Reserve this area for generated recruitment hero art and social assets.</p>
+                <div class="media-slot-preview">
+                  <img src="/static/generated/bidboard-landing-hero.webp" alt="Generated recruitment hero artwork example" loading="lazy" />
+                </div>
+              </article>
+            </div>
+          </aside>
+        </div>
       </header>
 
       <section id="platformAuth" class="panel">
@@ -174,6 +198,24 @@
               Organization logo (optional)
               <input id="tenantLogoFile" type="file" accept="image/png,image/jpeg,image/webp" />
             </label>
+            <div class="media-slot-grid">
+              <article class="media-slot">
+                <p class="media-slot-label">Logo Variant Slot</p>
+                <h3 class="media-slot-title">Square Icon</h3>
+                <p class="media-slot-note">Best for app icon/profile use. Upload once generated.</p>
+                <div class="media-slot-preview logo">
+                  <img src="/static/generated/bidboard-logo-mark-alt.webp" alt="Generated square logo example" loading="lazy" />
+                </div>
+              </article>
+              <article class="media-slot">
+                <p class="media-slot-label">Banner Slot</p>
+                <h3 class="media-slot-title">Wide Hero Image</h3>
+                <p class="media-slot-note">Use for landing/marketing visuals tied to this organization.</p>
+                <div class="media-slot-preview">
+                  <img src="/static/generated/bidboard-features-visual.webp" alt="Generated organization banner artwork example" loading="lazy" />
+                </div>
+              </article>
+            </div>
             <button type="submit">Create Organization</button>
           </form>
         </section>

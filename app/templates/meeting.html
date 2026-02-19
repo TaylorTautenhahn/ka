@@ -31,12 +31,42 @@
     </div>
     <main class="shell">
       <header class="hero reveal">
-        {% if app_config.logo_path %}
-        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-        {% endif %}
-        <p class="eyebrow">{{ app_config.chapter_name }}</p>
-        <h1>Meeting Packet</h1>
-        <p>Dedicated meeting context for one rushee at a time, optimized for review and print-to-PDF exports.</p>
+        <div class="hero-shell">
+          <div class="hero-copy">
+            {% if app_config.logo_path %}
+            <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+            {% endif %}
+            <p class="eyebrow">{{ app_config.chapter_name }}</p>
+            <h1>Meeting Packet</h1>
+            <p>Dedicated meeting context for one rushee at a time, optimized for review and print-to-PDF exports.</p>
+          </div>
+          <aside class="hero-visuals" aria-label="Meeting visuals">
+            <div class="media-slot-grid">
+              <article class="media-slot">
+                <p class="media-slot-label">Meeting Branding</p>
+                <h3 class="media-slot-title">Packet Logo Slot</h3>
+                <p class="media-slot-note">Displays your chapter identity during formal packet review.</p>
+                {% if app_config and app_config.logo_path %}
+                <div class="media-slot-preview logo">
+                  <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
+                </div>
+                {% else %}
+                <div class="media-slot-preview logo">
+                  <img src="/static/generated/bidboard-logo-mark.webp" alt="Default BidBoard logo preview" loading="lazy" />
+                </div>
+                {% endif %}
+              </article>
+              <article class="media-slot">
+                <p class="media-slot-label">Presentation Visual</p>
+                <h3 class="media-slot-title">Meeting Backdrop Slot</h3>
+                <p class="media-slot-note">Space for generated visual art used in live review sessions.</p>
+                <div class="media-slot-preview">
+                  <img src="/static/generated/bidboard-dashboard-visual.webp" alt="Generated meeting backdrop visual" loading="lazy" />
+                </div>
+              </article>
+            </div>
+          </aside>
+        </div>
       </header>
 
       <nav class="panel quick-nav" aria-label="Tabs">

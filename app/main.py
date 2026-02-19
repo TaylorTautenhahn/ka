@@ -95,6 +95,16 @@ REQUIRE_PERSISTENT_DATA = os.getenv("REQUIRE_PERSISTENT_DATA", "0").strip().lowe
 PLATFORM_DB_PATH = Path(os.getenv("PLATFORM_DB_PATH", str(DATA_ROOT / "platform.db")))
 DEFAULT_TENANT_SLUG = os.getenv("DEFAULT_TENANT_SLUG", "kappaalphaorder").strip().lower() or "kappaalphaorder"
 DEFAULT_TENANT_NAME = os.getenv("DEFAULT_TENANT_NAME", "Kappa Alpha Order").strip() or "Kappa Alpha Order"
+DEMO_ENABLED = os.getenv("DEMO_ENABLED", "1").strip().lower() in {"1", "true", "yes"}
+DEMO_AUTO_LOGIN = os.getenv("DEMO_AUTO_LOGIN", "1").strip().lower() in {"1", "true", "yes"}
+DEMO_TENANT_SLUG_RAW = os.getenv("DEMO_TENANT_SLUG", "bidboarddemo").strip().lower() or "bidboarddemo"
+DEMO_TENANT_NAME = os.getenv("DEMO_TENANT_NAME", "BidBoard Demo").strip() or "BidBoard Demo"
+DEMO_TENANT_CHAPTER_NAME = os.getenv("DEMO_TENANT_CHAPTER_NAME", "Demo").strip() or "Demo"
+DEMO_HEAD_USERNAME = os.getenv("DEMO_HEAD_USERNAME", "demohead").strip() or "demohead"
+DEMO_HEAD_FIRST_NAME = os.getenv("DEMO_HEAD_FIRST_NAME", "Demo").strip() or "Demo"
+DEMO_HEAD_LAST_NAME = os.getenv("DEMO_HEAD_LAST_NAME", "Head").strip() or "Head"
+DEMO_HEAD_PLEDGE_CLASS = os.getenv("DEMO_HEAD_PLEDGE_CLASS", "Demo").strip() or "Demo"
+DEMO_HEAD_ACCESS_CODE = os.getenv("DEMO_HEAD_ACCESS_CODE", "DemoHead123!").strip() or "DemoHead123!"
 PLATFORM_ADMIN_USERNAME = os.getenv("PLATFORM_ADMIN_USERNAME", "taylortaut").strip() or "taylortaut"
 PLATFORM_ADMIN_ACCESS_CODE = os.getenv("PLATFORM_ADMIN_ACCESS_CODE", "").strip()
 HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "").strip()
@@ -563,6 +573,17 @@ def normalize_slug(value: str) -> str:
     if not re.fullmatch(r"[a-z0-9-]{3,64}", slug):
         raise ValueError("Slug must use lowercase letters, numbers, and hyphens only.")
     return slug
+
+
+def demo_tenant_slug() -> str:
+    try:
+        return normalize_slug(DEMO_TENANT_SLUG_RAW)
+    except ValueError:
+        return "bidboarddemo"
+
+
+def is_demo_tenant_slug(slug: str) -> bool:
+    return DEMO_ENABLED and slug == demo_tenant_slug()
 
 
 def normalize_theme_color(value: str, fallback: str) -> str:
@@ -1493,7 +1514,7 @@ async def csrf_protection(request: Request, call_next):  # type: ignore[no-untyp
     if not ENFORCE_CSRF or method not in UNSAFE_HTTP_METHODS:
         return await call_next(request)
 
-    has_session_cookie = bool(request.cookies.get(SESSION_COOKIE) or request.cookies.get(PLATFORM_SESSION_COOKIE))
+    has_session_cookie = request_has_active_session(request) or request_has_active_platform_session(request)
     origin = (request.headers.get("origin") or "").strip()
     referer = (request.headers.get("referer") or "").strip()
 
@@ -3697,6 +3718,130 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
     return conn.execute("SELECT * FROM tenants WHERE slug = ?", (DEFAULT_TENANT_SLUG,)).fetchone()
 
 
+def ensure_demo_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row | None:
+    if not DEMO_ENABLED:
+        return None
+
+    slug = demo_tenant_slug()
+    created_at = now_iso()
+    demo_db_path = default_tenant_db_path(slug)
+    row = conn.execute("SELECT * FROM tenants WHERE slug = ?", (slug,)).fetchone()
+    setup_tagline = "Explore the full BidBoard workflow with live demo data."
+
+    if row:
+        existing_token = (row["calendar_share_token"] or "").strip() if "calendar_share_token" in row.keys() else ""
+        calendar_share_token = existing_token or secrets.token_urlsafe(24)
+        existing_db_path_raw = (row["db_path"] or "").strip()
+        existing_db_path = Path(existing_db_path_raw).expanduser() if existing_db_path_raw else None
+        preserved_db_path = existing_db_path or demo_db_path
+
+        if existing_db_path and existing_db_path != demo_db_path:
+            if not existing_db_path.exists():
+                preserved_db_path = demo_db_path
+                print(
+                    f"[startup] warning: prior demo tenant DB path not found ({existing_db_path}). "
+                    f"Switching to configured path {demo_db_path}."
+                )
+            else:
+                if not demo_db_path.exists() and copy_sqlite_database(existing_db_path, demo_db_path):
+                    print(
+                        f"[startup] migrated demo tenant DB from {existing_db_path} to {demo_db_path} "
+                        "for persistent storage."
+                    )
+                if demo_db_path.exists():
+                    preserved_db_path = demo_db_path
+                else:
+                    print(
+                        "[startup] warning: demo tenant DB migration to configured path was not possible "
+                        f"({existing_db_path} -> {demo_db_path}). Keeping existing path."
+                    )
+
+        conn.execute(
+            """
+            UPDATE tenants
+            SET
+                display_name = ?,
+                chapter_name = ?,
+                org_type = ?,
+                setup_tagline = ?,
+                db_path = ?,
+                calendar_share_token = ?,
+                head_seed_username = ?,
+                head_seed_first_name = ?,
+                head_seed_last_name = ?,
+                head_seed_pledge_class = ?,
+                is_active = 1,
+                updated_at = ?
+            WHERE slug = ?
+            """,
+            (
+                DEMO_TENANT_NAME,
+                DEMO_TENANT_CHAPTER_NAME,
+                "Fraternity",
+                setup_tagline,
+                str(preserved_db_path),
+                calendar_share_token,
+                DEMO_HEAD_USERNAME,
+                DEMO_HEAD_FIRST_NAME,
+                DEMO_HEAD_LAST_NAME,
+                DEMO_HEAD_PLEDGE_CLASS,
+                created_at,
+                slug,
+            ),
+        )
+        return conn.execute("SELECT * FROM tenants WHERE slug = ?", (slug,)).fetchone()
+
+    conn.execute(
+        """
+        INSERT INTO tenants (
+            slug,
+            display_name,
+            chapter_name,
+            org_type,
+            setup_tagline,
+            logo_path,
+            theme_primary,
+            theme_secondary,
+            theme_tertiary,
+            rating_criteria_json,
+            officer_weight,
+            rusher_weight,
+            default_interest_tags,
+            default_stereotype_tags,
+            calendar_share_token,
+            db_path,
+            head_seed_username,
+            head_seed_first_name,
+            head_seed_last_name,
+            head_seed_pledge_class,
+            created_at,
+            updated_at,
+            is_active
+        )
+        VALUES (?, ?, ?, ?, ?, NULL, '#0f4c81', '#c99a2b', '#1d7a4b', ?, 0.6, 0.4, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """,
+        (
+            slug,
+            DEMO_TENANT_NAME,
+            DEMO_TENANT_CHAPTER_NAME,
+            "Fraternity",
+            setup_tagline,
+            json.dumps(default_rating_criteria(), separators=(",", ":")),
+            json.dumps(DEFAULT_INTEREST_TAG_SUGGESTIONS, separators=(",", ":")),
+            json.dumps(DEFAULT_STEREOTYPE_TAG_SUGGESTIONS, separators=(",", ":")),
+            secrets.token_urlsafe(24),
+            str(demo_db_path),
+            DEMO_HEAD_USERNAME,
+            DEMO_HEAD_FIRST_NAME,
+            DEMO_HEAD_LAST_NAME,
+            DEMO_HEAD_PLEDGE_CLASS,
+            created_at,
+            created_at,
+        ),
+    )
+    return conn.execute("SELECT * FROM tenants WHERE slug = ?", (slug,)).fetchone()
+
+
 def initialize_tenant_datastore(row: sqlite3.Row, seed_access_code: str | None = None) -> None:
     ctx = tenant_context_from_row(row)
     ctx.pnm_uploads_dir.mkdir(parents=True, exist_ok=True)
@@ -3714,6 +3859,1132 @@ def initialize_tenant_datastore(row: sqlite3.Row, seed_access_code: str | None =
         )
 
 
+def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
+    def iso_at(days_offset: int, hour: int, minute: int = 0) -> str:
+        base = datetime.now(timezone.utc) + timedelta(days=days_offset)
+        return base.replace(hour=hour, minute=minute, second=0, microsecond=0).isoformat()
+
+    def date_at(days_offset: int) -> str:
+        return (date.today() + timedelta(days=days_offset)).isoformat()
+
+    def make_scores(good_with_girls: int, will_make_it: int, personable: int, alcohol_control: int, instagram: int) -> dict[str, int]:
+        payload = {
+            "good_with_girls": int(good_with_girls),
+            "will_make_it": int(will_make_it),
+            "personable": int(personable),
+            "alcohol_control": int(alcohol_control),
+            "instagram_marketability": int(instagram),
+        }
+        payload["total_score"] = score_total(payload)
+        return payload
+
+    def upsert_demo_user(
+        *,
+        username: str,
+        first_name: str,
+        last_name: str,
+        pledge_class: str,
+        role: str,
+        emoji: str | None,
+        stereotype: str,
+        interests: list[str],
+        access_code: str,
+        approved: bool,
+        approved_by: int | None,
+    ) -> int:
+        interests_csv, interests_norm = encode_interests(interests)
+        stamp = now_iso()
+        approved_at = iso_at(-14, 15, 0) if approved else None
+        approved_by_value = int(approved_by) if approved and approved_by else None
+        emoji_value = (emoji or "").strip() or None
+        existing = conn.execute("SELECT id, created_at FROM users WHERE username = ?", (username,)).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE users
+                SET
+                    first_name = ?,
+                    last_name = ?,
+                    pledge_class = ?,
+                    role = ?,
+                    emoji = ?,
+                    stereotype = ?,
+                    interests = ?,
+                    interests_norm = ?,
+                    access_code_hash = ?,
+                    is_approved = ?,
+                    approved_by = ?,
+                    approved_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    first_name,
+                    last_name,
+                    pledge_class,
+                    role,
+                    emoji_value if role == ROLE_RUSH_OFFICER else None,
+                    stereotype,
+                    interests_csv,
+                    interests_norm,
+                    hash_access_code(access_code),
+                    1 if approved else 0,
+                    approved_by_value,
+                    approved_at,
+                    stamp,
+                    int(existing["id"]),
+                ),
+            )
+            return int(existing["id"])
+
+        created_at = iso_at(-21, 16, 30)
+        cursor = conn.execute(
+            """
+            INSERT INTO users (
+                username,
+                first_name,
+                last_name,
+                pledge_class,
+                role,
+                emoji,
+                stereotype,
+                interests,
+                interests_norm,
+                access_code_hash,
+                is_approved,
+                approved_by,
+                approved_at,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                username,
+                first_name,
+                last_name,
+                pledge_class,
+                role,
+                emoji_value if role == ROLE_RUSH_OFFICER else None,
+                stereotype,
+                interests_csv,
+                interests_norm,
+                hash_access_code(access_code),
+                1 if approved else 0,
+                approved_by_value,
+                approved_at,
+                created_at,
+                stamp,
+            ),
+        )
+        return int(cursor.lastrowid or 0)
+
+    def upsert_demo_pnm(
+        *,
+        pnm_code: str,
+        first_name: str,
+        last_name: str,
+        class_year: str,
+        hometown: str,
+        phone_number: str,
+        instagram_handle: str,
+        first_event_date: str,
+        interests: list[str],
+        stereotype: str,
+        lunch_stats: str,
+        notes: str,
+        created_by: int,
+        assigned_officer_id: int | None,
+        assigned_by: int | None,
+    ) -> int:
+        interests_csv, interests_norm = encode_interests(interests)
+        updated_at = now_iso()
+        assigned_at = iso_at(-5, 12, 0) if assigned_officer_id else None
+        existing = conn.execute("SELECT id, created_at FROM pnms WHERE pnm_code = ?", (pnm_code,)).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE pnms
+                SET
+                    first_name = ?,
+                    last_name = ?,
+                    class_year = ?,
+                    hometown = ?,
+                    phone_number = ?,
+                    instagram_handle = ?,
+                    first_event_date = ?,
+                    interests = ?,
+                    interests_norm = ?,
+                    stereotype = ?,
+                    lunch_stats = ?,
+                    notes = ?,
+                    assigned_officer_id = ?,
+                    assigned_by = ?,
+                    assigned_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    first_name,
+                    last_name,
+                    class_year,
+                    hometown,
+                    phone_number,
+                    instagram_handle,
+                    first_event_date,
+                    interests_csv,
+                    interests_norm,
+                    stereotype,
+                    lunch_stats,
+                    notes,
+                    assigned_officer_id,
+                    assigned_by,
+                    assigned_at,
+                    updated_at,
+                    int(existing["id"]),
+                ),
+            )
+            return int(existing["id"])
+
+        cursor = conn.execute(
+            """
+            INSERT INTO pnms (
+                pnm_code,
+                first_name,
+                last_name,
+                class_year,
+                hometown,
+                phone_number,
+                instagram_handle,
+                first_event_date,
+                interests,
+                interests_norm,
+                stereotype,
+                lunch_stats,
+                notes,
+                assigned_officer_id,
+                assigned_by,
+                assigned_at,
+                created_by,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pnm_code,
+                first_name,
+                last_name,
+                class_year,
+                hometown,
+                phone_number,
+                instagram_handle,
+                first_event_date,
+                interests_csv,
+                interests_norm,
+                stereotype,
+                lunch_stats,
+                notes,
+                assigned_officer_id,
+                assigned_by,
+                assigned_at,
+                created_by,
+                iso_at(-15, 18, 0),
+                updated_at,
+            ),
+        )
+        return int(cursor.lastrowid or 0)
+
+    fallback_access_code = "DemoPass123!"
+    head_id = upsert_demo_user(
+        username=DEMO_HEAD_USERNAME,
+        first_name=DEMO_HEAD_FIRST_NAME,
+        last_name=DEMO_HEAD_LAST_NAME,
+        pledge_class=DEMO_HEAD_PLEDGE_CLASS,
+        role=ROLE_HEAD,
+        emoji=None,
+        stereotype="Strategist",
+        interests=["Leadership", "Analytics", "Recruitment"],
+        access_code=DEMO_HEAD_ACCESS_CODE,
+        approved=True,
+        approved_by=None,
+    )
+
+    user_ids: dict[str, int] = {
+        DEMO_HEAD_USERNAME: head_id,
+        "officerjack": upsert_demo_user(
+            username="officerjack",
+            first_name="Jack",
+            last_name="Miller",
+            pledge_class="Fall23",
+            role=ROLE_RUSH_OFFICER,
+            emoji="🔥",
+            stereotype="Connector",
+            interests=["Sports", "Leadership", "Fitness"],
+            access_code=fallback_access_code,
+            approved=True,
+            approved_by=head_id,
+        ),
+        "officerliam": upsert_demo_user(
+            username="officerliam",
+            first_name="Liam",
+            last_name="Brooks",
+            pledge_class="Fall24",
+            role=ROLE_RUSH_OFFICER,
+            emoji="⚡",
+            stereotype="Mentor",
+            interests=["Finance", "Outdoors", "Recruitment"],
+            access_code=fallback_access_code,
+            approved=True,
+            approved_by=head_id,
+        ),
+        "officernoah": upsert_demo_user(
+            username="officernoah",
+            first_name="Noah",
+            last_name="Grant",
+            pledge_class="Spring24",
+            role=ROLE_RUSH_OFFICER,
+            emoji="🎯",
+            stereotype="Builder",
+            interests=["Academics", "Music", "Leadership"],
+            access_code=fallback_access_code,
+            approved=True,
+            approved_by=head_id,
+        ),
+        "memberalex": upsert_demo_user(
+            username="memberalex",
+            first_name="Alex",
+            last_name="Parker",
+            pledge_class="Spring25",
+            role=ROLE_RUSHER,
+            emoji=None,
+            stereotype="Social",
+            interests=["Travel", "Sports", "Philanthropy"],
+            access_code=fallback_access_code,
+            approved=True,
+            approved_by=head_id,
+        ),
+        "memberryan": upsert_demo_user(
+            username="memberryan",
+            first_name="Ryan",
+            last_name="Cole",
+            pledge_class="Spring25",
+            role=ROLE_RUSHER,
+            emoji=None,
+            stereotype="Athlete",
+            interests=["Fitness", "Outdoors", "Gaming"],
+            access_code=fallback_access_code,
+            approved=True,
+            approved_by=head_id,
+        ),
+        "memberniko": upsert_demo_user(
+            username="memberniko",
+            first_name="Niko",
+            last_name="West",
+            pledge_class="Fall25",
+            role=ROLE_RUSHER,
+            emoji=None,
+            stereotype="Scholar",
+            interests=["Academics", "Finance", "Music"],
+            access_code=fallback_access_code,
+            approved=True,
+            approved_by=head_id,
+        ),
+        "newmemberdemo": upsert_demo_user(
+            username="newmemberdemo",
+            first_name="Jordan",
+            last_name="Lee",
+            pledge_class="Spring26",
+            role=ROLE_RUSHER,
+            emoji=None,
+            stereotype="Leader",
+            interests=["Leadership", "Music"],
+            access_code=fallback_access_code,
+            approved=False,
+            approved_by=None,
+        ),
+    }
+
+    pnm_seed = [
+        {
+            "pnm_code": "DMB01202026",
+            "first_name": "Ethan",
+            "last_name": "Brooks",
+            "class_year": "F",
+            "hometown": "Nashville, TN",
+            "phone_number": "(555) 201-1001",
+            "instagram_handle": "@ethanbrooks",
+            "first_event_date": date_at(-20),
+            "interests": ["Leadership", "Sports", "Faith"],
+            "stereotype": "Leader",
+            "lunch_stats": "2 lunches this month",
+            "notes": "Strong early buy-in and follows up quickly.",
+            "assigned_officer": "officerjack",
+        },
+        {
+            "pnm_code": "DJC01222026",
+            "first_name": "Mason",
+            "last_name": "Carter",
+            "class_year": "S",
+            "hometown": "Dallas, TX",
+            "phone_number": "(555) 201-1002",
+            "instagram_handle": "@masoncarter",
+            "first_event_date": date_at(-18),
+            "interests": ["Finance", "Entrepreneurship", "Travel"],
+            "stereotype": "Builder",
+            "lunch_stats": "1 lunch completed",
+            "notes": "Great one-on-one conversations, needs more chapter touchpoints.",
+            "assigned_officer": "officerliam",
+        },
+        {
+            "pnm_code": "DTR01242026",
+            "first_name": "Owen",
+            "last_name": "Hayes",
+            "class_year": "J",
+            "hometown": "Atlanta, GA",
+            "phone_number": "(555) 201-1003",
+            "instagram_handle": "@owenhayes",
+            "first_event_date": date_at(-16),
+            "interests": ["Academics", "Outdoors", "Philanthropy"],
+            "stereotype": "Scholar",
+            "lunch_stats": "3 lunches logged",
+            "notes": "High character, quieter in groups but very consistent.",
+            "assigned_officer": "officernoah",
+        },
+        {
+            "pnm_code": "DSW01252026",
+            "first_name": "Dylan",
+            "last_name": "Stone",
+            "class_year": "F",
+            "hometown": "Birmingham, AL",
+            "phone_number": "(555) 201-1004",
+            "instagram_handle": "@dylanstone",
+            "first_event_date": date_at(-15),
+            "interests": ["Fitness", "Sports", "Music"],
+            "stereotype": "Athlete",
+            "lunch_stats": "2 lunches completed",
+            "notes": "Popular socially and shows up to every event.",
+            "assigned_officer": "officerjack",
+        },
+        {
+            "pnm_code": "DKM01272026",
+            "first_name": "Caleb",
+            "last_name": "Morris",
+            "class_year": "S",
+            "hometown": "Charlotte, NC",
+            "phone_number": "(555) 201-1005",
+            "instagram_handle": "@calebmorris",
+            "first_event_date": date_at(-13),
+            "interests": ["Gaming", "Music", "Leadership"],
+            "stereotype": "Social",
+            "lunch_stats": "1 lunch set",
+            "notes": "Good personality, monitor consistency.",
+            "assigned_officer": "officerliam",
+        },
+        {
+            "pnm_code": "DAN01292026",
+            "first_name": "Hudson",
+            "last_name": "Knight",
+            "class_year": "J",
+            "hometown": "Memphis, TN",
+            "phone_number": "(555) 201-1006",
+            "instagram_handle": "@hudsonknight",
+            "first_event_date": date_at(-11),
+            "interests": ["Outdoors", "Travel", "Sports"],
+            "stereotype": "Connector",
+            "lunch_stats": "0 lunches so far",
+            "notes": "Needs more officer contact this week.",
+            "assigned_officer": "officernoah",
+        },
+        {
+            "pnm_code": "DRV01302026",
+            "first_name": "Gavin",
+            "last_name": "Reed",
+            "class_year": "F",
+            "hometown": "Jackson, MS",
+            "phone_number": "(555) 201-1007",
+            "instagram_handle": "@gavinreed",
+            "first_event_date": date_at(-10),
+            "interests": ["Faith", "Philanthropy", "Leadership"],
+            "stereotype": "Mentor",
+            "lunch_stats": "2 lunches completed",
+            "notes": "Great cultural fit and strong recommendations.",
+            "assigned_officer": "officerjack",
+        },
+        {
+            "pnm_code": "DPL02012026",
+            "first_name": "Brady",
+            "last_name": "Lane",
+            "class_year": "S",
+            "hometown": "Tampa, FL",
+            "phone_number": "(555) 201-1008",
+            "instagram_handle": "@bradylane",
+            "first_event_date": date_at(-8),
+            "interests": ["Finance", "Academics", "Entrepreneurship"],
+            "stereotype": "Scholar",
+            "lunch_stats": "1 lunch completed",
+            "notes": "Analytical and thoughtful, needs social reps.",
+            "assigned_officer": "officerliam",
+        },
+    ]
+
+    pnm_ids: dict[str, int] = {}
+    for pnm in pnm_seed:
+        assigned_username = str(pnm["assigned_officer"])
+        assigned_officer_id = user_ids.get(assigned_username)
+        pnm_ids[str(pnm["pnm_code"])] = upsert_demo_pnm(
+            pnm_code=str(pnm["pnm_code"]),
+            first_name=str(pnm["first_name"]),
+            last_name=str(pnm["last_name"]),
+            class_year=str(pnm["class_year"]),
+            hometown=str(pnm["hometown"]),
+            phone_number=str(pnm["phone_number"]),
+            instagram_handle=str(pnm["instagram_handle"]),
+            first_event_date=str(pnm["first_event_date"]),
+            interests=list(pnm["interests"]),
+            stereotype=str(pnm["stereotype"]),
+            lunch_stats=str(pnm["lunch_stats"]),
+            notes=str(pnm["notes"]),
+            created_by=head_id,
+            assigned_officer_id=assigned_officer_id,
+            assigned_by=head_id if assigned_officer_id else None,
+        )
+
+    ratings_seed = [
+        {
+            "pnm_code": "DMB01202026",
+            "username": "officerjack",
+            "create": make_scores(7, 8, 8, 7, 4),
+            "update": make_scores(8, 8, 9, 8, 4),
+            "create_comment": "Strong first read after roundtable conversations.",
+            "update_comment": "Improved after two follow ups with chapter members.",
+            "create_days": -19,
+            "update_days": -7,
+        },
+        {
+            "pnm_code": "DMB01202026",
+            "username": "officerliam",
+            "create": make_scores(8, 8, 8, 7, 4),
+            "create_comment": "Reliable and engaged with multiple officers.",
+            "create_days": -18,
+        },
+        {
+            "pnm_code": "DMB01202026",
+            "username": "memberalex",
+            "create": make_scores(7, 7, 8, 7, 3),
+            "create_comment": "Good fit and personable at dinner event.",
+            "create_days": -16,
+        },
+        {
+            "pnm_code": "DJC01222026",
+            "username": "officerliam",
+            "create": make_scores(6, 7, 8, 7, 3),
+            "update": make_scores(7, 8, 8, 7, 4),
+            "create_comment": "Solid start with high upside this cycle.",
+            "update_comment": "Confidence increased after mentorship conversation.",
+            "create_days": -18,
+            "update_days": -6,
+        },
+        {
+            "pnm_code": "DJC01222026",
+            "username": "officernoah",
+            "create": make_scores(7, 7, 7, 7, 3),
+            "create_comment": "Good interview, still evaluating consistency.",
+            "create_days": -14,
+        },
+        {
+            "pnm_code": "DJC01222026",
+            "username": "memberryan",
+            "create": make_scores(6, 7, 7, 6, 3),
+            "create_comment": "Positive conversations at social event.",
+            "create_days": -12,
+        },
+        {
+            "pnm_code": "DTR01242026",
+            "username": "officernoah",
+            "create": make_scores(7, 8, 7, 8, 3),
+            "create_comment": "High maturity and disciplined approach overall.",
+            "create_days": -15,
+        },
+        {
+            "pnm_code": "DTR01242026",
+            "username": "officerjack",
+            "create": make_scores(6, 7, 7, 8, 3),
+            "update": make_scores(7, 8, 8, 8, 3),
+            "create_comment": "Strong character and dependable communication.",
+            "update_comment": "Multiple brothers gave stronger feedback this week.",
+            "create_days": -14,
+            "update_days": -5,
+        },
+        {
+            "pnm_code": "DSW01252026",
+            "username": "officerjack",
+            "create": make_scores(8, 8, 8, 7, 4),
+            "create_comment": "High social confidence and easy chapter fit.",
+            "create_days": -13,
+        },
+        {
+            "pnm_code": "DSW01252026",
+            "username": "memberalex",
+            "create": make_scores(8, 7, 8, 7, 4),
+            "create_comment": "Very comfortable in group settings and events.",
+            "create_days": -11,
+        },
+        {
+            "pnm_code": "DKM01272026",
+            "username": "officerliam",
+            "create": make_scores(6, 6, 7, 6, 3),
+            "update": make_scores(7, 7, 8, 7, 4),
+            "create_comment": "Personable with room to grow in consistency.",
+            "update_comment": "Better communication and stronger attendance lately.",
+            "create_days": -12,
+            "update_days": -4,
+        },
+        {
+            "pnm_code": "DAN01292026",
+            "username": "officernoah",
+            "create": make_scores(7, 6, 7, 6, 3),
+            "create_comment": "Needs more touches but potential is clear.",
+            "create_days": -10,
+        },
+        {
+            "pnm_code": "DAN01292026",
+            "username": "memberniko",
+            "create": make_scores(6, 6, 7, 6, 3),
+            "create_comment": "Good one on one interactions so far.",
+            "create_days": -8,
+        },
+        {
+            "pnm_code": "DRV01302026",
+            "username": "officerjack",
+            "create": make_scores(7, 8, 8, 8, 4),
+            "create_comment": "Strong values fit and active participation.",
+            "create_days": -9,
+        },
+        {
+            "pnm_code": "DRV01302026",
+            "username": "officerliam",
+            "create": make_scores(7, 8, 7, 8, 4),
+            "create_comment": "Consistent with chapter culture and expectations.",
+            "create_days": -8,
+        },
+        {
+            "pnm_code": "DPL02012026",
+            "username": "officerliam",
+            "create": make_scores(6, 7, 7, 7, 4),
+            "create_comment": "Smart and thoughtful, still building comfort.",
+            "create_days": -7,
+        },
+        {
+            "pnm_code": "DPL02012026",
+            "username": "memberryan",
+            "create": make_scores(6, 7, 6, 7, 3),
+            "create_comment": "Solid first impression and reliable follow through.",
+            "create_days": -6,
+        },
+    ]
+
+    for seed in ratings_seed:
+        pnm_id = pnm_ids.get(str(seed["pnm_code"]))
+        user_id = user_ids.get(str(seed["username"]))
+        if not pnm_id or not user_id:
+            continue
+
+        create_scores = dict(seed["create"])
+        final_scores = dict(seed.get("update") or create_scores)
+        create_comment = str(seed["create_comment"])
+        update_comment = str(seed.get("update_comment") or create_comment)
+        create_stamp = iso_at(int(seed.get("create_days", -10)), 19, 0)
+        update_stamp = iso_at(int(seed.get("update_days", -3)), 20, 0) if "update" in seed else create_stamp
+
+        existing_rating = conn.execute(
+            "SELECT id, created_at FROM ratings WHERE pnm_id = ? AND user_id = ?",
+            (pnm_id, user_id),
+        ).fetchone()
+        if existing_rating:
+            rating_id = int(existing_rating["id"])
+            created_at = str(existing_rating["created_at"] or create_stamp)
+            conn.execute(
+                """
+                UPDATE ratings
+                SET
+                    good_with_girls = ?,
+                    will_make_it = ?,
+                    personable = ?,
+                    alcohol_control = ?,
+                    instagram_marketability = ?,
+                    total_score = ?,
+                    comment = ?,
+                    created_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    final_scores["good_with_girls"],
+                    final_scores["will_make_it"],
+                    final_scores["personable"],
+                    final_scores["alcohol_control"],
+                    final_scores["instagram_marketability"],
+                    final_scores["total_score"],
+                    update_comment,
+                    created_at,
+                    update_stamp,
+                    rating_id,
+                ),
+            )
+        else:
+            cursor = conn.execute(
+                """
+                INSERT INTO ratings (
+                    pnm_id,
+                    user_id,
+                    good_with_girls,
+                    will_make_it,
+                    personable,
+                    alcohol_control,
+                    instagram_marketability,
+                    total_score,
+                    comment,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    pnm_id,
+                    user_id,
+                    final_scores["good_with_girls"],
+                    final_scores["will_make_it"],
+                    final_scores["personable"],
+                    final_scores["alcohol_control"],
+                    final_scores["instagram_marketability"],
+                    final_scores["total_score"],
+                    update_comment,
+                    create_stamp,
+                    update_stamp,
+                ),
+            )
+            rating_id = int(cursor.lastrowid or 0)
+
+        if rating_id <= 0:
+            continue
+
+        has_create_history = conn.execute(
+            "SELECT 1 FROM rating_history WHERE rating_id = ? AND event_type = 'create' LIMIT 1",
+            (rating_id,),
+        ).fetchone()
+        if not has_create_history:
+            write_rating_history_event(
+                conn,
+                rating_id=rating_id,
+                pnm_id=int(pnm_id),
+                user_id=int(user_id),
+                event_type="create",
+                scores=create_scores,
+                changed_at=create_stamp,
+            )
+
+        if "update" in seed:
+            has_update_history = conn.execute(
+                "SELECT 1 FROM rating_history WHERE rating_id = ? AND event_type = 'update' LIMIT 1",
+                (rating_id,),
+            ).fetchone()
+            if not has_update_history:
+                write_rating_history_event(
+                    conn,
+                    rating_id=rating_id,
+                    pnm_id=int(pnm_id),
+                    user_id=int(user_id),
+                    event_type="update",
+                    scores=final_scores,
+                    changed_at=update_stamp,
+                )
+
+            conn.execute(
+                """
+                INSERT INTO rating_changes (
+                    rating_id,
+                    pnm_id,
+                    user_id,
+                    old_total,
+                    new_total,
+                    delta_total,
+                    old_payload,
+                    new_payload,
+                    comment,
+                    changed_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(rating_id) DO UPDATE SET
+                    pnm_id = excluded.pnm_id,
+                    user_id = excluded.user_id,
+                    old_total = excluded.old_total,
+                    new_total = excluded.new_total,
+                    delta_total = excluded.delta_total,
+                    old_payload = excluded.old_payload,
+                    new_payload = excluded.new_payload,
+                    comment = excluded.comment,
+                    changed_at = excluded.changed_at
+                """,
+                (
+                    rating_id,
+                    int(pnm_id),
+                    int(user_id),
+                    create_scores["total_score"],
+                    final_scores["total_score"],
+                    final_scores["total_score"] - create_scores["total_score"],
+                    json.dumps(create_scores, separators=(",", ":")),
+                    json.dumps(final_scores, separators=(",", ":")),
+                    update_comment,
+                    update_stamp,
+                ),
+            )
+        else:
+            conn.execute("DELETE FROM rating_changes WHERE rating_id = ?", (rating_id,))
+
+    lunch_seed = [
+        ("DMB01202026", "officerjack", -5, "12:15", "13:00", "Student Union", "Kickoff lunch with two brothers."),
+        ("DJC01222026", "officerliam", -4, "12:30", "13:10", "Campus Cafe", "Follow-up on interview questions."),
+        ("DTR01242026", "officernoah", -3, "13:00", "13:45", "Library Patio", "Talked through leadership goals."),
+        ("DSW01252026", "memberalex", -2, "12:00", "12:50", "Downtown Deli", "Strong social chemistry."),
+        ("DKM01272026", "officerliam", -1, "12:20", "13:05", "Main Street Grill", "Good progress and better engagement."),
+        ("DAN01292026", "officernoah", 1, "12:30", "13:20", "Brew House", "Scheduled to increase officer touchpoints."),
+        ("DRV01302026", "officerjack", 2, "12:10", "12:55", "Campus Commons", "Discussing philanthropy involvement."),
+        ("DPL02012026", "memberryan", 3, "12:45", "13:30", "North Dining", "Continuing relationship build."),
+    ]
+    lunch_user_ids: set[int] = set()
+    lunch_pnm_ids: set[int] = set()
+    for pnm_code, username, day_offset, start_time, end_time, location, notes in lunch_seed:
+        pnm_id = pnm_ids.get(pnm_code)
+        user_id = user_ids.get(username)
+        if not pnm_id or not user_id:
+            continue
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO lunches (
+                pnm_id,
+                user_id,
+                lunch_date,
+                start_time,
+                end_time,
+                location,
+                notes,
+                created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                int(pnm_id),
+                int(user_id),
+                date_at(int(day_offset)),
+                str(start_time),
+                str(end_time),
+                str(location),
+                str(notes),
+                iso_at(int(day_offset), 17, 15),
+            ),
+        )
+        lunch_user_ids.add(int(user_id))
+        lunch_pnm_ids.add(int(pnm_id))
+
+    rush_events_seed = [
+        ("Chapter Kickoff", "official", -6, "18:30", "20:00", "Chapter House", "Opening rush kickoff event.", 1),
+        ("Values Roundtable", "roundtable", -4, "19:00", "20:15", "Chapter House", "Roundtable with brothers and PNMs.", 1),
+        ("Brotherhood Mixer", "mixer", -1, "20:00", "22:00", "Back Patio", "Informal social mixer.", 1),
+        ("Philanthropy Planning", "philanthropy", 2, "18:00", "19:15", "Student Center", "Plan chapter service partnership.", 1),
+        ("Interview Night", "interview", 4, "18:45", "21:00", "Chapter House", "Structured final-round interviews.", 1),
+        ("Officer Debrief", "meeting", 5, "21:15", "22:00", "War Room", "Finalize bid strategy and assignments.", 0),
+    ]
+    for title, event_type, day_offset, start_time, end_time, location, details, is_official in rush_events_seed:
+        event_date = date_at(int(day_offset))
+        existing = conn.execute(
+            "SELECT id, created_at FROM rush_events WHERE title = ? AND event_date = ? LIMIT 1",
+            (title, event_date),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE rush_events
+                SET
+                    event_type = ?,
+                    start_time = ?,
+                    end_time = ?,
+                    location = ?,
+                    details = ?,
+                    is_official = ?,
+                    is_cancelled = 0,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    event_type,
+                    start_time,
+                    end_time,
+                    location,
+                    details,
+                    int(is_official),
+                    now_iso(),
+                    int(existing["id"]),
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO rush_events (
+                    title,
+                    event_type,
+                    event_date,
+                    start_time,
+                    end_time,
+                    location,
+                    details,
+                    is_official,
+                    is_cancelled,
+                    created_by,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)
+                """,
+                (
+                    title,
+                    event_type,
+                    event_date,
+                    start_time,
+                    end_time,
+                    location,
+                    details,
+                    int(is_official),
+                    int(head_id),
+                    iso_at(int(day_offset), 16, 0),
+                    now_iso(),
+                ),
+            )
+
+    week_start, week_end = week_bounds_for(date.today())
+    weekly_goals_seed = [
+        (
+            "Top PNMs fully rated",
+            "Ensure each top-board PNM has at least three quality ratings this week.",
+            "ratings_submitted",
+            14,
+            0,
+            user_ids.get("officerjack"),
+        ),
+        (
+            "Lunch outreach cadence",
+            "Log lunch touchpoints across officer assignments.",
+            "lunches_logged",
+            8,
+            0,
+            None,
+        ),
+        (
+            "Chapter rush coordination",
+            "Track completion of prep tasks and messaging alignment.",
+            "manual",
+            6,
+            3,
+            user_ids.get("officerliam"),
+        ),
+        (
+            "Event pipeline maintained",
+            "Keep at least two upcoming official rush events scheduled.",
+            "rush_events_created",
+            2,
+            0,
+            user_ids.get("officernoah"),
+        ),
+    ]
+    for title, description, metric_type, target_count, manual_progress, assigned_user_id in weekly_goals_seed:
+        existing = conn.execute(
+            """
+            SELECT id
+            FROM weekly_goals
+            WHERE title = ?
+              AND week_start = ?
+              AND week_end = ?
+              AND is_archived = 0
+            LIMIT 1
+            """,
+            (title, week_start.isoformat(), week_end.isoformat()),
+        ).fetchone()
+        if existing:
+            conn.execute(
+                """
+                UPDATE weekly_goals
+                SET
+                    description = ?,
+                    metric_type = ?,
+                    target_count = ?,
+                    manual_progress = ?,
+                    assigned_user_id = ?,
+                    created_by = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    description,
+                    metric_type,
+                    int(target_count),
+                    int(manual_progress),
+                    int(assigned_user_id) if assigned_user_id else None,
+                    int(head_id),
+                    now_iso(),
+                    int(existing["id"]),
+                ),
+            )
+        else:
+            conn.execute(
+                """
+                INSERT INTO weekly_goals (
+                    title,
+                    description,
+                    metric_type,
+                    target_count,
+                    manual_progress,
+                    week_start,
+                    week_end,
+                    assigned_user_id,
+                    created_by,
+                    is_archived,
+                    completed_at,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, NULL, ?, ?)
+                """,
+                (
+                    title,
+                    description,
+                    metric_type,
+                    int(target_count),
+                    int(manual_progress),
+                    week_start.isoformat(),
+                    week_end.isoformat(),
+                    int(assigned_user_id) if assigned_user_id else None,
+                    int(head_id),
+                    iso_at(-2, 14, 0),
+                    now_iso(),
+                ),
+            )
+
+    chat_seed = [
+        {
+            "sender": DEMO_HEAD_USERNAME,
+            "message": "Command center sync tonight at 9pm. @officerjack lead PNM assignment updates.",
+            "tags": ["Ops", "Assignment"],
+            "mentions": ["officerjack"],
+            "days": -2,
+        },
+        {
+            "sender": "officerjack",
+            "message": "Updated lunch coverage and added two new touchpoints for Ethan and Dylan.",
+            "tags": ["Lunch", "Update"],
+            "mentions": [],
+            "days": -2,
+        },
+        {
+            "sender": "officerliam",
+            "message": "Need one more rating on Mason before final board review. @officernoah can you handle it?",
+            "tags": ["Ratings", "Urgent"],
+            "mentions": ["officernoah"],
+            "days": -1,
+        },
+        {
+            "sender": "officernoah",
+            "message": "Handled. Added updated feedback and bumped confidence after interview night.",
+            "tags": ["Ratings", "Done"],
+            "mentions": [],
+            "days": -1,
+        },
+    ]
+    for seed in chat_seed:
+        sender_id = user_ids.get(str(seed["sender"]))
+        if not sender_id:
+            continue
+        message = str(seed["message"]).strip()
+        created_at = iso_at(int(seed["days"]), 21, 0)
+        existing = conn.execute(
+            "SELECT id FROM officer_chat_messages WHERE sender_id = ? AND message = ? LIMIT 1",
+            (int(sender_id), message),
+        ).fetchone()
+        if existing:
+            message_id = int(existing["id"])
+        else:
+            cursor = conn.execute(
+                """
+                INSERT INTO officer_chat_messages (sender_id, message, tags, created_at, edited_at)
+                VALUES (?, ?, ?, ?, NULL)
+                """,
+                (
+                    int(sender_id),
+                    message,
+                    ",".join([normalize_chat_tag(str(tag)) for tag in list(seed["tags"])]),
+                    created_at,
+                ),
+            )
+            message_id = int(cursor.lastrowid or 0)
+        if message_id <= 0:
+            continue
+
+        for raw_tag in list(seed["tags"]):
+            tag = normalize_chat_tag(str(raw_tag))
+            conn.execute(
+                "INSERT OR IGNORE INTO officer_chat_tags (message_id, tag, created_at) VALUES (?, ?, ?)",
+                (message_id, tag, created_at),
+            )
+
+        for mention_username in list(seed["mentions"]):
+            mention_id = user_ids.get(str(mention_username))
+            if not mention_id:
+                continue
+            conn.execute(
+                "INSERT OR IGNORE INTO officer_chat_mentions (message_id, user_id, created_at) VALUES (?, ?, ?)",
+                (message_id, int(mention_id), created_at),
+            )
+            if int(mention_id) == int(sender_id):
+                continue
+            title = f"Mentioned by {seed['sender']}"
+            exists_notif = conn.execute(
+                """
+                SELECT id
+                FROM notifications
+                WHERE user_id = ? AND notif_type = 'chat_mention' AND title = ? AND body = ?
+                LIMIT 1
+                """,
+                (int(mention_id), title, message[:220]),
+            ).fetchone()
+            if not exists_notif:
+                create_notification(
+                    conn,
+                    user_id=int(mention_id),
+                    notif_type="chat_mention",
+                    title=title,
+                    body=message[:220],
+                    link_path="/?view=operations",
+                )
+
+    upsert_contact_download_records(
+        conn,
+        user_id=int(head_id),
+        pnm_ids=[pnm_ids["DMB01202026"], pnm_ids["DTR01242026"]],
+        downloaded_at=iso_at(-1, 22, 0),
+    )
+
+    for user_id in set(user_ids.values()):
+        if user_id <= 0:
+            continue
+        recalc_member_rating_stats(conn, user_id)
+        recalc_member_lunch_stats(conn, user_id)
+    for pnm_id in set(pnm_ids.values()):
+        if pnm_id <= 0:
+            continue
+        recalc_pnm_rating_stats(conn, pnm_id)
+        recalc_pnm_lunch_stats(conn, pnm_id)
+    evaluate_weekly_goal_completions(conn)
+
+
 def bootstrap_platform_and_tenants() -> None:
     PLATFORM_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     TENANTS_DB_DIR.mkdir(parents=True, exist_ok=True)
@@ -3726,11 +4997,21 @@ def bootstrap_platform_and_tenants() -> None:
         ensure_platform_schema_upgrades(conn)
         ensure_platform_admin_seed(conn)
         ensure_default_tenant_record(conn)
+        ensure_demo_tenant_record(conn)
         tenant_rows = conn.execute("SELECT * FROM tenants WHERE is_active = 1").fetchall()
 
     for row in tenant_rows:
-        seed_access = HEAD_SEED_ACCESS_CODE if row["slug"] == DEFAULT_TENANT_SLUG else None
+        if row["slug"] == DEFAULT_TENANT_SLUG:
+            seed_access = HEAD_SEED_ACCESS_CODE
+        elif is_demo_tenant_slug(row["slug"]):
+            seed_access = DEMO_HEAD_ACCESS_CODE
+        else:
+            seed_access = None
         initialize_tenant_datastore(row, seed_access_code=seed_access)
+        if is_demo_tenant_slug(row["slug"]):
+            ctx = tenant_context_from_row(row)
+            with db_session(ctx.db_path) as tenant_conn:
+                ensure_demo_seed_dataset(tenant_conn)
 
 
 def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str, Any]:
@@ -3886,6 +5167,28 @@ def request_has_active_session(request: Request) -> bool:
         idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
         if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return False
+    return True
+
+
+def request_has_active_platform_session(request: Request) -> bool:
+    token = request.cookies.get(PLATFORM_SESSION_COOKIE)
+    if not token:
+        return False
+
+    with platform_db_session() as conn:
+        row = conn.execute("SELECT last_seen_at, max_idle_seconds FROM platform_sessions WHERE token = ?", (token,)).fetchone()
+        if not row:
+            return False
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+            return False
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], PLATFORM_SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
             return False
     return True
 
@@ -4400,14 +5703,128 @@ async def faq_page(request: Request) -> HTMLResponse:
     )
 
 
+def resolved_demo_tenant() -> TenantContext | None:
+    if not DEMO_ENABLED:
+        return None
+    row = fetch_tenant_row(demo_tenant_slug())
+    if not row:
+        return None
+    return tenant_context_from_row(row)
+
+
+def ensure_demo_head_session(request: Request, response: Response, tenant: TenantContext) -> None:
+    head_username = DEMO_HEAD_USERNAME.strip()
+    if not head_username:
+        return
+
+    existing_token = request.cookies.get(SESSION_COOKIE)
+    issued_token: str | None = None
+    max_idle_seconds = user_session_idle_seconds(True)
+    now = now_iso()
+
+    def _valid_idle_window(last_seen_raw: Any, idle_seconds_raw: Any) -> bool:
+        try:
+            last_seen_dt = datetime.fromisoformat(str(last_seen_raw))
+        except (TypeError, ValueError):
+            return False
+        idle_limit = normalized_idle_ttl_seconds(idle_seconds_raw, SESSION_TTL_SECONDS)
+        return (datetime.now(timezone.utc) - last_seen_dt).total_seconds() <= idle_limit
+
+    with db_session(tenant.db_path) as conn:
+        head_user = conn.execute(
+            "SELECT id, role, is_approved FROM users WHERE username = ?",
+            (head_username,),
+        ).fetchone()
+        if not head_user or head_user["role"] != ROLE_HEAD:
+            return
+
+        if not bool(head_user["is_approved"]):
+            conn.execute(
+                """
+                UPDATE users
+                SET is_approved = 1, approved_at = COALESCE(approved_at, ?), updated_at = ?
+                WHERE id = ?
+                """,
+                (now, now, int(head_user["id"])),
+            )
+
+        if existing_token:
+            session_row = conn.execute(
+                "SELECT user_id, last_seen_at, max_idle_seconds FROM sessions WHERE token = ?",
+                (existing_token,),
+            ).fetchone()
+            if session_row and int(session_row["user_id"]) == int(head_user["id"]):
+                if _valid_idle_window(session_row["last_seen_at"], session_row["max_idle_seconds"]):
+                    issued_token = existing_token
+                    max_idle_seconds = normalized_idle_ttl_seconds(session_row["max_idle_seconds"], SESSION_TTL_SECONDS)
+                else:
+                    conn.execute("DELETE FROM sessions WHERE token = ?", (existing_token,))
+
+        if not issued_token:
+            latest_row = conn.execute(
+                """
+                SELECT token, last_seen_at, max_idle_seconds
+                FROM sessions
+                WHERE user_id = ?
+                ORDER BY last_seen_at DESC
+                LIMIT 1
+                """,
+                (int(head_user["id"]),),
+            ).fetchone()
+            if latest_row and _valid_idle_window(latest_row["last_seen_at"], latest_row["max_idle_seconds"]):
+                issued_token = str(latest_row["token"])
+                max_idle_seconds = normalized_idle_ttl_seconds(latest_row["max_idle_seconds"], SESSION_TTL_SECONDS)
+            elif latest_row:
+                conn.execute("DELETE FROM sessions WHERE token = ?", (latest_row["token"],))
+
+        if not issued_token:
+            issued_token = secrets.token_urlsafe(32)
+            conn.execute(
+                "INSERT INTO sessions (token, user_id, created_at, last_seen_at, max_idle_seconds) VALUES (?, ?, ?, ?, ?)",
+                (issued_token, int(head_user["id"]), now, now, max_idle_seconds),
+            )
+
+        conn.execute("UPDATE sessions SET last_seen_at = ? WHERE token = ?", (now, issued_token))
+        conn.execute(
+            "UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?",
+            (now, now, int(head_user["id"])),
+        )
+
+    if not issued_token:
+        return
+
+    secure_cookie = should_use_secure_cookie(request)
+    response.set_cookie(
+        key=SESSION_COOKIE,
+        value=issued_token,
+        httponly=True,
+        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
+        max_age=max_idle_seconds,
+        secure=secure_cookie,
+        path="/",
+    )
+    set_csrf_cookie(response, request)
+    mark_response_private(response)
+
+
 @app.get("/demo", response_class=HTMLResponse)
 async def demo_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(
-        "demo.html",
+    tenant = resolved_demo_tenant()
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Demo is currently unavailable.")
+
+    response = templates.TemplateResponse(
+        "index.html",
         {
             "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "is_demo_mode": True,
         },
     )
+    if DEMO_AUTO_LOGIN and request.query_params.get("autologin", "1") != "0":
+        ensure_demo_head_session(request, response, tenant)
+    return response
 
 
 @app.head("/", include_in_schema=False)

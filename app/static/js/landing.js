@@ -148,31 +148,125 @@
     if (!ctx) {
       return;
     }
+    const interestReadout = document.getElementById("bbNetworkInterest");
+    const matchReadout = document.getElementById("bbNetworkMatch");
 
     const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     const pointer = { x: 0.5, y: 0.5, active: false };
     const nodes = [
-      { id: "r1", label: "Rushee A", type: "rushee", x: 0.16, y: 0.22, radius: 5.3, phase: 0.2, depth: 0.9 },
-      { id: "r2", label: "Rushee B", type: "rushee", x: 0.14, y: 0.5, radius: 5.5, phase: 1.1, depth: 0.9 },
-      { id: "r3", label: "Rushee C", type: "rushee", x: 0.18, y: 0.78, radius: 5.2, phase: 2.3, depth: 0.9 },
-      { id: "off1", label: "Officer", type: "officer", x: 0.36, y: 0.18, radius: 4.4, phase: 0.9, depth: 0.75 },
-      { id: "off2", label: "Officer", type: "officer", x: 0.34, y: 0.84, radius: 4.4, phase: 2.8, depth: 0.75 },
-      { id: "hub", label: "Match Engine", type: "hub", x: 0.5, y: 0.5, radius: 7.6, phase: 1.5, depth: 1.2 },
-      { id: "o1", label: "Org X", type: "org", x: 0.84, y: 0.24, radius: 5.3, phase: 0.4, depth: 0.92 },
-      { id: "o2", label: "Org Y", type: "org", x: 0.86, y: 0.52, radius: 5.4, phase: 1.8, depth: 0.92 },
-      { id: "o3", label: "Org Z", type: "org", x: 0.82, y: 0.8, radius: 5.1, phase: 2.7, depth: 0.92 },
+      {
+        id: "r1",
+        label: "Mason Carter",
+        type: "rushee",
+        interest: "Finance",
+        x: 0.15,
+        y: 0.2,
+        radius: 5.4,
+        phase: 0.2,
+        depth: 0.92,
+      },
+      {
+        id: "r2",
+        label: "Eli Brooks",
+        type: "rushee",
+        interest: "Fitness",
+        x: 0.12,
+        y: 0.43,
+        radius: 5.5,
+        phase: 1.1,
+        depth: 0.92,
+      },
+      {
+        id: "r3",
+        label: "Noah James",
+        type: "rushee",
+        interest: "Leadership",
+        x: 0.16,
+        y: 0.66,
+        radius: 5.3,
+        phase: 2.3,
+        depth: 0.92,
+      },
+      {
+        id: "r4",
+        label: "Luke Patel",
+        type: "rushee",
+        interest: "Outdoors",
+        x: 0.18,
+        y: 0.84,
+        radius: 5.2,
+        phase: 2.9,
+        depth: 0.92,
+      },
+      { id: "i1", label: "Finance", type: "interest", x: 0.47, y: 0.2, radius: 6.0, phase: 0.7, depth: 1.06 },
+      { id: "i2", label: "Fitness", type: "interest", x: 0.5, y: 0.43, radius: 6.0, phase: 1.5, depth: 1.06 },
+      { id: "i3", label: "Leadership", type: "interest", x: 0.48, y: 0.66, radius: 6.0, phase: 2.1, depth: 1.06 },
+      { id: "i4", label: "Outdoors", type: "interest", x: 0.52, y: 0.84, radius: 5.8, phase: 2.7, depth: 1.06 },
+      {
+        id: "off1",
+        label: "Jack M.",
+        type: "officer",
+        roleLabel: "Rush Officer",
+        interests: ["Leadership", "Outdoors"],
+        x: 0.82,
+        y: 0.2,
+        radius: 5.4,
+        phase: 0.55,
+        depth: 0.96,
+      },
+      {
+        id: "off2",
+        label: "Aiden R.",
+        type: "officer",
+        roleLabel: "Rush Officer",
+        interests: ["Finance", "Leadership"],
+        x: 0.86,
+        y: 0.43,
+        radius: 5.4,
+        phase: 1.85,
+        depth: 0.96,
+      },
+      {
+        id: "mem1",
+        label: "Ben C.",
+        type: "member",
+        roleLabel: "Member",
+        interests: ["Fitness", "Outdoors"],
+        x: 0.8,
+        y: 0.66,
+        radius: 5.3,
+        phase: 2.45,
+        depth: 0.96,
+      },
+      {
+        id: "mem2",
+        label: "Cole T.",
+        type: "member",
+        roleLabel: "Member",
+        interests: ["Finance", "Fitness"],
+        x: 0.84,
+        y: 0.84,
+        radius: 5.2,
+        phase: 3.1,
+        depth: 0.96,
+      },
     ];
     const edges = [
-      ["r1", "hub"],
-      ["r2", "hub"],
-      ["r3", "hub"],
-      ["off1", "hub"],
-      ["off2", "hub"],
-      ["hub", "o1"],
-      ["hub", "o2"],
-      ["hub", "o3"],
-      ["r1", "off1"],
-      ["r3", "off2"],
+      ["r1", "i1"],
+      ["r2", "i2"],
+      ["r3", "i3"],
+      ["r4", "i4"],
+      ["i1", "off2"],
+      ["i1", "mem2"],
+      ["i2", "mem1"],
+      ["i2", "mem2"],
+      ["i3", "off1"],
+      ["i3", "off2"],
+      ["i4", "off1"],
+      ["i4", "mem1"],
+      ["i1", "i2"],
+      ["i2", "i3"],
+      ["i3", "i4"],
     ];
     const dust = Array.from({ length: 30 }, (_, idx) => ({
       x: Math.random(),
@@ -183,9 +277,26 @@
       size: 0.8 + Math.random() * 1.3,
     }));
     const rusheeIds = nodes.filter((node) => node.type === "rushee").map((node) => node.id);
-    const orgIds = nodes.filter((node) => node.type === "org").map((node) => node.id);
+    const interestNodeByName = new Map(
+      nodes
+        .filter((node) => node.type === "interest")
+        .map((node) => [node.label, node.id])
+    );
+    const matchersByInterest = new Map();
+    nodes
+      .filter((node) => node.type === "officer" || node.type === "member")
+      .forEach((node) => {
+        (node.interests || []).forEach((interest) => {
+          const existing = matchersByInterest.get(interest) || [];
+          existing.push(node.id);
+          matchersByInterest.set(interest, existing);
+        });
+      });
+
     let autoRouteIndex = 0;
+    let autoMatcherOffset = 0;
     let lastRouteSwitchAt = 0;
+    let lastReadoutKey = "";
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
@@ -205,6 +316,9 @@
         id: node.id,
         label: node.label,
         type: node.type,
+        interest: node.interest || null,
+        interests: node.interests || [],
+        roleLabel: node.roleLabel || "",
         x: (node.x + wobbleX) * width + tiltX,
         y: (node.y + wobbleY) * height + tiltY,
         radius: node.radius * (1 + Math.sin(time * 0.0015 + node.phase) * 0.06),
@@ -224,6 +338,23 @@
           nearest = node;
         }
       }
+      return nearest;
+    }
+
+    function nearestNodeFromIds(ids, x, y, map) {
+      let nearest = null;
+      let best = Number.POSITIVE_INFINITY;
+      ids.forEach((id) => {
+        const node = map.get(id);
+        if (!node) {
+          return;
+        }
+        const distance = Math.hypot(node.x - x, node.y - y);
+        if (distance < best) {
+          best = distance;
+          nearest = node;
+        }
+      });
       return nearest;
     }
 
@@ -292,6 +423,20 @@
       }
     }
 
+    function updateReadout(activeRushee, activeInterest, activeMatch) {
+      if (!interestReadout || !matchReadout || !activeRushee || !activeInterest || !activeMatch) {
+        return;
+      }
+      const role = activeMatch.roleLabel || (activeMatch.type === "officer" ? "Rush Officer" : "Member");
+      const nextKey = `${activeRushee.id}|${activeInterest.id}|${activeMatch.id}`;
+      if (nextKey === lastReadoutKey) {
+        return;
+      }
+      interestReadout.textContent = `Interest Signal: ${activeInterest.label} (${activeRushee.label})`;
+      matchReadout.textContent = `Matched ${role}: ${activeMatch.label}`;
+      lastReadoutKey = nextKey;
+    }
+
     function tick(time) {
       const width = canvas.width / DPR;
       const height = canvas.height / DPR;
@@ -317,32 +462,45 @@
       });
 
       const projectedMap = new Map(nodes.map((node) => [node.id, nodeScreenPosition(node, time)]));
-      const hub = projectedMap.get("hub");
-      if (!hub) {
-        window.requestAnimationFrame(tick);
-        return;
-      }
-
       let activeRushee = null;
-      let activeOrg = null;
+      let activeInterest = null;
+      let activeMatch = null;
       if (pointer.active) {
         const pointerX = pointer.x * width;
         const pointerY = pointer.y * height;
         activeRushee = nearestNode("rushee", pointerX, pointerY, projectedMap);
-        activeOrg = nearestNode("org", pointerX, pointerY, projectedMap);
       } else {
         if (time - lastRouteSwitchAt > 2600) {
           autoRouteIndex = (autoRouteIndex + 1) % rusheeIds.length;
+          autoMatcherOffset += 1;
           lastRouteSwitchAt = time;
         }
         activeRushee = projectedMap.get(rusheeIds[autoRouteIndex]) || null;
-        activeOrg = projectedMap.get(orgIds[autoRouteIndex % orgIds.length]) || null;
+      }
+
+      if (activeRushee) {
+        const interestId = interestNodeByName.get(activeRushee.interest || "");
+        activeInterest = interestId ? projectedMap.get(interestId) || null : null;
+        const candidates = matchersByInterest.get(activeRushee.interest || "") || [];
+        if (candidates.length) {
+          if (pointer.active) {
+            activeMatch = nearestNodeFromIds(candidates, pointer.x * width, pointer.y * height, projectedMap);
+          } else {
+            const index = autoMatcherOffset % candidates.length;
+            activeMatch = projectedMap.get(candidates[index]) || null;
+          }
+          if (!activeMatch) {
+            activeMatch = projectedMap.get(candidates[0]) || null;
+          }
+        }
       }
 
       const activeLinks = new Set();
-      if (activeRushee && activeOrg) {
-        activeLinks.add(`${activeRushee.id}->hub`);
-        activeLinks.add(`hub->${activeOrg.id}`);
+      if (activeRushee && activeInterest) {
+        activeLinks.add(`${activeRushee.id}->${activeInterest.id}`);
+      }
+      if (activeInterest && activeMatch) {
+        activeLinks.add(`${activeInterest.id}->${activeMatch.id}`);
       }
 
       edges.forEach(([sourceId, targetId]) => {
@@ -362,25 +520,34 @@
       });
 
       projectedMap.forEach((node) => {
-        const isActive = (activeRushee && node.id === activeRushee.id) || (activeOrg && node.id === activeOrg.id) || node.id === "hub";
+        const isActive =
+          (activeRushee && node.id === activeRushee.id) ||
+          (activeInterest && node.id === activeInterest.id) ||
+          (activeMatch && node.id === activeMatch.id);
         if (node.type === "rushee") {
           drawNode(node, "rgba(69, 230, 184, 0.95)", 16, isActive);
-        } else if (node.type === "org") {
+        } else if (node.type === "interest") {
+          drawNode(node, "rgba(220, 235, 255, 0.95)", 18, isActive);
+        } else if (node.type === "officer") {
           drawNode(node, "rgba(53, 203, 255, 0.95)", 16, isActive);
-        } else if (node.type === "hub") {
-          drawNode(node, "rgba(222, 236, 255, 0.96)", 18, true);
+        } else if (node.type === "member") {
+          drawNode(node, "rgba(149, 151, 255, 0.94)", 14, isActive);
         } else {
           drawNode(node, "rgba(153, 183, 238, 0.9)", 10, false);
         }
       });
 
       if (activeRushee) {
-        drawLabel(activeRushee, activeRushee.label);
+        drawLabel(activeRushee, `Rushee: ${activeRushee.label}`);
       }
-      drawLabel(hub, "Match Engine");
-      if (activeOrg) {
-        drawLabel(activeOrg, activeOrg.label);
+      if (activeInterest) {
+        drawLabel(activeInterest, `Interest: ${activeInterest.label}`);
       }
+      if (activeMatch) {
+        const role = activeMatch.roleLabel || (activeMatch.type === "officer" ? "Rush Officer" : "Member");
+        drawLabel(activeMatch, `${role}: ${activeMatch.label}`);
+      }
+      updateReadout(activeRushee, activeInterest, activeMatch);
 
       if (pointer.active) {
         const pointerScreen = { x: pointer.x * width, y: pointer.y * height, radius: 3.2 };

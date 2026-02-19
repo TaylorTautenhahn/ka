@@ -74,23 +74,6 @@
             </article>
           </div>
         </div>
-
-        <aside class="bb-hero-panel" aria-label="BidBoard command advantages">
-          <p class="bb-hero-panel-kicker">Command Advantages</p>
-          <h3>Built for fast, high-accountability recruitment weeks</h3>
-          <ul class="bb-hero-panel-list">
-            <li>Weighted scores update instantly across all views</li>
-            <li>Head chairs can coordinate assignments and outreach in one board</li>
-            <li>Meeting packet mode keeps decisions backed by trend context</li>
-            <li>Every rating and change remains auditable and role-aware</li>
-          </ul>
-          <div class="bb-hero-panel-tags">
-            <span>Real-Time</span>
-            <span>Accountable</span>
-            <span>Mobile Ready</span>
-            <span>Meeting First</span>
-          </div>
-        </aside>
       </section>
 
       <section class="bb-marquee-wrap bb-reveal" data-delay="55" aria-label="Greek organizations on BidBoard">
@@ -125,28 +108,32 @@
       <section class="bb-section bb-network-section bb-reveal" data-delay="62">
         <div class="bb-section-head">
           <p class="bb-kicker">Interactive Match Map</p>
-          <h2>Watch BidBoard connect rushees to the right organization in real time</h2>
+          <h2>Watch BidBoard connect rushees to the right members and rush officers in real time</h2>
         </div>
         <div class="bb-network-layout">
           <div class="bb-network-copy">
             <p>
-              Move your cursor through the map to simulate active matching flow. Signals route from rushee nodes through
-              evaluation hubs to organization decision nodes.
+              Move your cursor through the map to simulate active matching flow. Signals route from each rushee through
+              shared interests into the best-fit member or rush officer.
             </p>
             <ul class="bb-network-legend">
-              <li><span class="bb-network-dot bb-network-dot-rushee"></span>Rushee signal nodes</li>
-              <li><span class="bb-network-dot bb-network-dot-hub"></span>Evaluation + assignment hub</li>
-              <li><span class="bb-network-dot bb-network-dot-org"></span>Organization decision nodes</li>
+              <li><span class="bb-network-dot bb-network-dot-rushee"></span>Rushee profile nodes</li>
+              <li><span class="bb-network-dot bb-network-dot-interest"></span>Interest signal nodes</li>
+              <li><span class="bb-network-dot bb-network-dot-match"></span>Matched members + rush officers</li>
             </ul>
           </div>
           <div class="bb-network-stage" aria-label="Interactive matching network">
             <div class="bb-network-head">
               <p>Live Matching Visualization</p>
-              <h3>Rushee <span>⇄</span> Organization</h3>
+              <h3>Rushee <span>⇄</span> Interest <span>⇄</span> Match</h3>
+              <div class="bb-network-readout" aria-live="polite">
+                <span class="bb-network-pill" id="bbNetworkInterest">Interest Signal: Leadership</span>
+                <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
+              </div>
             </div>
             <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="520" aria-hidden="true"></canvas>
             <div class="bb-network-note">
-              Hover the map to activate an intelligent pathway and see the connected decision flow.
+              Hover the map to activate an interest-driven pathway and see who gets matched to that rushee.
             </div>
           </div>
         </div>

@@ -691,36 +691,27 @@
       list.innerHTML = state.items.map((item) => `<li>${item}</li>`).join("");
       footer.textContent = state.footer;
       steps.forEach((step) => {
-        step.classList.toggle("is-active", step.getAttribute("data-step") === key);
+        const active = step.getAttribute("data-step") === key;
+        step.classList.toggle("is-active", active);
+        step.setAttribute("aria-pressed", active ? "true" : "false");
       });
     }
 
-    if (disableMotion || !("IntersectionObserver" in window)) {
-      applyState("capture");
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        let bestEntry = null;
-        entries.forEach((entry) => {
-          if (!entry.isIntersecting) {
-            return;
-          }
-          if (!bestEntry || entry.intersectionRatio > bestEntry.intersectionRatio) {
-            bestEntry = entry;
-          }
-        });
-        if (!bestEntry) {
+    steps.forEach((step) => {
+      const activateStep = () => {
+        const stepKey = step.getAttribute("data-step") || "capture";
+        applyState(stepKey);
+      };
+      step.addEventListener("click", activateStep);
+      step.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") {
           return;
         }
-        const step = bestEntry.target.getAttribute("data-step") || "capture";
-        applyState(step);
-      },
-      { threshold: [0.35, 0.6, 0.8], rootMargin: "-10% 0px -30% 0px" }
-    );
+        event.preventDefault();
+        activateStep();
+      });
+    });
 
-    steps.forEach((step) => observer.observe(step));
     applyState("capture");
   }
 

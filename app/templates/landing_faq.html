@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#8a1538" />
+    <meta name="theme-color" content="#090b14" />
     <title>BidBoard | FAQ</title>
     <meta
       name="description"
@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Sora:wght@500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/landing.css" />
@@ -20,9 +20,10 @@
     <script src="/static/js/landing.js" defer></script>
   </head>
   <body class="bb-page-faq">
-    <div class="bb-orb bb-orb-a"></div>
-    <div class="bb-orb bb-orb-b"></div>
-    <div class="bb-noise"></div>
+    <div class="bb-cursor-glow" aria-hidden="true"></div>
+    <div class="bb-noise" aria-hidden="true"></div>
+    <div class="bb-atmosphere bb-atmosphere-a" aria-hidden="true"></div>
+    <div class="bb-atmosphere bb-atmosphere-b" aria-hidden="true"></div>
 
     <main class="bb-shell">
       <header class="bb-topbar bb-reveal">
@@ -36,8 +37,14 @@
           <a class="bb-link" href="/demo">Live Demo</a>
           <a class="bb-link is-active" href="/faq">FAQ</a>
           <a class="bb-link bb-link-admin" href="/platform">Platform Admin</a>
-          <a class="bb-login-btn" href="/organizations">Login</a>
         </nav>
+        <div class="bb-topbar-utilities">
+          <button class="bb-theme-toggle" id="bbThemeToggle" type="button" aria-label="Toggle dark and light mode">
+            <span class="bb-theme-toggle-sun" aria-hidden="true">☀</span>
+            <span class="bb-theme-toggle-moon" aria-hidden="true">◐</span>
+          </button>
+          <a class="bb-login-btn" href="/organizations">Organization Login</a>
+        </div>
       </header>
 
       <section class="bb-section bb-reveal">

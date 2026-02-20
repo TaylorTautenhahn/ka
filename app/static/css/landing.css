@@ -1156,7 +1156,12 @@ html[data-theme="light"] .bb-kicker {
 
 html[data-theme="light"] .bb-hero-title,
 html[data-theme="light"] .bb-title-shine {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
   color: #14366f;
+  -webkit-text-fill-color: #14366f;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.72);
 }
 
 html[data-theme="light"] .bb-inline-metric {

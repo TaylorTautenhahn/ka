@@ -25,6 +25,22 @@
   --panel-padding: clamp(0.92rem, 1.2vw, 1.14rem);
 }
 
+body.backend-ui {
+  --accent: #5f1327;
+  --accent-bright: #7f2541;
+  --heading: #3e1624;
+}
+
+body.backend-ui .eyebrow,
+body.backend-ui .media-slot-label,
+body.backend-ui .quick-nav-link {
+  color: #551726;
+}
+
+body.backend-ui .quick-nav-link:hover {
+  color: #3f1420;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -2081,6 +2097,10 @@ body::after {
   align-items: start;
 }
 
+.hero-shell.hero-shell-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .hero-copy {
   min-width: 0;
 }
@@ -2301,6 +2321,10 @@ body::after {
 @media (min-width: 960px) {
   .hero-shell {
     grid-template-columns: minmax(0, 1.22fr) minmax(280px, 0.78fr);
+  }
+
+  .hero-shell.hero-shell-single {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .media-slot-grid {

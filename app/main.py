@@ -23,7 +23,7 @@ from threading import Lock
 from typing import Any
 import csv
 
-from fastapi import Depends, FastAPI, File, HTTPException, Request, Response, UploadFile, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -146,6 +146,45 @@ RUSH_EVENT_TYPES = {
     "social",
     "other",
 }
+ENGAGEMENT_EVENT_TYPES = {
+    "lunch",
+    "rush_event",
+    "meeting",
+    "follow_up",
+}
+ENGAGEMENT_EVENT_STATUSES = {
+    "planned",
+    "attended",
+    "no_show",
+    "cancelled",
+}
+ASSIGNMENT_STATUSES = {
+    "unassigned",
+    "assigned",
+    "in_progress",
+    "completed",
+    "needs_help",
+}
+ASSIGNMENT_STATUS_LABELS: dict[str, str] = {
+    "unassigned": "Unassigned",
+    "assigned": "Assigned",
+    "in_progress": "In Progress",
+    "completed": "Completed",
+    "needs_help": "Needs Help",
+}
+ASSIGNMENT_DUE_SOON_DAYS = int(os.getenv("ASSIGNMENT_DUE_SOON_DAYS", "2"))
+ASSIGNMENT_DEFAULT_PRIORITY = int(os.getenv("ASSIGNMENT_DEFAULT_PRIORITY", "3"))
+ASSIGNMENT_MAX_PRIORITY = int(os.getenv("ASSIGNMENT_MAX_PRIORITY", "5"))
+OFFICER_CAPACITY_TARGET = int(os.getenv("OFFICER_CAPACITY_TARGET", "8"))
+PNM_FUNNEL_STAGES = (
+    "sourced",
+    "engaged",
+    "evaluated",
+    "discussed",
+    "bid",
+    "accepted",
+    "declined",
+)
 WEEKLY_GOAL_METRIC_TYPES = {
     "manual",
     "ratings_submitted",
@@ -1148,6 +1187,53 @@ def normalize_rush_event_type(value: str) -> str:
             "Event type must be one of: "
             + ", ".join(sorted(RUSH_EVENT_TYPES))
         )
+    return token
+
+
+def normalize_engagement_event_type(value: str) -> str:
+    token = value.strip().lower()
+    if token not in ENGAGEMENT_EVENT_TYPES:
+        raise ValueError(
+            "Engagement event type must be one of: "
+            + ", ".join(sorted(ENGAGEMENT_EVENT_TYPES))
+        )
+    return token
+
+
+def normalize_engagement_event_status(value: str) -> str:
+    token = value.strip().lower()
+    if token not in ENGAGEMENT_EVENT_STATUSES:
+        raise ValueError(
+            "Event status must be one of: "
+            + ", ".join(sorted(ENGAGEMENT_EVENT_STATUSES))
+        )
+    return token
+
+
+def normalize_assignment_status(value: str) -> str:
+    token = value.strip().lower()
+    if token not in ASSIGNMENT_STATUSES:
+        raise ValueError(
+            "Assignment status must be one of: "
+            + ", ".join(sorted(ASSIGNMENT_STATUSES))
+        )
+    return token
+
+
+def normalize_funnel_stage(value: str) -> str:
+    token = value.strip().lower()
+    if token not in PNM_FUNNEL_STAGES:
+        raise ValueError(
+            "Funnel stage must be one of: "
+            + ", ".join(PNM_FUNNEL_STAGES)
+        )
+    return token
+
+
+def normalize_digest_period(value: str) -> str:
+    token = value.strip().lower()
+    if token not in {"daily", "weekly"}:
+        raise ValueError("Digest period must be daily or weekly.")
     return token
 
 
@@ -2231,7 +2317,10 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
         rating_history_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_history ORDER BY id ASC").fetchall()]
         lunch_rows = [dict(row) for row in conn.execute("SELECT * FROM lunches ORDER BY id ASC").fetchall()]
         rush_event_rows = [dict(row) for row in conn.execute("SELECT * FROM rush_events ORDER BY id ASC").fetchall()]
+        engagement_event_rows = [dict(row) for row in conn.execute("SELECT * FROM engagement_events ORDER BY id ASC").fetchall()]
         weekly_goal_rows = [dict(row) for row in conn.execute("SELECT * FROM weekly_goals ORDER BY id ASC").fetchall()]
+        stage_history_rows = [dict(row) for row in conn.execute("SELECT * FROM pnm_stage_history ORDER BY id ASC").fetchall()]
+        audit_rows = [dict(row) for row in conn.execute("SELECT * FROM audit_ledger ORDER BY id ASC").fetchall()]
         chat_rows = [dict(row) for row in conn.execute("SELECT * FROM officer_chat_messages ORDER BY id ASC").fetchall()]
         chat_tag_rows = [dict(row) for row in conn.execute("SELECT * FROM officer_chat_tags ORDER BY id ASC").fetchall()]
         chat_mention_rows = [dict(row) for row in conn.execute("SELECT * FROM officer_chat_mentions ORDER BY id ASC").fetchall()]
@@ -2291,6 +2380,15 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "assigned_officer_id",
             "assigned_by",
             "assigned_at",
+            "assignment_status",
+            "assignment_priority",
+            "assignment_due_date",
+            "assignment_notes",
+            "assignment_updated_at",
+            "funnel_stage",
+            "funnel_stage_reason",
+            "funnel_stage_updated_at",
+            "funnel_stage_updated_by",
             "created_by",
             "created_at",
             "updated_at",
@@ -2362,6 +2460,24 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "created_at",
             "updated_at",
         ], rush_event_rows))
+        zf.writestr("engagement_events.csv", csv_bytes_from_rows(list(engagement_event_rows[0].keys()) if engagement_event_rows else [
+            "id",
+            "event_type",
+            "status",
+            "title",
+            "event_date",
+            "start_time",
+            "end_time",
+            "location",
+            "details",
+            "pnm_id",
+            "owner_user_id",
+            "source_type",
+            "source_id",
+            "created_by",
+            "created_at",
+            "updated_at",
+        ], engagement_event_rows))
         zf.writestr("weekly_goals.csv", csv_bytes_from_rows(list(weekly_goal_rows[0].keys()) if weekly_goal_rows else [
             "id",
             "title",
@@ -2378,6 +2494,24 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "created_at",
             "updated_at",
         ], weekly_goal_rows))
+        zf.writestr("pnm_stage_history.csv", csv_bytes_from_rows(list(stage_history_rows[0].keys()) if stage_history_rows else [
+            "id",
+            "pnm_id",
+            "from_stage",
+            "to_stage",
+            "reason",
+            "changed_by",
+            "changed_at",
+        ], stage_history_rows))
+        zf.writestr("audit_ledger.csv", csv_bytes_from_rows(list(audit_rows[0].keys()) if audit_rows else [
+            "id",
+            "actor_user_id",
+            "action_type",
+            "entity_type",
+            "entity_id",
+            "payload_json",
+            "created_at",
+        ], audit_rows))
         zf.writestr("officer_chat_messages.csv", csv_bytes_from_rows(list(chat_rows[0].keys()) if chat_rows else [
             "id",
             "sender_id",
@@ -2412,7 +2546,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "KAO Rush Backup Export\n"
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
             f"Database path: {db_path}\n"
-            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, lunches.csv, rush_events.csv, weekly_goals.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
+            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, lunches.csv, rush_events.csv, engagement_events.csv, weekly_goals.csv, pnm_stage_history.csv, audit_ledger.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
             "Password hashes are intentionally excluded from users.csv for security.\n"
         )
         zf.writestr("README.txt", readme.encode("utf-8"))
@@ -2518,6 +2652,257 @@ def create_notifications_for_users(
             body=body,
             link_path=link_path,
         )
+
+
+def append_audit_entry(
+    conn: sqlite3.Connection,
+    *,
+    actor_user_id: int | None,
+    action_type: str,
+    entity_type: str,
+    entity_id: int | None,
+    payload: dict[str, Any] | None = None,
+) -> None:
+    action_token = action_type.strip().lower()[:64] or "update"
+    entity_token = entity_type.strip().lower()[:64] or "resource"
+    payload_json = json.dumps(payload or {}, ensure_ascii=True, separators=(",", ":"))
+    conn.execute(
+        """
+        INSERT INTO audit_ledger (
+            actor_user_id,
+            action_type,
+            entity_type,
+            entity_id,
+            payload_json,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(actor_user_id) if actor_user_id is not None else None,
+            action_token,
+            entity_token,
+            int(entity_id) if entity_id is not None else None,
+            payload_json,
+            now_iso(),
+        ),
+    )
+
+
+def assignment_due_state(status: str, due_date_raw: str | None) -> str:
+    status_token = (status or "").strip().lower()
+    if not due_date_raw:
+        return "none"
+    try:
+        due_day = date.fromisoformat(due_date_raw)
+    except ValueError:
+        return "none"
+    if status_token == "completed":
+        return "done"
+    today = date.today()
+    if due_day < today:
+        return "overdue"
+    if due_day <= today + timedelta(days=max(1, ASSIGNMENT_DUE_SOON_DAYS)):
+        return "due_soon"
+    return "upcoming"
+
+
+def clamped_assignment_priority(value: int | None) -> int:
+    if value is None:
+        return max(1, min(ASSIGNMENT_MAX_PRIORITY, ASSIGNMENT_DEFAULT_PRIORITY))
+    return max(1, min(ASSIGNMENT_MAX_PRIORITY, int(value)))
+
+
+def default_engagement_status_for_date(event_date_raw: str, *, is_cancelled: bool = False) -> str:
+    if is_cancelled:
+        return "cancelled"
+    try:
+        event_day = date.fromisoformat(event_date_raw)
+    except ValueError:
+        return "planned"
+    return "attended" if event_day < date.today() else "planned"
+
+
+def sync_engagement_event_from_lunch(conn: sqlite3.Connection, lunch_id: int) -> None:
+    row = conn.execute(
+        """
+        SELECT
+            l.id,
+            l.pnm_id,
+            l.user_id,
+            l.lunch_date,
+            l.start_time,
+            l.end_time,
+            l.location,
+            l.notes,
+            l.created_at,
+            p.first_name,
+            p.last_name
+        FROM lunches l
+        JOIN pnms p ON p.id = l.pnm_id
+        WHERE l.id = ?
+        """,
+        (lunch_id,),
+    ).fetchone()
+    if not row:
+        return
+
+    status = default_engagement_status_for_date(row["lunch_date"])
+    title = f"Lunch with {row['first_name']} {row['last_name']}"
+    details = (row["notes"] or "").strip()
+    location = (row["location"] or "").strip()
+    updated_at = now_iso()
+    conn.execute(
+        """
+        INSERT INTO engagement_events (
+            event_type,
+            status,
+            title,
+            event_date,
+            start_time,
+            end_time,
+            location,
+            details,
+            pnm_id,
+            owner_user_id,
+            source_type,
+            source_id,
+            created_by,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'lunch', ?, ?, ?, ?)
+        ON CONFLICT(source_type, source_id) DO UPDATE SET
+            event_type = excluded.event_type,
+            status = excluded.status,
+            title = excluded.title,
+            event_date = excluded.event_date,
+            start_time = excluded.start_time,
+            end_time = excluded.end_time,
+            location = excluded.location,
+            details = excluded.details,
+            pnm_id = excluded.pnm_id,
+            owner_user_id = excluded.owner_user_id,
+            updated_at = excluded.updated_at
+        """,
+        (
+            "lunch",
+            status,
+            title,
+            row["lunch_date"],
+            row["start_time"],
+            row["end_time"],
+            location,
+            details,
+            row["pnm_id"],
+            row["user_id"],
+            row["id"],
+            row["user_id"],
+            row["created_at"],
+            updated_at,
+        ),
+    )
+
+
+def sync_engagement_event_from_rush_event(conn: sqlite3.Connection, event_id: int) -> None:
+    row = conn.execute(
+        """
+        SELECT
+            id,
+            title,
+            event_type,
+            event_date,
+            start_time,
+            end_time,
+            location,
+            details,
+            is_cancelled,
+            created_by,
+            created_at
+        FROM rush_events
+        WHERE id = ?
+        """,
+        (event_id,),
+    ).fetchone()
+    if not row:
+        return
+
+    normalized_type = "meeting" if row["event_type"] == "meeting" else "rush_event"
+    status = default_engagement_status_for_date(row["event_date"], is_cancelled=bool(row["is_cancelled"]))
+    updated_at = now_iso()
+    conn.execute(
+        """
+        INSERT INTO engagement_events (
+            event_type,
+            status,
+            title,
+            event_date,
+            start_time,
+            end_time,
+            location,
+            details,
+            pnm_id,
+            owner_user_id,
+            source_type,
+            source_id,
+            created_by,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, 'rush_event', ?, ?, ?, ?)
+        ON CONFLICT(source_type, source_id) DO UPDATE SET
+            event_type = excluded.event_type,
+            status = excluded.status,
+            title = excluded.title,
+            event_date = excluded.event_date,
+            start_time = excluded.start_time,
+            end_time = excluded.end_time,
+            location = excluded.location,
+            details = excluded.details,
+            owner_user_id = excluded.owner_user_id,
+            updated_at = excluded.updated_at
+        """,
+        (
+            normalized_type,
+            status,
+            row["title"],
+            row["event_date"],
+            row["start_time"],
+            row["end_time"],
+            (row["location"] or "").strip(),
+            (row["details"] or "").strip(),
+            row["created_by"],
+            row["id"],
+            row["created_by"],
+            row["created_at"],
+            updated_at,
+        ),
+    )
+
+
+def sync_engagement_events_from_sources(conn: sqlite3.Connection) -> None:
+    lunch_rows = conn.execute("SELECT id FROM lunches ORDER BY id ASC").fetchall()
+    for row in lunch_rows:
+        sync_engagement_event_from_lunch(conn, int(row["id"]))
+
+    rush_rows = conn.execute("SELECT id FROM rush_events ORDER BY id ASC").fetchall()
+    for row in rush_rows:
+        sync_engagement_event_from_rush_event(conn, int(row["id"]))
+
+    conn.execute(
+        """
+        DELETE FROM engagement_events
+        WHERE source_type = 'lunch'
+          AND source_id NOT IN (SELECT id FROM lunches)
+        """
+    )
+    conn.execute(
+        """
+        DELETE FROM engagement_events
+        WHERE source_type = 'rush_event'
+          AND source_id NOT IN (SELECT id FROM rush_events)
+        """
+    )
 
 
 def resolve_goal_week_span(week_start_raw: str | None, week_end_raw: str | None) -> tuple[str, str]:
@@ -2961,6 +3346,15 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             assigned_officer_id INTEGER REFERENCES users(id),
             assigned_by INTEGER REFERENCES users(id),
             assigned_at TEXT,
+            assignment_status TEXT NOT NULL DEFAULT 'unassigned' CHECK (assignment_status IN ('unassigned', 'assigned', 'in_progress', 'completed', 'needs_help')),
+            assignment_priority INTEGER NOT NULL DEFAULT 3 CHECK (assignment_priority BETWEEN 1 AND 5),
+            assignment_due_date TEXT,
+            assignment_notes TEXT NOT NULL DEFAULT '',
+            assignment_updated_at TEXT,
+            funnel_stage TEXT NOT NULL DEFAULT 'sourced' CHECK (funnel_stage IN ('sourced', 'engaged', 'evaluated', 'discussed', 'bid', 'accepted', 'declined')),
+            funnel_stage_reason TEXT NOT NULL DEFAULT '',
+            funnel_stage_updated_at TEXT,
+            funnel_stage_updated_by INTEGER REFERENCES users(id),
             created_by INTEGER NOT NULL REFERENCES users(id),
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
@@ -3101,6 +3495,46 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             UNIQUE (user_id, pnm_id)
         );
 
+        CREATE TABLE IF NOT EXISTS engagement_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL CHECK (event_type IN ('lunch', 'rush_event', 'meeting', 'follow_up')),
+            status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'attended', 'no_show', 'cancelled')),
+            title TEXT NOT NULL,
+            event_date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            location TEXT NOT NULL DEFAULT '',
+            details TEXT NOT NULL DEFAULT '',
+            pnm_id INTEGER REFERENCES pnms(id) ON DELETE SET NULL,
+            owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            source_type TEXT NOT NULL DEFAULT 'manual' CHECK (source_type IN ('manual', 'lunch', 'rush_event')),
+            source_id INTEGER,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (source_type, source_id)
+        );
+
+        CREATE TABLE IF NOT EXISTS pnm_stage_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            from_stage TEXT NOT NULL,
+            to_stage TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            changed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            changed_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS audit_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            action_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER,
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -3124,6 +3558,10 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
         CREATE INDEX IF NOT EXISTS idx_pnms_interests ON pnms(interests_norm);
+        CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id);
+        CREATE INDEX IF NOT EXISTS idx_pnms_assignment_status ON pnms(assignment_status);
+        CREATE INDEX IF NOT EXISTS idx_pnms_assignment_due_date ON pnms(assignment_due_date);
+        CREATE INDEX IF NOT EXISTS idx_pnms_funnel_stage ON pnms(funnel_stage);
         CREATE INDEX IF NOT EXISTS idx_ratings_pnm ON ratings(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
@@ -3141,6 +3579,14 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
         CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_user ON user_contact_downloads(user_id, downloaded_at);
         CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_pnm ON user_contact_downloads(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_date ON engagement_events(event_date, start_time);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_status ON engagement_events(status);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_owner ON engagement_events(owner_user_id);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_pnm ON engagement_events(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_source ON engagement_events(source_type, source_id);
+        CREATE INDEX IF NOT EXISTS idx_pnm_stage_history_pnm_changed_at ON pnm_stage_history(pnm_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_ledger_created_at ON audit_ledger(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_ledger_entity ON audit_ledger(entity_type, entity_id, created_at);
         """
     )
 
@@ -3163,7 +3609,96 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE pnms ADD COLUMN assigned_at TEXT")
     if "notes" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN notes TEXT NOT NULL DEFAULT ''")
+    if "assignment_status" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assignment_status TEXT NOT NULL DEFAULT 'unassigned'")
+    if "assignment_priority" not in pnm_columns:
+        conn.execute(
+            f"ALTER TABLE pnms ADD COLUMN assignment_priority INTEGER NOT NULL DEFAULT {max(1, min(ASSIGNMENT_MAX_PRIORITY, ASSIGNMENT_DEFAULT_PRIORITY))}"
+        )
+    if "assignment_due_date" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assignment_due_date TEXT")
+    if "assignment_notes" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assignment_notes TEXT NOT NULL DEFAULT ''")
+    if "assignment_updated_at" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN assignment_updated_at TEXT")
+    if "funnel_stage" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN funnel_stage TEXT NOT NULL DEFAULT 'sourced'")
+    if "funnel_stage_reason" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN funnel_stage_reason TEXT NOT NULL DEFAULT ''")
+    if "funnel_stage_updated_at" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN funnel_stage_updated_at TEXT")
+    if "funnel_stage_updated_by" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN funnel_stage_updated_by INTEGER REFERENCES users(id)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assigned_officer ON pnms(assigned_officer_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assignment_status ON pnms(assignment_status)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assignment_due_date ON pnms(assignment_due_date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_funnel_stage ON pnms(funnel_stage)")
+    conn.execute(
+        """
+        UPDATE pnms
+        SET assignment_status = CASE
+            WHEN assigned_officer_id IS NULL THEN 'unassigned'
+            WHEN assignment_status IS NULL OR trim(assignment_status) = '' THEN 'assigned'
+            ELSE assignment_status
+        END
+        """
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET assignment_status = CASE
+            WHEN assigned_officer_id IS NULL THEN 'unassigned'
+            ELSE 'assigned'
+        END
+        WHERE lower(trim(COALESCE(assignment_status, ''))) NOT IN ('unassigned', 'assigned', 'in_progress', 'completed', 'needs_help')
+        """
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET assignment_priority = ?
+        WHERE assignment_priority IS NULL OR assignment_priority < 1 OR assignment_priority > ?
+        """,
+        (
+            max(1, min(ASSIGNMENT_MAX_PRIORITY, ASSIGNMENT_DEFAULT_PRIORITY)),
+            ASSIGNMENT_MAX_PRIORITY,
+        ),
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET assignment_updated_at = COALESCE(assignment_updated_at, assigned_at, updated_at, created_at)
+        WHERE assignment_updated_at IS NULL OR trim(assignment_updated_at) = ''
+        """
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET funnel_stage = CASE
+            WHEN funnel_stage IS NULL OR trim(funnel_stage) = '' THEN
+                CASE
+                    WHEN weighted_total > 0 THEN 'evaluated'
+                    WHEN total_lunches > 0 THEN 'engaged'
+                    ELSE 'sourced'
+                END
+            ELSE lower(trim(funnel_stage))
+        END
+        """
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET funnel_stage = 'sourced'
+        WHERE funnel_stage NOT IN ('sourced', 'engaged', 'evaluated', 'discussed', 'bid', 'accepted', 'declined')
+        """
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET funnel_stage_updated_at = COALESCE(funnel_stage_updated_at, updated_at, created_at)
+        WHERE funnel_stage_updated_at IS NULL OR trim(funnel_stage_updated_at) = ''
+        """
+    )
 
     lunch_columns = {row["name"] for row in conn.execute("PRAGMA table_info(lunches)").fetchall()}
     if "start_time" not in lunch_columns:
@@ -3317,6 +3852,57 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_user_contact_downloads_pnm ON user_contact_downloads(pnm_id);
         """
     )
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS engagement_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            event_type TEXT NOT NULL CHECK (event_type IN ('lunch', 'rush_event', 'meeting', 'follow_up')),
+            status TEXT NOT NULL DEFAULT 'planned' CHECK (status IN ('planned', 'attended', 'no_show', 'cancelled')),
+            title TEXT NOT NULL,
+            event_date TEXT NOT NULL,
+            start_time TEXT,
+            end_time TEXT,
+            location TEXT NOT NULL DEFAULT '',
+            details TEXT NOT NULL DEFAULT '',
+            pnm_id INTEGER REFERENCES pnms(id) ON DELETE SET NULL,
+            owner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            source_type TEXT NOT NULL DEFAULT 'manual' CHECK (source_type IN ('manual', 'lunch', 'rush_event')),
+            source_id INTEGER,
+            created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (source_type, source_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_date ON engagement_events(event_date, start_time);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_status ON engagement_events(status);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_owner ON engagement_events(owner_user_id);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_pnm ON engagement_events(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_engagement_events_source ON engagement_events(source_type, source_id);
+
+        CREATE TABLE IF NOT EXISTS pnm_stage_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            from_stage TEXT NOT NULL,
+            to_stage TEXT NOT NULL,
+            reason TEXT NOT NULL DEFAULT '',
+            changed_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            changed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pnm_stage_history_pnm_changed_at ON pnm_stage_history(pnm_id, changed_at);
+
+        CREATE TABLE IF NOT EXISTS audit_ledger (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            actor_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            action_type TEXT NOT NULL,
+            entity_type TEXT NOT NULL,
+            entity_id INTEGER,
+            payload_json TEXT NOT NULL DEFAULT '{}',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_ledger_created_at ON audit_ledger(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_ledger_entity ON audit_ledger(entity_type, entity_id, created_at);
+        """
+    )
     weekly_goal_columns = {row["name"] for row in conn.execute("PRAGMA table_info(weekly_goals)").fetchall()}
     if "description" not in weekly_goal_columns:
         conn.execute("ALTER TABLE weekly_goals ADD COLUMN description TEXT NOT NULL DEFAULT ''")
@@ -3338,6 +3924,8 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE rush_events ADD COLUMN details TEXT NOT NULL DEFAULT ''")
     if "location" not in rush_event_columns:
         conn.execute("ALTER TABLE rush_events ADD COLUMN location TEXT NOT NULL DEFAULT ''")
+
+    sync_engagement_events_from_sources(conn)
 
     # Backfill a baseline seed event for legacy ratings so trend charts can start from current stored state.
     conn.execute(
@@ -5042,6 +5630,20 @@ def pnm_payload(
     assigned_officer: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
+    keys = set(row.keys())
+    assignment_status = (
+        str(row["assignment_status"]).strip().lower()
+        if "assignment_status" in keys and row["assignment_status"] is not None
+        else ("assigned" if row["assigned_officer_id"] else "unassigned")
+    )
+    if assignment_status not in ASSIGNMENT_STATUSES:
+        assignment_status = "assigned" if row["assigned_officer_id"] else "unassigned"
+    assignment_priority = int(row["assignment_priority"]) if "assignment_priority" in keys and row["assignment_priority"] is not None else max(1, min(ASSIGNMENT_MAX_PRIORITY, ASSIGNMENT_DEFAULT_PRIORITY))
+    assignment_priority = max(1, min(ASSIGNMENT_MAX_PRIORITY, assignment_priority))
+    assignment_due_date = row["assignment_due_date"] if "assignment_due_date" in keys else None
+    funnel_stage = str(row["funnel_stage"]).strip().lower() if "funnel_stage" in keys and row["funnel_stage"] is not None else "sourced"
+    if funnel_stage not in PNM_FUNNEL_STAGES:
+        funnel_stage = "sourced"
     return {
         "pnm_id": row["id"],
         "pnm_code": row["pnm_code"],
@@ -5070,7 +5672,18 @@ def pnm_payload(
         "assigned_officer_id": row["assigned_officer_id"] if "assigned_officer_id" in row.keys() else None,
         "assigned_by": row["assigned_by"] if "assigned_by" in row.keys() else None,
         "assigned_at": row["assigned_at"] if "assigned_at" in row.keys() else None,
+        "assignment_status": assignment_status,
+        "assignment_status_label": ASSIGNMENT_STATUS_LABELS.get(assignment_status, assignment_status.replace("_", " ").title()),
+        "assignment_priority": assignment_priority,
+        "assignment_due_date": assignment_due_date,
+        "assignment_due_state": assignment_due_state(assignment_status, assignment_due_date),
+        "assignment_notes": row["assignment_notes"] if "assignment_notes" in keys and row["assignment_notes"] is not None else "",
+        "assignment_updated_at": row["assignment_updated_at"] if "assignment_updated_at" in keys else None,
         "assigned_officer": assigned_officer,
+        "funnel_stage": funnel_stage,
+        "funnel_stage_reason": row["funnel_stage_reason"] if "funnel_stage_reason" in keys and row["funnel_stage_reason"] is not None else "",
+        "funnel_stage_updated_at": row["funnel_stage_updated_at"] if "funnel_stage_updated_at" in keys else None,
+        "funnel_stage_updated_by": row["funnel_stage_updated_by"] if "funnel_stage_updated_by" in keys else None,
         "own_rating": own_rating,
     }
 
@@ -5507,6 +6120,157 @@ class OfficerChatMessageCreateRequest(BaseModel):
 
 class AssignOfficerRequest(BaseModel):
     officer_user_id: int | None = None
+
+
+class PnmAssignmentUpdateRequest(BaseModel):
+    officer_user_id: int | None = None
+    assignment_status: str | None = Field(default=None, min_length=3, max_length=20)
+    assignment_priority: int | None = Field(default=None, ge=1, le=ASSIGNMENT_MAX_PRIORITY)
+    assignment_due_date: str | None = None
+    assignment_notes: str | None = Field(default=None, max_length=1600)
+    notify_officer: bool = True
+
+    @field_validator("assignment_status")
+    @classmethod
+    def validate_optional_assignment_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_assignment_status(value)
+
+    @field_validator("assignment_due_date")
+    @classmethod
+    def validate_optional_assignment_due_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return None
+        return verify_iso_date(token, "Assignment due date")
+
+    @field_validator("assignment_notes")
+    @classmethod
+    def normalize_optional_assignment_notes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+
+class PnmFunnelStageUpdateRequest(BaseModel):
+    stage: str = Field(..., min_length=3, max_length=24)
+    reason: str = Field(default="", max_length=320)
+
+    @field_validator("stage")
+    @classmethod
+    def validate_stage(cls, value: str) -> str:
+        return normalize_funnel_stage(value)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str) -> str:
+        return value.strip()
+
+
+class EngagementEventCreateRequest(BaseModel):
+    event_type: str = Field(default="follow_up", min_length=3, max_length=32)
+    status: str = Field(default="planned", min_length=3, max_length=16)
+    title: str = Field(..., min_length=3, max_length=160)
+    event_date: str
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str = Field(default="", max_length=180)
+    details: str = Field(default="", max_length=2400)
+    pnm_id: int | None = None
+    owner_user_id: int | None = None
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_event_type(cls, value: str) -> str:
+        return normalize_engagement_event_type(value)
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        return normalize_engagement_event_status(value)
+
+    @field_validator("event_date")
+    @classmethod
+    def validate_event_date(cls, value: str) -> str:
+        return verify_iso_date(value, "Event date")
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_times(cls, value: str | None) -> str | None:
+        return LunchCreateRequest.validate_time_value(value)
+
+    @model_validator(mode="after")
+    def validate_time_order(self) -> "EngagementEventCreateRequest":
+        if self.end_time and not self.start_time:
+            raise ValueError("End time requires a start time.")
+        if self.start_time and self.end_time:
+            start_value = parse_clock_value(self.start_time)
+            end_value = parse_clock_value(self.end_time)
+            if start_value and end_value and (end_value[0] * 60 + end_value[1]) <= (start_value[0] * 60 + start_value[1]):
+                raise ValueError("End time must be after start time.")
+        return self
+
+
+class EngagementEventUpdateRequest(BaseModel):
+    event_type: str | None = Field(default=None, min_length=3, max_length=32)
+    status: str | None = Field(default=None, min_length=3, max_length=16)
+    title: str | None = Field(default=None, min_length=3, max_length=160)
+    event_date: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
+    location: str | None = Field(default=None, max_length=180)
+    details: str | None = Field(default=None, max_length=2400)
+    pnm_id: int | None = None
+    owner_user_id: int | None = None
+
+    @field_validator("event_type")
+    @classmethod
+    def validate_optional_event_type(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_engagement_event_type(value)
+
+    @field_validator("status")
+    @classmethod
+    def validate_optional_status(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_engagement_event_status(value)
+
+    @field_validator("event_date")
+    @classmethod
+    def validate_optional_event_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return verify_iso_date(value, "Event date")
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def validate_optional_times(cls, value: str | None) -> str | None:
+        return LunchCreateRequest.validate_time_value(value)
+
+
+class NotificationDigestBroadcastRequest(BaseModel):
+    period: str = Field(default="daily", min_length=5, max_length=10)
+    recipients: str = Field(default="officers", min_length=3, max_length=24)
+    include_read: bool = False
+    max_items: int = Field(default=20, ge=5, le=120)
+
+    @field_validator("period")
+    @classmethod
+    def validate_period(cls, value: str) -> str:
+        return normalize_digest_period(value)
+
+    @field_validator("recipients")
+    @classmethod
+    def normalize_recipients(cls, value: str) -> str:
+        token = value.strip().lower()
+        if token not in {"officers", "all_approved"}:
+            raise ValueError("Recipients must be officers or all_approved.")
+        return token
 
 
 class PromoteHeadRequest(BaseModel):
@@ -6417,7 +7181,10 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
         ratings_count = int(conn.execute("SELECT COUNT(*) AS count FROM ratings").fetchone()["count"])
         lunches_count = int(conn.execute("SELECT COUNT(*) AS count FROM lunches").fetchone()["count"])
         rush_events_count = int(conn.execute("SELECT COUNT(*) AS count FROM rush_events").fetchone()["count"])
+        engagement_events_count = int(conn.execute("SELECT COUNT(*) AS count FROM engagement_events").fetchone()["count"])
         weekly_goals_count = int(conn.execute("SELECT COUNT(*) AS count FROM weekly_goals").fetchone()["count"])
+        stage_history_count = int(conn.execute("SELECT COUNT(*) AS count FROM pnm_stage_history").fetchone()["count"])
+        audit_count = int(conn.execute("SELECT COUNT(*) AS count FROM audit_ledger").fetchone()["count"])
         chat_messages_count = int(conn.execute("SELECT COUNT(*) AS count FROM officer_chat_messages").fetchone()["count"])
         notifications_count = int(conn.execute("SELECT COUNT(*) AS count FROM notifications").fetchone()["count"])
 
@@ -6449,7 +7216,10 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
             "ratings": ratings_count,
             "lunches": lunches_count,
             "rush_events": rush_events_count,
+            "engagement_events": engagement_events_count,
             "weekly_goals": weekly_goals_count,
+            "pnm_stage_history": stage_history_count,
+            "audit_ledger": audit_count,
             "chat_messages": chat_messages_count,
             "notifications": notifications_count,
         },
@@ -6595,7 +7365,10 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
         conn.execute("DELETE FROM officer_chat_messages")
         conn.execute("DELETE FROM weekly_goals")
         conn.execute("DELETE FROM rush_events")
+        conn.execute("DELETE FROM engagement_events")
+        conn.execute("DELETE FROM pnm_stage_history")
         conn.execute("DELETE FROM notifications")
+        conn.execute("DELETE FROM user_contact_downloads")
         conn.execute("DELETE FROM lunches")
         conn.execute("DELETE FROM pnms")
         conn.execute(
@@ -6636,6 +7409,20 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
                 rating_count,
                 lunch_count,
             ),
+        )
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="season_reset",
+            entity_type="season",
+            entity_id=1,
+            payload={
+                "archive_path": str(archive_file),
+                "archive_label": label,
+                "pnm_count": pnm_count,
+                "rating_count": rating_count,
+                "lunch_count": lunch_count,
+            },
         )
 
     purge_pnm_uploads_dir()
@@ -7193,7 +7980,7 @@ def pending_users(_: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
 @app.post("/api/users/pending/{user_id}/approve")
 def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_officer)) -> dict[str, str]:
     with db_session() as conn:
-        row = conn.execute("SELECT id, is_approved FROM users WHERE id = ?", (user_id,)).fetchone()
+        row = conn.execute("SELECT id, username, is_approved FROM users WHERE id = ?", (user_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="User not found.")
         if bool(row["is_approved"]):
@@ -7202,6 +7989,22 @@ def approve_user(user_id: int, approver: sqlite3.Row = Depends(require_officer))
         conn.execute(
             "UPDATE users SET is_approved = 1, approved_by = ?, approved_at = ?, updated_at = ? WHERE id = ?",
             (approver["id"], now_iso(), now_iso(), user_id),
+        )
+        append_audit_entry(
+            conn,
+            actor_user_id=int(approver["id"]),
+            action_type="user_approve",
+            entity_type="user",
+            entity_id=user_id,
+            payload={"username": row["username"]},
+        )
+        create_notification(
+            conn,
+            user_id=int(user_id),
+            notif_type="approval",
+            title="Account Approved",
+            body="You can now sign in and start contributing.",
+            link_path="/",
         )
 
     return {"message": "User approved."}
@@ -7225,6 +8028,14 @@ def disapprove_user(user_id: int, actor: sqlite3.Row = Depends(require_officer))
             (now_iso(), user_id),
         )
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        append_audit_entry(
+            conn,
+            actor_user_id=int(actor["id"]),
+            action_type="user_disapprove",
+            entity_type="user",
+            entity_id=user_id,
+            payload={"username": row["username"]},
+        )
 
     return {"message": f"{row['username']} has been disapproved and moved to pending approval."}
 
@@ -7317,7 +8128,7 @@ def head_admin_officer_metrics(_: sqlite3.Row = Depends(require_head)) -> dict[s
 def promote_officer_to_head(
     user_id: int,
     payload: PromoteHeadRequest,
-    _: sqlite3.Row = Depends(require_head),
+    actor: sqlite3.Row = Depends(require_head),
 ) -> dict[str, Any]:
     with db_session() as conn:
         target = conn.execute(
@@ -7354,6 +8165,18 @@ def promote_officer_to_head(
         conn.execute(
             "UPDATE users SET role = ?, emoji = NULL, updated_at = ? WHERE id = ?",
             (ROLE_HEAD, now_iso(), user_id),
+        )
+        append_audit_entry(
+            conn,
+            actor_user_id=int(actor["id"]),
+            action_type="role_promote_head",
+            entity_type="user",
+            entity_id=user_id,
+            payload={
+                "username": target["username"],
+                "demoted_head_count": len(demoted_head_ids),
+                "demoted_head_ids": demoted_head_ids,
+            },
         )
         refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
 
@@ -7791,20 +8614,61 @@ def assign_pnm_officer(
             officer = None
 
         now = now_iso()
+        old_assigned_id = int(pnm_row["assigned_officer_id"]) if pnm_row["assigned_officer_id"] is not None else None
+        old_status = str(pnm_row["assignment_status"]).strip().lower() if "assignment_status" in pnm_row.keys() else "unassigned"
+        if old_status not in ASSIGNMENT_STATUSES:
+            old_status = "assigned" if old_assigned_id else "unassigned"
+        if assigned_user_id is None:
+            next_status = "unassigned"
+        elif old_assigned_id == assigned_user_id and old_status in ASSIGNMENT_STATUSES:
+            next_status = old_status
+        else:
+            next_status = "assigned"
         conn.execute(
             """
             UPDATE pnms
-            SET assigned_officer_id = ?, assigned_by = ?, assigned_at = ?, updated_at = ?
+            SET
+                assigned_officer_id = ?,
+                assigned_by = ?,
+                assigned_at = ?,
+                assignment_status = ?,
+                assignment_updated_at = ?,
+                updated_at = ?
             WHERE id = ?
             """,
             (
                 assigned_user_id,
                 head_user["id"] if assigned_user_id is not None else None,
                 now if assigned_user_id is not None else None,
+                next_status,
+                now,
                 now,
                 pnm_id,
             ),
         )
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="assignment_change",
+            entity_type="pnm",
+            entity_id=pnm_id,
+            payload={
+                "old_assigned_officer_id": old_assigned_id,
+                "new_assigned_officer_id": assigned_user_id,
+                "old_status": old_status,
+                "new_status": next_status,
+            },
+        )
+        if assigned_user_id is not None and assigned_user_id != old_assigned_id:
+            create_notification(
+                conn,
+                user_id=assigned_user_id,
+                notif_type="assignment",
+                title=f"New Assignment: {pnm_row['first_name']} {pnm_row['last_name']}",
+                body=f"Assigned by {head_user['username']}",
+                link_path=f"/?pnm={pnm_id}",
+            )
 
         refreshed = conn.execute(
             """
@@ -7825,6 +8689,699 @@ def assign_pnm_officer(
     return {
         "message": "PNM assignment updated.",
         "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+    }
+
+
+@app.get("/api/assignments/overview")
+def assignments_overview(
+    include_completed: bool = True,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        if user["role"] == ROLE_HEAD:
+            pnm_rows = conn.execute(
+                """
+                SELECT
+                    p.*,
+                    ao.id AS assigned_officer_id,
+                    ao.username AS assigned_officer_username,
+                    ao.role AS assigned_officer_role,
+                    ao.emoji AS assigned_officer_emoji
+                FROM pnms p
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                ORDER BY
+                    CASE
+                        WHEN p.assignment_status = 'needs_help' THEN 0
+                        WHEN p.assignment_status = 'in_progress' THEN 1
+                        WHEN p.assignment_status = 'assigned' THEN 2
+                        WHEN p.assignment_status = 'unassigned' THEN 3
+                        ELSE 4
+                    END ASC,
+                    p.assignment_priority DESC,
+                    p.weighted_total DESC,
+                    p.last_name ASC,
+                    p.first_name ASC
+                """
+            ).fetchall()
+        else:
+            pnm_rows = conn.execute(
+                """
+                SELECT
+                    p.*,
+                    ao.id AS assigned_officer_id,
+                    ao.username AS assigned_officer_username,
+                    ao.role AS assigned_officer_role,
+                    ao.emoji AS assigned_officer_emoji
+                FROM pnms p
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                WHERE p.assigned_officer_id = ? OR p.assigned_officer_id IS NULL
+                ORDER BY
+                    CASE
+                        WHEN p.assignment_status = 'needs_help' THEN 0
+                        WHEN p.assignment_status = 'in_progress' THEN 1
+                        WHEN p.assignment_status = 'assigned' THEN 2
+                        WHEN p.assignment_status = 'unassigned' THEN 3
+                        ELSE 4
+                    END ASC,
+                    p.assignment_priority DESC,
+                    p.weighted_total DESC,
+                    p.last_name ASC,
+                    p.first_name ASC
+                """,
+                (user["id"],),
+            ).fetchall()
+
+        officer_rows = conn.execute(
+            """
+            SELECT
+                u.id,
+                u.username,
+                u.role,
+                u.emoji,
+                u.stereotype,
+                u.interests_norm,
+                COUNT(p.id) AS total_assigned,
+                SUM(CASE WHEN p.assignment_status IN ('assigned', 'in_progress', 'needs_help') THEN 1 ELSE 0 END) AS active_assignments,
+                SUM(CASE WHEN p.assignment_status = 'completed' THEN 1 ELSE 0 END) AS completed_assignments
+            FROM users u
+            LEFT JOIN pnms p ON p.assigned_officer_id = u.id
+            WHERE u.is_approved = 1 AND u.role = ?
+            GROUP BY u.id, u.username, u.role, u.emoji, u.stereotype, u.interests_norm
+            ORDER BY active_assignments ASC, total_assigned ASC, u.username ASC
+            """,
+            (ROLE_RUSH_OFFICER,),
+        ).fetchall()
+
+    assignments: list[dict[str, Any]] = []
+    status_counts = {status_key: 0 for status_key in ASSIGNMENT_STATUSES}
+    due_counts = {"none": 0, "done": 0, "overdue": 0, "due_soon": 0, "upcoming": 0}
+    escalation_rows: list[dict[str, Any]] = []
+    unassigned_rows: list[sqlite3.Row] = []
+    for row in pnm_rows:
+        status_token = str(row["assignment_status"] or "").strip().lower()
+        if status_token not in ASSIGNMENT_STATUSES:
+            status_token = "assigned" if row["assigned_officer_id"] else "unassigned"
+        due_state = assignment_due_state(status_token, row["assignment_due_date"])
+        if not include_completed and status_token == "completed":
+            continue
+        status_counts[status_token] += 1
+        due_counts[due_state] = int(due_counts.get(due_state, 0)) + 1
+        if status_token in {"needs_help"} or due_state in {"overdue", "due_soon"}:
+            escalation_rows.append(
+                {
+                    "pnm_id": int(row["id"]),
+                    "pnm_code": row["pnm_code"],
+                    "name": f"{row['first_name']} {row['last_name']}",
+                    "assignment_status": status_token,
+                    "assignment_due_state": due_state,
+                    "assignment_due_date": row["assignment_due_date"],
+                    "assigned_officer_username": row["assigned_officer_username"] or "",
+                    "priority": clamped_assignment_priority(
+                        int(row["assignment_priority"]) if row["assignment_priority"] is not None else None
+                    ),
+                }
+            )
+        if row["assigned_officer_id"] is None or status_token == "unassigned":
+            unassigned_rows.append(row)
+        assignments.append(
+            {
+                "pnm_id": int(row["id"]),
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "weighted_total": round(float(row["weighted_total"]), 2),
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+                "assignment_status": status_token,
+                "assignment_status_label": ASSIGNMENT_STATUS_LABELS.get(status_token, status_token.title()),
+                "assignment_priority": clamped_assignment_priority(
+                    int(row["assignment_priority"]) if row["assignment_priority"] is not None else None
+                ),
+                "assignment_due_date": row["assignment_due_date"],
+                "assignment_due_state": due_state,
+                "assignment_notes": row["assignment_notes"] or "",
+                "assignment_updated_at": row["assignment_updated_at"],
+                "funnel_stage": row["funnel_stage"] if "funnel_stage" in row.keys() else "sourced",
+                "assigned_officer": assigned_officer_payload_from_row(row),
+                "interests_norm": split_normalized_csv(row["interests_norm"]),
+                "stereotype_norm": (row["stereotype"] or "").strip().lower(),
+            }
+        )
+
+    officer_loads: list[dict[str, Any]] = []
+    officer_lookup: list[dict[str, Any]] = []
+    for row in officer_rows:
+        active_assignments = int(row["active_assignments"] or 0)
+        total_assigned = int(row["total_assigned"] or 0)
+        completed_assignments = int(row["completed_assignments"] or 0)
+        capacity_ratio = round(active_assignments / max(1, OFFICER_CAPACITY_TARGET), 2)
+        payload = {
+            "user_id": int(row["id"]),
+            "username": row["username"],
+            "role": row["role"],
+            "emoji": row["emoji"],
+            "total_assigned": total_assigned,
+            "active_assignments": active_assignments,
+            "completed_assignments": completed_assignments,
+            "capacity_target": OFFICER_CAPACITY_TARGET,
+            "capacity_ratio": capacity_ratio,
+            "is_over_capacity": active_assignments > OFFICER_CAPACITY_TARGET,
+            "remaining_capacity": max(0, OFFICER_CAPACITY_TARGET - active_assignments),
+            "stereotype_norm": (row["stereotype"] or "").strip().lower(),
+            "interests_norm": split_normalized_csv(row["interests_norm"] or ""),
+        }
+        officer_loads.append(payload)
+        officer_lookup.append(payload)
+
+    recommendations: list[dict[str, Any]] = []
+    for pnm_row in sorted(
+        unassigned_rows,
+        key=lambda item: (
+            clamped_assignment_priority(int(item["assignment_priority"]) if item["assignment_priority"] is not None else None) * -1,
+            float(item["weighted_total"]) * -1,
+            int(item["id"]),
+        ),
+    )[:24]:
+        pnm_interests = split_normalized_csv(pnm_row["interests_norm"] or "")
+        pnm_stereotype = (pnm_row["stereotype"] or "").strip().lower()
+        ranked_officers: list[tuple[float, dict[str, Any], int, bool]] = []
+        for officer in officer_lookup:
+            shared_interest_count = len(pnm_interests & officer["interests_norm"])
+            stereotype_match = bool(pnm_stereotype and officer["stereotype_norm"] == pnm_stereotype)
+            score = (
+                shared_interest_count * 3.0
+                + (1.25 if stereotype_match else 0.0)
+                - officer["active_assignments"] * 0.75
+            )
+            ranked_officers.append((score, officer, shared_interest_count, stereotype_match))
+        ranked_officers.sort(
+            key=lambda item: (
+                item[0],
+                -item[1]["active_assignments"],
+                item[1]["username"].lower(),
+            ),
+            reverse=True,
+        )
+        top_suggestions = [
+            {
+                "user_id": candidate["user_id"],
+                "username": candidate["username"],
+                "role": candidate["role"],
+                "emoji": candidate["emoji"],
+                "score": round(score, 2),
+                "shared_interest_count": shared_count,
+                "stereotype_match": stereotype_match,
+                "active_assignments": candidate["active_assignments"],
+                "capacity_ratio": candidate["capacity_ratio"],
+            }
+            for score, candidate, shared_count, stereotype_match in ranked_officers[:3]
+        ]
+        if not top_suggestions:
+            continue
+        recommendations.append(
+            {
+                "pnm_id": int(pnm_row["id"]),
+                "pnm_code": pnm_row["pnm_code"],
+                "name": f"{pnm_row['first_name']} {pnm_row['last_name']}",
+                "assignment_priority": clamped_assignment_priority(
+                    int(pnm_row["assignment_priority"]) if pnm_row["assignment_priority"] is not None else None
+                ),
+                "weighted_total": round(float(pnm_row["weighted_total"]), 2),
+                "top_suggestions": top_suggestions,
+            }
+        )
+
+    for assignment in assignments:
+        assignment.pop("interests_norm", None)
+        assignment.pop("stereotype_norm", None)
+    for load in officer_loads:
+        load.pop("interests_norm", None)
+        load.pop("stereotype_norm", None)
+
+    return {
+        "assignments": assignments,
+        "status_counts": status_counts,
+        "due_counts": due_counts,
+        "officer_loads": officer_loads,
+        "recommendations": recommendations,
+        "escalations": escalation_rows[:40],
+        "capacity_target": OFFICER_CAPACITY_TARGET,
+    }
+
+
+@app.patch("/api/pnms/{pnm_id}/assignment")
+def update_pnm_assignment(
+    pnm_id: int,
+    payload: PnmAssignmentUpdateRequest,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    requested_fields = set(payload.model_fields_set)
+    if not requested_fields:
+        raise HTTPException(status_code=400, detail="No assignment changes provided.")
+
+    with db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        old_assigned_officer_id = int(row["assigned_officer_id"]) if row["assigned_officer_id"] is not None else None
+        old_status = str(row["assignment_status"] or "").strip().lower()
+        if old_status not in ASSIGNMENT_STATUSES:
+            old_status = "assigned" if old_assigned_officer_id else "unassigned"
+
+        assigned_officer_id = old_assigned_officer_id
+        if "officer_user_id" in requested_fields:
+            assigned_officer_id = payload.officer_user_id
+
+        target_officer_row: sqlite3.Row | None = None
+        if assigned_officer_id is not None:
+            target_officer_row = conn.execute(
+                "SELECT id, username, role, emoji FROM users WHERE id = ? AND is_approved = 1",
+                (assigned_officer_id,),
+            ).fetchone()
+            if not target_officer_row:
+                raise HTTPException(status_code=404, detail="Rush Officer not found.")
+            if target_officer_row["role"] != ROLE_RUSH_OFFICER:
+                raise HTTPException(status_code=400, detail="Assignment target must be a Rush Officer.")
+
+        if "assignment_status" in requested_fields and payload.assignment_status is not None:
+            status_token = payload.assignment_status
+        else:
+            if assigned_officer_id is None:
+                status_token = "unassigned"
+            elif old_assigned_officer_id != assigned_officer_id:
+                status_token = "assigned"
+            else:
+                status_token = old_status
+        if assigned_officer_id is None:
+            status_token = "unassigned"
+        if status_token not in ASSIGNMENT_STATUSES:
+            raise HTTPException(status_code=400, detail="Invalid assignment status.")
+
+        if "assignment_priority" in requested_fields:
+            priority = clamped_assignment_priority(payload.assignment_priority)
+        else:
+            priority = clamped_assignment_priority(int(row["assignment_priority"]) if row["assignment_priority"] is not None else None)
+
+        if "assignment_due_date" in requested_fields:
+            due_date = payload.assignment_due_date
+        else:
+            due_date = row["assignment_due_date"]
+        if assigned_officer_id is None and "assignment_due_date" not in requested_fields:
+            due_date = None
+
+        if "assignment_notes" in requested_fields:
+            notes = payload.assignment_notes or ""
+        else:
+            notes = row["assignment_notes"] or ""
+        notes = notes.strip()
+
+        now = now_iso()
+        assigned_by = row["assigned_by"]
+        assigned_at = row["assigned_at"]
+        if assigned_officer_id is None:
+            assigned_by = None
+            assigned_at = None
+        elif old_assigned_officer_id != assigned_officer_id:
+            assigned_by = head_user["id"]
+            assigned_at = now
+        conn.execute(
+            """
+            UPDATE pnms
+            SET
+                assigned_officer_id = ?,
+                assigned_by = ?,
+                assigned_at = ?,
+                assignment_status = ?,
+                assignment_priority = ?,
+                assignment_due_date = ?,
+                assignment_notes = ?,
+                assignment_updated_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                assigned_officer_id,
+                assigned_by,
+                assigned_at,
+                status_token,
+                priority,
+                due_date,
+                notes,
+                now,
+                now,
+                pnm_id,
+            ),
+        )
+
+        if assigned_officer_id is not None and payload.notify_officer and assigned_officer_id != old_assigned_officer_id:
+            create_notification(
+                conn,
+                user_id=assigned_officer_id,
+                notif_type="assignment",
+                title=f"Assigned: {row['first_name']} {row['last_name']}",
+                body=f"Status: {ASSIGNMENT_STATUS_LABELS.get(status_token, status_token)}",
+                link_path=f"/?pnm={pnm_id}",
+            )
+        if status_token == "needs_help":
+            helper_rows = conn.execute(
+                "SELECT id FROM users WHERE role = ? AND is_approved = 1",
+                (ROLE_HEAD,),
+            ).fetchall()
+            create_notifications_for_users(
+                conn,
+                [int(item["id"]) for item in helper_rows],
+                notif_type="assignment_alert",
+                title=f"Needs Help: {row['first_name']} {row['last_name']}",
+                body=notes[:220] or "Assignment was marked as needs help.",
+                link_path=f"/?pnm={pnm_id}",
+            )
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="assignment_update",
+            entity_type="pnm",
+            entity_id=pnm_id,
+            payload={
+                "old_assigned_officer_id": old_assigned_officer_id,
+                "new_assigned_officer_id": assigned_officer_id,
+                "old_status": old_status,
+                "new_status": status_token,
+                "old_priority": row["assignment_priority"],
+                "new_priority": priority,
+                "old_due_date": row["assignment_due_date"],
+                "new_due_date": due_date,
+            },
+        )
+
+        refreshed = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, head_user["id"])
+
+    return {
+        "message": "PNM assignment details updated.",
+        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+    }
+
+
+@app.patch("/api/pnms/{pnm_id}/stage")
+def update_pnm_funnel_stage(
+    pnm_id: int,
+    payload: PnmFunnelStageUpdateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    next_stage = payload.stage
+    reason = payload.reason.strip()
+    with db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        old_stage = str(row["funnel_stage"] or "").strip().lower() or "sourced"
+        if old_stage not in PNM_FUNNEL_STAGES:
+            old_stage = "sourced"
+        old_reason = str(row["funnel_stage_reason"] or "").strip()
+        if old_stage == next_stage and old_reason == reason:
+            own = fetch_own_rating(conn, pnm_id, user["id"])
+            return {
+                "message": "Funnel stage unchanged.",
+                "pnm": pnm_payload(row, own, assigned_officer=assigned_officer_payload_from_row(row)),
+            }
+
+        changed_at = now_iso()
+        conn.execute(
+            """
+            UPDATE pnms
+            SET funnel_stage = ?, funnel_stage_reason = ?, funnel_stage_updated_at = ?, funnel_stage_updated_by = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (next_stage, reason, changed_at, user["id"], changed_at, pnm_id),
+        )
+        conn.execute(
+            """
+            INSERT INTO pnm_stage_history (pnm_id, from_stage, to_stage, reason, changed_by, changed_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (pnm_id, old_stage, next_stage, reason, user["id"], changed_at),
+        )
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="funnel_stage_change",
+            entity_type="pnm",
+            entity_id=pnm_id,
+            payload={
+                "from_stage": old_stage,
+                "to_stage": next_stage,
+                "reason": reason,
+            },
+        )
+
+        if next_stage in {"bid", "accepted", "declined"}:
+            head_rows = conn.execute(
+                "SELECT id FROM users WHERE role = ? AND is_approved = 1 AND id != ?",
+                (ROLE_HEAD, user["id"]),
+            ).fetchall()
+            create_notifications_for_users(
+                conn,
+                [int(item["id"]) for item in head_rows],
+                notif_type="funnel_stage",
+                title=f"Stage updated: {row['first_name']} {row['last_name']}",
+                body=f"{old_stage.title()} -> {next_stage.title()}",
+                link_path=f"/meeting?pnm={pnm_id}",
+            )
+
+        refreshed = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, user["id"])
+
+    return {
+        "message": "PNM funnel stage updated.",
+        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "change": {
+            "from_stage": old_stage,
+            "to_stage": next_stage,
+            "reason": reason,
+            "changed_at": changed_at,
+            "changed_by": int(user["id"]),
+            "changed_by_username": user["username"],
+        },
+    }
+
+
+@app.get("/api/pnms/{pnm_id}/stage-history")
+def pnm_funnel_stage_history(
+    pnm_id: int,
+    limit: int = 120,
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    max_limit = max(1, min(400, int(limit)))
+    with db_session() as conn:
+        exists = conn.execute("SELECT id, funnel_stage FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not exists:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+        rows = conn.execute(
+            """
+            SELECT
+                h.id,
+                h.from_stage,
+                h.to_stage,
+                h.reason,
+                h.changed_by,
+                h.changed_at,
+                u.username AS changed_by_username
+            FROM pnm_stage_history h
+            JOIN users u ON u.id = h.changed_by
+            WHERE h.pnm_id = ?
+            ORDER BY h.changed_at DESC, h.id DESC
+            LIMIT ?
+            """,
+            (pnm_id, max_limit),
+        ).fetchall()
+    return {
+        "pnm_id": pnm_id,
+        "current_stage": exists["funnel_stage"] if exists["funnel_stage"] else "sourced",
+        "history": [
+            {
+                "id": int(row["id"]),
+                "from_stage": row["from_stage"],
+                "to_stage": row["to_stage"],
+                "reason": row["reason"] or "",
+                "changed_by": int(row["changed_by"]),
+                "changed_by_username": row["changed_by_username"],
+                "changed_at": row["changed_at"],
+            }
+            for row in rows
+        ],
+    }
+
+
+@app.get("/api/funnel/summary")
+def funnel_summary(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    with db_session() as conn:
+        totals = conn.execute(
+            """
+            SELECT
+                COUNT(*) AS pnm_total,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'accepted' THEN 1 ELSE 0 END), 0) AS accepted_count,
+                COALESCE(SUM(CASE WHEN funnel_stage = 'declined' THEN 1 ELSE 0 END), 0) AS declined_count
+            FROM pnms
+            """
+        ).fetchone()
+        stage_rows = conn.execute(
+            """
+            SELECT
+                funnel_stage,
+                COUNT(*) AS count,
+                COALESCE(AVG(weighted_total), 0) AS avg_weighted_total
+            FROM pnms
+            GROUP BY funnel_stage
+            """
+        ).fetchall()
+        transition_rows = conn.execute(
+            """
+            SELECT
+                from_stage,
+                to_stage,
+                COUNT(*) AS transition_count
+            FROM pnm_stage_history
+            GROUP BY from_stage, to_stage
+            ORDER BY transition_count DESC, from_stage ASC, to_stage ASC
+            LIMIT 40
+            """
+        ).fetchall()
+        recent_rows = conn.execute(
+            """
+            SELECT
+                h.pnm_id,
+                h.from_stage,
+                h.to_stage,
+                h.reason,
+                h.changed_at,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                u.username AS changed_by_username
+            FROM pnm_stage_history h
+            JOIN pnms p ON p.id = h.pnm_id
+            JOIN users u ON u.id = h.changed_by
+            ORDER BY h.changed_at DESC, h.id DESC
+            LIMIT 30
+            """
+        ).fetchall()
+
+    stage_counts: dict[str, int] = {stage: 0 for stage in PNM_FUNNEL_STAGES}
+    stage_avg_scores: dict[str, float] = {stage: 0.0 for stage in PNM_FUNNEL_STAGES}
+    for row in stage_rows:
+        stage_name = str(row["funnel_stage"] or "").strip().lower()
+        if stage_name not in stage_counts:
+            continue
+        stage_counts[stage_name] = int(row["count"])
+        stage_avg_scores[stage_name] = round(float(row["avg_weighted_total"]), 2)
+
+    conversion_steps: list[dict[str, Any]] = []
+    previous_count = None
+    for stage_name in PNM_FUNNEL_STAGES:
+        count = stage_counts[stage_name]
+        conversion_from_previous = None
+        if previous_count is not None and previous_count > 0:
+            conversion_from_previous = round((count / previous_count) * 100, 1)
+        conversion_steps.append(
+            {
+                "stage": stage_name,
+                "count": count,
+                "avg_weighted_total": stage_avg_scores[stage_name],
+                "conversion_from_previous_pct": conversion_from_previous,
+            }
+        )
+        previous_count = count
+
+    pnm_total = int(totals["pnm_total"] or 0)
+    accepted_count = int(totals["accepted_count"] or 0)
+    declined_count = int(totals["declined_count"] or 0)
+    bid_count = stage_counts["bid"] + stage_counts["accepted"] + stage_counts["declined"]
+    bid_conversion_pct = round((accepted_count / bid_count) * 100, 1) if bid_count > 0 else 0.0
+    overall_acceptance_pct = round((accepted_count / pnm_total) * 100, 1) if pnm_total > 0 else 0.0
+
+    return {
+        "total_pnms": pnm_total,
+        "accepted_count": accepted_count,
+        "declined_count": declined_count,
+        "bid_count": bid_count,
+        "bid_conversion_pct": bid_conversion_pct,
+        "overall_acceptance_pct": overall_acceptance_pct,
+        "stages": conversion_steps,
+        "transitions": [
+            {
+                "from_stage": row["from_stage"],
+                "to_stage": row["to_stage"],
+                "count": int(row["transition_count"]),
+            }
+            for row in transition_rows
+        ],
+        "recent_changes": [
+            {
+                "pnm_id": int(row["pnm_id"]),
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "from_stage": row["from_stage"],
+                "to_stage": row["to_stage"],
+                "reason": row["reason"] or "",
+                "changed_at": row["changed_at"],
+                "changed_by_username": row["changed_by_username"],
+            }
+            for row in recent_rows
+        ],
     }
 
 
@@ -8040,6 +9597,23 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             """,
             (pnm_id,),
         ).fetchall()
+        stage_rows = conn.execute(
+            """
+            SELECT
+                h.id,
+                h.from_stage,
+                h.to_stage,
+                h.reason,
+                h.changed_at,
+                u.username AS changed_by_username
+            FROM pnm_stage_history h
+            JOIN users u ON u.id = h.changed_by
+            WHERE h.pnm_id = ?
+            ORDER BY h.changed_at DESC, h.id DESC
+            LIMIT 20
+            """,
+            (pnm_id,),
+        ).fetchall()
 
     can_view_identity = user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
     ratings: list[dict[str, Any]] = []
@@ -8129,6 +9703,17 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             "end_weighted_total": trend_end,
             "delta_weighted_total": round(float(trend_delta), 2) if trend_delta is not None else None,
         },
+        "funnel_history": [
+            {
+                "id": int(row["id"]),
+                "from_stage": row["from_stage"],
+                "to_stage": row["to_stage"],
+                "reason": row["reason"] or "",
+                "changed_at": row["changed_at"],
+                "changed_by_username": row["changed_by_username"],
+            }
+            for row in stage_rows
+        ],
         "ratings": ratings,
         "lunches": [
             {
@@ -8148,7 +9733,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
 
 
 @app.delete("/api/pnms/{pnm_id}")
-def delete_pnm(pnm_id: int, _: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
+def delete_pnm(pnm_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
     with db_session() as conn:
         row = conn.execute("SELECT id, pnm_code, first_name, last_name, photo_path FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not row:
@@ -8160,7 +9745,17 @@ def delete_pnm(pnm_id: int, _: sqlite3.Row = Depends(require_head)) -> dict[str,
         photo_path = row["photo_path"]
         display_name = f"{row['first_name']} {row['last_name']}"
 
+        conn.execute("DELETE FROM engagement_events WHERE pnm_id = ?", (pnm_id,))
         conn.execute("DELETE FROM pnms WHERE id = ?", (pnm_id,))
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="pnm_delete",
+            entity_type="pnm",
+            entity_id=pnm_id,
+            payload={"pnm_code": row["pnm_code"], "name": display_name},
+        )
+        sync_engagement_events_from_sources(conn)
         for user_id in affected_users:
             recalc_member_rating_stats(conn, user_id)
             recalc_member_lunch_stats(conn, user_id)
@@ -8308,6 +9903,19 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                     scores=new_payload,
                     changed_at=now,
                 )
+                append_audit_entry(
+                    conn,
+                    actor_user_id=int(user["id"]),
+                    action_type="rating_update",
+                    entity_type="rating",
+                    entity_id=int(existing["id"]),
+                    payload={
+                        "pnm_id": payload.pnm_id,
+                        "old_total": int(existing["total_score"]),
+                        "new_total": new_total,
+                        "delta_total": delta_total,
+                    },
+                )
         else:
             cursor = conn.execute(
                 """
@@ -8357,6 +9965,14 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                 event_type="create",
                 scores=create_payload,
                 changed_at=now,
+            )
+            append_audit_entry(
+                conn,
+                actor_user_id=int(user["id"]),
+                action_type="rating_create",
+                entity_type="rating",
+                entity_id=rating_id,
+                payload={"pnm_id": payload.pnm_id, "new_total": new_total},
             )
 
         recalc_pnm_rating_stats(conn, payload.pnm_id)
@@ -8528,6 +10144,20 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             ) from exc
 
         lunch_id = int(cursor.lastrowid or 0)
+        sync_engagement_event_from_lunch(conn, lunch_id)
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="lunch_create",
+            entity_type="lunch",
+            entity_id=lunch_id,
+            payload={
+                "pnm_id": payload.pnm_id,
+                "lunch_date": payload.lunch_date,
+                "start_time": payload.start_time,
+                "end_time": payload.end_time,
+            },
+        )
         recalc_member_lunch_stats(conn, user["id"])
         recalc_pnm_lunch_stats(conn, payload.pnm_id)
         evaluate_weekly_goal_completions(conn)
@@ -9101,6 +10731,431 @@ def public_rush_calendar_feed(token: str | None = None) -> Response:
     )
 
 
+def engagement_event_payload(row: sqlite3.Row) -> dict[str, Any]:
+    keys = set(row.keys())
+    pnm_id = int(row["pnm_id"]) if "pnm_id" in keys and row["pnm_id"] is not None else None
+    pnm_name = None
+    pnm_code = None
+    if pnm_id is not None:
+        first_name = row["pnm_first_name"] if "pnm_first_name" in keys else None
+        last_name = row["pnm_last_name"] if "pnm_last_name" in keys else None
+        if first_name and last_name:
+            pnm_name = f"{first_name} {last_name}"
+        pnm_code = row["pnm_code"] if "pnm_code" in keys else None
+
+    title = row["title"]
+    details = row["details"] if "details" in keys else ""
+    owner_username = row["owner_username"] if "owner_username" in keys else None
+    google_calendar_url = None
+    try:
+        if row["event_type"] == "lunch" and pnm_name and pnm_code:
+            google_calendar_url = build_google_calendar_event_url(
+                pnm_name=pnm_name,
+                pnm_code=pnm_code,
+                lunch_date=row["event_date"],
+                notes=details or "",
+                location=row["location"] or "",
+                start_time=row["start_time"],
+                end_time=row["end_time"],
+                logged_by_username=owner_username or row["created_by_username"] or "BidBoard",
+            )
+        else:
+            google_calendar_url = build_google_calendar_generic_event_url(
+                title=title,
+                event_date=row["event_date"],
+                details=details or "",
+                location=row["location"] or "",
+                start_time=row["start_time"],
+                end_time=row["end_time"],
+            )
+    except ValueError:
+        google_calendar_url = None
+
+    return {
+        "event_id": int(row["id"]),
+        "event_type": row["event_type"],
+        "status": row["status"],
+        "title": title,
+        "event_date": row["event_date"],
+        "start_time": row["start_time"],
+        "end_time": row["end_time"],
+        "location": row["location"] or "",
+        "details": details or "",
+        "pnm": (
+            {
+                "pnm_id": pnm_id,
+                "pnm_code": pnm_code,
+                "name": pnm_name,
+            }
+            if pnm_id is not None
+            else None
+        ),
+        "owner": (
+            {
+                "user_id": int(row["owner_user_id"]),
+                "username": owner_username,
+                "role": row["owner_role"] if "owner_role" in keys else None,
+                "emoji": row["owner_emoji"] if "owner_emoji" in keys else None,
+            }
+            if "owner_user_id" in keys and row["owner_user_id"] is not None
+            else None
+        ),
+        "source_type": row["source_type"],
+        "source_id": row["source_id"],
+        "created_by": int(row["created_by"]),
+        "created_by_username": row["created_by_username"] if "created_by_username" in keys else None,
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+        "google_calendar_url": google_calendar_url,
+    }
+
+
+@app.get("/api/events")
+def list_engagement_events(
+    request: Request,
+    event_type: str | None = None,
+    status_value: str | None = Query(default=None, alias="status"),
+    pnm_id: int | None = None,
+    owner_user_id: int | None = None,
+    source_type: str | None = None,
+    include_past: bool = False,
+    include_cancelled: bool = False,
+    limit: int = 500,
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    where_clauses: list[str] = []
+    params: list[Any] = []
+
+    if event_type:
+        try:
+            normalized_event_type = normalize_engagement_event_type(event_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        where_clauses.append("e.event_type = ?")
+        params.append(normalized_event_type)
+
+    if status_value:
+        try:
+            normalized_status = normalize_engagement_event_status(status_value)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        where_clauses.append("e.status = ?")
+        params.append(normalized_status)
+    elif not include_cancelled:
+        where_clauses.append("e.status != 'cancelled'")
+
+    if pnm_id is not None:
+        where_clauses.append("e.pnm_id = ?")
+        params.append(pnm_id)
+    if owner_user_id is not None:
+        where_clauses.append("e.owner_user_id = ?")
+        params.append(owner_user_id)
+    if source_type:
+        normalized_source = source_type.strip().lower()
+        if normalized_source not in {"manual", "lunch", "rush_event"}:
+            raise HTTPException(status_code=400, detail="Source type must be manual, lunch, or rush_event.")
+        where_clauses.append("e.source_type = ?")
+        params.append(normalized_source)
+    if not include_past:
+        where_clauses.append("e.event_date >= date('now', '-3 day')")
+
+    safe_limit = max(1, min(1200, int(limit)))
+    where_sql = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+    with db_session() as conn:
+        rows = conn.execute(
+            f"""
+            SELECT
+                e.*,
+                p.pnm_code,
+                p.first_name AS pnm_first_name,
+                p.last_name AS pnm_last_name,
+                owner.username AS owner_username,
+                owner.role AS owner_role,
+                owner.emoji AS owner_emoji,
+                creator.username AS created_by_username
+            FROM engagement_events e
+            LEFT JOIN pnms p ON p.id = e.pnm_id
+            LEFT JOIN users owner ON owner.id = e.owner_user_id
+            LEFT JOIN users creator ON creator.id = e.created_by
+            {where_sql}
+            ORDER BY e.event_date ASC, COALESCE(e.start_time, '23:59') ASC, e.id ASC
+            LIMIT ?
+            """,
+            (*params, safe_limit),
+        ).fetchall()
+
+    events = [engagement_event_payload(row) for row in rows]
+    type_counts: dict[str, int] = {event_name: 0 for event_name in ENGAGEMENT_EVENT_TYPES}
+    status_counts: dict[str, int] = {status_name: 0 for status_name in ENGAGEMENT_EVENT_STATUSES}
+    for item in events:
+        type_counts[item["event_type"]] = int(type_counts.get(item["event_type"], 0)) + 1
+        status_counts[item["status"]] = int(status_counts.get(item["status"], 0)) + 1
+    return {
+        "events": events,
+        "count": len(events),
+        "type_counts": type_counts,
+        "status_counts": status_counts,
+        "calendar_share": calendar_share_payload(request, current_tenant()),
+    }
+
+
+@app.post("/api/events")
+def create_engagement_event(
+    payload: EngagementEventCreateRequest,
+    user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=400, detail="Title cannot be empty.")
+    details = payload.details.strip()
+    location = payload.location.strip()
+    if payload.event_type == "lunch" and payload.pnm_id is None:
+        raise HTTPException(status_code=400, detail="Lunch events require a PNM.")
+
+    with db_session() as conn:
+        owner_user_id = payload.owner_user_id if payload.owner_user_id is not None else int(user["id"])
+        owner = conn.execute(
+            "SELECT id, username, role, emoji FROM users WHERE id = ? AND is_approved = 1",
+            (owner_user_id,),
+        ).fetchone()
+        if not owner:
+            raise HTTPException(status_code=404, detail="Owner user not found.")
+
+        if payload.pnm_id is not None:
+            pnm = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+            if not pnm:
+                raise HTTPException(status_code=404, detail="PNM not found.")
+
+        now = now_iso()
+        cursor = conn.execute(
+            """
+            INSERT INTO engagement_events (
+                event_type,
+                status,
+                title,
+                event_date,
+                start_time,
+                end_time,
+                location,
+                details,
+                pnm_id,
+                owner_user_id,
+                source_type,
+                source_id,
+                created_by,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual', NULL, ?, ?, ?)
+            """,
+            (
+                payload.event_type,
+                payload.status,
+                title,
+                payload.event_date,
+                payload.start_time,
+                payload.end_time,
+                location,
+                details,
+                payload.pnm_id,
+                owner_user_id,
+                user["id"],
+                now,
+                now,
+            ),
+        )
+        event_id = int(cursor.lastrowid or 0)
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="event_create",
+            entity_type="engagement_event",
+            entity_id=event_id,
+            payload={
+                "event_type": payload.event_type,
+                "status": payload.status,
+                "event_date": payload.event_date,
+                "owner_user_id": owner_user_id,
+                "pnm_id": payload.pnm_id,
+            },
+        )
+        if int(owner_user_id) != int(user["id"]):
+            create_notification(
+                conn,
+                user_id=int(owner_user_id),
+                notif_type="event",
+                title=f"Event Assigned: {title}",
+                body=f"{payload.event_date} | {payload.start_time or 'All Day'}",
+                link_path="/?view=operations",
+            )
+
+        row = conn.execute(
+            """
+            SELECT
+                e.*,
+                p.pnm_code,
+                p.first_name AS pnm_first_name,
+                p.last_name AS pnm_last_name,
+                owner.username AS owner_username,
+                owner.role AS owner_role,
+                owner.emoji AS owner_emoji,
+                creator.username AS created_by_username
+            FROM engagement_events e
+            LEFT JOIN pnms p ON p.id = e.pnm_id
+            LEFT JOIN users owner ON owner.id = e.owner_user_id
+            LEFT JOIN users creator ON creator.id = e.created_by
+            WHERE e.id = ?
+            """,
+            (event_id,),
+        ).fetchone()
+    return {"event": engagement_event_payload(row)}
+
+
+@app.patch("/api/events/{event_id}")
+def update_engagement_event(
+    event_id: int,
+    payload: EngagementEventUpdateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    requested_fields = set(payload.model_fields_set)
+    if not requested_fields:
+        raise HTTPException(status_code=400, detail="No event changes provided.")
+
+    with db_session() as conn:
+        row = conn.execute("SELECT * FROM engagement_events WHERE id = ?", (event_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Event not found.")
+
+        if row["source_type"] != "manual":
+            disallowed = requested_fields - {"status"}
+            if disallowed:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Linked events can only update status here. Edit lunches/rush events from their native APIs.",
+                )
+
+        if int(user["id"]) != int(row["created_by"]) and user["role"] != ROLE_HEAD:
+            if not (row["source_type"] == "lunch" and row["owner_user_id"] == user["id"]):
+                raise HTTPException(status_code=403, detail="You cannot edit this event.")
+
+        event_type_token = row["event_type"]
+        if "event_type" in requested_fields and payload.event_type is not None:
+            event_type_token = payload.event_type
+        status_token = row["status"]
+        if "status" in requested_fields and payload.status is not None:
+            status_token = payload.status
+        title = row["title"]
+        if "title" in requested_fields and payload.title is not None:
+            title = payload.title.strip()
+        event_date = row["event_date"]
+        if "event_date" in requested_fields and payload.event_date is not None:
+            event_date = payload.event_date
+        start_time = row["start_time"]
+        if "start_time" in requested_fields:
+            start_time = payload.start_time
+        end_time = row["end_time"]
+        if "end_time" in requested_fields:
+            end_time = payload.end_time
+        location = row["location"]
+        if "location" in requested_fields and payload.location is not None:
+            location = payload.location.strip()
+        details = row["details"]
+        if "details" in requested_fields and payload.details is not None:
+            details = payload.details.strip()
+        pnm_id = row["pnm_id"]
+        if "pnm_id" in requested_fields:
+            pnm_id = payload.pnm_id
+        owner_user_id = row["owner_user_id"]
+        if "owner_user_id" in requested_fields:
+            owner_user_id = payload.owner_user_id
+
+        if end_time and not start_time:
+            raise HTTPException(status_code=400, detail="End time requires a start time.")
+        if start_time and end_time:
+            start_value = parse_clock_value(start_time)
+            end_value = parse_clock_value(end_time)
+            if start_value and end_value and (end_value[0] * 60 + end_value[1]) <= (start_value[0] * 60 + start_value[1]):
+                raise HTTPException(status_code=400, detail="End time must be after start time.")
+        if event_type_token == "lunch" and pnm_id is None:
+            raise HTTPException(status_code=400, detail="Lunch events require a PNM.")
+
+        if pnm_id is not None:
+            pnm_exists = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+            if not pnm_exists:
+                raise HTTPException(status_code=404, detail="PNM not found.")
+        if owner_user_id is not None:
+            owner_exists = conn.execute("SELECT id FROM users WHERE id = ? AND is_approved = 1", (owner_user_id,)).fetchone()
+            if not owner_exists:
+                raise HTTPException(status_code=404, detail="Owner user not found.")
+
+        conn.execute(
+            """
+            UPDATE engagement_events
+            SET
+                event_type = ?,
+                status = ?,
+                title = ?,
+                event_date = ?,
+                start_time = ?,
+                end_time = ?,
+                location = ?,
+                details = ?,
+                pnm_id = ?,
+                owner_user_id = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                event_type_token,
+                status_token,
+                title,
+                event_date,
+                start_time,
+                end_time,
+                location,
+                details,
+                pnm_id,
+                owner_user_id,
+                now_iso(),
+                event_id,
+            ),
+        )
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="event_update",
+            entity_type="engagement_event",
+            entity_id=event_id,
+            payload={
+                "source_type": row["source_type"],
+                "old_status": row["status"],
+                "new_status": status_token,
+                "old_event_date": row["event_date"],
+                "new_event_date": event_date,
+            },
+        )
+        refreshed = conn.execute(
+            """
+            SELECT
+                e.*,
+                p.pnm_code,
+                p.first_name AS pnm_first_name,
+                p.last_name AS pnm_last_name,
+                owner.username AS owner_username,
+                owner.role AS owner_role,
+                owner.emoji AS owner_emoji,
+                creator.username AS created_by_username
+            FROM engagement_events e
+            LEFT JOIN pnms p ON p.id = e.pnm_id
+            LEFT JOIN users owner ON owner.id = e.owner_user_id
+            LEFT JOIN users creator ON creator.id = e.created_by
+            WHERE e.id = ?
+            """,
+            (event_id,),
+        ).fetchone()
+    return {"event": engagement_event_payload(refreshed)}
+
+
 def rush_event_payload(row: sqlite3.Row) -> dict[str, Any]:
     details = row["details"] if "details" in row.keys() else ""
     google_calendar_url = None
@@ -9220,6 +11275,19 @@ def create_rush_event(payload: RushEventCreateRequest, user: sqlite3.Row = Depen
             ),
         )
         event_id = int(cursor.lastrowid)
+        sync_engagement_event_from_rush_event(conn, event_id)
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="rush_event_create",
+            entity_type="rush_event",
+            entity_id=event_id,
+            payload={
+                "event_type": payload.event_type,
+                "event_date": payload.event_date,
+                "is_official": bool(payload.is_official),
+            },
+        )
         created = conn.execute(
             """
             SELECT
@@ -9307,6 +11375,19 @@ def update_rush_event(
                 event_id,
             ),
         )
+        sync_engagement_event_from_rush_event(conn, event_id)
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="rush_event_update",
+            entity_type="rush_event",
+            entity_id=event_id,
+            payload={
+                "event_type": event_type,
+                "event_date": event_date,
+                "is_cancelled": bool(is_cancelled),
+            },
+        )
         refreshed = conn.execute(
             """
             SELECT
@@ -9323,12 +11404,21 @@ def update_rush_event(
 
 
 @app.delete("/api/rush-events/{event_id}")
-def delete_rush_event(event_id: int, _: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
+def delete_rush_event(event_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
     with db_session() as conn:
         row = conn.execute("SELECT * FROM rush_events WHERE id = ?", (event_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Rush event not found.")
         conn.execute("UPDATE rush_events SET is_cancelled = 1, updated_at = ? WHERE id = ?", (now_iso(), event_id))
+        sync_engagement_event_from_rush_event(conn, event_id)
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="rush_event_cancel",
+            entity_type="rush_event",
+            entity_id=event_id,
+            payload={"event_type": row["event_type"], "event_date": row["event_date"]},
+        )
     return {"message": "Rush event removed."}
 
 
@@ -9807,6 +11897,290 @@ def list_notifications(
             }
             for row in rows
         ],
+    }
+
+
+@app.get("/api/notifications/digest")
+def notification_digest(
+    period: str = "daily",
+    include_read: bool = False,
+    max_items: int = 40,
+    user: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    try:
+        period_token = normalize_digest_period(period)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    window_modifier = "-1 day" if period_token == "daily" else "-6 day"
+    safe_limit = max(5, min(200, int(max_items)))
+
+    with db_session() as conn:
+        unread_row = conn.execute(
+            "SELECT COUNT(*) AS c FROM notifications WHERE user_id = ? AND is_read = 0",
+            (user["id"],),
+        ).fetchone()
+
+        if include_read:
+            digest_rows = conn.execute(
+                """
+                SELECT *
+                FROM notifications
+                WHERE user_id = ?
+                  AND date(created_at) >= date('now', ?)
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (user["id"], window_modifier, safe_limit),
+            ).fetchall()
+            type_rows = conn.execute(
+                """
+                SELECT notif_type, COUNT(*) AS c
+                FROM notifications
+                WHERE user_id = ?
+                  AND date(created_at) >= date('now', ?)
+                GROUP BY notif_type
+                ORDER BY c DESC, notif_type ASC
+                """,
+                (user["id"], window_modifier),
+            ).fetchall()
+        else:
+            digest_rows = conn.execute(
+                """
+                SELECT *
+                FROM notifications
+                WHERE user_id = ?
+                  AND is_read = 0
+                  AND date(created_at) >= date('now', ?)
+                ORDER BY created_at DESC, id DESC
+                LIMIT ?
+                """,
+                (user["id"], window_modifier, safe_limit),
+            ).fetchall()
+            type_rows = conn.execute(
+                """
+                SELECT notif_type, COUNT(*) AS c
+                FROM notifications
+                WHERE user_id = ?
+                  AND is_read = 0
+                  AND date(created_at) >= date('now', ?)
+                GROUP BY notif_type
+                ORDER BY c DESC, notif_type ASC
+                """,
+                (user["id"], window_modifier),
+            ).fetchall()
+
+        assignment_where = ""
+        assignment_params: list[Any] = []
+        if user["role"] != ROLE_HEAD:
+            assignment_where = "WHERE p.assigned_officer_id = ?"
+            assignment_params = [user["id"]]
+
+        assignment_rows = conn.execute(
+            f"""
+            SELECT
+                p.id,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                p.assignment_status,
+                p.assignment_due_date
+            FROM pnms p
+            {assignment_where}
+            ORDER BY p.assignment_priority DESC, p.weighted_total DESC, p.last_name ASC
+            """,
+            tuple(assignment_params),
+        ).fetchall()
+
+        touchpoint_rows = conn.execute(
+            f"""
+            SELECT
+                p.id,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                p.assignment_status,
+                MAX(l.lunch_date) AS last_lunch_date
+            FROM pnms p
+            LEFT JOIN lunches l ON l.pnm_id = p.id
+            {assignment_where}
+            GROUP BY p.id, p.pnm_code, p.first_name, p.last_name, p.assignment_status
+            ORDER BY p.weighted_total DESC, p.last_name ASC
+            LIMIT 300
+            """,
+            tuple(assignment_params),
+        ).fetchall()
+
+    by_type = [{"notif_type": row["notif_type"], "count": int(row["c"])} for row in type_rows]
+    assignment_alerts: dict[str, int] = {"overdue": 0, "due_soon": 0, "needs_help": 0, "unassigned": 0}
+    flagged_assignments: list[dict[str, Any]] = []
+    for row in assignment_rows:
+        status_token = str(row["assignment_status"] or "").strip().lower() or "unassigned"
+        if status_token not in ASSIGNMENT_STATUSES:
+            status_token = "unassigned"
+        due_state = assignment_due_state(status_token, row["assignment_due_date"])
+        if status_token == "needs_help":
+            assignment_alerts["needs_help"] += 1
+        if status_token == "unassigned":
+            assignment_alerts["unassigned"] += 1
+        if due_state == "overdue":
+            assignment_alerts["overdue"] += 1
+        elif due_state == "due_soon":
+            assignment_alerts["due_soon"] += 1
+        if status_token == "needs_help" or due_state in {"overdue", "due_soon"}:
+            flagged_assignments.append(
+                {
+                    "pnm_id": int(row["id"]),
+                    "pnm_code": row["pnm_code"],
+                    "name": f"{row['first_name']} {row['last_name']}",
+                    "assignment_status": status_token,
+                    "due_state": due_state,
+                    "due_date": row["assignment_due_date"],
+                }
+            )
+
+    stale_touchpoints: list[dict[str, Any]] = []
+    for row in touchpoint_rows:
+        last_lunch = row["last_lunch_date"]
+        is_stale = (last_lunch is None) or str(last_lunch) < (date.today() - timedelta(days=10)).isoformat()
+        if not is_stale:
+            continue
+        stale_touchpoints.append(
+            {
+                "pnm_id": int(row["id"]),
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "assignment_status": row["assignment_status"] or "unassigned",
+                "last_lunch_date": last_lunch,
+            }
+        )
+
+    return {
+        "period": period_token,
+        "include_read": include_read,
+        "window_start": (date.today() - timedelta(days=1 if period_token == "daily" else 6)).isoformat(),
+        "unread_count": int(unread_row["c"]),
+        "digest_count": len(digest_rows),
+        "by_type": by_type,
+        "assignment_alerts": assignment_alerts,
+        "flagged_assignments": flagged_assignments[:30],
+        "stale_touchpoints": stale_touchpoints[:30],
+        "notifications": [
+            {
+                "notification_id": int(row["id"]),
+                "notif_type": row["notif_type"],
+                "title": row["title"],
+                "body": row["body"],
+                "link_path": row["link_path"],
+                "is_read": bool(row["is_read"]),
+                "created_at": row["created_at"],
+            }
+            for row in digest_rows
+        ],
+    }
+
+
+@app.post("/api/notifications/digest")
+def broadcast_notification_digest(
+    payload: NotificationDigestBroadcastRequest,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    window_modifier = "-1 day" if payload.period == "daily" else "-6 day"
+    with db_session() as conn:
+        if payload.recipients == "all_approved":
+            recipient_rows = conn.execute(
+                "SELECT id, username FROM users WHERE is_approved = 1 AND id != ?",
+                (head_user["id"],),
+            ).fetchall()
+        else:
+            recipient_rows = conn.execute(
+                """
+                SELECT id, username
+                FROM users
+                WHERE is_approved = 1
+                  AND role IN (?, ?)
+                  AND id != ?
+                """,
+                (ROLE_HEAD, ROLE_RUSH_OFFICER, head_user["id"]),
+            ).fetchall()
+
+        dispatched = 0
+        for recipient in recipient_rows:
+            if payload.include_read:
+                notif_count = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM notifications
+                    WHERE user_id = ?
+                      AND date(created_at) >= date('now', ?)
+                    """,
+                    (recipient["id"], window_modifier),
+                ).fetchone()
+            else:
+                notif_count = conn.execute(
+                    """
+                    SELECT COUNT(*) AS c
+                    FROM notifications
+                    WHERE user_id = ?
+                      AND is_read = 0
+                      AND date(created_at) >= date('now', ?)
+                    """,
+                    (recipient["id"], window_modifier),
+                ).fetchone()
+
+            alert_rows = conn.execute(
+                """
+                SELECT assignment_status, assignment_due_date
+                FROM pnms
+                WHERE assigned_officer_id = ?
+                """,
+                (recipient["id"],),
+            ).fetchall()
+            overdue_count = 0
+            due_soon_count = 0
+            needs_help_count = 0
+            for alert_row in alert_rows:
+                status_token = str(alert_row["assignment_status"] or "").strip().lower() or "unassigned"
+                if status_token == "needs_help":
+                    needs_help_count += 1
+                due_state = assignment_due_state(status_token, alert_row["assignment_due_date"])
+                if due_state == "overdue":
+                    overdue_count += 1
+                elif due_state == "due_soon":
+                    due_soon_count += 1
+
+            body = (
+                f"{payload.period.title()} digest: {int(notif_count['c'] or 0)} notification(s), "
+                f"{overdue_count} overdue assignment(s), {due_soon_count} due soon, {needs_help_count} needs-help."
+            )
+            create_notification(
+                conn,
+                user_id=int(recipient["id"]),
+                notif_type="digest",
+                title=f"{payload.period.title()} Team Digest",
+                body=body[:500],
+                link_path="/?view=operations",
+            )
+            dispatched += 1
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="digest_broadcast",
+            entity_type="notification",
+            entity_id=None,
+            payload={
+                "period": payload.period,
+                "recipients": payload.recipients,
+                "dispatched": dispatched,
+                "include_read": payload.include_read,
+            },
+        )
+
+    return {
+        "message": f"Digest sent to {dispatched} user(s).",
+        "period": payload.period,
+        "recipients": payload.recipients,
+        "dispatched": dispatched,
     }
 
 

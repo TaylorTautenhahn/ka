@@ -331,6 +331,54 @@ def main() -> None:
             expect_status(response, 200, "Head creates rush event")
             checks.append("Head rush event create works")
 
+            response = client.patch(
+                f"/kappaalphaorder/api/pnms/{pnm_id}/assignment",
+                json={
+                    "officer_user_id": officer_user_id,
+                    "assignment_status": "in_progress",
+                    "assignment_priority": 4,
+                    "assignment_due_date": today,
+                    "assignment_notes": "Priority outreach before chapter discussion.",
+                },
+            )
+            expect_status(response, 200, "Assignment detail update")
+            checks.append("Assignment orchestration endpoint works")
+
+            response = client.patch(
+                f"/kappaalphaorder/api/pnms/{pnm_id}/stage",
+                json={"stage": "evaluated", "reason": "Completed initial officer review."},
+            )
+            expect_status(response, 200, "Funnel stage update")
+            checks.append("Funnel stage update API works")
+
+            response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/stage-history")
+            expect_status(response, 200, "Funnel stage history API")
+            stage_history = response.json().get("history", [])
+            if not stage_history:
+                raise AssertionError("Funnel stage history should include at least one transition.")
+            checks.append("Funnel stage history API works")
+
+            response = client.get("/kappaalphaorder/api/assignments/overview")
+            expect_status(response, 200, "Assignments overview API")
+            checks.append("Assignments overview API works")
+
+            response = client.get("/kappaalphaorder/api/events?include_past=1")
+            expect_status(response, 200, "Unified events API")
+            events_payload = response.json()
+            if int(events_payload.get("count", 0)) < 2:
+                raise AssertionError("Unified events feed should include both lunch and rush events.")
+            checks.append("Unified event/workflow API works")
+
+            response = client.get("/kappaalphaorder/api/funnel/summary")
+            expect_status(response, 200, "Funnel summary API")
+            if int(response.json().get("total_pnms", 0)) < 1:
+                raise AssertionError("Funnel summary should include at least one PNM.")
+            checks.append("Funnel summary API works")
+
+            response = client.get("/kappaalphaorder/api/notifications/digest?period=daily")
+            expect_status(response, 200, "Notification digest API")
+            checks.append("Notification digest API works")
+
             response = client.get("/kappaalphaorder/api/rush-calendar?limit=50")
             expect_status(response, 200, "Rush calendar API")
             calendar_payload = response.json()

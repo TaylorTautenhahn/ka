@@ -297,6 +297,58 @@
     let autoMatcherOffset = 0;
     let lastRouteSwitchAt = 0;
     let lastReadoutKey = "";
+    const baseFont = "Space Grotesk, sans-serif";
+
+    function isLightTheme() {
+      return doc.getAttribute("data-theme") === "light";
+    }
+
+    function networkPalette() {
+      if (isLightTheme()) {
+        return {
+          gridLine: "rgba(73, 111, 180, 0.16)",
+          dustRgba: (alpha) => `rgba(82, 121, 192, ${alpha.toFixed(3)})`,
+          labelText: "rgba(18, 44, 88, 0.98)",
+          labelBg: "rgba(255, 255, 255, 0.95)",
+          labelBorder: "rgba(89, 136, 214, 0.58)",
+          labelShadow: "rgba(44, 91, 173, 0.22)",
+          connectionStart: (alpha) => `rgba(19, 174, 131, ${alpha.toFixed(3)})`,
+          connectionMid: (alpha) => `rgba(53, 121, 220, ${alpha.toFixed(3)})`,
+          connectionEnd: (alpha) => `rgba(91, 97, 228, ${alpha.toFixed(3)})`,
+          connectionShadowActive: "rgba(66, 131, 228, 0.58)",
+          connectionShadowIdle: "rgba(86, 122, 186, 0.2)",
+          pulseFill: "rgba(255, 255, 255, 0.98)",
+          pulseShadow: "rgba(82, 132, 214, 0.78)",
+          rusheeNode: "rgba(18, 184, 137, 0.95)",
+          interestNode: "rgba(45, 107, 212, 0.97)",
+          officerNode: "rgba(16, 120, 232, 0.96)",
+          memberNode: "rgba(106, 102, 233, 0.94)",
+          fallbackNode: "rgba(86, 126, 201, 0.9)",
+          pointerNode: "rgba(33, 92, 181, 0.94)",
+        };
+      }
+      return {
+        gridLine: "rgba(94, 132, 194, 0.08)",
+        dustRgba: (alpha) => `rgba(154, 188, 243, ${alpha.toFixed(3)})`,
+        labelText: "rgba(223, 236, 255, 0.94)",
+        labelBg: "rgba(15, 27, 48, 0.78)",
+        labelBorder: "rgba(123, 171, 247, 0.36)",
+        labelShadow: "rgba(117, 166, 244, 0.2)",
+        connectionStart: (alpha) => `rgba(69, 230, 184, ${alpha.toFixed(3)})`,
+        connectionMid: (alpha) => `rgba(184, 214, 255, ${alpha.toFixed(3)})`,
+        connectionEnd: (alpha) => `rgba(53, 203, 255, ${alpha.toFixed(3)})`,
+        connectionShadowActive: "rgba(72, 190, 255, 0.66)",
+        connectionShadowIdle: "rgba(122, 167, 236, 0.24)",
+        pulseFill: "rgba(213, 233, 255, 0.95)",
+        pulseShadow: "rgba(125, 185, 255, 0.76)",
+        rusheeNode: "rgba(69, 230, 184, 0.95)",
+        interestNode: "rgba(220, 235, 255, 0.95)",
+        officerNode: "rgba(53, 203, 255, 0.95)",
+        memberNode: "rgba(149, 151, 255, 0.94)",
+        fallbackNode: "rgba(153, 183, 238, 0.9)",
+        pointerNode: "rgba(214, 230, 255, 0.94)",
+      };
+    }
 
     function resize() {
       const rect = canvas.getBoundingClientRect();
@@ -368,24 +420,65 @@
       ctx.shadowBlur = 0;
     }
 
-    function drawLabel(screen, text) {
+    function drawRoundedRect(x, y, width, height, radius) {
+      if (typeof ctx.roundRect === "function") {
+        ctx.beginPath();
+        ctx.roundRect(x, y, width, height, radius);
+        return;
+      }
+      const r = Math.min(radius, width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function drawLabel(screen, text, palette) {
+      const labelText = String(text || "");
+      if (!labelText) {
+        return;
+      }
       ctx.save();
-      ctx.fillStyle = "rgba(223, 236, 255, 0.92)";
-      ctx.font = "700 11px Space Grotesk, sans-serif";
+      ctx.font = `700 11px ${baseFont}`;
       ctx.textAlign = "center";
-      ctx.fillText(text, screen.x, screen.y - (screen.radius + 10));
+      ctx.textBaseline = "middle";
+      const textWidth = ctx.measureText(labelText).width;
+      const chipWidth = textWidth + 16;
+      const chipHeight = 20;
+      const chipX = screen.x - chipWidth / 2;
+      const chipY = screen.y - (screen.radius + 30);
+
+      drawRoundedRect(chipX, chipY, chipWidth, chipHeight, 9);
+      ctx.fillStyle = palette.labelBg;
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = palette.labelBorder;
+      ctx.stroke();
+
+      ctx.fillStyle = palette.labelText;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = palette.labelShadow;
+      ctx.textAlign = "center";
+      ctx.fillText(labelText, screen.x, chipY + chipHeight / 2 + 0.2);
       ctx.restore();
     }
 
-    function drawConnection(a, b, intensity, active) {
+    function drawConnection(a, b, intensity, active, palette) {
       const gradient = ctx.createLinearGradient(a.x, a.y, b.x, b.y);
-      gradient.addColorStop(0, `rgba(69, 230, 184, ${0.08 + intensity * 0.35})`);
-      gradient.addColorStop(0.52, `rgba(184, 214, 255, ${0.08 + intensity * 0.4})`);
-      gradient.addColorStop(1, `rgba(53, 203, 255, ${0.1 + intensity * 0.45})`);
+      gradient.addColorStop(0, palette.connectionStart(0.08 + intensity * 0.35));
+      gradient.addColorStop(0.52, palette.connectionMid(0.08 + intensity * 0.4));
+      gradient.addColorStop(1, palette.connectionEnd(0.1 + intensity * 0.45));
       ctx.strokeStyle = gradient;
       ctx.lineWidth = active ? 2 + intensity * 2.2 : 0.9 + intensity * 1.15;
       ctx.shadowBlur = active ? 18 + intensity * 16 : 6 + intensity * 5;
-      ctx.shadowColor = active ? "rgba(72, 190, 255, 0.66)" : "rgba(122, 167, 236, 0.24)";
+      ctx.shadowColor = active ? palette.connectionShadowActive : palette.connectionShadowIdle;
       ctx.beginPath();
       ctx.moveTo(a.x, a.y);
       ctx.lineTo(b.x, b.y);
@@ -393,21 +486,21 @@
       ctx.shadowBlur = 0;
     }
 
-    function drawPulse(a, b, progress) {
+    function drawPulse(a, b, progress, palette) {
       const x = a.x + (b.x - a.x) * progress;
       const y = a.y + (b.y - a.y) * progress;
       ctx.beginPath();
-      ctx.fillStyle = "rgba(213, 233, 255, 0.95)";
+      ctx.fillStyle = palette.pulseFill;
       ctx.shadowBlur = 16;
-      ctx.shadowColor = "rgba(125, 185, 255, 0.76)";
+      ctx.shadowColor = palette.pulseShadow;
       ctx.arc(x, y, 2.6, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     }
 
-    function drawGrid(width, height) {
+    function drawGrid(width, height, palette) {
       const spacing = 36;
-      ctx.strokeStyle = "rgba(94, 132, 194, 0.08)";
+      ctx.strokeStyle = palette.gridLine;
       ctx.lineWidth = 0.8;
       for (let x = spacing; x < width; x += spacing) {
         ctx.beginPath();
@@ -440,8 +533,9 @@
     function tick(time) {
       const width = canvas.width / DPR;
       const height = canvas.height / DPR;
+      const palette = networkPalette();
       ctx.clearRect(0, 0, width, height);
-      drawGrid(width, height);
+      drawGrid(width, height, palette);
 
       dust.forEach((point) => {
         point.x += point.vx;
@@ -456,7 +550,7 @@
         const py = point.y * height;
         const alpha = 0.18 + (Math.sin(time * 0.0012 + point.phase) + 1) * 0.12;
         ctx.beginPath();
-        ctx.fillStyle = `rgba(154, 188, 243, ${alpha.toFixed(3)})`;
+        ctx.fillStyle = palette.dustRgba(alpha);
         ctx.arc(px, py, point.size, 0, Math.PI * 2);
         ctx.fill();
       });
@@ -512,10 +606,10 @@
         const key = `${sourceId}->${targetId}`;
         const reverseKey = `${targetId}->${sourceId}`;
         const isActive = activeLinks.has(key) || activeLinks.has(reverseKey);
-        drawConnection(source, target, isActive ? 0.68 : 0.3, isActive);
+        drawConnection(source, target, isActive ? 0.68 : 0.3, isActive, palette);
         if (isActive) {
           const progress = (time * 0.0007 + (sourceId.charCodeAt(0) % 4) * 0.19) % 1;
-          drawPulse(source, target, progress);
+          drawPulse(source, target, progress, palette);
         }
       });
 
@@ -525,33 +619,33 @@
           (activeInterest && node.id === activeInterest.id) ||
           (activeMatch && node.id === activeMatch.id);
         if (node.type === "rushee") {
-          drawNode(node, "rgba(69, 230, 184, 0.95)", 16, isActive);
+          drawNode(node, palette.rusheeNode, 16, isActive);
         } else if (node.type === "interest") {
-          drawNode(node, "rgba(220, 235, 255, 0.95)", 18, isActive);
+          drawNode(node, palette.interestNode, 18, isActive);
         } else if (node.type === "officer") {
-          drawNode(node, "rgba(53, 203, 255, 0.95)", 16, isActive);
+          drawNode(node, palette.officerNode, 16, isActive);
         } else if (node.type === "member") {
-          drawNode(node, "rgba(149, 151, 255, 0.94)", 14, isActive);
+          drawNode(node, palette.memberNode, 14, isActive);
         } else {
-          drawNode(node, "rgba(153, 183, 238, 0.9)", 10, false);
+          drawNode(node, palette.fallbackNode, 10, false);
         }
       });
 
       if (activeRushee) {
-        drawLabel(activeRushee, `Rushee: ${activeRushee.label}`);
+        drawLabel(activeRushee, `Rushee: ${activeRushee.label}`, palette);
       }
       if (activeInterest) {
-        drawLabel(activeInterest, `Interest: ${activeInterest.label}`);
+        drawLabel(activeInterest, `Interest: ${activeInterest.label}`, palette);
       }
       if (activeMatch) {
         const role = activeMatch.roleLabel || (activeMatch.type === "officer" ? "Rush Officer" : "Member");
-        drawLabel(activeMatch, `${role}: ${activeMatch.label}`);
+        drawLabel(activeMatch, `${role}: ${activeMatch.label}`, palette);
       }
       updateReadout(activeRushee, activeInterest, activeMatch);
 
       if (pointer.active) {
         const pointerScreen = { x: pointer.x * width, y: pointer.y * height, radius: 3.2 };
-        drawNode(pointerScreen, "rgba(214, 230, 255, 0.94)", 12, true);
+        drawNode(pointerScreen, palette.pointerNode, 12, true);
       }
 
       window.requestAnimationFrame(tick);

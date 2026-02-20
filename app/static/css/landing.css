@@ -1187,20 +1187,37 @@ html[data-theme="light"] .bb-network-head p {
   color: #2d6cc7;
 }
 
+html[data-theme="light"] .bb-network-head h3 {
+  color: #14366f;
+}
+
+html[data-theme="light"] .bb-network-head h3 span {
+  color: #1f66cf;
+}
+
+html[data-theme="light"] .bb-network-copy p {
+  color: #2d4574;
+}
+
 html[data-theme="light"] .bb-network-legend li {
   color: #2b426f;
 }
 
+html[data-theme="light"] .bb-network-dot-interest {
+  background: #2f6fd0;
+  box-shadow: 0 0 10px rgba(47, 111, 208, 0.44);
+}
+
 html[data-theme="light"] .bb-network-pill {
-  background: rgba(234, 245, 255, 0.92);
-  color: #1d3f79;
-  border-color: rgba(96, 150, 226, 0.4);
+  background: rgba(238, 248, 255, 0.96);
+  color: #173769;
+  border-color: rgba(84, 136, 212, 0.46);
 }
 
 html[data-theme="light"] .bb-network-pill-secondary {
-  background: rgba(231, 255, 246, 0.92);
-  color: #1b5e50;
-  border-color: rgba(75, 184, 155, 0.42);
+  background: rgba(235, 255, 248, 0.96);
+  color: #1a5b4e;
+  border-color: rgba(66, 175, 146, 0.46);
 }
 
 html[data-theme="light"] .bb-network-canvas {
@@ -1209,6 +1226,10 @@ html[data-theme="light"] .bb-network-canvas {
     radial-gradient(780px 300px at 22% 8%, rgba(53, 130, 255, 0.13), transparent 72%),
     radial-gradient(680px 300px at 82% 90%, rgba(122, 114, 255, 0.14), transparent 72%),
     linear-gradient(165deg, rgba(249, 252, 255, 0.95), rgba(236, 244, 255, 0.92));
+}
+
+html[data-theme="light"] .bb-network-note {
+  color: #2f4d80;
 }
 
 html[data-theme="light"] .bb-marquee-wrap {

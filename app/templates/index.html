@@ -156,6 +156,7 @@
           <div class="action-row">
             <button id="backupCsvBtn" type="button" class="secondary hidden">Backup CSV</button>
             <button id="backupDbBtn" type="button" class="secondary hidden">Backup DB</button>
+            <button id="openTutorialBtn" type="button" class="secondary hidden">Tutorial</button>
             <button id="installBtn" type="button" class="secondary hidden">Install App</button>
             <button id="logoutBtn" type="button" class="secondary">Logout</button>
           </div>
@@ -877,6 +878,51 @@
         </div>
       </section>
     </main>
+
+    <div id="tutorialLayer" class="tutorial-layer hidden" aria-hidden="true">
+      <div class="tutorial-scrim"></div>
+
+      <section id="tutorialModeCard" class="tutorial-card hidden" aria-live="polite">
+        <p class="eyebrow">First-Time Setup</p>
+        <h2 id="tutorialModeTitle">Welcome to BidBoard</h2>
+        <p id="tutorialModeSubtitle" class="muted">
+          Choose how you want to learn your role workflow.
+        </p>
+        <div id="tutorialRoleChecklist" class="tutorial-role-checklist"></div>
+        <div class="tutorial-mode-grid">
+          <button type="button" class="tutorial-mode-btn" data-tutorial-mode="guided">
+            <strong>Guided Tour</strong>
+            <span>Step-by-step with popups and page highlights.</span>
+          </button>
+          <button type="button" class="tutorial-mode-btn" data-tutorial-mode="advanced">
+            <strong>Advanced Mode</strong>
+            <span>Deep walkthrough with checks and role strategy tips.</span>
+          </button>
+          <button type="button" class="tutorial-mode-btn" data-tutorial-mode="quick">
+            <strong>Quick Mode</strong>
+            <span>Fast overview of your most-used actions.</span>
+          </button>
+        </div>
+        <div class="action-row tutorial-card-actions">
+          <button id="tutorialModeSkipBtn" type="button" class="secondary">Skip For Now</button>
+        </div>
+      </section>
+
+      <section id="tutorialStepCard" class="tutorial-card hidden" aria-live="polite">
+        <p id="tutorialStepMeta" class="eyebrow">Step 1 of 1</p>
+        <h2 id="tutorialStepTitle">Tutorial Step</h2>
+        <p id="tutorialStepBody" class="muted"></p>
+        <div id="tutorialStepHint" class="tutorial-step-hint hidden"></div>
+        <div class="tutorial-progress-wrap">
+          <div id="tutorialProgressBar" class="tutorial-progress-bar"></div>
+        </div>
+        <div class="action-row tutorial-card-actions">
+          <button id="tutorialPrevBtn" type="button" class="secondary">Back</button>
+          <button id="tutorialNextBtn" type="button">Next</button>
+          <button id="tutorialCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+      </section>
+    </div>
 
     <div id="toast" class="toast hidden"></div>
   </body>

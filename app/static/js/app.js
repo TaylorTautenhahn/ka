@@ -100,6 +100,7 @@ const logoutBtn = document.getElementById("logoutBtn");
 const installBtn = document.getElementById("installBtn");
 const backupCsvBtn = document.getElementById("backupCsvBtn");
 const backupDbBtn = document.getElementById("backupDbBtn");
+const openTutorialBtn = document.getElementById("openTutorialBtn");
 const loginRememberMe = document.getElementById("loginRememberMe");
 
 const regEmoji = document.getElementById("regEmoji");
@@ -223,6 +224,21 @@ const desktopPageNav = document.getElementById("desktopPageNav");
 const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
 const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
 const operationsUnreadBadge = document.getElementById("operationsUnreadBadge");
+const tutorialLayer = document.getElementById("tutorialLayer");
+const tutorialModeCard = document.getElementById("tutorialModeCard");
+const tutorialStepCard = document.getElementById("tutorialStepCard");
+const tutorialModeTitle = document.getElementById("tutorialModeTitle");
+const tutorialModeSubtitle = document.getElementById("tutorialModeSubtitle");
+const tutorialRoleChecklist = document.getElementById("tutorialRoleChecklist");
+const tutorialModeSkipBtn = document.getElementById("tutorialModeSkipBtn");
+const tutorialStepMeta = document.getElementById("tutorialStepMeta");
+const tutorialStepTitle = document.getElementById("tutorialStepTitle");
+const tutorialStepBody = document.getElementById("tutorialStepBody");
+const tutorialStepHint = document.getElementById("tutorialStepHint");
+const tutorialProgressBar = document.getElementById("tutorialProgressBar");
+const tutorialPrevBtn = document.getElementById("tutorialPrevBtn");
+const tutorialNextBtn = document.getElementById("tutorialNextBtn");
+const tutorialCloseBtn = document.getElementById("tutorialCloseBtn");
 
 const assignedRushPanel = document.getElementById("assignedRushPanel");
 const assignedRushTitle = document.getElementById("assignedRushTitle");
@@ -236,6 +252,13 @@ const headAssignClearBtn = document.getElementById("headAssignClearBtn");
 const headAssignmentTable = document.getElementById("headAssignmentTable");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
+const ROLE_HEAD = "Head Rush Officer";
+const ROLE_RUSH_OFFICER = "Rush Officer";
+const ROLE_RUSHER = "Rusher";
+const TUTORIAL_MODE_GUIDED = "guided";
+const TUTORIAL_MODE_ADVANCED = "advanced";
+const TUTORIAL_MODE_QUICK = "quick";
+const TUTORIAL_VERSION = 1;
 const BASE_DEFAULT_INTEREST_TAGS = [
   "Leadership",
   "Sports",
@@ -384,6 +407,14 @@ const state = {
   adminEditPnmId: null,
   headAssignmentPnmId: null,
   seasonArchive: null,
+  tutorial: {
+    active: false,
+    mode: TUTORIAL_MODE_GUIDED,
+    steps: [],
+    index: 0,
+    highlightedEl: null,
+    completing: false,
+  },
 };
 
 function ratingCriteriaForField(field) {
@@ -824,6 +855,9 @@ function updateTopbarActions() {
   const isHead = roleCanUseAdminPanel();
   backupCsvBtn.classList.toggle("hidden", !isHead);
   backupDbBtn.classList.toggle("hidden", !isHead);
+  if (openTutorialBtn) {
+    openTutorialBtn.classList.toggle("hidden", !state.user);
+  }
   if (adminNavLink) {
     adminNavLink.classList.toggle("hidden", !isHead);
   }
@@ -909,6 +943,473 @@ function roleCanViewAssignedRushes() {
 
 function roleCanManageOperations() {
   return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
+function userOnboardingState() {
+  if (!state.user || typeof state.user !== "object") {
+    return {
+      mode: TUTORIAL_MODE_GUIDED,
+      completed_at: null,
+      version: 0,
+      required: false,
+    };
+  }
+  const raw = state.user.onboarding && typeof state.user.onboarding === "object" ? state.user.onboarding : {};
+  const mode = String(raw.mode || TUTORIAL_MODE_GUIDED).trim().toLowerCase();
+  return {
+    mode:
+      mode === TUTORIAL_MODE_ADVANCED || mode === TUTORIAL_MODE_QUICK || mode === TUTORIAL_MODE_GUIDED
+        ? mode
+        : TUTORIAL_MODE_GUIDED,
+    completed_at: raw.completed_at || null,
+    version: Number.isFinite(Number(raw.version)) ? Number(raw.version) : 0,
+    required: Boolean(raw.required),
+  };
+}
+
+function tutorialRoleSummary(role) {
+  if (role === ROLE_HEAD) {
+    return [
+      { title: "Head Controls", body: "Manage approvals, assignments, season reset, and officer promotions." },
+      { title: "Operations Command", body: "Run events, goals, chat, notifications, and calendar strategy." },
+      { title: "Meeting Decisions", body: "Move from ratings to meeting packets with full accountability context." },
+    ];
+  }
+  if (role === ROLE_RUSH_OFFICER) {
+    return [
+      { title: "Daily Execution", body: "Add rushees, log lunches, and submit rating updates instantly." },
+      { title: "Coordination", body: "Track assignments, notifications, and officer chat in one flow." },
+      { title: "Meeting Prep", body: "Use leaderboard and packets to keep decisions sharp and consistent." },
+    ];
+  }
+  return [
+    { title: "Member View", body: "Find rushees quickly and submit simplified ratings." },
+    { title: "Participation", body: "Contribute feedback without seeing role-restricted officer analytics." },
+  ];
+}
+
+function tutorialBaseStepsForRole(role) {
+  const commonOfficerSteps = [
+    {
+      page: "overview",
+      target: "#desktopPageNav",
+      title: "Use Page Tabs As Your Command Rail",
+      body: "Switch between Overview, Operations, Rushees, Members, and Head Console from one fixed navigation bar.",
+      hint: "Pro tip: keep this on Overview during meetings, then jump to Rushees for live updates.",
+      advanced:
+        "Advanced workflow: keep one browser tab on Operations and one on Rushees during rush week for faster context switching.",
+    },
+    {
+      page: "overview",
+      target: "#matchingSection",
+      title: "Run Interest + Stereotype Matching",
+      body: "Apply shared filters to intentionally pair rushees with the best-fit members and officers.",
+      hint: "Filter by one interest first, then add stereotype only when you need tighter matching.",
+      advanced:
+        "Advanced workflow: run matching before each event block and create officer assignments based on strongest overlap.",
+    },
+    {
+      page: "rushees",
+      target: "#pnmForm",
+      title: "Create Rushees With Complete Intake",
+      body: "Capture contact info, interests, stereotype, notes, and photo so the chapter has one reliable record.",
+      hint: "Use consistent interests so filters and matching stay clean.",
+      advanced:
+        "Advanced workflow: create intake standards for notes (strengths, concerns, context) to keep meeting packets consistent.",
+    },
+    {
+      page: "rushees",
+      target: "#ratingForm",
+      title: "Submit Role-Weighted Ratings",
+      body: "Each rating update immediately recalculates weighted totals and meeting analytics.",
+      hint: "When updating an existing rating, include clear context in the comment.",
+      advanced:
+        "Advanced workflow: rate right after each event while context is fresh to improve historical trend quality.",
+    },
+    {
+      page: "rushees",
+      target: "#lunchForm",
+      title: "Schedule Lunches From The App",
+      body: "Lunch scheduling updates member and rushee stats and can be opened in Google Calendar instantly.",
+      hint: "Add location/time to make coordination easier for the full team.",
+      advanced:
+        "Advanced workflow: schedule lunches by assignment owner so accountability is clear before key decision meetings.",
+    },
+    {
+      page: "operations",
+      target: "#rushCalendarTable",
+      title: "Track One Shared Rush Timeline",
+      body: "The calendar combines official rush events and lunches into a single operational timeline.",
+      hint: "Use this view as the source of truth before each day starts.",
+      advanced:
+        "Advanced workflow: compare timeline density against rating activity to spot under-covered rushees quickly.",
+    },
+    {
+      page: "operations",
+      target: "#weeklyGoalsList",
+      title: "Use Weekly Goals For Accountability",
+      body: "Goals auto-track progress from real activity like ratings, lunches, and chat participation.",
+      hint: "Create one team goal and one owner-specific goal each week.",
+      advanced:
+        "Advanced workflow: align goals to funnel stage movement so progress reflects recruiting outcomes, not just activity.",
+    },
+    {
+      page: "operations",
+      target: "#officerChatForm",
+      title: "Coordinate In Live Officer Chat",
+      body: "Use tags and mentions to run real-time coordination like a focused rush command channel.",
+      hint: "Use tags like #priority and #followup to keep thread signal high.",
+      advanced:
+        "Advanced workflow: standardize tags by event type so chat stats become a reliable operations diagnostic.",
+    },
+    {
+      page: "members",
+      target: "#assignedRushPanel",
+      title: "Check Assigned Rushee Ownership",
+      body: "Assignment visibility keeps outreach accountable and prevents coverage gaps.",
+      hint: "Visit this page before events to confirm every key rushee has an owner.",
+      advanced:
+        "Advanced workflow: escalate any high-score unassigned rushee immediately from this panel.",
+    },
+  ];
+
+  if (role === ROLE_HEAD) {
+    return commonOfficerSteps.concat([
+      {
+        page: "admin",
+        target: "#headAdminSummary",
+        title: "Use Head Console As Mission Control",
+        body: "Head-only metrics summarize officer output, approvals, and chapter-level recruiting health.",
+        hint: "Review this panel daily before assigning priorities.",
+        advanced:
+          "Advanced workflow: run a quick metrics review each morning to rebalance assignments before noon events.",
+      },
+      {
+        page: "admin",
+        target: "#headAssignmentForm",
+        title: "Assign Rushees Directly From Head Console",
+        body: "Set or clear assignment ownership centrally so every rushee has accountable follow-through.",
+        hint: "Assign by fit and current officer capacity, not just availability.",
+        advanced:
+          "Advanced workflow: pair assignment updates with funnel-stage updates to track movement quality over time.",
+      },
+      {
+        page: "admin",
+        target: "#seasonArchiveSummary",
+        title: "Archive And Reset Safely",
+        body: "Archive one full season snapshot before reset so leadership transitions keep historical context.",
+        hint: "Use this only with explicit head-chair confirmation.",
+        advanced:
+          "Advanced workflow: export CSV + archive DB before reset for audit-grade redundancy.",
+      },
+    ]);
+  }
+
+  if (role === ROLE_RUSH_OFFICER) {
+    return commonOfficerSteps.concat([
+      {
+        page: "members",
+        target: "#approvalsPanel",
+        title: "Approve New Team Accounts",
+        body: "Rush Officers can approve pending users so new members can contribute quickly.",
+        hint: "Approve only known accounts to keep data quality and security tight.",
+        advanced:
+          "Advanced workflow: review pending accounts at fixed windows each day so onboarding is fast but controlled.",
+      },
+    ]);
+  }
+
+  return [
+    {
+      page: "overview",
+      target: "#leaderboardSection",
+      title: "Track Priority Rushees",
+      body: "Use leaderboard context to focus your feedback on top-priority candidates.",
+      hint: "You will only see access-appropriate information for your role.",
+      advanced: "Advanced workflow: submit ratings immediately after interactions to improve decision quality.",
+    },
+  ];
+}
+
+function buildTutorialSteps(role, mode) {
+  const base = tutorialBaseStepsForRole(role);
+  if (!base.length) {
+    return [];
+  }
+  if (mode === TUTORIAL_MODE_QUICK) {
+    const selectedIndices = [0, 2, 3, 7, base.length - 1];
+    const seen = new Set();
+    return selectedIndices
+      .filter((index) => index >= 0 && index < base.length)
+      .filter((index) => {
+        if (seen.has(index)) {
+          return false;
+        }
+        seen.add(index);
+        return true;
+      })
+      .map((index) => ({
+        ...base[index],
+        hint: base[index].hint || base[index].advanced || "",
+      }));
+  }
+  if (mode === TUTORIAL_MODE_ADVANCED) {
+    return base.map((step) => ({
+      ...step,
+      hint: step.advanced || step.hint || "",
+    }));
+  }
+  return base.map((step) => ({
+    ...step,
+    hint: step.hint || "",
+  }));
+}
+
+function clearTutorialHighlight() {
+  if (state.tutorial.highlightedEl) {
+    state.tutorial.highlightedEl.classList.remove("tutorial-highlight");
+    state.tutorial.highlightedEl = null;
+  }
+}
+
+function setTutorialHighlight(selector) {
+  clearTutorialHighlight();
+  if (!selector) {
+    return null;
+  }
+  const target = document.querySelector(selector);
+  if (!target) {
+    return null;
+  }
+  state.tutorial.highlightedEl = target;
+  target.classList.add("tutorial-highlight");
+  if (typeof target.scrollIntoView === "function") {
+    target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
+  }
+  return target;
+}
+
+function setTutorialLayerVisible(visible) {
+  if (!tutorialLayer) {
+    return;
+  }
+  tutorialLayer.classList.toggle("hidden", !visible);
+  tutorialLayer.setAttribute("aria-hidden", visible ? "false" : "true");
+}
+
+function closeTutorialOverlay(reset = true) {
+  clearTutorialHighlight();
+  setTutorialLayerVisible(false);
+  if (tutorialModeCard) {
+    tutorialModeCard.classList.add("hidden");
+  }
+  if (tutorialStepCard) {
+    tutorialStepCard.classList.add("hidden");
+  }
+  state.tutorial.active = false;
+  state.tutorial.completing = false;
+  if (reset) {
+    state.tutorial.mode = TUTORIAL_MODE_GUIDED;
+    state.tutorial.steps = [];
+    state.tutorial.index = 0;
+  }
+}
+
+function renderTutorialModeCard() {
+  if (!state.user || !tutorialModeCard || !tutorialModeTitle || !tutorialModeSubtitle || !tutorialRoleChecklist) {
+    return;
+  }
+  const role = state.user.role || ROLE_RUSH_OFFICER;
+  const roleCopy = role === ROLE_HEAD ? "Head Rush Officer" : role === ROLE_RUSH_OFFICER ? "Rush Officer" : "Member";
+  tutorialModeTitle.textContent = `${roleCopy} Tutorial`;
+  tutorialModeSubtitle.textContent = `Choose a mode to learn the ${roleCopy.toLowerCase()} workflow with in-app popups.`;
+  tutorialRoleChecklist.innerHTML = tutorialRoleSummary(role)
+    .map(
+      (item) => `
+        <div class="entry">
+          <div class="entry-title"><strong>${escapeHtml(item.title)}</strong></div>
+          <p class="muted">${escapeHtml(item.body)}</p>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function openTutorialModeChooser() {
+  if (!state.user || !tutorialLayer || !tutorialModeCard || !tutorialStepCard) {
+    return;
+  }
+  state.tutorial.active = true;
+  state.tutorial.steps = [];
+  state.tutorial.index = 0;
+  state.tutorial.completing = false;
+  clearTutorialHighlight();
+  renderTutorialModeCard();
+  tutorialStepCard.classList.add("hidden");
+  tutorialModeCard.classList.remove("hidden");
+  setTutorialLayerVisible(true);
+}
+
+function renderTutorialStep() {
+  if (!tutorialStepCard || !tutorialStepMeta || !tutorialStepTitle || !tutorialStepBody || !tutorialProgressBar) {
+    return;
+  }
+  const steps = state.tutorial.steps;
+  const safeIndex = Math.max(0, Math.min(state.tutorial.index, Math.max(steps.length - 1, 0)));
+  state.tutorial.index = safeIndex;
+  if (!steps.length) {
+    closeTutorialOverlay();
+    return;
+  }
+
+  const step = steps[safeIndex];
+  if (step.page) {
+    setActiveDesktopPage(step.page);
+  }
+  window.setTimeout(() => {
+    const highlighted = setTutorialHighlight(step.target);
+    let hintText = step.hint || "";
+    if (!highlighted && step.target) {
+      hintText = hintText
+        ? `${hintText} This target may be hidden by role permissions or current layout.`
+        : "This target may be hidden by role permissions or current layout.";
+    }
+    if (tutorialStepHint) {
+      tutorialStepHint.classList.toggle("hidden", !hintText);
+      tutorialStepHint.textContent = hintText;
+    }
+  }, 70);
+
+  tutorialStepMeta.textContent = `Step ${safeIndex + 1} of ${steps.length} • ${state.tutorial.mode.toUpperCase()} mode`;
+  tutorialStepTitle.textContent = step.title;
+  tutorialStepBody.textContent = step.body;
+  tutorialProgressBar.style.width = `${Math.round(((safeIndex + 1) / steps.length) * 100)}%`;
+  if (tutorialPrevBtn) {
+    tutorialPrevBtn.disabled = safeIndex <= 0;
+  }
+  if (tutorialNextBtn) {
+    tutorialNextBtn.textContent = safeIndex >= steps.length - 1 ? "Finish Tutorial" : "Next";
+  }
+}
+
+function startTutorialMode(mode) {
+  if (!state.user || !tutorialModeCard || !tutorialStepCard) {
+    return;
+  }
+  const normalized = String(mode || "").trim().toLowerCase();
+  const resolvedMode =
+    normalized === TUTORIAL_MODE_ADVANCED || normalized === TUTORIAL_MODE_QUICK ? normalized : TUTORIAL_MODE_GUIDED;
+  const steps = buildTutorialSteps(state.user.role || ROLE_RUSH_OFFICER, resolvedMode);
+  if (!steps.length) {
+    showToast("No tutorial steps are available for this role.");
+    return;
+  }
+  state.tutorial.active = true;
+  state.tutorial.mode = resolvedMode;
+  state.tutorial.steps = steps;
+  state.tutorial.index = 0;
+  tutorialModeCard.classList.add("hidden");
+  tutorialStepCard.classList.remove("hidden");
+  setTutorialLayerVisible(true);
+  renderTutorialStep();
+}
+
+function goTutorialStep(delta) {
+  if (!state.tutorial.active || !state.tutorial.steps.length) {
+    return;
+  }
+  const next = state.tutorial.index + delta;
+  if (next < 0 || next >= state.tutorial.steps.length) {
+    return;
+  }
+  state.tutorial.index = next;
+  renderTutorialStep();
+}
+
+async function completeTutorialFlow() {
+  if (state.tutorial.completing) {
+    return;
+  }
+  state.tutorial.completing = true;
+  if (tutorialNextBtn) {
+    tutorialNextBtn.disabled = true;
+    tutorialNextBtn.textContent = "Saving...";
+  }
+  try {
+    const payload = await api("/api/auth/tutorial/complete", {
+      method: "POST",
+      body: {
+        mode: state.tutorial.mode,
+        version: TUTORIAL_VERSION,
+      },
+    });
+    if (payload && payload.user) {
+      state.user = payload.user;
+      setSessionHeading();
+    }
+    closeTutorialOverlay();
+    showToast("Tutorial completed. Reopen it anytime from the Tutorial button.");
+  } catch (error) {
+    showToast(error.message || "Unable to save tutorial completion.");
+  } finally {
+    state.tutorial.completing = false;
+    if (tutorialNextBtn) {
+      tutorialNextBtn.disabled = false;
+      tutorialNextBtn.textContent =
+        state.tutorial.index >= state.tutorial.steps.length - 1 ? "Finish Tutorial" : "Next";
+    }
+  }
+}
+
+async function handleTutorialNext() {
+  const isLastStep = state.tutorial.index >= state.tutorial.steps.length - 1;
+  if (isLastStep) {
+    await completeTutorialFlow();
+    return;
+  }
+  goTutorialStep(1);
+}
+
+function maybeLaunchFirstRunTutorial() {
+  if (!state.user || !tutorialLayer) {
+    return;
+  }
+  const onboarding = userOnboardingState();
+  if (!onboarding.required) {
+    return;
+  }
+  state.tutorial.mode = onboarding.mode || TUTORIAL_MODE_GUIDED;
+  openTutorialModeChooser();
+}
+
+function handleTutorialShortcut() {
+  if (!state.user) {
+    return;
+  }
+  openTutorialModeChooser();
+}
+
+function handleTutorialKeydown(event) {
+  if (!state.tutorial.active || !tutorialLayer || tutorialLayer.classList.contains("hidden")) {
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeTutorialOverlay();
+    return;
+  }
+  if (tutorialModeCard && !tutorialModeCard.classList.contains("hidden")) {
+    return;
+  }
+  if (event.key === "ArrowLeft") {
+    event.preventDefault();
+    goTutorialStep(-1);
+    return;
+  }
+  if (event.key === "ArrowRight") {
+    event.preventDefault();
+    handleTutorialNext();
+  }
 }
 
 function shouldPreferMobileUi() {
@@ -2863,11 +3364,12 @@ async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
     state.user = payload.user;
+    const onboarding = state.user && state.user.onboarding ? state.user.onboarding : null;
     if (shouldRedirectToMemberPortal(state.user)) {
       window.location.replace(APP_CONFIG.member_base);
       return;
     }
-    if (shouldRedirectToMobileNow()) {
+    if (shouldRedirectToMobileNow() && !(onboarding && onboarding.required)) {
       window.location.replace(APP_CONFIG.mobile_base);
       return;
     }
@@ -2876,8 +3378,10 @@ async function ensureSession() {
     updateTopbarActions();
     await refreshAll();
     startLiveRefresh();
+    maybeLaunchFirstRunTutorial();
   } catch {
     state.user = null;
+    closeTutorialOverlay();
     setAuthView(false);
     updateTopbarActions();
     stopLiveRefresh();
@@ -2904,13 +3408,14 @@ async function handleLogin(event) {
         remember_me: rememberMe,
       },
     });
+    const onboarding = payload.user && payload.user.onboarding ? payload.user.onboarding : null;
 
     if (shouldRedirectToMemberPortal(payload.user)) {
       window.location.href = APP_CONFIG.member_base;
       return;
     }
 
-    if (APP_CONFIG.mobile_base && shouldPreferMobileUi()) {
+    if (APP_CONFIG.mobile_base && shouldPreferMobileUi() && !(onboarding && onboarding.required)) {
       window.location.href = APP_CONFIG.mobile_base;
       return;
     }
@@ -2922,6 +3427,7 @@ async function handleLogin(event) {
     showToast("Logged in.");
     await refreshAll();
     startLiveRefresh();
+    maybeLaunchFirstRunTutorial();
   } catch (error) {
     showToast(error.message || "Login failed.");
   }
@@ -2967,6 +3473,7 @@ async function handleLogout() {
     // ignore logout transport errors; local reset still required.
   }
   state.user = null;
+  closeTutorialOverlay();
   state.selectedPnmId = null;
   state.pnms = [];
   state.members = [];
@@ -4251,6 +4758,9 @@ function attachEvents() {
   loginForm.addEventListener("submit", handleLogin);
   registerForm.addEventListener("submit", handleRegister);
   logoutBtn.addEventListener("click", handleLogout);
+  if (openTutorialBtn) {
+    openTutorialBtn.addEventListener("click", handleTutorialShortcut);
+  }
   backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
   backupDbBtn.addEventListener("click", handleDbBackupDownload);
   if (seasonResetBtn) {
@@ -4394,6 +4904,43 @@ function attachEvents() {
   window.addEventListener("popstate", () => {
     setActiveDesktopPage(currentRequestedDesktopPage(), false);
   });
+
+  if (tutorialLayer) {
+    tutorialLayer.addEventListener("click", (event) => {
+      const target = event.target;
+      if (target === tutorialLayer || (target && target.classList && target.classList.contains("tutorial-scrim"))) {
+        closeTutorialOverlay();
+      }
+    });
+  }
+  if (tutorialModeCard) {
+    tutorialModeCard.addEventListener("click", (event) => {
+      const button = event.target.closest("[data-tutorial-mode]");
+      if (!button) {
+        return;
+      }
+      event.preventDefault();
+      startTutorialMode(button.dataset.tutorialMode || TUTORIAL_MODE_GUIDED);
+    });
+  }
+  if (tutorialModeSkipBtn) {
+    tutorialModeSkipBtn.addEventListener("click", () => {
+      closeTutorialOverlay();
+      showToast("Tutorial skipped. Use the Tutorial button any time.");
+    });
+  }
+  if (tutorialPrevBtn) {
+    tutorialPrevBtn.addEventListener("click", () => goTutorialStep(-1));
+  }
+  if (tutorialNextBtn) {
+    tutorialNextBtn.addEventListener("click", () => {
+      handleTutorialNext();
+    });
+  }
+  if (tutorialCloseBtn) {
+    tutorialCloseBtn.addEventListener("click", () => closeTutorialOverlay());
+  }
+  document.addEventListener("keydown", handleTutorialKeydown);
 }
 
 async function init() {

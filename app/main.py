@@ -133,6 +133,9 @@ ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
 ROLE_RUSHER = "Rusher"
 ALLOWED_ROLES = {ROLE_HEAD, ROLE_RUSH_OFFICER, ROLE_RUSHER}
+ONBOARDING_TUTORIAL_MODES = {"quick", "guided", "advanced"}
+ONBOARDING_DEFAULT_MODE = "guided"
+ONBOARDING_TUTORIAL_VERSION = 1
 UNSAFE_HTTP_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 DEFAULT_RUSH_OFFICER_EMOJI = "⭐"
 RUSH_EVENT_TYPES = {
@@ -3311,6 +3314,9 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             lunches_per_week REAL NOT NULL DEFAULT 0,
             rating_count INTEGER NOT NULL DEFAULT 0,
             avg_rating_given REAL NOT NULL DEFAULT 0,
+            onboarding_mode TEXT NOT NULL DEFAULT 'guided',
+            onboarding_completed_at TEXT,
+            onboarding_version INTEGER NOT NULL DEFAULT 0,
             CHECK (
                 (role = 'Rush Officer' AND emoji IS NOT NULL AND length(trim(emoji)) > 0)
                 OR (role != 'Rush Officer' AND (emoji IS NULL OR length(trim(emoji)) = 0))
@@ -3588,6 +3594,42 @@ def setup_schema(conn: sqlite3.Connection) -> None:
 
 
 def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
+    user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)").fetchall()}
+    if "onboarding_mode" not in user_columns:
+        conn.execute(f"ALTER TABLE users ADD COLUMN onboarding_mode TEXT NOT NULL DEFAULT '{ONBOARDING_DEFAULT_MODE}'")
+    if "onboarding_completed_at" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN onboarding_completed_at TEXT")
+    if "onboarding_version" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN onboarding_version INTEGER NOT NULL DEFAULT 0")
+    conn.execute(
+        "UPDATE users SET onboarding_mode = ? WHERE onboarding_mode IS NULL OR trim(onboarding_mode) = ''",
+        (ONBOARDING_DEFAULT_MODE,),
+    )
+    conn.execute(
+        """
+        UPDATE users
+        SET onboarding_mode = ?
+        WHERE lower(trim(onboarding_mode)) NOT IN ('quick', 'guided', 'advanced')
+        """,
+        (ONBOARDING_DEFAULT_MODE,),
+    )
+    conn.execute(
+        "UPDATE users SET onboarding_version = 0 WHERE onboarding_version IS NULL OR onboarding_version < 0"
+    )
+    # Existing users with successful logins are treated as already onboarded.
+    conn.execute(
+        """
+        UPDATE users
+        SET
+            onboarding_completed_at = COALESCE(onboarding_completed_at, last_login_at),
+            onboarding_version = CASE
+                WHEN (COALESCE(onboarding_completed_at, last_login_at, '') != '') AND onboarding_version < ? THEN ?
+                ELSE onboarding_version
+            END
+        """,
+        (ONBOARDING_TUTORIAL_VERSION, ONBOARDING_TUTORIAL_VERSION),
+    )
+
     pnm_columns = {row["name"] for row in conn.execute("PRAGMA table_info(pnms)").fetchall()}
     if "phone_number" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN phone_number TEXT NOT NULL DEFAULT ''")
@@ -5600,6 +5642,16 @@ def bootstrap_platform_and_tenants() -> None:
 
 def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str, Any]:
     can_view_rating_stats = viewer_role in {ROLE_HEAD, ROLE_RUSH_OFFICER} or row["id"] == viewer_id
+    keys = set(row.keys())
+    onboarding_mode = (
+        str(row["onboarding_mode"]).strip().lower()
+        if "onboarding_mode" in keys and row["onboarding_mode"] is not None
+        else ONBOARDING_DEFAULT_MODE
+    )
+    if onboarding_mode not in ONBOARDING_TUTORIAL_MODES:
+        onboarding_mode = ONBOARDING_DEFAULT_MODE
+    onboarding_completed_at = row["onboarding_completed_at"] if "onboarding_completed_at" in keys else None
+    onboarding_version = int(row["onboarding_version"]) if "onboarding_version" in keys and row["onboarding_version"] is not None else 0
     payload = {
         "user_id": row["id"],
         "username": row["username"],
@@ -5610,6 +5662,12 @@ def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str
         "is_approved": bool(row["is_approved"]),
         "total_lunches": int(row["total_lunches"]),
         "lunches_per_week": round(float(row["lunches_per_week"]), 2),
+        "onboarding": {
+            "mode": onboarding_mode,
+            "completed_at": onboarding_completed_at,
+            "version": onboarding_version,
+            "required": onboarding_completed_at is None or onboarding_version < ONBOARDING_TUTORIAL_VERSION,
+        },
     }
     if can_view_rating_stats:
         payload["rating_count"] = int(row["rating_count"])
@@ -5910,6 +5968,19 @@ class LoginRequest(BaseModel):
             merged["access_code"] = merged.get("password")
             return merged
         return data
+
+
+class TutorialCompleteRequest(BaseModel):
+    mode: str = Field(default=ONBOARDING_DEFAULT_MODE, min_length=1, max_length=24)
+    version: int = Field(default=ONBOARDING_TUTORIAL_VERSION, ge=1, le=25)
+
+    @field_validator("mode")
+    @classmethod
+    def validate_mode(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in ONBOARDING_TUTORIAL_MODES:
+            raise ValueError("Invalid tutorial mode.")
+        return normalized
 
 
 class SelfUpdateRequest(BaseModel):
@@ -7943,6 +8014,31 @@ def auth_me(request: Request, response: Response, user: sqlite3.Row = Depends(cu
     return {
         "authenticated": True,
         "user": user_payload(user, user["role"], user["id"]),
+    }
+
+
+@app.post("/api/auth/tutorial/complete")
+def complete_tutorial(payload: TutorialCompleteRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    completed_at = now_iso()
+    with db_session() as conn:
+        conn.execute(
+            """
+            UPDATE users
+            SET onboarding_mode = ?, onboarding_completed_at = ?, onboarding_version = ?, updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                payload.mode,
+                completed_at,
+                max(payload.version, ONBOARDING_TUTORIAL_VERSION),
+                completed_at,
+                user["id"],
+            ),
+        )
+        refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+    return {
+        "message": "Tutorial completed.",
+        "user": user_payload(refreshed, refreshed["role"], refreshed["id"]),
     }
 
 

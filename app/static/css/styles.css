@@ -2318,6 +2318,174 @@ body::after {
   gap: clamp(1.1rem, 1.7vw, 1.55rem);
 }
 
+.tutorial-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 360;
+}
+
+.tutorial-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 13, 22, 0.66);
+  backdrop-filter: blur(4px);
+}
+
+.tutorial-card {
+  position: absolute;
+  width: min(580px, calc(100% - 1.5rem));
+  max-height: min(78vh, 700px);
+  overflow: auto;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: linear-gradient(150deg, rgba(11, 21, 39, 0.95), rgba(19, 34, 58, 0.88));
+  box-shadow:
+    0 28px 60px rgba(4, 8, 14, 0.48),
+    0 0 0 1px rgba(var(--accent-rgb), 0.14) inset;
+  padding: clamp(1rem, 2.2vw, 1.4rem);
+}
+
+.tutorial-mode-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.68rem;
+  margin-top: 0.85rem;
+}
+
+.tutorial-mode-btn {
+  min-height: 124px;
+  text-align: left;
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  padding: 0.8rem 0.86rem;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.17);
+  background: linear-gradient(148deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
+  color: #f5f8ff;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.tutorial-mode-btn strong {
+  font-size: 0.98rem;
+}
+
+.tutorial-mode-btn span {
+  color: rgba(235, 242, 255, 0.8);
+  font-size: 0.81rem;
+  line-height: 1.45;
+}
+
+.tutorial-mode-btn:hover,
+.tutorial-mode-btn:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.27);
+  border-color: rgba(var(--gold-rgb), 0.5);
+}
+
+.tutorial-role-checklist {
+  margin-top: 0.72rem;
+  display: grid;
+  gap: 0.44rem;
+}
+
+.tutorial-role-checklist .entry {
+  margin: 0;
+  padding: 0.56rem 0.62rem;
+}
+
+.tutorial-step-hint {
+  margin-top: 0.58rem;
+  padding: 0.62rem 0.68rem;
+  border-radius: 12px;
+  border: 1px solid rgba(var(--gold-rgb), 0.32);
+  background: rgba(var(--gold-rgb), 0.12);
+  color: rgba(255, 250, 238, 0.94);
+  font-size: 0.86rem;
+}
+
+.tutorial-progress-wrap {
+  margin-top: 0.82rem;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+
+.tutorial-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(var(--gold-rgb), 0.85), rgba(var(--accent-rgb), 0.92));
+  border-radius: inherit;
+  transition: width 0.24s ease;
+}
+
+.tutorial-card-actions {
+  margin-top: 0.88rem;
+  justify-content: flex-end;
+}
+
+.tutorial-highlight {
+  position: relative;
+  z-index: 355;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 2px rgba(var(--gold-rgb), 0.78),
+    0 0 0 6px rgba(var(--gold-rgb), 0.18),
+    0 20px 42px rgba(0, 0, 0, 0.28);
+  animation: tutorialPulse 1.9s ease-in-out infinite;
+}
+
+@keyframes tutorialPulse {
+  0% {
+    box-shadow:
+      0 0 0 2px rgba(var(--gold-rgb), 0.7),
+      0 0 0 6px rgba(var(--gold-rgb), 0.15),
+      0 18px 38px rgba(0, 0, 0, 0.26);
+  }
+  50% {
+    box-shadow:
+      0 0 0 2px rgba(var(--gold-rgb), 0.98),
+      0 0 0 9px rgba(var(--gold-rgb), 0.22),
+      0 22px 46px rgba(0, 0, 0, 0.3);
+  }
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(var(--gold-rgb), 0.7),
+      0 0 0 6px rgba(var(--gold-rgb), 0.15),
+      0 18px 38px rgba(0, 0, 0, 0.26);
+  }
+}
+
+html.light-mode .tutorial-scrim {
+  background: rgba(8, 13, 22, 0.52);
+}
+
+html.light-mode .tutorial-card {
+  border-color: rgba(27, 40, 63, 0.14);
+  background: linear-gradient(156deg, rgba(250, 252, 255, 0.97), rgba(238, 245, 252, 0.95));
+}
+
+html.light-mode .tutorial-mode-btn {
+  background: linear-gradient(148deg, rgba(255, 255, 255, 0.94), rgba(241, 247, 255, 0.96));
+  border-color: rgba(26, 50, 87, 0.16);
+  color: #10213b;
+}
+
+html.light-mode .tutorial-mode-btn span {
+  color: rgba(17, 34, 57, 0.8);
+}
+
+html.light-mode .tutorial-step-hint {
+  background: rgba(var(--gold-rgb), 0.17);
+  color: #2f2600;
+}
+
 @media (min-width: 960px) {
   .hero-shell {
     grid-template-columns: minmax(0, 1.22fr) minmax(280px, 0.78fr);
@@ -2384,6 +2552,17 @@ body::after {
     font-size: 0.76rem;
     flex: 0 0 auto;
     white-space: nowrap;
+  }
+
+  .tutorial-card {
+    width: min(96vw, 500px);
+    max-height: min(82vh, 720px);
+    border-radius: 18px;
+    padding: 0.9rem;
+  }
+
+  .tutorial-mode-grid {
+    grid-template-columns: 1fr;
   }
 }
 

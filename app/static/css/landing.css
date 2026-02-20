@@ -300,11 +300,7 @@ html[data-theme="light"] .bb-theme-toggle-moon {
   letter-spacing: -0.03em;
   text-wrap: balance;
   max-width: 15ch;
-  background: linear-gradient(120deg, #f4f7ff, #8ad9ff 46%, #a897ff 88%);
-  background-size: 180% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #f4f7ff;
   animation: bbShine 7s linear infinite;
 }
 
@@ -539,12 +535,36 @@ html[data-theme="light"] .bb-theme-toggle-moon {
 }
 
 .bb-title-shine {
-  background: linear-gradient(120deg, #f2f7ff, #8dd9ff 44%, #ab9dff 88%);
-  background-size: 180% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #f2f7ff;
+  display: inline;
   animation: bbShine 7s linear infinite;
+}
+
+@supports ((-webkit-background-clip: text) or (background-clip: text)) {
+  .bb-hero-title {
+    background: linear-gradient(120deg, #f4f7ff, #8ad9ff 46%, #a897ff 88%);
+    background-size: 180% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .bb-title-shine {
+    background: linear-gradient(120deg, #f2f7ff, #8dd9ff 44%, #ab9dff 88%);
+    background-size: 180% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+  }
+
+  html[data-theme="light"] .bb-hero-title,
+  html[data-theme="light"] .bb-title-shine {
+    background: linear-gradient(118deg, #0f2f67, #1f74de 46%, #6652ee 88%);
+    background-size: 180% 100%;
+    -webkit-text-fill-color: transparent;
+  }
 }
 
 .bb-page-subtitle {
@@ -1136,8 +1156,7 @@ html[data-theme="light"] .bb-kicker {
 
 html[data-theme="light"] .bb-hero-title,
 html[data-theme="light"] .bb-title-shine {
-  background: linear-gradient(118deg, #0f2f67, #1f74de 46%, #6652ee 88%);
-  background-size: 180% 100%;
+  color: #14366f;
 }
 
 html[data-theme="light"] .bb-inline-metric {
@@ -1428,18 +1447,56 @@ html[data-theme="light"] .bb-media-slot-ghost {
   }
 
   .bb-topbar {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 0.74rem 0.82rem;
+    gap: 0.62rem;
+    scrollbar-width: none;
+  }
+
+  .bb-topbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .bb-brand,
+  .bb-topbar-actions,
+  .bb-topbar-utilities {
+    flex: 0 0 auto;
   }
 
   .bb-topbar-actions {
-    width: 100%;
-    overflow-x: auto;
+    width: auto;
+    overflow: visible;
     white-space: nowrap;
-    padding-bottom: 0.18rem;
+    padding-bottom: 0;
+    gap: 0.32rem;
+    scrollbar-width: none;
+  }
+
+  .bb-topbar-actions::-webkit-scrollbar {
+    display: none;
   }
 
   .bb-topbar-utilities {
-    margin-left: auto;
+    margin-left: 0;
+    gap: 0.34rem;
+  }
+
+  .bb-link,
+  .bb-login-btn {
+    white-space: nowrap;
+  }
+
+  .bb-link {
+    padding: 0.4rem 0.52rem;
+    font-size: 0.82rem;
+  }
+
+  .bb-login-btn {
+    padding: 0.54rem 0.72rem;
+    font-size: 0.82rem;
   }
 
   .bb-link-admin {

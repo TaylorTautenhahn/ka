@@ -2342,9 +2342,24 @@ body::after {
     font-size: 0.76rem;
   }
 
+  .quick-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 0.5rem;
+  }
+
+  .quick-nav::-webkit-scrollbar {
+    display: none;
+  }
+
   .quick-nav-link {
     padding: 0.36rem 0.64rem;
     font-size: 0.76rem;
+    flex: 0 0 auto;
+    white-space: nowrap;
   }
 }
 

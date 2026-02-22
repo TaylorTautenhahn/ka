@@ -145,6 +145,11 @@ const assignPanel = document.getElementById("assignPanel");
 const assignOfficerSelect = document.getElementById("assignOfficerSelect");
 const assignOfficerBtn = document.getElementById("assignOfficerBtn");
 const clearAssignBtn = document.getElementById("clearAssignBtn");
+const packageDealPanel = document.getElementById("packageDealPanel");
+const packagePartnerSelect = document.getElementById("packagePartnerSelect");
+const packageLinkBtn = document.getElementById("packageLinkBtn");
+const packageUnlinkBtn = document.getElementById("packageUnlinkBtn");
+const packageDealSummary = document.getElementById("packageDealSummary");
 
 const approvalsPanel = document.getElementById("approvalsPanel");
 const pendingList = document.getElementById("pendingList");
@@ -411,6 +416,7 @@ const state = {
   adminEditPnmId: null,
   headAssignmentPnmId: null,
   headPackagePartnerId: null,
+  packagePartnerId: null,
   seasonArchive: null,
   tutorial: {
     active: false,
@@ -996,6 +1002,10 @@ function roleCanViewAssignedRushes() {
 
 function roleCanManageOperations() {
   return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
+function roleCanManagePackages() {
+  return Boolean(state.user);
 }
 
 function userOnboardingState() {
@@ -2859,6 +2869,68 @@ function renderHeadPackageControls() {
   headPackageSummary.textContent = `${packageInfo.label} includes ${packageInfo.count} rushees: ${memberNames}.`;
 }
 
+function renderPackageDealPanel() {
+  if (!packageDealPanel || !packagePartnerSelect || !packageDealSummary) {
+    return;
+  }
+  const canManage = roleCanManagePackages();
+  packageDealPanel.classList.toggle("hidden", !canManage);
+  if (!canManage) {
+    packagePartnerSelect.innerHTML = "";
+    packageDealSummary.textContent = "";
+    return;
+  }
+
+  const selected = state.pnms.find((pnm) => pnm.pnm_id === Number(state.selectedPnmId)) || null;
+  if (!selected) {
+    packagePartnerSelect.innerHTML = '<option value="">Select a rushee first</option>';
+    packageDealSummary.textContent = "No package deal linked for this rushee yet.";
+    if (packageLinkBtn) {
+      packageLinkBtn.disabled = true;
+    }
+    if (packageUnlinkBtn) {
+      packageUnlinkBtn.disabled = true;
+    }
+    state.packagePartnerId = null;
+    return;
+  }
+
+  const optionRows = ['<option value="">Select partner rushee</option>'];
+  state.pnms
+    .filter((pnm) => pnm.pnm_id !== selected.pnm_id)
+    .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`))
+    .forEach((pnm) => {
+      const info = packageInfoForPnm(pnm);
+      const marker = info.id ? ` (${info.label})` : "";
+      optionRows.push(
+        `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}${marker}`)}</option>`
+      );
+    });
+  packagePartnerSelect.innerHTML = optionRows.join("");
+
+  const selectedPartnerExists = state.pnms.some((pnm) => pnm.pnm_id === Number(state.packagePartnerId));
+  if (selectedPartnerExists) {
+    packagePartnerSelect.value = String(state.packagePartnerId);
+  } else {
+    state.packagePartnerId = null;
+  }
+
+  const selectedInfo = packageInfoForPnm(selected);
+  if (!selectedInfo.id) {
+    packageDealSummary.textContent = "No package deal linked for this rushee yet.";
+  } else {
+    const members = selectedInfo.members.map((pnm) => `${pnm.first_name} ${pnm.last_name}`).join(", ");
+    packageDealSummary.textContent = `${selectedInfo.label} includes ${selectedInfo.count} rushees: ${members}.`;
+  }
+
+  if (packageLinkBtn) {
+    packageLinkBtn.disabled = !state.pnms.some((pnm) => pnm.pnm_id !== selected.pnm_id);
+  }
+  if (packageUnlinkBtn) {
+    packageUnlinkBtn.disabled = !selectedInfo.id;
+  }
+}
+
 function renderHeadAssignmentTable() {
   if (!headAssignmentTable) {
     return;
@@ -3008,6 +3080,7 @@ function applyRatingFormForSelected() {
     renderSelectedPnmPhoto(null);
     photoForm.classList.toggle("hidden", !roleCanManagePhotos());
     renderAssignmentControls();
+    renderPackageDealPanel();
     return;
   }
 
@@ -3016,6 +3089,7 @@ function applyRatingFormForSelected() {
     renderSelectedPnmPhoto(null);
     photoForm.classList.toggle("hidden", !roleCanManagePhotos());
     renderAssignmentControls();
+    renderPackageDealPanel();
     return;
   }
 
@@ -3042,6 +3116,7 @@ function applyRatingFormForSelected() {
   renderSelectedPnmPhoto(selected);
   photoForm.classList.toggle("hidden", !roleCanManagePhotos());
   renderAssignmentControls();
+  renderPackageDealPanel();
 }
 
 function renderRatingEntries(data) {
@@ -3282,6 +3357,7 @@ async function loadPnms() {
   renderAssignedRushSection();
   applyRatingFormForSelected();
   renderAssignmentControls();
+  renderPackageDealPanel();
   await loadPnmDetail(state.selectedPnmId);
 }
 
@@ -3647,6 +3723,7 @@ async function handleLogout() {
   state.adminEditPnmId = null;
   state.headAssignmentPnmId = null;
   state.headPackagePartnerId = null;
+  state.packagePartnerId = null;
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
   animateCounter(heroLunchCount, 0);
@@ -4116,6 +4193,92 @@ async function handleHeadPackageUnlink() {
     if (headPackageUnlinkBtn) {
       headPackageUnlinkBtn.disabled = false;
       headPackageUnlinkBtn.textContent = "Unlink Selected";
+    }
+  }
+}
+
+async function handlePackageDealLink() {
+  if (!roleCanManagePackages()) {
+    showToast("Sign in required.");
+    return;
+  }
+  const primaryId = Number(state.selectedPnmId || 0);
+  const partnerId = Number(packagePartnerSelect && packagePartnerSelect.value ? packagePartnerSelect.value : 0);
+  if (!primaryId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  if (!partnerId || primaryId === partnerId) {
+    showToast("Select a different rushee to link.");
+    return;
+  }
+  const primaryPnm = state.pnms.find((pnm) => pnm.pnm_id === primaryId) || null;
+  const partnerPnm = state.pnms.find((pnm) => pnm.pnm_id === partnerId) || null;
+  if (!primaryPnm || !partnerPnm) {
+    showToast("Could not find selected rushees.");
+    return;
+  }
+
+  const primaryPackage = packageInfoForPnm(primaryPnm);
+  const partnerPackage = packageInfoForPnm(partnerPnm);
+  const packageIds = new Set([primaryId, partnerId]);
+  primaryPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
+  partnerPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
+
+  if (packageLinkBtn) {
+    packageLinkBtn.disabled = true;
+    packageLinkBtn.textContent = "Linking...";
+  }
+  try {
+    const payload = await api("/api/pnms/package/link", {
+      method: "POST",
+      body: { pnm_ids: Array.from(packageIds), sync_assignment: true },
+    });
+    state.packagePartnerId = partnerId;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(primaryId);
+    showToast(payload.message || "Package deal linked.");
+  } catch (error) {
+    showToast(error.message || "Unable to link package deal.");
+  } finally {
+    if (packageLinkBtn) {
+      packageLinkBtn.disabled = false;
+      packageLinkBtn.textContent = "Link Package Deal";
+    }
+  }
+}
+
+async function handlePackageDealUnlink() {
+  if (!roleCanManagePackages()) {
+    showToast("Sign in required.");
+    return;
+  }
+  const pnmId = Number(state.selectedPnmId || 0);
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+
+  if (packageUnlinkBtn) {
+    packageUnlinkBtn.disabled = true;
+    packageUnlinkBtn.textContent = "Unlinking...";
+  }
+  try {
+    const payload = await api(`/api/pnms/${pnmId}/package/unlink`, {
+      method: "POST",
+    });
+    state.packagePartnerId = null;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    showToast(payload.message || "Package deal updated.");
+  } catch (error) {
+    showToast(error.message || "Unable to unlink package deal.");
+  } finally {
+    if (packageUnlinkBtn) {
+      packageUnlinkBtn.disabled = false;
+      packageUnlinkBtn.textContent = "Unlink Selected";
     }
   }
 }
@@ -5120,6 +5283,17 @@ function attachEvents() {
   }
   if (headPackageUnlinkBtn) {
     headPackageUnlinkBtn.addEventListener("click", handleHeadPackageUnlink);
+  }
+  if (packagePartnerSelect) {
+    packagePartnerSelect.addEventListener("change", () => {
+      state.packagePartnerId = Number(packagePartnerSelect.value || 0) || null;
+    });
+  }
+  if (packageLinkBtn) {
+    packageLinkBtn.addEventListener("click", handlePackageDealLink);
+  }
+  if (packageUnlinkBtn) {
+    packageUnlinkBtn.addEventListener("click", handlePackageDealUnlink);
   }
 
   ratingPnm.addEventListener("change", async (event) => {

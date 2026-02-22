@@ -8913,7 +8913,7 @@ def assign_pnm_officer(
 @app.post("/api/pnms/package/link")
 def link_pnms_package_deal(
     payload: PnmPackageLinkRequest,
-    head_user: sqlite3.Row = Depends(require_head),
+    user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     pnm_ids = [int(item) for item in payload.pnm_ids]
     placeholders = ",".join(["?"] * len(pnm_ids))
@@ -8985,7 +8985,7 @@ def link_pnms_package_deal(
                     assigned_by = None
                     assigned_at = None
                 elif previous_assigned != synced_officer_id:
-                    assigned_by = head_user["id"]
+                    assigned_by = user["id"]
                     assigned_at = now
 
                 conn.execute(
@@ -9020,7 +9020,7 @@ def link_pnms_package_deal(
 
         append_audit_entry(
             conn,
-            actor_user_id=int(head_user["id"]),
+            actor_user_id=int(user["id"]),
             action_type="pnm_package_link",
             entity_type="pnm_package",
             entity_id=pnm_ids[0] if pnm_ids else None,
@@ -9071,7 +9071,7 @@ def link_pnms_package_deal(
 @app.post("/api/pnms/{pnm_id}/package/unlink")
 def unlink_pnm_package_deal(
     pnm_id: int,
-    head_user: sqlite3.Row = Depends(require_head),
+    user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     with db_session() as conn:
         row = conn.execute(
@@ -9118,7 +9118,7 @@ def unlink_pnm_package_deal(
 
         append_audit_entry(
             conn,
-            actor_user_id=int(head_user["id"]),
+            actor_user_id=int(user["id"]),
             action_type="pnm_package_unlink",
             entity_type="pnm_package",
             entity_id=pnm_id,

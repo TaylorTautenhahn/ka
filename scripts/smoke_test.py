@@ -239,6 +239,16 @@ def main() -> None:
             checks.append("Rating create works")
 
             response = client.post(
+                "/kappaalphaorder/api/pnms/package/link",
+                json={
+                    "pnm_ids": [pnm_id, pnm_two_id],
+                    "sync_assignment": True,
+                },
+            )
+            expect_status(response, 200, "Officer package link endpoint")
+            checks.append("Rush team users can link package deals")
+
+            response = client.post(
                 "/kappaalphaorder/api/ratings",
                 json={
                     "pnm_id": pnm_id,

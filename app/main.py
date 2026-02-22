@@ -3609,7 +3609,6 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
         CREATE INDEX IF NOT EXISTS idx_pnms_interests ON pnms(interests_norm);
-        CREATE INDEX IF NOT EXISTS idx_pnms_package_group ON pnms(package_group_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_pnm ON ratings(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);

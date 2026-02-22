@@ -1223,6 +1223,25 @@ def normalize_assignment_status(value: str) -> str:
     return token
 
 
+def normalize_package_group_id(value: Any) -> str:
+    token = str(value or "").strip()
+    return token
+
+
+def new_package_group_id() -> str:
+    return f"pkg_{secrets.token_hex(6)}"
+
+
+def package_group_label(package_group_id: str | None) -> str | None:
+    token = normalize_package_group_id(package_group_id)
+    if not token:
+        return None
+    if token.startswith("pkg_"):
+        token = token[4:]
+    token = token.upper()
+    return token[:8] if token else None
+
+
 def normalize_funnel_stage(value: str) -> str:
     token = value.strip().lower()
     if token not in PNM_FUNNEL_STAGES:
@@ -2716,6 +2735,31 @@ def clamped_assignment_priority(value: int | None) -> int:
     return max(1, min(ASSIGNMENT_MAX_PRIORITY, int(value)))
 
 
+def assignment_target_rows_for_pnm(
+    conn: sqlite3.Connection,
+    *,
+    pnm_id: int,
+    package_group_id: str | None,
+) -> list[sqlite3.Row]:
+    group_token = normalize_package_group_id(package_group_id)
+    if group_token:
+        rows = conn.execute(
+            """
+            SELECT *
+            FROM pnms
+            WHERE package_group_id = ?
+            ORDER BY id ASC
+            """,
+            (group_token,),
+        ).fetchall()
+        if rows:
+            return rows
+    row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+    if not row:
+        return []
+    return [row]
+
+
 def default_engagement_status_for_date(event_date_raw: str, *, is_cancelled: bool = False) -> str:
     if is_cancelled:
         return "cancelled"
@@ -3357,6 +3401,7 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             assignment_due_date TEXT,
             assignment_notes TEXT NOT NULL DEFAULT '',
             assignment_updated_at TEXT,
+            package_group_id TEXT,
             funnel_stage TEXT NOT NULL DEFAULT 'sourced' CHECK (funnel_stage IN ('sourced', 'engaged', 'evaluated', 'discussed', 'bid', 'accepted', 'declined')),
             funnel_stage_reason TEXT NOT NULL DEFAULT '',
             funnel_stage_updated_at TEXT,
@@ -3564,6 +3609,7 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
         CREATE INDEX IF NOT EXISTS idx_pnms_interests ON pnms(interests_norm);
+        CREATE INDEX IF NOT EXISTS idx_pnms_package_group ON pnms(package_group_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_pnm ON ratings(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
@@ -3659,6 +3705,8 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE pnms ADD COLUMN assignment_notes TEXT NOT NULL DEFAULT ''")
     if "assignment_updated_at" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN assignment_updated_at TEXT")
+    if "package_group_id" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN package_group_id TEXT")
     if "funnel_stage" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN funnel_stage TEXT NOT NULL DEFAULT 'sourced'")
     if "funnel_stage_reason" not in pnm_columns:
@@ -3671,6 +3719,7 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assignment_status ON pnms(assignment_status)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assignment_due_date ON pnms(assignment_due_date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_funnel_stage ON pnms(funnel_stage)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_package_group ON pnms(package_group_id)")
     conn.execute(
         """
         UPDATE pnms
@@ -3707,6 +3756,13 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         UPDATE pnms
         SET assignment_updated_at = COALESCE(assignment_updated_at, assigned_at, updated_at, created_at)
         WHERE assignment_updated_at IS NULL OR trim(assignment_updated_at) = ''
+        """
+    )
+    conn.execute(
+        """
+        UPDATE pnms
+        SET package_group_id = NULL
+        WHERE package_group_id IS NOT NULL AND trim(package_group_id) = ''
         """
     )
     conn.execute(
@@ -5698,6 +5754,7 @@ def pnm_payload(
     funnel_stage = str(row["funnel_stage"]).strip().lower() if "funnel_stage" in keys and row["funnel_stage"] is not None else "sourced"
     if funnel_stage not in PNM_FUNNEL_STAGES:
         funnel_stage = "sourced"
+    package_group_id = normalize_package_group_id(row["package_group_id"]) if "package_group_id" in keys else ""
     return {
         "pnm_id": row["id"],
         "pnm_code": row["pnm_code"],
@@ -5734,6 +5791,8 @@ def pnm_payload(
         "assignment_notes": row["assignment_notes"] if "assignment_notes" in keys and row["assignment_notes"] is not None else "",
         "assignment_updated_at": row["assignment_updated_at"] if "assignment_updated_at" in keys else None,
         "assigned_officer": assigned_officer,
+        "package_group_id": package_group_id or None,
+        "package_group_label": package_group_label(package_group_id),
         "funnel_stage": funnel_stage,
         "funnel_stage_reason": row["funnel_stage_reason"] if "funnel_stage_reason" in keys and row["funnel_stage_reason"] is not None else "",
         "funnel_stage_updated_at": row["funnel_stage_updated_at"] if "funnel_stage_updated_at" in keys else None,
@@ -6220,6 +6279,28 @@ class PnmAssignmentUpdateRequest(BaseModel):
         if value is None:
             return None
         return value.strip()
+
+
+class PnmPackageLinkRequest(BaseModel):
+    pnm_ids: list[int] = Field(..., min_length=2, max_length=48)
+    sync_assignment: bool = True
+
+    @field_validator("pnm_ids")
+    @classmethod
+    def validate_pnm_ids(cls, value: list[int]) -> list[int]:
+        unique_ids: list[int] = []
+        seen: set[int] = set()
+        for raw_id in value:
+            pnm_id = int(raw_id)
+            if pnm_id <= 0:
+                raise ValueError("PNM IDs must be positive integers.")
+            if pnm_id in seen:
+                continue
+            seen.add(pnm_id)
+            unique_ids.append(pnm_id)
+        if len(unique_ids) < 2:
+            raise ValueError("Select at least two unique PNMs for a package deal.")
+        return unique_ids
 
 
 class PnmFunnelStageUpdateRequest(BaseModel):
@@ -8706,38 +8787,64 @@ def assign_pnm_officer(
             officer = None
 
         now = now_iso()
+        package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
+        target_rows = assignment_target_rows_for_pnm(
+            conn,
+            pnm_id=pnm_id,
+            package_group_id=package_group_id,
+        )
+        if not target_rows:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+        affected_pnm_ids: list[int] = []
+        changed_assignment_count = 0
+
         old_assigned_id = int(pnm_row["assigned_officer_id"]) if pnm_row["assigned_officer_id"] is not None else None
         old_status = str(pnm_row["assignment_status"]).strip().lower() if "assignment_status" in pnm_row.keys() else "unassigned"
         if old_status not in ASSIGNMENT_STATUSES:
             old_status = "assigned" if old_assigned_id else "unassigned"
-        if assigned_user_id is None:
-            next_status = "unassigned"
-        elif old_assigned_id == assigned_user_id and old_status in ASSIGNMENT_STATUSES:
-            next_status = old_status
-        else:
-            next_status = "assigned"
-        conn.execute(
-            """
-            UPDATE pnms
-            SET
-                assigned_officer_id = ?,
-                assigned_by = ?,
-                assigned_at = ?,
-                assignment_status = ?,
-                assignment_updated_at = ?,
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                assigned_user_id,
-                head_user["id"] if assigned_user_id is not None else None,
-                now if assigned_user_id is not None else None,
-                next_status,
-                now,
-                now,
-                pnm_id,
-            ),
-        )
+        next_status = old_status
+
+        for target_row in target_rows:
+            target_pnm_id = int(target_row["id"])
+            previous_assigned = int(target_row["assigned_officer_id"]) if target_row["assigned_officer_id"] is not None else None
+            previous_status = str(target_row["assignment_status"] or "").strip().lower()
+            if previous_status not in ASSIGNMENT_STATUSES:
+                previous_status = "assigned" if previous_assigned else "unassigned"
+
+            if assigned_user_id is None:
+                current_status = "unassigned"
+            elif previous_assigned == assigned_user_id and previous_status in ASSIGNMENT_STATUSES:
+                current_status = previous_status
+            else:
+                current_status = "assigned"
+            if target_pnm_id == pnm_id:
+                next_status = current_status
+
+            conn.execute(
+                """
+                UPDATE pnms
+                SET
+                    assigned_officer_id = ?,
+                    assigned_by = ?,
+                    assigned_at = ?,
+                    assignment_status = ?,
+                    assignment_updated_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    assigned_user_id,
+                    head_user["id"] if assigned_user_id is not None else None,
+                    now if assigned_user_id is not None else None,
+                    current_status,
+                    now,
+                    now,
+                    target_pnm_id,
+                ),
+            )
+            if assigned_user_id != previous_assigned:
+                changed_assignment_count += 1
+            affected_pnm_ids.append(target_pnm_id)
 
         append_audit_entry(
             conn,
@@ -8750,15 +8857,27 @@ def assign_pnm_officer(
                 "new_assigned_officer_id": assigned_user_id,
                 "old_status": old_status,
                 "new_status": next_status,
+                "package_group_id": package_group_id or None,
+                "affected_pnm_ids": affected_pnm_ids,
             },
         )
-        if assigned_user_id is not None and assigned_user_id != old_assigned_id:
+        if assigned_user_id is not None and changed_assignment_count > 0:
+            notification_title = (
+                f"Package Assignment ({len(affected_pnm_ids)}): {pnm_row['first_name']} {pnm_row['last_name']}"
+                if len(affected_pnm_ids) > 1
+                else f"New Assignment: {pnm_row['first_name']} {pnm_row['last_name']}"
+            )
+            notification_body = (
+                f"Assigned by {head_user['username']} (package deal synced)."
+                if len(affected_pnm_ids) > 1
+                else f"Assigned by {head_user['username']}"
+            )
             create_notification(
                 conn,
                 user_id=assigned_user_id,
                 notif_type="assignment",
-                title=f"New Assignment: {pnm_row['first_name']} {pnm_row['last_name']}",
-                body=f"Assigned by {head_user['username']}",
+                title=notification_title,
+                body=notification_body,
                 link_path=f"/?pnm={pnm_id}",
             )
 
@@ -8778,9 +8897,246 @@ def assign_pnm_officer(
         ).fetchone()
         own = fetch_own_rating(conn, pnm_id, head_user["id"])
 
+    affected_count = len(affected_pnm_ids)
     return {
-        "message": "PNM assignment updated.",
+        "message": (
+            f"PNM assignment updated for {affected_count} linked rushee(s)."
+            if affected_count > 1
+            else "PNM assignment updated."
+        ),
+        "affected_pnm_ids": affected_pnm_ids,
+        "package_group_id": package_group_id or None,
         "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+    }
+
+
+@app.post("/api/pnms/package/link")
+def link_pnms_package_deal(
+    payload: PnmPackageLinkRequest,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    pnm_ids = [int(item) for item in payload.pnm_ids]
+    placeholders = ",".join(["?"] * len(pnm_ids))
+
+    with db_session() as conn:
+        selected_rows = conn.execute(
+            f"SELECT * FROM pnms WHERE id IN ({placeholders})",
+            tuple(pnm_ids),
+        ).fetchall()
+        selected_by_id: dict[int, sqlite3.Row] = {int(row["id"]): row for row in selected_rows}
+        missing_ids = [pnm_id for pnm_id in pnm_ids if pnm_id not in selected_by_id]
+        if missing_ids:
+            raise HTTPException(status_code=404, detail=f"PNM not found: {missing_ids[0]}")
+
+        package_group_id = new_package_group_id()
+        now = now_iso()
+        conn.execute(
+            f"""
+            UPDATE pnms
+            SET package_group_id = ?, updated_at = ?
+            WHERE id IN ({placeholders})
+            """,
+            (package_group_id, now, *pnm_ids),
+        )
+
+        assignment_synced = False
+        synced_officer_id: int | None = None
+        synced_status = "unassigned"
+        if payload.sync_assignment and pnm_ids:
+            template_row = next(
+                (selected_by_id[pnm_id] for pnm_id in pnm_ids if selected_by_id[pnm_id]["assigned_officer_id"] is not None),
+                selected_by_id[pnm_ids[0]],
+            )
+            synced_officer_id = (
+                int(template_row["assigned_officer_id"]) if template_row["assigned_officer_id"] is not None else None
+            )
+            template_status = str(template_row["assignment_status"] or "").strip().lower()
+            if template_status not in ASSIGNMENT_STATUSES:
+                template_status = "assigned" if synced_officer_id is not None else "unassigned"
+            if synced_officer_id is None:
+                template_status = "unassigned"
+            synced_status = template_status
+            priority = clamped_assignment_priority(
+                int(template_row["assignment_priority"]) if template_row["assignment_priority"] is not None else None
+            )
+            due_date = template_row["assignment_due_date"] if synced_officer_id is not None else None
+            notes = (template_row["assignment_notes"] or "").strip()
+
+            for target_id in pnm_ids:
+                target_row = selected_by_id[target_id]
+                previous_assigned = (
+                    int(target_row["assigned_officer_id"]) if target_row["assigned_officer_id"] is not None else None
+                )
+                previous_status = str(target_row["assignment_status"] or "").strip().lower()
+                if previous_status not in ASSIGNMENT_STATUSES:
+                    previous_status = "assigned" if previous_assigned is not None else "unassigned"
+                if synced_officer_id is None:
+                    next_status = "unassigned"
+                elif previous_assigned != synced_officer_id:
+                    next_status = "assigned"
+                else:
+                    next_status = template_status
+                if next_status not in ASSIGNMENT_STATUSES:
+                    next_status = "assigned" if synced_officer_id is not None else "unassigned"
+
+                assigned_by = target_row["assigned_by"]
+                assigned_at = target_row["assigned_at"]
+                if synced_officer_id is None:
+                    assigned_by = None
+                    assigned_at = None
+                elif previous_assigned != synced_officer_id:
+                    assigned_by = head_user["id"]
+                    assigned_at = now
+
+                conn.execute(
+                    """
+                    UPDATE pnms
+                    SET
+                        assigned_officer_id = ?,
+                        assigned_by = ?,
+                        assigned_at = ?,
+                        assignment_status = ?,
+                        assignment_priority = ?,
+                        assignment_due_date = ?,
+                        assignment_notes = ?,
+                        assignment_updated_at = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        synced_officer_id,
+                        assigned_by,
+                        assigned_at,
+                        next_status,
+                        priority,
+                        due_date,
+                        notes,
+                        now,
+                        now,
+                        target_id,
+                    ),
+                )
+            assignment_synced = True
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="pnm_package_link",
+            entity_type="pnm_package",
+            entity_id=pnm_ids[0] if pnm_ids else None,
+            payload={
+                "pnm_ids": pnm_ids,
+                "package_group_id": package_group_id,
+                "sync_assignment": bool(payload.sync_assignment),
+                "synced_officer_id": synced_officer_id,
+                "synced_status": synced_status,
+            },
+        )
+
+        refreshed_rows = conn.execute(
+            f"""
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id IN ({placeholders})
+            ORDER BY p.last_name ASC, p.first_name ASC
+            """,
+            tuple(pnm_ids),
+        ).fetchall()
+
+    return {
+        "message": (
+            f"Linked {len(pnm_ids)} rushees into package deal {package_group_label(package_group_id)}."
+            + (" Assignment settings were synced." if assignment_synced else "")
+        ),
+        "package_group_id": package_group_id,
+        "package_group_label": package_group_label(package_group_id),
+        "assignment_synced": assignment_synced,
+        "pnms": [
+            pnm_payload(
+                row,
+                own_rating=None,
+                assigned_officer=assigned_officer_payload_from_row(row),
+            )
+            for row in refreshed_rows
+        ],
+    }
+
+
+@app.post("/api/pnms/{pnm_id}/package/unlink")
+def unlink_pnm_package_deal(
+    pnm_id: int,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute(
+            "SELECT id, first_name, last_name, package_group_id FROM pnms WHERE id = ?",
+            (pnm_id,),
+        ).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        package_group_id = normalize_package_group_id(row["package_group_id"])
+        if not package_group_id:
+            return {
+                "message": "PNM is not currently linked in a package deal.",
+                "package_group_id": None,
+                "affected_pnm_ids": [pnm_id],
+            }
+
+        member_rows = conn.execute(
+            """
+            SELECT id
+            FROM pnms
+            WHERE package_group_id = ?
+            ORDER BY id ASC
+            """,
+            (package_group_id,),
+        ).fetchall()
+        member_ids = [int(item["id"]) for item in member_rows]
+        now = now_iso()
+        conn.execute(
+            "UPDATE pnms SET package_group_id = NULL, updated_at = ? WHERE id = ?",
+            (now, pnm_id),
+        )
+        affected_pnm_ids = [pnm_id]
+        collapsed_group = False
+
+        remaining_ids = [item for item in member_ids if item != pnm_id]
+        if len(remaining_ids) == 1:
+            conn.execute(
+                "UPDATE pnms SET package_group_id = NULL, updated_at = ? WHERE id = ?",
+                (now, remaining_ids[0]),
+            )
+            affected_pnm_ids.append(remaining_ids[0])
+            collapsed_group = True
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="pnm_package_unlink",
+            entity_type="pnm_package",
+            entity_id=pnm_id,
+            payload={
+                "package_group_id": package_group_id,
+                "affected_pnm_ids": affected_pnm_ids,
+                "collapsed_group": collapsed_group,
+            },
+        )
+
+    return {
+        "message": (
+            f"Removed {row['first_name']} {row['last_name']} from package deal {package_group_label(package_group_id)}."
+            + (" Remaining single-member package was cleared." if collapsed_group else "")
+        ),
+        "package_group_id": package_group_id,
+        "package_group_label": package_group_label(package_group_id),
+        "affected_pnm_ids": affected_pnm_ids,
     }
 
 
@@ -8888,6 +9244,8 @@ def assignments_overview(
                     "assignment_due_state": due_state,
                     "assignment_due_date": row["assignment_due_date"],
                     "assigned_officer_username": row["assigned_officer_username"] or "",
+                    "package_group_id": normalize_package_group_id(row["package_group_id"]) or None,
+                    "package_group_label": package_group_label(normalize_package_group_id(row["package_group_id"])),
                     "priority": clamped_assignment_priority(
                         int(row["assignment_priority"]) if row["assignment_priority"] is not None else None
                     ),
@@ -8914,6 +9272,8 @@ def assignments_overview(
                 "assignment_updated_at": row["assignment_updated_at"],
                 "funnel_stage": row["funnel_stage"] if "funnel_stage" in row.keys() else "sourced",
                 "assigned_officer": assigned_officer_payload_from_row(row),
+                "package_group_id": normalize_package_group_id(row["package_group_id"]) or None,
+                "package_group_label": package_group_label(normalize_package_group_id(row["package_group_id"])),
                 "interests_norm": split_normalized_csv(row["interests_norm"]),
                 "stereotype_norm": (row["stereotype"] or "").strip().lower(),
             }
@@ -9052,12 +9412,19 @@ def update_pnm_assignment(
         old_status = str(row["assignment_status"] or "").strip().lower()
         if old_status not in ASSIGNMENT_STATUSES:
             old_status = "assigned" if old_assigned_officer_id else "unassigned"
+        package_group_id = normalize_package_group_id(row["package_group_id"])
+        target_rows = assignment_target_rows_for_pnm(
+            conn,
+            pnm_id=pnm_id,
+            package_group_id=package_group_id,
+        )
+        if not target_rows:
+            raise HTTPException(status_code=404, detail="PNM not found.")
 
         assigned_officer_id = old_assigned_officer_id
         if "officer_user_id" in requested_fields:
             assigned_officer_id = payload.officer_user_id
 
-        target_officer_row: sqlite3.Row | None = None
         if assigned_officer_id is not None:
             target_officer_row = conn.execute(
                 "SELECT id, username, role, emoji FROM users WHERE id = ? AND is_approved = 1",
@@ -9101,62 +9468,107 @@ def update_pnm_assignment(
         notes = notes.strip()
 
         now = now_iso()
-        assigned_by = row["assigned_by"]
-        assigned_at = row["assigned_at"]
-        if assigned_officer_id is None:
-            assigned_by = None
-            assigned_at = None
-        elif old_assigned_officer_id != assigned_officer_id:
-            assigned_by = head_user["id"]
-            assigned_at = now
-        conn.execute(
-            """
-            UPDATE pnms
-            SET
-                assigned_officer_id = ?,
-                assigned_by = ?,
-                assigned_at = ?,
-                assignment_status = ?,
-                assignment_priority = ?,
-                assignment_due_date = ?,
-                assignment_notes = ?,
-                assignment_updated_at = ?,
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                assigned_officer_id,
-                assigned_by,
-                assigned_at,
-                status_token,
-                priority,
-                due_date,
-                notes,
-                now,
-                now,
-                pnm_id,
-            ),
-        )
+        affected_pnm_ids: list[int] = []
+        officer_changed_for_any = False
+        resolved_primary_status = status_token
 
-        if assigned_officer_id is not None and payload.notify_officer and assigned_officer_id != old_assigned_officer_id:
+        for target_row in target_rows:
+            target_pnm_id = int(target_row["id"])
+            previous_assigned_officer_id = (
+                int(target_row["assigned_officer_id"]) if target_row["assigned_officer_id"] is not None else None
+            )
+            previous_status = str(target_row["assignment_status"] or "").strip().lower()
+            if previous_status not in ASSIGNMENT_STATUSES:
+                previous_status = "assigned" if previous_assigned_officer_id else "unassigned"
+
+            if "assignment_status" in requested_fields and payload.assignment_status is not None:
+                next_status = status_token
+            else:
+                if assigned_officer_id is None:
+                    next_status = "unassigned"
+                elif previous_assigned_officer_id != assigned_officer_id:
+                    next_status = "assigned"
+                else:
+                    next_status = previous_status
+            if next_status not in ASSIGNMENT_STATUSES:
+                next_status = "assigned" if assigned_officer_id is not None else "unassigned"
+
+            assigned_by = target_row["assigned_by"]
+            assigned_at = target_row["assigned_at"]
+            if assigned_officer_id is None:
+                assigned_by = None
+                assigned_at = None
+            elif previous_assigned_officer_id != assigned_officer_id:
+                assigned_by = head_user["id"]
+                assigned_at = now
+
+            target_due_date = due_date
+            if assigned_officer_id is None and "assignment_due_date" not in requested_fields:
+                target_due_date = None
+
+            conn.execute(
+                """
+                UPDATE pnms
+                SET
+                    assigned_officer_id = ?,
+                    assigned_by = ?,
+                    assigned_at = ?,
+                    assignment_status = ?,
+                    assignment_priority = ?,
+                    assignment_due_date = ?,
+                    assignment_notes = ?,
+                    assignment_updated_at = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (
+                    assigned_officer_id,
+                    assigned_by,
+                    assigned_at,
+                    next_status,
+                    priority,
+                    target_due_date,
+                    notes,
+                    now,
+                    now,
+                    target_pnm_id,
+                ),
+            )
+            if previous_assigned_officer_id != assigned_officer_id:
+                officer_changed_for_any = True
+            affected_pnm_ids.append(target_pnm_id)
+            if target_pnm_id == pnm_id:
+                resolved_primary_status = next_status
+
+        if assigned_officer_id is not None and payload.notify_officer and officer_changed_for_any:
+            assignment_title = (
+                f"Package Assignment ({len(affected_pnm_ids)}): {row['first_name']} {row['last_name']}"
+                if len(affected_pnm_ids) > 1
+                else f"Assigned: {row['first_name']} {row['last_name']}"
+            )
             create_notification(
                 conn,
                 user_id=assigned_officer_id,
                 notif_type="assignment",
-                title=f"Assigned: {row['first_name']} {row['last_name']}",
-                body=f"Status: {ASSIGNMENT_STATUS_LABELS.get(status_token, status_token)}",
+                title=assignment_title,
+                body=f"Status: {ASSIGNMENT_STATUS_LABELS.get(resolved_primary_status, resolved_primary_status)}",
                 link_path=f"/?pnm={pnm_id}",
             )
-        if status_token == "needs_help":
+        if resolved_primary_status == "needs_help":
             helper_rows = conn.execute(
                 "SELECT id FROM users WHERE role = ? AND is_approved = 1",
                 (ROLE_HEAD,),
             ).fetchall()
+            helper_title = (
+                f"Needs Help Package ({len(affected_pnm_ids)}): {row['first_name']} {row['last_name']}"
+                if len(affected_pnm_ids) > 1
+                else f"Needs Help: {row['first_name']} {row['last_name']}"
+            )
             create_notifications_for_users(
                 conn,
                 [int(item["id"]) for item in helper_rows],
                 notif_type="assignment_alert",
-                title=f"Needs Help: {row['first_name']} {row['last_name']}",
+                title=helper_title,
                 body=notes[:220] or "Assignment was marked as needs help.",
                 link_path=f"/?pnm={pnm_id}",
             )
@@ -9171,11 +9583,13 @@ def update_pnm_assignment(
                 "old_assigned_officer_id": old_assigned_officer_id,
                 "new_assigned_officer_id": assigned_officer_id,
                 "old_status": old_status,
-                "new_status": status_token,
+                "new_status": resolved_primary_status,
                 "old_priority": row["assignment_priority"],
                 "new_priority": priority,
                 "old_due_date": row["assignment_due_date"],
                 "new_due_date": due_date,
+                "package_group_id": package_group_id or None,
+                "affected_pnm_ids": affected_pnm_ids,
             },
         )
 
@@ -9195,8 +9609,15 @@ def update_pnm_assignment(
         ).fetchone()
         own = fetch_own_rating(conn, pnm_id, head_user["id"])
 
+    affected_count = len(affected_pnm_ids)
     return {
-        "message": "PNM assignment details updated.",
+        "message": (
+            f"PNM assignment details updated for {affected_count} linked rushee(s)."
+            if affected_count > 1
+            else "PNM assignment details updated."
+        ),
+        "affected_pnm_ids": affected_pnm_ids,
+        "package_group_id": package_group_id or None,
         "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
     }
 
@@ -9827,7 +10248,10 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
 @app.delete("/api/pnms/{pnm_id}")
 def delete_pnm(pnm_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[str, str]:
     with db_session() as conn:
-        row = conn.execute("SELECT id, pnm_code, first_name, last_name, photo_path FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        row = conn.execute(
+            "SELECT id, pnm_code, first_name, last_name, photo_path, package_group_id FROM pnms WHERE id = ?",
+            (pnm_id,),
+        ).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="PNM not found.")
 
@@ -9839,6 +10263,17 @@ def delete_pnm(pnm_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[s
 
         conn.execute("DELETE FROM engagement_events WHERE pnm_id = ?", (pnm_id,))
         conn.execute("DELETE FROM pnms WHERE id = ?", (pnm_id,))
+        package_group_id = normalize_package_group_id(row["package_group_id"])
+        if package_group_id:
+            remaining = conn.execute(
+                "SELECT id FROM pnms WHERE package_group_id = ? ORDER BY id ASC",
+                (package_group_id,),
+            ).fetchall()
+            if len(remaining) == 1:
+                conn.execute(
+                    "UPDATE pnms SET package_group_id = NULL, updated_at = ? WHERE id = ?",
+                    (now_iso(), int(remaining[0]["id"])),
+                )
         append_audit_entry(
             conn,
             actor_user_id=int(user["id"]),

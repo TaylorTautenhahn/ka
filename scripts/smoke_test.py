@@ -190,6 +190,27 @@ def main() -> None:
             pnm_id = int(pnm.get("pnm_id"))
             checks.append("PNM create works")
 
+            response = client.post(
+                "/kappaalphaorder/api/pnms",
+                json={
+                    "first_name": "Blake",
+                    "last_name": "Donovan",
+                    "class_year": "F",
+                    "hometown": "Dallas",
+                    "phone_number": "+1 555 000 1111",
+                    "instagram_handle": "@blaked",
+                    "first_event_date": today,
+                    "interests": ["Leadership", "Finance"],
+                    "stereotype": "Connector",
+                    "notes": "Potential package deal candidate with Alex.",
+                    "auto_photo_from_instagram": False,
+                },
+            )
+            expect_status(response, 200, "Create second PNM")
+            pnm_two = response.json().get("pnm", {})
+            pnm_two_id = int(pnm_two.get("pnm_id"))
+            checks.append("Second PNM create works")
+
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Head logout")
             sync_csrf_header()
@@ -343,6 +364,32 @@ def main() -> None:
             )
             expect_status(response, 200, "Assignment detail update")
             checks.append("Assignment orchestration endpoint works")
+
+            response = client.post(
+                "/kappaalphaorder/api/pnms/package/link",
+                json={
+                    "pnm_ids": [pnm_id, pnm_two_id],
+                    "sync_assignment": True,
+                },
+            )
+            expect_status(response, 200, "Package link endpoint")
+            package_payload = response.json()
+            package_group_id = package_payload.get("package_group_id")
+            if not package_group_id:
+                raise AssertionError("Package link response missing package_group_id.")
+
+            response = client.get("/kappaalphaorder/api/pnms")
+            expect_status(response, 200, "List PNMs after package link")
+            pnms = {int(item.get("pnm_id")): item for item in response.json().get("pnms", []) if item.get("pnm_id")}
+            first = pnms.get(pnm_id)
+            second = pnms.get(pnm_two_id)
+            if not first or not second:
+                raise AssertionError("Expected PNMs missing after package link.")
+            if first.get("package_group_id") != package_group_id or second.get("package_group_id") != package_group_id:
+                raise AssertionError("Package link did not persist same package_group_id across linked PNMs.")
+            if int(first.get("assigned_officer_id") or 0) != officer_user_id or int(second.get("assigned_officer_id") or 0) != officer_user_id:
+                raise AssertionError("Package link sync should align assigned officer across linked PNMs.")
+            checks.append("Package deal link and assignment sync works")
 
             response = client.patch(
                 f"/kappaalphaorder/api/pnms/{pnm_id}/stage",

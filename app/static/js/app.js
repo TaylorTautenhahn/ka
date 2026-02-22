@@ -250,6 +250,10 @@ const headAssignPnmSelect = document.getElementById("headAssignPnmSelect");
 const headAssignOfficerSelect = document.getElementById("headAssignOfficerSelect");
 const headAssignClearBtn = document.getElementById("headAssignClearBtn");
 const headAssignmentTable = document.getElementById("headAssignmentTable");
+const headPackagePartnerSelect = document.getElementById("headPackagePartnerSelect");
+const headPackageLinkBtn = document.getElementById("headPackageLinkBtn");
+const headPackageUnlinkBtn = document.getElementById("headPackageUnlinkBtn");
+const headPackageSummary = document.getElementById("headPackageSummary");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
 const ROLE_HEAD = "Head Rush Officer";
@@ -406,6 +410,7 @@ const state = {
   officerChatStats: null,
   adminEditPnmId: null,
   headAssignmentPnmId: null,
+  headPackagePartnerId: null,
   seasonArchive: null,
   tutorial: {
     active: false,
@@ -434,6 +439,54 @@ function formatScoreBreakdown(row) {
     const value = Number(row[criterion.field] || 0);
     return `${criterion.short_label} ${value}`;
   }).join(" | ");
+}
+
+
+function normalizePackageGroupId(value) {
+  const token = String(value || "").trim();
+  return token || "";
+}
+
+function packageGroupLabel(groupId) {
+  const token = normalizePackageGroupId(groupId);
+  if (!token) {
+    return "";
+  }
+  const raw = token.startsWith("pkg_") ? token.slice(4) : token;
+  return `PKG-${raw.slice(0, 6).toUpperCase()}`;
+}
+
+function packageGroupIndex() {
+  const map = new Map();
+  state.pnms.forEach((pnm) => {
+    const groupId = normalizePackageGroupId(pnm.package_group_id);
+    if (!groupId) {
+      return;
+    }
+    if (!map.has(groupId)) {
+      map.set(groupId, []);
+    }
+    map.get(groupId).push(pnm);
+  });
+  return map;
+}
+
+function packageInfoForPnm(pnm, groups = null) {
+  if (!pnm) {
+    return { id: "", label: "Solo", count: 1, members: [] };
+  }
+  const groupId = normalizePackageGroupId(pnm.package_group_id);
+  if (!groupId) {
+    return { id: "", label: "Solo", count: 1, members: [pnm] };
+  }
+  const lookup = groups || packageGroupIndex();
+  const members = lookup.get(groupId) || [pnm];
+  return {
+    id: groupId,
+    label: packageGroupLabel(groupId) || "Package",
+    count: members.length,
+    members,
+  };
 }
 
 function applyRatingCriteriaUi() {
@@ -1989,16 +2042,20 @@ function renderAssignedRushSection() {
     return;
   }
 
+  const groups = packageGroupIndex();
   const tableRows = rows
     .map((pnm) => {
       const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
       const assignedAt = pnm.assigned_at ? formatLastSeen(pnm.assigned_at) : "-";
+      const packageInfo = packageInfoForPnm(pnm, groups);
+      const packageDisplay = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
       const officerCell = isHead ? `<td>${escapeHtml(assignedOfficer)}</td>` : "";
       const assignedAtCell = isHead ? `<td>${escapeHtml(assignedAt)}</td>` : "";
       return `
         <tr>
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>${escapeHtml(packageDisplay)}</td>
           <td>${escapeHtml(pnm.phone_number || "-")}</td>
           ${officerCell}
           ${assignedAtCell}
@@ -2016,6 +2073,7 @@ function renderAssignedRushSection() {
         <tr>
           <th>Code</th>
           <th>Name</th>
+          <th>Package</th>
           <th>Phone</th>
           ${officerHeader}
           <th>Weighted Total</th>
@@ -2163,6 +2221,8 @@ function renderPnmTable() {
       const own = pnm.own_rating;
       const ownDisplay = own ? `${own.total_score}/${RATING_TOTAL_MAX}` : "Not rated";
       const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+      const packageInfo = packageInfoForPnm(pnm);
+      const packageDisplay = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
       const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / RATING_TOTAL_MAX) * 100));
       const barWidth = Math.round((weightedPct / 100) * 58);
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
@@ -2176,6 +2236,7 @@ function renderPnmTable() {
           <td>${smallPhotoCell(pnm)}</td>
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>${escapeHtml(packageDisplay)}</td>
           <td>${escapeHtml(pnm.phone_number || "-")}</td>
           <td>${escapeHtml(pnm.class_year)}</td>
           <td>${pnm.days_since_first_event}</td>
@@ -2206,6 +2267,7 @@ function renderPnmTable() {
           <th>Photo</th>
           <th>Code</th>
           <th>Name</th>
+          <th>Package</th>
           <th>Phone</th>
           <th>Class</th>
           <th>Days Since Event</th>
@@ -2688,11 +2750,15 @@ function renderAdminPnmTable() {
 
   const rows = state.pnms
     .map(
-      (pnm) => `
+      (pnm) => {
+        const packageInfo = packageInfoForPnm(pnm);
+        const packageDisplay = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
+        return `
       <tr>
         <td>${smallPhotoCell(pnm)}</td>
         <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
         <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+        <td>${escapeHtml(packageDisplay)}</td>
         <td>${escapeHtml(pnm.phone_number || "-")}</td>
         <td>${escapeHtml(pnm.instagram_handle)}</td>
         <td>${pnm.weighted_total.toFixed(2)}</td>
@@ -2705,7 +2771,8 @@ function renderAdminPnmTable() {
           </div>
         </td>
       </tr>
-    `
+    `;
+      }
     )
     .join("");
 
@@ -2716,6 +2783,7 @@ function renderAdminPnmTable() {
           <th>Photo</th>
           <th>Code</th>
           <th>Name</th>
+          <th>Package</th>
           <th>Phone</th>
           <th>Instagram</th>
           <th>Weighted Total</th>
@@ -2736,14 +2804,59 @@ function syncHeadAssignmentSelection() {
   const pnmId = Number(headAssignPnmSelect.value || 0);
   if (!pnmId) {
     headAssignOfficerSelect.value = "";
+    renderHeadPackageControls();
     return;
   }
   const pnm = state.pnms.find((item) => item.pnm_id === pnmId);
   if (!pnm || !pnm.assigned_officer_id) {
     headAssignOfficerSelect.value = "";
+    renderHeadPackageControls();
     return;
   }
   headAssignOfficerSelect.value = String(pnm.assigned_officer_id);
+  renderHeadPackageControls();
+}
+
+function renderHeadPackageControls() {
+  if (!headPackagePartnerSelect || !headPackageSummary) {
+    return;
+  }
+  const selectedPnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  const selected = state.pnms.find((pnm) => pnm.pnm_id === selectedPnmId) || null;
+  if (!selected) {
+    headPackagePartnerSelect.innerHTML = '<option value="">Select a rushee first</option>';
+    headPackageSummary.textContent = "No package deal linked for this rushee yet.";
+    state.headPackagePartnerId = null;
+    return;
+  }
+
+  const partnerOptions = ['<option value="">Select partner rushee</option>'];
+  state.pnms
+    .filter((pnm) => pnm.pnm_id !== selected.pnm_id)
+    .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`))
+    .forEach((pnm) => {
+      const packageInfo = packageInfoForPnm(pnm);
+      const marker = packageInfo.id ? ` (${packageInfo.label})` : "";
+      partnerOptions.push(
+        `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}${marker}`)}</option>`
+      );
+    });
+  headPackagePartnerSelect.innerHTML = partnerOptions.join("");
+
+  const selectedPartnerExists = state.pnms.some((pnm) => pnm.pnm_id === Number(state.headPackagePartnerId));
+  if (selectedPartnerExists) {
+    headPackagePartnerSelect.value = String(state.headPackagePartnerId);
+  } else {
+    state.headPackagePartnerId = null;
+  }
+
+  const packageInfo = packageInfoForPnm(selected);
+  if (!packageInfo.id) {
+    headPackageSummary.textContent = "No package deal linked for this rushee yet.";
+    return;
+  }
+  const memberNames = packageInfo.members.map((pnm) => `${pnm.first_name} ${pnm.last_name}`).join(", ");
+  headPackageSummary.textContent = `${packageInfo.label} includes ${packageInfo.count} rushees: ${memberNames}.`;
 }
 
 function renderHeadAssignmentTable() {
@@ -2755,6 +2868,7 @@ function renderHeadAssignmentTable() {
     return;
   }
 
+  const groups = packageGroupIndex();
   const rows = [...state.pnms]
     .sort((a, b) => {
       const aOfficer = (a.assigned_officer && a.assigned_officer.username) || "zzzz";
@@ -2762,15 +2876,31 @@ function renderHeadAssignmentTable() {
       if (aOfficer !== bOfficer) {
         return aOfficer.localeCompare(bOfficer);
       }
+      const aPackage = normalizePackageGroupId(a.package_group_id) || `solo-${a.pnm_id}`;
+      const bPackage = normalizePackageGroupId(b.package_group_id) || `solo-${b.pnm_id}`;
+      if (aPackage !== bPackage) {
+        return aPackage.localeCompare(bPackage);
+      }
       return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`);
     })
     .map((pnm) => {
       const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
       const assignedAt = pnm.assigned_at ? formatLastSeen(pnm.assigned_at) : "-";
+      const packageInfo = packageInfoForPnm(pnm, groups);
+      const packageMembers = packageInfo.members
+        .map((member) => `${member.first_name} ${member.last_name}`)
+        .join(", ");
+      const packageText = packageInfo.id
+        ? `${packageInfo.label} (${packageInfo.count})`
+        : "Solo";
       return `
         <tr>
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>
+            <strong>${escapeHtml(packageText)}</strong>
+            ${packageInfo.id ? `<div class="muted">${escapeHtml(packageMembers)}</div>` : ""}
+          </td>
           <td>${escapeHtml(assignedOfficer)}</td>
           <td>${escapeHtml(assignedAt)}</td>
           <td>${pnm.weighted_total.toFixed(2)}</td>
@@ -2785,6 +2915,7 @@ function renderHeadAssignmentTable() {
         <tr>
           <th>Code</th>
           <th>Rushee</th>
+          <th>Package Deal</th>
           <th>Assigned Officer</th>
           <th>Assigned At</th>
           <th>Weighted Total</th>
@@ -2802,12 +2933,22 @@ function renderHeadAssignmentManager() {
   if (!roleCanUseAdminPanel()) {
     headAssignmentForm.classList.add("hidden");
     headAssignmentTable.innerHTML = "";
+    if (headPackagePartnerSelect) {
+      headPackagePartnerSelect.innerHTML = "";
+    }
+    if (headPackageSummary) {
+      headPackageSummary.textContent = "";
+    }
     return;
   }
 
   headAssignmentForm.classList.remove("hidden");
   const pnmOptions = state.pnms
-    .map((pnm) => `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`)}</option>`)
+    .map((pnm) => {
+      const packageInfo = packageInfoForPnm(pnm);
+      const marker = packageInfo.id ? ` (${packageInfo.label})` : "";
+      return `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}${marker}`)}</option>`;
+    })
     .join("");
   headAssignPnmSelect.innerHTML = pnmOptions || '<option value="">No rushees available</option>';
 
@@ -2831,6 +2972,7 @@ function renderHeadAssignmentManager() {
   }
   syncHeadAssignmentSelection();
   renderHeadAssignmentTable();
+  renderHeadPackageControls();
 }
 
 function renderAdminPanel() {
@@ -2878,8 +3020,10 @@ function applyRatingFormForSelected() {
   }
 
   const assigned = selected.assigned_officer ? selected.assigned_officer.username : "Unassigned";
+  const packageInfo = packageInfoForPnm(selected);
+  const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
   const phone = selected.phone_number || "No phone";
-  selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Assigned: ${assigned}`;
+  selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Assigned: ${assigned} | Package: ${packageText}`;
   ratingPnm.value = String(selected.pnm_id);
   lunchPnm.value = String(selected.pnm_id);
 
@@ -2974,6 +3118,11 @@ function renderMeetingView(payload) {
   }
   const { pnm, summary, ratings, lunches, matches, rating_trend: trend, can_view_rater_identity: canSeeRaters } = payload;
   const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+  const packageInfo = packageInfoForPnm(pnm);
+  const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
+  const packageMembers = packageInfo.id
+    ? packageInfo.members.map((item) => `${item.first_name} ${item.last_name}`).join(", ")
+    : "";
   const trendPoints = trend && Array.isArray(trend.points) ? trend.points : [];
   const trendDelta = trend && typeof trend.delta_weighted_total === "number" ? trend.delta_weighted_total : null;
   const trendDeltaClass = trendDelta == null ? "warn" : trendDelta > 0 ? "good" : trendDelta < 0 ? "bad" : "warn";
@@ -3028,6 +3177,7 @@ function renderMeetingView(payload) {
         <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
         <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
         <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
+        <p class="muted">Package Deal: ${escapeHtml(packageText)}${packageMembers ? ` | Members: ${escapeHtml(packageMembers)}` : ""}</p>
       </div>
     </div>
     <div class="meeting-metrics">
@@ -3496,6 +3646,7 @@ async function handleLogout() {
   state.seasonArchive = null;
   state.adminEditPnmId = null;
   state.headAssignmentPnmId = null;
+  state.headPackagePartnerId = null;
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
   animateCounter(heroLunchCount, 0);
@@ -3876,6 +4027,95 @@ async function handleHeadAssignmentClear() {
     if (clearButton) {
       clearButton.disabled = false;
       clearButton.textContent = "Clear Assignment";
+    }
+  }
+}
+
+async function handleHeadPackageLink() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const primaryId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  const partnerId = Number(headPackagePartnerSelect && headPackagePartnerSelect.value ? headPackagePartnerSelect.value : 0);
+  if (!primaryId) {
+    showToast("Select a primary rushee first.");
+    return;
+  }
+  if (!partnerId || primaryId === partnerId) {
+    showToast("Select a different rushee to link as a package deal.");
+    return;
+  }
+
+  const primaryPnm = state.pnms.find((pnm) => pnm.pnm_id === primaryId) || null;
+  const partnerPnm = state.pnms.find((pnm) => pnm.pnm_id === partnerId) || null;
+  if (!primaryPnm || !partnerPnm) {
+    showToast("Could not find selected rushees.");
+    return;
+  }
+
+  const primaryPackage = packageInfoForPnm(primaryPnm);
+  const partnerPackage = packageInfoForPnm(partnerPnm);
+  const packageIds = new Set([primaryId, partnerId]);
+  primaryPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
+  partnerPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
+
+  if (headPackageLinkBtn) {
+    headPackageLinkBtn.disabled = true;
+    headPackageLinkBtn.textContent = "Linking...";
+  }
+  try {
+    const payload = await api("/api/pnms/package/link", {
+      method: "POST",
+      body: { pnm_ids: Array.from(packageIds), sync_assignment: true },
+    });
+    state.headAssignmentPnmId = primaryId;
+    state.selectedPnmId = primaryId;
+    state.headPackagePartnerId = partnerId;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(primaryId);
+    showToast(payload.message || "Package deal linked.");
+  } catch (error) {
+    showToast(error.message || "Unable to link package deal.");
+  } finally {
+    if (headPackageLinkBtn) {
+      headPackageLinkBtn.disabled = false;
+      headPackageLinkBtn.textContent = "Link Package Deal";
+    }
+  }
+}
+
+async function handleHeadPackageUnlink() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const pnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+
+  if (headPackageUnlinkBtn) {
+    headPackageUnlinkBtn.disabled = true;
+    headPackageUnlinkBtn.textContent = "Unlinking...";
+  }
+  try {
+    const payload = await api(`/api/pnms/${pnmId}/package/unlink`, { method: "POST" });
+    state.headAssignmentPnmId = pnmId;
+    state.selectedPnmId = pnmId;
+    state.headPackagePartnerId = null;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    showToast(payload.message || "Package deal updated.");
+  } catch (error) {
+    showToast(error.message || "Unable to unlink package deal.");
+  } finally {
+    if (headPackageUnlinkBtn) {
+      headPackageUnlinkBtn.disabled = false;
+      headPackageUnlinkBtn.textContent = "Unlink Selected";
     }
   }
 }
@@ -4863,11 +5103,23 @@ function attachEvents() {
   if (headAssignPnmSelect) {
     headAssignPnmSelect.addEventListener("change", () => {
       state.headAssignmentPnmId = Number(headAssignPnmSelect.value || 0) || null;
+      state.headPackagePartnerId = null;
       syncHeadAssignmentSelection();
     });
   }
   if (headAssignClearBtn) {
     headAssignClearBtn.addEventListener("click", handleHeadAssignmentClear);
+  }
+  if (headPackagePartnerSelect) {
+    headPackagePartnerSelect.addEventListener("change", () => {
+      state.headPackagePartnerId = Number(headPackagePartnerSelect.value || 0) || null;
+    });
+  }
+  if (headPackageLinkBtn) {
+    headPackageLinkBtn.addEventListener("click", handleHeadPackageLink);
+  }
+  if (headPackageUnlinkBtn) {
+    headPackageUnlinkBtn.addEventListener("click", handleHeadPackageUnlink);
   }
 
   ratingPnm.addEventListener("change", async (event) => {

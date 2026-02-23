@@ -50,6 +50,22 @@ def main() -> None:
         from app.main import app
 
         checks: list[str] = []
+
+        if main_module.normalize_state_code("Texas") != "TX":
+            raise AssertionError("State normalization should map full state names.")
+        if main_module.normalize_state_code("tx") != "TX":
+            raise AssertionError("State normalization should map 2-letter abbreviations.")
+        parsed_city, parsed_state = main_module.parse_hometown_city_state("Austin, TX")
+        if parsed_city != "Austin" or parsed_state != "TX":
+            raise AssertionError("Hometown parser should handle City, ST format.")
+        parsed_city, parsed_state = main_module.parse_hometown_city_state("Dallas TX")
+        if parsed_city != "Dallas" or parsed_state != "TX":
+            raise AssertionError("Hometown parser should handle City ST format.")
+        parsed_city, parsed_state = main_module.parse_hometown_city_state("Unknown Place")
+        if parsed_city != "Unknown Place" or parsed_state != "":
+            raise AssertionError("Hometown parser should preserve unknown format city with empty state.")
+        checks.append("State normalization + hometown parsing helpers work")
+
         with TestClient(app) as client:
             client.headers.update({"Origin": "http://testserver"})
 

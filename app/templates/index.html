@@ -35,7 +35,7 @@
 
     <main class="shell">
       <header class="hero reveal">
-        <div class="hero-shell">
+        <div class="hero-shell hero-shell-single">
           <div class="hero-copy">
             {% if app_config.logo_path %}
             <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
@@ -60,28 +60,6 @@
               </article>
             </div>
           </div>
-          <aside class="hero-visuals" aria-label="Brand and media slots">
-            <div class="media-slot-grid">
-              <article class="media-slot">
-                <p class="media-slot-label">Organization Branding</p>
-                <h3 class="media-slot-title">Primary Logo Slot</h3>
-                <p class="media-slot-note">Use this area for your chapter crest or logo.</p>
-                {% if app_config and app_config.logo_path %}
-                <div class="media-slot-preview logo">
-                  <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
-                </div>
-                {% else %}
-                <div class="media-slot-empty">Upload your chapter crest in Platform Admin.</div>
-                {% endif %}
-              </article>
-              <article class="media-slot">
-                <p class="media-slot-label">Campaign Visual</p>
-                <h3 class="media-slot-title">Hero Image Slot</h3>
-                <p class="media-slot-note">Use this space for your own chapter artwork or event announcement card.</p>
-                <div class="media-slot-empty">No stock art shown by default.</div>
-              </article>
-            </div>
-          </aside>
         </div>
       </header>
 

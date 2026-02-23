@@ -425,6 +425,7 @@ const state = {
   calendarShare: null,
   activeDesktopPage: DEFAULT_DESKTOP_PAGE,
   liveRefreshTimer: null,
+  liveRefreshInFlight: false,
   headAdmin: {
     summary: null,
     currentHeads: [],
@@ -1056,12 +1057,19 @@ function setActiveDesktopPage(page, updateUrl = true) {
   if (!updateUrl) {
     return;
   }
+  const shouldRefresh = Boolean(state.user);
   const nextPath = desktopRoutePathForPage(target);
   const current = window.location.pathname;
   if (!nextPath || current === nextPath) {
+    if (shouldRefresh) {
+      refreshByActivePage().catch(() => {});
+    }
     return;
   }
   window.history.replaceState({}, "", nextPath);
+  if (shouldRefresh) {
+    refreshByActivePage().catch(() => {});
+  }
 }
 
 function updateTopbarActions() {
@@ -1079,6 +1087,68 @@ function updateTopbarActions() {
   }
 }
 
+function refreshLoadersForActivePage() {
+  const page = state.activeDesktopPage || DEFAULT_DESKTOP_PAGE;
+  if (page === "operations") {
+    return [
+      () => loadPnms({ includeDetail: false }),
+      () => loadMembers({ includeSameState: false }),
+      loadCalendarShare,
+      loadScheduledLunches,
+      loadRushCalendar,
+      loadWeeklyGoals,
+      loadNotifications,
+      loadOfficerChat,
+      loadOfficerChatStats,
+    ];
+  }
+  if (page === "rushees") {
+    return [
+      () => loadPnms({ includeDetail: true }),
+      () => loadMembers({ includeSameState: false }),
+      loadAnalytics,
+      loadCalendarShare,
+      loadScheduledLunches,
+      loadAssignedRushData,
+      loadNotifications,
+    ];
+  }
+  if (page === "members") {
+    return [
+      () => loadPnms({ includeDetail: false }),
+      () => loadMembers({ includeSameState: true }),
+      loadApprovals,
+      loadAssignedRushData,
+      loadNotifications,
+    ];
+  }
+  if (page === "admin") {
+    return [
+      () => loadPnms({ includeDetail: false }),
+      () => loadMembers({ includeSameState: false }),
+      loadApprovals,
+      loadHeadAdminData,
+      loadSeasonArchiveStatus,
+      loadAssignedRushData,
+      loadNotifications,
+    ];
+  }
+  return [
+    () => loadPnms({ includeDetail: false }),
+    () => loadMembers({ includeSameState: false }),
+    loadMatching,
+    loadAnalytics,
+    loadLeaderboard,
+    loadAssignedRushData,
+    loadNotifications,
+  ];
+}
+
+async function refreshByActivePage() {
+  const loaders = refreshLoadersForActivePage();
+  await Promise.all(loaders.map((loader) => loader()));
+}
+
 function startLiveRefresh() {
   if (state.liveRefreshTimer) {
     clearInterval(state.liveRefreshTimer);
@@ -1087,27 +1157,16 @@ function startLiveRefresh() {
     if (!state.user) {
       return;
     }
+    if (state.liveRefreshInFlight) {
+      return;
+    }
+    state.liveRefreshInFlight = true;
     try {
-      await Promise.all([
-        loadPnms(),
-        loadMembers(),
-        loadMatching(),
-        loadAnalytics(),
-        loadLeaderboard(),
-        loadCalendarShare(),
-        loadScheduledLunches(),
-        loadRushCalendar(),
-        loadWeeklyGoals(),
-        loadNotifications(),
-        loadOfficerChat(),
-        loadOfficerChatStats(),
-        loadApprovals(),
-        loadHeadAdminData(),
-        loadAssignedRushData(),
-        loadSeasonArchiveStatus(),
-      ]);
+      await refreshByActivePage();
     } catch {
       // Passive sync should fail silently; explicit actions already report errors.
+    } finally {
+      state.liveRefreshInFlight = false;
     }
   }, 18000);
 }
@@ -1117,6 +1176,7 @@ function stopLiveRefresh() {
     clearInterval(state.liveRefreshTimer);
     state.liveRefreshTimer = null;
   }
+  state.liveRefreshInFlight = false;
 }
 
 function setSessionHeading() {
@@ -3520,7 +3580,11 @@ async function loadInterestHints() {
   renderInterestHints(payload.interests || []);
 }
 
-async function loadPnms() {
+async function loadPnms(options = {}) {
+  const includeDetail =
+    options.includeDetail !== undefined
+      ? Boolean(options.includeDetail)
+      : state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin";
   const query = toQuery(state.rusheeFilters);
   const payload = await api(`/api/pnms${query}`);
   state.pnms = payload.pnms || [];
@@ -3542,10 +3606,14 @@ async function loadPnms() {
   renderAssignmentControls();
   renderPackageDealPanel();
   renderSameStatePnmsPanel();
-  await loadPnmDetail(state.selectedPnmId);
+  if (includeDetail) {
+    await loadPnmDetail(state.selectedPnmId);
+  }
 }
 
-async function loadMembers() {
+async function loadMembers(options = {}) {
+  const includeSameState =
+    options.includeSameState !== undefined ? Boolean(options.includeSameState) : state.activeDesktopPage === "members";
   const query = toQuery(state.memberFilters);
   const payload = await api(`/api/users${query}`);
   state.members = payload.users || [];
@@ -3553,7 +3621,11 @@ async function loadMembers() {
     state.selectedMemberId = state.members.length ? Number(state.members[0].user_id) : null;
   }
   renderMemberTable();
-  await loadSameStatePnms();
+  if (includeSameState) {
+    await loadSameStatePnms();
+  } else {
+    renderSameStatePnmsPanel();
+  }
   renderWeeklyGoalAssignedUsers();
   renderAssignmentControls();
   renderAdminPanel();
@@ -3771,8 +3843,8 @@ async function loadSeasonArchiveStatus() {
 async function refreshAll() {
   await Promise.all([
     loadInterestHints(),
-    loadPnms(),
-    loadMembers(),
+    loadPnms({ includeDetail: state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin" }),
+    loadMembers({ includeSameState: state.activeDesktopPage === "members" }),
     loadMatching(),
     loadAnalytics(),
     loadLeaderboard(),

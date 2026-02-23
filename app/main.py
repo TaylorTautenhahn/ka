@@ -3712,7 +3712,7 @@ def evaluate_weekly_goal_completions(conn: sqlite3.Connection) -> None:
             notif_type="goal_completed",
             title=f"Goal Completed: {row['title']}",
             body=f"Progress reached {progress}/{target}.",
-            link_path="/?view=operations",
+            link_path="/calendar",
         )
 
 
@@ -6542,7 +6542,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                     notif_type="chat_mention",
                     title=title,
                     body=message[:220],
-                    link_path="/?view=operations",
+                    link_path="/calendar",
                 )
 
     upsert_contact_download_records(
@@ -13560,7 +13560,7 @@ def create_engagement_event(
                 notif_type="event",
                 title=f"Event Assigned: {title}",
                 body=f"{payload.event_date} | {payload.start_time or 'All Day'}",
-                link_path="/?view=operations",
+                link_path="/calendar",
             )
 
         row = conn.execute(
@@ -13887,7 +13887,7 @@ def create_rush_event(payload: RushEventCreateRequest, user: sqlite3.Row = Depen
             notif_type="rush_event",
             title=f"New Rush Event: {title}",
             body=f"{payload.event_date} | {event_clock}",
-            link_path="/?view=operations",
+            link_path="/calendar",
         )
 
     return {"event": rush_event_payload(created)}
@@ -14288,7 +14288,7 @@ def create_weekly_goal(payload: WeeklyGoalCreateRequest, user: sqlite3.Row = Dep
                 notif_type="goal_assigned",
                 title=f"New Weekly Goal: {row['title']}",
                 body=f"Target: {row['target_count']} {WEEKLY_GOAL_METRIC_LABELS.get(row['metric_type'], row['metric_type'])}",
-                link_path="/?view=operations",
+                link_path="/calendar",
             )
         elif row["assigned_user_id"] is None:
             officer_rows = conn.execute(
@@ -14301,7 +14301,7 @@ def create_weekly_goal(payload: WeeklyGoalCreateRequest, user: sqlite3.Row = Dep
                 notif_type="goal_created",
                 title=f"Team Weekly Goal: {row['title']}",
                 body=f"Target: {row['target_count']} {WEEKLY_GOAL_METRIC_LABELS.get(row['metric_type'], row['metric_type'])}",
-                link_path="/?view=operations",
+                link_path="/calendar",
             )
 
         goal_payload = weekly_goal_payload(conn, row)
@@ -14749,7 +14749,7 @@ def broadcast_notification_digest(
                 notif_type="digest",
                 title=f"{payload.period.title()} Team Digest",
                 body=body[:500],
-                link_path="/?view=operations",
+                link_path="/calendar",
             )
             dispatched += 1
 
@@ -14939,7 +14939,7 @@ def create_officer_chat_message(
                         notif_type="chat_mention",
                         title=f"Mentioned by {user['username']}",
                         body=message[:220],
-                        link_path="/?view=operations",
+                        link_path="/calendar",
                     )
 
         evaluate_weekly_goal_completions(conn)

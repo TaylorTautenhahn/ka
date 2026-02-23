@@ -147,7 +147,6 @@ const ratingList = document.getElementById("ratingList");
 const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
 const openMeetingPageBtn = document.getElementById("openMeetingPageBtn");
-const meetingView = null;
 const ratingPnm = document.getElementById("ratingPnm");
 const lunchPnm = document.getElementById("lunchPnm");
 const lunchStartTime = document.getElementById("lunchStartTime");
@@ -272,10 +271,6 @@ const headAddAssigneeSelect = document.getElementById("headAddAssigneeSelect");
 const headAddAssigneeBtn = document.getElementById("headAddAssigneeBtn");
 const headAssigneeList = document.getElementById("headAssigneeList");
 const headAssignmentTable = document.getElementById("headAssignmentTable");
-const headPackagePartnerSelect = document.getElementById("headPackagePartnerSelect");
-const headPackageLinkBtn = document.getElementById("headPackageLinkBtn");
-const headPackageUnlinkBtn = document.getElementById("headPackageUnlinkBtn");
-const headPackageSummary = document.getElementById("headPackageSummary");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
 const ROLE_HEAD = "Head Rush Officer";
@@ -447,7 +442,6 @@ const state = {
   officerChatStats: null,
   adminEditPnmId: null,
   headAssignmentPnmId: null,
-  headPackagePartnerId: null,
   packagePartnerId: null,
   seasonArchive: null,
   tutorial: {
@@ -3015,19 +3009,16 @@ function syncHeadAssignmentSelection() {
   if (!pnmId) {
     headAssignOfficerSelect.value = "";
     renderHeadAssigneeControls();
-    renderHeadPackageControls();
     return;
   }
   const pnm = state.pnms.find((item) => item.pnm_id === pnmId);
   if (!pnm || !pnm.assigned_officer_id) {
     headAssignOfficerSelect.value = "";
     renderHeadAssigneeControls();
-    renderHeadPackageControls();
     return;
   }
   headAssignOfficerSelect.value = String(pnm.assigned_officer_id);
   renderHeadAssigneeControls();
-  renderHeadPackageControls();
 }
 
 function renderHeadAssigneeControls() {
@@ -3086,48 +3077,6 @@ function renderHeadAssigneeControls() {
   if (headAddAssigneeBtn) {
     headAddAssigneeBtn.disabled = availableOfficers.length === 0;
   }
-}
-
-function renderHeadPackageControls() {
-  if (!headPackagePartnerSelect || !headPackageSummary) {
-    return;
-  }
-  const selectedPnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
-  const selected = state.pnms.find((pnm) => pnm.pnm_id === selectedPnmId) || null;
-  if (!selected) {
-    headPackagePartnerSelect.innerHTML = '<option value="">Select a rushee first</option>';
-    headPackageSummary.textContent = "No package deal linked for this rushee yet.";
-    state.headPackagePartnerId = null;
-    return;
-  }
-
-  const partnerOptions = ['<option value="">Select partner rushee</option>'];
-  state.pnms
-    .filter((pnm) => pnm.pnm_id !== selected.pnm_id)
-    .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`))
-    .forEach((pnm) => {
-      const packageInfo = packageInfoForPnm(pnm);
-      const marker = packageInfo.id ? ` (${packageInfo.label})` : "";
-      partnerOptions.push(
-        `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}${marker}`)}</option>`
-      );
-    });
-  headPackagePartnerSelect.innerHTML = partnerOptions.join("");
-
-  const selectedPartnerExists = state.pnms.some((pnm) => pnm.pnm_id === Number(state.headPackagePartnerId));
-  if (selectedPartnerExists) {
-    headPackagePartnerSelect.value = String(state.headPackagePartnerId);
-  } else {
-    state.headPackagePartnerId = null;
-  }
-
-  const packageInfo = packageInfoForPnm(selected);
-  if (!packageInfo.id) {
-    headPackageSummary.textContent = "No package deal linked for this rushee yet.";
-    return;
-  }
-  const memberNames = packageInfo.members.map((pnm) => `${pnm.first_name} ${pnm.last_name}`).join(", ");
-  headPackageSummary.textContent = `${packageInfo.label} includes ${packageInfo.count} rushees: ${memberNames}.`;
 }
 
 function renderPackageDealPanel() {
@@ -3276,12 +3225,6 @@ function renderHeadAssignmentManager() {
     if (headAssigneeList) {
       headAssigneeList.innerHTML = "";
     }
-    if (headPackagePartnerSelect) {
-      headPackagePartnerSelect.innerHTML = "";
-    }
-    if (headPackageSummary) {
-      headPackageSummary.textContent = "";
-    }
     return;
   }
 
@@ -3316,7 +3259,6 @@ function renderHeadAssignmentManager() {
   syncHeadAssignmentSelection();
   renderHeadAssignmentTable();
   renderHeadAssigneeControls();
-  renderHeadPackageControls();
 }
 
 function renderAdminPanel() {
@@ -3461,143 +3403,6 @@ function renderLunchEntries(data) {
     `
     )
     .join("");
-}
-
-function renderMeetingView(payload) {
-  if (!meetingView) {
-    return;
-  }
-  const {
-    pnm,
-    summary,
-    ratings,
-    lunches,
-    matches,
-    linked_pnms: linkedPnms = [],
-    rating_trend: trend,
-    can_view_rater_identity: canSeeRaters,
-  } = payload;
-  const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-  const linkedSummaryText = Array.isArray(linkedPnms) && linkedPnms.length
-    ? linkedPnms.map((item) => `${item.first_name} ${item.last_name}`).join(", ")
-    : "None";
-  const linkedActionMarkup = Array.isArray(linkedPnms) && linkedPnms.length
-    ? `<div class="linked-meeting-actions">
-        ${linkedPnms
-          .map(
-            (item) =>
-              `<button type="button" class="secondary linked-meeting-open-btn" data-pnm-id="${Number(item.pnm_id)}">Open ${escapeHtml(item.first_name)} ${escapeHtml(item.last_name)}</button>`
-          )
-          .join("")}
-      </div>`
-    : "";
-  const trendPoints = trend && Array.isArray(trend.points) ? trend.points : [];
-  const trendDelta = trend && typeof trend.delta_weighted_total === "number" ? trend.delta_weighted_total : null;
-  const trendDeltaClass = trendDelta == null ? "warn" : trendDelta > 0 ? "good" : trendDelta < 0 ? "bad" : "warn";
-  const trendDeltaLabel = trendDelta == null ? "N/A" : `${trendDelta > 0 ? "+" : ""}${trendDelta.toFixed(2)}`;
-  const trendEvents = trend && typeof trend.events_count === "number" ? trend.events_count : trendPoints.length;
-  const photoMarkup = pnm.photo_url
-    ? `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}" class="meeting-photo large" loading="lazy" />`
-    : '<div class="photo-placeholder large">No photo uploaded.</div>';
-
-  const ratingsMarkup =
-    ratings
-      .slice(0, 8)
-      .map((row) => {
-        const who = canSeeRaters
-          ? `${escapeHtml(row.rater.username)} (${escapeHtml(row.rater.role)})`
-          : row.from_me
-            ? "Your rating"
-            : "Member rating";
-        const delta =
-          row.last_change && typeof row.last_change.delta_total === "number"
-            ? ` | Delta ${row.last_change.delta_total > 0 ? "+" : ""}${row.last_change.delta_total}`
-            : "";
-        return `<li><strong>${who}</strong>: ${row.total_score}/${RATING_TOTAL_MAX}${delta}</li>`;
-      })
-      .join("") || "<li>No ratings yet.</li>";
-
-  const lunchMarkup =
-    lunches
-      .slice(0, 8)
-      .map((row) => {
-        const timing = formatLunchWindow(row);
-        const detail = timing ? ` | ${escapeHtml(timing)}` : "";
-        return `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})${detail}</li>`;
-      })
-      .join("") || "<li>No lunch logs yet.</li>";
-
-  const matchMarkup =
-    matches
-      .slice(0, 8)
-      .map((row) => {
-        const shared = row.shared_interests.length ? row.shared_interests.map((x) => escapeHtml(x)).join(", ") : "None";
-        return `<li><strong>${escapeHtml(row.username)}</strong> (${escapeHtml(row.role)}) | Fit ${row.fit_score} | Shared: ${shared}</li>`;
-      })
-      .join("") || "<li>No fit matches yet.</li>";
-
-  meetingView.innerHTML = `
-    <div class="meeting-header">
-      ${photoMarkup}
-      <div>
-        <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
-        <p class="muted">${escapeHtml(pnm.hometown)} | ${escapeHtml(pnm.class_year)} | ${escapeHtml(pnm.instagram_handle)} | ${escapeHtml(pnm.phone_number || "No phone")}</p>
-        <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
-        <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
-        <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
-        <p class="muted">Linked With: ${escapeHtml(linkedSummaryText)}</p>
-        ${linkedActionMarkup}
-      </div>
-    </div>
-    <div class="meeting-metrics">
-      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / ${RATING_TOTAL_MAX}</p></article>
-      <article class="card"><strong>Ratings Count</strong><p>${summary.ratings_count}</p></article>
-      <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
-      <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>
-    </div>
-    <article class="list-column">
-      <div class="entry-title">
-        <h3>Long-Term Rating Trend</h3>
-        <span class="${trendDeltaClass}">${trendDeltaLabel}</span>
-      </div>
-      <p class="muted">Weighted total trajectory over time from rating history events: ${trendEvents}</p>
-      ${renderTrendChart(trendPoints)}
-    </article>
-    <div class="grid-two">
-      <article class="list-column">
-        <h3>Top Ratings</h3>
-        <ul class="meeting-list">${ratingsMarkup}</ul>
-      </article>
-      <article class="list-column">
-        <h3>Recent Lunches</h3>
-        <ul class="meeting-list">${lunchMarkup}</ul>
-      </article>
-    </div>
-    <article class="list-column">
-      <h3>Best Member Matches</h3>
-      <ul class="meeting-list">${matchMarkup}</ul>
-    </article>
-  `;
-}
-
-async function loadMeetingView(pnmId) {
-  if (!meetingView) {
-    return;
-  }
-  if (meetingView.classList.contains("hidden")) {
-    return;
-  }
-  if (!pnmId) {
-    meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
-    return;
-  }
-  try {
-    const payload = await api(`/api/pnms/${pnmId}/meeting`);
-    renderMeetingView(payload);
-  } catch (error) {
-    meetingView.innerHTML = '<p class="muted">Unable to load meeting view.</p>';
-    showToast(error.message || "Unable to load meeting view.");
-  }
 }
 
 async function loadPnmDetail(pnmId) {
@@ -4042,7 +3847,6 @@ async function handleLogout() {
   state.seasonArchive = null;
   state.adminEditPnmId = null;
   state.headAssignmentPnmId = null;
-  state.headPackagePartnerId = null;
   state.packagePartnerId = null;
   animateCounter(heroPnmCount, 0);
   animateCounter(heroRatingCount, 0);
@@ -4634,95 +4438,6 @@ async function handleAssignedRushTableClick(event) {
     showToast(error.message || "Unable to download contact.");
   } finally {
     button.disabled = false;
-  }
-}
-
-async function handleHeadPackageLink() {
-  if (!roleCanUseAdminPanel()) {
-    showToast("Head Rush Officer access required.");
-    return;
-  }
-  const primaryId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
-  const partnerId = Number(headPackagePartnerSelect && headPackagePartnerSelect.value ? headPackagePartnerSelect.value : 0);
-  if (!primaryId) {
-    showToast("Select a primary rushee first.");
-    return;
-  }
-  if (!partnerId || primaryId === partnerId) {
-    showToast("Select a different rushee to link as a package deal.");
-    return;
-  }
-
-  const primaryPnm = state.pnms.find((pnm) => pnm.pnm_id === primaryId) || null;
-  const partnerPnm = state.pnms.find((pnm) => pnm.pnm_id === partnerId) || null;
-  if (!primaryPnm || !partnerPnm) {
-    showToast("Could not find selected rushees.");
-    return;
-  }
-  const primaryGroupId = normalizePackageGroupId(primaryPnm.package_group_id);
-  const partnerGroupId = normalizePackageGroupId(partnerPnm.package_group_id);
-  if (primaryGroupId && primaryGroupId === partnerGroupId) {
-    showToast("These rushees are already linked in the same package deal.");
-    return;
-  }
-
-  if (headPackageLinkBtn) {
-    headPackageLinkBtn.disabled = true;
-    headPackageLinkBtn.textContent = "Linking...";
-  }
-  try {
-    const payload = await api("/api/pnms/package/link", {
-      method: "POST",
-      body: { pnm_ids: [primaryId, partnerId], sync_assignment: true },
-    });
-    state.headAssignmentPnmId = primaryId;
-    state.selectedPnmId = primaryId;
-    state.headPackagePartnerId = partnerId;
-    await refreshAll();
-    applyRatingFormForSelected();
-    await loadPnmDetail(primaryId);
-    showToast(payload.message || "Package deal linked.");
-  } catch (error) {
-    showToast(error.message || "Unable to link package deal.");
-  } finally {
-    if (headPackageLinkBtn) {
-      headPackageLinkBtn.disabled = false;
-      headPackageLinkBtn.textContent = "Link Package Deal";
-    }
-  }
-}
-
-async function handleHeadPackageUnlink() {
-  if (!roleCanUseAdminPanel()) {
-    showToast("Head Rush Officer access required.");
-    return;
-  }
-  const pnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
-  if (!pnmId) {
-    showToast("Select a rushee first.");
-    return;
-  }
-
-  if (headPackageUnlinkBtn) {
-    headPackageUnlinkBtn.disabled = true;
-    headPackageUnlinkBtn.textContent = "Unlinking...";
-  }
-  try {
-    const payload = await api(`/api/pnms/${pnmId}/package/unlink`, { method: "POST" });
-    state.headAssignmentPnmId = pnmId;
-    state.selectedPnmId = pnmId;
-    state.headPackagePartnerId = null;
-    await refreshAll();
-    applyRatingFormForSelected();
-    await loadPnmDetail(pnmId);
-    showToast(payload.message || "Package deal updated.");
-  } catch (error) {
-    showToast(error.message || "Unable to unlink package deal.");
-  } finally {
-    if (headPackageUnlinkBtn) {
-      headPackageUnlinkBtn.disabled = false;
-      headPackageUnlinkBtn.textContent = "Unlink Selected";
-    }
   }
 }
 
@@ -5845,7 +5560,6 @@ function attachEvents() {
   if (headAssignPnmSelect) {
     headAssignPnmSelect.addEventListener("change", () => {
       state.headAssignmentPnmId = Number(headAssignPnmSelect.value || 0) || null;
-      state.headPackagePartnerId = null;
       syncHeadAssignmentSelection();
     });
   }
@@ -5857,17 +5571,6 @@ function attachEvents() {
   }
   if (headAssigneeList) {
     headAssigneeList.addEventListener("click", handleHeadAssigneeListClick);
-  }
-  if (headPackagePartnerSelect) {
-    headPackagePartnerSelect.addEventListener("change", () => {
-      state.headPackagePartnerId = Number(headPackagePartnerSelect.value || 0) || null;
-    });
-  }
-  if (headPackageLinkBtn) {
-    headPackageLinkBtn.addEventListener("click", handleHeadPackageLink);
-  }
-  if (headPackageUnlinkBtn) {
-    headPackageUnlinkBtn.addEventListener("click", handleHeadPackageUnlink);
   }
   if (packagePartnerSelect) {
     packagePartnerSelect.addEventListener("change", () => {
@@ -5941,23 +5644,6 @@ function attachEvents() {
       }
       event.preventDefault();
       startTutorialMode(button.dataset.tutorialMode || TUTORIAL_MODE_GUIDED);
-    });
-  }
-  if (meetingView) {
-    meetingView.addEventListener("click", async (event) => {
-      const button = event.target.closest(".linked-meeting-open-btn");
-      if (!button) {
-        return;
-      }
-      const linkedId = Number(button.dataset.pnmId || 0);
-      if (!linkedId) {
-        return;
-      }
-      state.selectedPnmId = linkedId;
-      state.headAssignmentPnmId = linkedId;
-      renderPnmTable();
-      applyRatingFormForSelected();
-      await loadPnmDetail(linkedId);
     });
   }
   if (tutorialModeSkipBtn) {

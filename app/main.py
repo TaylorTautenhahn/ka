@@ -4135,8 +4135,6 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             lunch_count INTEGER NOT NULL DEFAULT 0
         );
 
-        CREATE INDEX IF NOT EXISTS idx_users_state_code ON users(state_code);
-        CREATE INDEX IF NOT EXISTS idx_users_city ON users(city);
         CREATE INDEX IF NOT EXISTS idx_users_stereotype ON users(stereotype);
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);

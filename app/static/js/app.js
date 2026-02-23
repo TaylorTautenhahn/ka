@@ -4130,12 +4130,12 @@ async function handleHeadPackageLink() {
     showToast("Could not find selected rushees.");
     return;
   }
-
-  const primaryPackage = packageInfoForPnm(primaryPnm);
-  const partnerPackage = packageInfoForPnm(partnerPnm);
-  const packageIds = new Set([primaryId, partnerId]);
-  primaryPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
-  partnerPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
+  const primaryGroupId = normalizePackageGroupId(primaryPnm.package_group_id);
+  const partnerGroupId = normalizePackageGroupId(partnerPnm.package_group_id);
+  if (primaryGroupId && primaryGroupId === partnerGroupId) {
+    showToast("These rushees are already linked in the same package deal.");
+    return;
+  }
 
   if (headPackageLinkBtn) {
     headPackageLinkBtn.disabled = true;
@@ -4144,7 +4144,7 @@ async function handleHeadPackageLink() {
   try {
     const payload = await api("/api/pnms/package/link", {
       method: "POST",
-      body: { pnm_ids: Array.from(packageIds), sync_assignment: true },
+      body: { pnm_ids: [primaryId, partnerId], sync_assignment: true },
     });
     state.headAssignmentPnmId = primaryId;
     state.selectedPnmId = primaryId;
@@ -4218,12 +4218,12 @@ async function handlePackageDealLink() {
     showToast("Could not find selected rushees.");
     return;
   }
-
-  const primaryPackage = packageInfoForPnm(primaryPnm);
-  const partnerPackage = packageInfoForPnm(partnerPnm);
-  const packageIds = new Set([primaryId, partnerId]);
-  primaryPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
-  partnerPackage.members.forEach((pnm) => packageIds.add(Number(pnm.pnm_id)));
+  const primaryGroupId = normalizePackageGroupId(primaryPnm.package_group_id);
+  const partnerGroupId = normalizePackageGroupId(partnerPnm.package_group_id);
+  if (primaryGroupId && primaryGroupId === partnerGroupId) {
+    showToast("These rushees are already linked in the same package deal.");
+    return;
+  }
 
   if (packageLinkBtn) {
     packageLinkBtn.disabled = true;
@@ -4232,7 +4232,7 @@ async function handlePackageDealLink() {
   try {
     const payload = await api("/api/pnms/package/link", {
       method: "POST",
-      body: { pnm_ids: Array.from(packageIds), sync_assignment: true },
+      body: { pnm_ids: [primaryId, partnerId], sync_assignment: roleCanUseAdminPanel() },
     });
     state.packagePartnerId = partnerId;
     await refreshAll();

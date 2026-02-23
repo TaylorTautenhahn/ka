@@ -142,8 +142,11 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
 const toastEl = document.getElementById("mobileToast");
 let mobileCalendarShare = null;
 let mobilePnmRows = [];
+let mobileCurrentUser = null;
 const mobileContactDownloads = new Map();
 let mobileSelectedContactPnmId = null;
+let mobilePackagePrimaryPnmId = null;
+let mobilePackagePartnerPnmId = null;
 
 function escapeHtml(input) {
   return String(input)
@@ -198,6 +201,38 @@ function formatDownloadStamp(value) {
     return value;
   }
   return parsed.toLocaleString();
+}
+
+function normalizePackageGroupId(value) {
+  const token = String(value || "").trim();
+  return token || "";
+}
+
+function packageGroupLabel(groupId) {
+  const token = normalizePackageGroupId(groupId);
+  if (!token) {
+    return "Solo";
+  }
+  const raw = token.startsWith("pkg_") ? token.slice(4) : token;
+  return `PKG-${raw.slice(0, 6).toUpperCase()}`;
+}
+
+function mobilePackageInfoForPnm(pnm) {
+  if (!pnm) {
+    return { id: "", label: "Solo", count: 1, members: [] };
+  }
+  const groupId = normalizePackageGroupId(pnm.package_group_id);
+  if (!groupId) {
+    return { id: "", label: "Solo", count: 1, members: [pnm] };
+  }
+  const members = mobilePnmRows.filter((item) => normalizePackageGroupId(item.package_group_id) === groupId);
+  const label = String(pnm.package_group_label || "").trim() || packageGroupLabel(groupId);
+  return {
+    id: groupId,
+    label,
+    count: members.length || 1,
+    members: members.length ? members : [pnm],
+  };
 }
 
 function contactSelectDisplayName(pnm) {
@@ -521,9 +556,100 @@ function renderContactsPanel() {
     .join("");
 }
 
+function sortedMobilePnms() {
+  return [...mobilePnmRows].sort((a, b) => {
+    const left = `${a.last_name || ""} ${a.first_name || ""}`.trim();
+    const right = `${b.last_name || ""} ${b.first_name || ""}`.trim();
+    return left.localeCompare(right);
+  });
+}
+
+function renderMobilePackageControls() {
+  const primarySelect = document.getElementById("mobilePackagePrimarySelect");
+  const partnerSelect = document.getElementById("mobilePackagePartnerSelect");
+  const summary = document.getElementById("mobilePackageSummary");
+  const linkButton = document.getElementById("mobilePackageLinkBtn");
+  const unlinkButton = document.getElementById("mobilePackageUnlinkBtn");
+  if (!primarySelect || !partnerSelect || !summary || !linkButton || !unlinkButton) {
+    return;
+  }
+
+  const rows = sortedMobilePnms();
+  if (!rows.length) {
+    primarySelect.innerHTML = '<option value="">No rushees available</option>';
+    partnerSelect.innerHTML = '<option value="">No partner available</option>';
+    primarySelect.disabled = true;
+    partnerSelect.disabled = true;
+    linkButton.disabled = true;
+    unlinkButton.disabled = true;
+    summary.textContent = "No package deal selected.";
+    mobilePackagePrimaryPnmId = null;
+    mobilePackagePartnerPnmId = null;
+    return;
+  }
+
+  const availableIds = new Set(rows.map((pnm) => Number(pnm.pnm_id)));
+  if (!mobilePackagePrimaryPnmId || !availableIds.has(Number(mobilePackagePrimaryPnmId))) {
+    mobilePackagePrimaryPnmId = Number(rows[0].pnm_id);
+  }
+
+  primarySelect.disabled = false;
+  primarySelect.innerHTML = rows
+    .map((pnm) => {
+      const packageInfo = mobilePackageInfoForPnm(pnm);
+      const marker = packageInfo.id ? ` (${packageInfo.label})` : "";
+      const selected = Number(pnm.pnm_id) === Number(mobilePackagePrimaryPnmId) ? " selected" : "";
+      return `<option value="${pnm.pnm_id}"${selected}>${escapeHtml(
+        `${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}${marker}`
+      )}</option>`;
+    })
+    .join("");
+
+  const selectedPrimary = rows.find((pnm) => Number(pnm.pnm_id) === Number(mobilePackagePrimaryPnmId)) || rows[0];
+  if (selectedPrimary) {
+    mobilePackagePrimaryPnmId = Number(selectedPrimary.pnm_id);
+  }
+
+  const partnerRows = rows.filter((pnm) => Number(pnm.pnm_id) !== Number(mobilePackagePrimaryPnmId));
+  const partnerIds = new Set(partnerRows.map((pnm) => Number(pnm.pnm_id)));
+  if (!mobilePackagePartnerPnmId || !partnerIds.has(Number(mobilePackagePartnerPnmId))) {
+    mobilePackagePartnerPnmId = partnerRows.length ? Number(partnerRows[0].pnm_id) : null;
+  }
+
+  if (!partnerRows.length) {
+    partnerSelect.innerHTML = '<option value="">Add another rushee to link package deals</option>';
+    partnerSelect.disabled = true;
+    linkButton.disabled = true;
+  } else {
+    partnerSelect.disabled = false;
+    partnerSelect.innerHTML = partnerRows
+      .map((pnm) => {
+        const packageInfo = mobilePackageInfoForPnm(pnm);
+        const marker = packageInfo.id ? ` (${packageInfo.label})` : "";
+        const selected = Number(pnm.pnm_id) === Number(mobilePackagePartnerPnmId) ? " selected" : "";
+        return `<option value="${pnm.pnm_id}"${selected}>${escapeHtml(
+          `${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}${marker}`
+        )}</option>`;
+      })
+      .join("");
+    linkButton.disabled = !mobilePackagePartnerPnmId;
+  }
+
+  const packageInfo = mobilePackageInfoForPnm(selectedPrimary);
+  if (!packageInfo.id) {
+    summary.textContent = `No package deal linked for ${selectedPrimary.first_name} ${selectedPrimary.last_name}.`;
+    unlinkButton.disabled = true;
+    return;
+  }
+  const names = packageInfo.members.map((pnm) => `${pnm.first_name} ${pnm.last_name}`).join(", ");
+  summary.textContent = `${packageInfo.label} includes ${packageInfo.count} rushees: ${names}.`;
+  unlinkButton.disabled = false;
+}
+
 function updateContactsUi() {
   renderPnmCards(mobilePnmRows);
   renderContactsPanel();
+  renderMobilePackageControls();
 }
 
 async function downloadContactsFile(button, apiPath, fallbackFileName) {
@@ -611,9 +737,93 @@ async function handleDownloadSelectedContact(button) {
   updateContactsUi();
 }
 
+async function handleMobilePackageLink(button) {
+  const primaryId = Number(
+    (document.getElementById("mobilePackagePrimarySelect") && document.getElementById("mobilePackagePrimarySelect").value) || 0
+  );
+  const partnerId = Number(
+    (document.getElementById("mobilePackagePartnerSelect") && document.getElementById("mobilePackagePartnerSelect").value) || 0
+  );
+  if (!primaryId) {
+    showToast("Select a primary rushee first.");
+    return;
+  }
+  if (!partnerId || primaryId === partnerId) {
+    showToast("Select a different partner rushee.");
+    return;
+  }
+
+  const primary = mobilePnmRows.find((pnm) => Number(pnm.pnm_id) === primaryId) || null;
+  const partner = mobilePnmRows.find((pnm) => Number(pnm.pnm_id) === partnerId) || null;
+  if (!primary || !partner) {
+    showToast("Could not find selected rushees.");
+    return;
+  }
+  const primaryGroupId = normalizePackageGroupId(primary.package_group_id);
+  const partnerGroupId = normalizePackageGroupId(partner.package_group_id);
+  if (primaryGroupId && primaryGroupId === partnerGroupId) {
+    showToast("These rushees are already linked in the same package.");
+    return;
+  }
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Linking...";
+  }
+  try {
+    const payload = await api("/api/pnms/package/link", {
+      method: "POST",
+      body: {
+        pnm_ids: [primaryId, partnerId],
+        sync_assignment: mobileCurrentUser && mobileCurrentUser.role === "Head Rush Officer",
+      },
+    });
+    mobilePackagePrimaryPnmId = primaryId;
+    mobilePackagePartnerPnmId = partnerId;
+    await loadPnmsPage();
+    showToast(payload.message || "Package deal linked.");
+  } catch (error) {
+    showToast(error.message || "Unable to link package deal.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Link Package Deal";
+    }
+  }
+}
+
+async function handleMobilePackageUnlink(button) {
+  const primaryId = Number(
+    (document.getElementById("mobilePackagePrimarySelect") && document.getElementById("mobilePackagePrimarySelect").value) || 0
+  );
+  if (!primaryId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Unlinking...";
+  }
+  try {
+    const payload = await api(`/api/pnms/${primaryId}/package/unlink`, { method: "POST" });
+    mobilePackagePrimaryPnmId = primaryId;
+    mobilePackagePartnerPnmId = null;
+    await loadPnmsPage();
+    showToast(payload.message || "Package deal updated.");
+  } catch (error) {
+    showToast(error.message || "Unable to unlink package deal.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Unlink Primary";
+    }
+  }
+}
+
 async function ensureSession() {
   try {
-    await api("/api/auth/me");
+    const payload = await api("/api/auth/me");
+    mobileCurrentUser = payload && payload.user ? payload.user : null;
   } catch {
     window.location.href = BASE_PATH || "/";
     throw new Error("Not authenticated");
@@ -710,6 +920,8 @@ function renderPnmCards(pnms) {
         : '<div class="mini-photo empty">No photo</div>';
       const assigned = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
       const downloaded = isContactDownloaded(pnm.pnm_id);
+      const packageInfo = mobilePackageInfoForPnm(pnm);
+      const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
       return `
         <article class="entry mobile-card">
           <div class="entry-title">
@@ -721,6 +933,7 @@ function renderPnmCards(pnms) {
             <div>
               <div class="muted">${escapeHtml(pnm.phone_number || "No phone")} | ${escapeHtml(pnm.instagram_handle)}</div>
               <div class="muted">Assigned: ${escapeHtml(assigned)}</div>
+              <div class="muted">Package: ${escapeHtml(packageText)}</div>
               <div class="muted">Contact export: ${downloaded ? "✓ Downloaded" : "○ Pending"}</div>
               <div class="muted">Interests: ${pnm.interests.map((x) => escapeHtml(x)).join(", ")}</div>
             </div>
@@ -851,6 +1064,10 @@ function attachPageEvents() {
     const downloadBtn = document.getElementById("mobileDownloadContactsBtn");
     const downloadSelectedBtn = document.getElementById("mobileDownloadSelectedContactBtn");
     const contactSelect = document.getElementById("mobileContactPnmSelect");
+    const packagePrimarySelect = document.getElementById("mobilePackagePrimarySelect");
+    const packagePartnerSelect = document.getElementById("mobilePackagePartnerSelect");
+    const packageLinkBtn = document.getElementById("mobilePackageLinkBtn");
+    const packageUnlinkBtn = document.getElementById("mobilePackageUnlinkBtn");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
         try {
@@ -874,6 +1091,28 @@ function attachPageEvents() {
     if (contactSelect) {
       contactSelect.addEventListener("change", () => {
         mobileSelectedContactPnmId = Number(contactSelect.value || 0) || null;
+      });
+    }
+    if (packagePrimarySelect) {
+      packagePrimarySelect.addEventListener("change", () => {
+        mobilePackagePrimaryPnmId = Number(packagePrimarySelect.value || 0) || null;
+        renderMobilePackageControls();
+      });
+    }
+    if (packagePartnerSelect) {
+      packagePartnerSelect.addEventListener("change", () => {
+        mobilePackagePartnerPnmId = Number(packagePartnerSelect.value || 0) || null;
+        renderMobilePackageControls();
+      });
+    }
+    if (packageLinkBtn) {
+      packageLinkBtn.addEventListener("click", () => {
+        handleMobilePackageLink(packageLinkBtn);
+      });
+    }
+    if (packageUnlinkBtn) {
+      packageUnlinkBtn.addEventListener("click", () => {
+        handleMobilePackageUnlink(packageUnlinkBtn);
       });
     }
   }

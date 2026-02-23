@@ -211,6 +211,27 @@ def main() -> None:
             pnm_two_id = int(pnm_two.get("pnm_id"))
             checks.append("Second PNM create works")
 
+            response = client.post(
+                "/kappaalphaorder/api/pnms",
+                json={
+                    "first_name": "Casey",
+                    "last_name": "Ellis",
+                    "class_year": "S",
+                    "hometown": "Houston",
+                    "phone_number": "+1 555 222 3333",
+                    "instagram_handle": "@caseye",
+                    "first_event_date": today,
+                    "interests": ["Finance", "Sports"],
+                    "stereotype": "Builder",
+                    "notes": "Bridge candidate to verify package merge behavior.",
+                    "auto_photo_from_instagram": False,
+                },
+            )
+            expect_status(response, 200, "Create third PNM")
+            pnm_three = response.json().get("pnm", {})
+            pnm_three_id = int(pnm_three.get("pnm_id"))
+            checks.append("Third PNM create works")
+
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Head logout")
             sync_csrf_header()
@@ -378,7 +399,7 @@ def main() -> None:
             response = client.post(
                 "/kappaalphaorder/api/pnms/package/link",
                 json={
-                    "pnm_ids": [pnm_id, pnm_two_id],
+                    "pnm_ids": [pnm_two_id, pnm_three_id],
                     "sync_assignment": True,
                 },
             )
@@ -393,13 +414,35 @@ def main() -> None:
             pnms = {int(item.get("pnm_id")): item for item in response.json().get("pnms", []) if item.get("pnm_id")}
             first = pnms.get(pnm_id)
             second = pnms.get(pnm_two_id)
-            if not first or not second:
+            third = pnms.get(pnm_three_id)
+            if not first or not second or not third:
                 raise AssertionError("Expected PNMs missing after package link.")
-            if first.get("package_group_id") != package_group_id or second.get("package_group_id") != package_group_id:
-                raise AssertionError("Package link did not persist same package_group_id across linked PNMs.")
-            if int(first.get("assigned_officer_id") or 0) != officer_user_id or int(second.get("assigned_officer_id") or 0) != officer_user_id:
+            if (
+                first.get("package_group_id") != package_group_id
+                or second.get("package_group_id") != package_group_id
+                or third.get("package_group_id") != package_group_id
+            ):
+                raise AssertionError("Package link merge did not persist same package_group_id across linked PNMs.")
+            if (
+                int(first.get("assigned_officer_id") or 0) != officer_user_id
+                or int(second.get("assigned_officer_id") or 0) != officer_user_id
+                or int(third.get("assigned_officer_id") or 0) != officer_user_id
+            ):
                 raise AssertionError("Package link sync should align assigned officer across linked PNMs.")
-            checks.append("Package deal link and assignment sync works")
+            checks.append("Package deal merge link and assignment sync works")
+
+            response = client.get("/kappaalphaorder/api/mobile/pnms")
+            expect_status(response, 200, "Mobile PNM payload")
+            mobile_pnms = {
+                int(item.get("pnm_id")): item for item in response.json().get("pnms", []) if item.get("pnm_id")
+            }
+            mobile_first = mobile_pnms.get(pnm_id)
+            mobile_second = mobile_pnms.get(pnm_two_id)
+            if not mobile_first or not mobile_second:
+                raise AssertionError("Mobile payload missing linked PNMs.")
+            if not mobile_first.get("package_group_id") or not mobile_second.get("package_group_id"):
+                raise AssertionError("Mobile payload should include package_group_id for linked PNMs.")
+            checks.append("Mobile PNM payload includes package metadata")
 
             response = client.patch(
                 f"/kappaalphaorder/api/pnms/{pnm_id}/stage",

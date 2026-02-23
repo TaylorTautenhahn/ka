@@ -4059,6 +4059,29 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     )
 
 
+def ensure_package_link_schema(conn: sqlite3.Connection) -> None:
+    required_columns = {
+        "package_group_id",
+        "assigned_officer_id",
+        "assigned_by",
+        "assigned_at",
+        "assignment_status",
+        "assignment_priority",
+        "assignment_due_date",
+        "assignment_notes",
+        "assignment_updated_at",
+    }
+    pnm_columns = {row["name"] for row in conn.execute("PRAGMA table_info(pnms)").fetchall()}
+    if required_columns.issubset(pnm_columns):
+        return
+
+    ensure_schema_upgrades(conn)
+    refreshed_columns = {row["name"] for row in conn.execute("PRAGMA table_info(pnms)").fetchall()}
+    missing_columns = sorted(required_columns.difference(refreshed_columns))
+    if missing_columns:
+        raise RuntimeError(f"PNM schema upgrade incomplete for package linking: missing {', '.join(missing_columns)}")
+
+
 def ensure_seed_data(
     conn: sqlite3.Connection,
     *,
@@ -8914,18 +8937,49 @@ def link_pnms_package_deal(
     payload: PnmPackageLinkRequest,
     user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
-    pnm_ids = [int(item) for item in payload.pnm_ids]
-    placeholders = ",".join(["?"] * len(pnm_ids))
+    requested_pnm_ids = sorted({int(item) for item in payload.pnm_ids if int(item) > 0})
+    if len(requested_pnm_ids) < 2:
+        raise HTTPException(status_code=400, detail="Select at least two rushees to link.")
+    selected_placeholders = ",".join(["?"] * len(requested_pnm_ids))
 
     with db_session() as conn:
+        ensure_package_link_schema(conn)
         selected_rows = conn.execute(
-            f"SELECT * FROM pnms WHERE id IN ({placeholders})",
-            tuple(pnm_ids),
+            f"SELECT * FROM pnms WHERE id IN ({selected_placeholders})",
+            tuple(requested_pnm_ids),
         ).fetchall()
         selected_by_id: dict[int, sqlite3.Row] = {int(row["id"]): row for row in selected_rows}
-        missing_ids = [pnm_id for pnm_id in pnm_ids if pnm_id not in selected_by_id]
+        missing_ids = [pnm_id for pnm_id in requested_pnm_ids if pnm_id not in selected_by_id]
         if missing_ids:
             raise HTTPException(status_code=404, detail=f"PNM not found: {missing_ids[0]}")
+
+        existing_group_ids = sorted(
+            {
+                group_id
+                for group_id in (normalize_package_group_id(row["package_group_id"]) for row in selected_rows)
+                if group_id
+            }
+        )
+        linked_pnm_ids: set[int] = set(requested_pnm_ids)
+        if existing_group_ids:
+            group_placeholders = ",".join(["?"] * len(existing_group_ids))
+            grouped_rows = conn.execute(
+                f"""
+                SELECT id
+                FROM pnms
+                WHERE package_group_id IN ({group_placeholders})
+                """,
+                tuple(existing_group_ids),
+            ).fetchall()
+            linked_pnm_ids.update(int(row["id"]) for row in grouped_rows)
+
+        target_pnm_ids = sorted(linked_pnm_ids)
+        target_placeholders = ",".join(["?"] * len(target_pnm_ids))
+        target_rows = conn.execute(
+            f"SELECT * FROM pnms WHERE id IN ({target_placeholders})",
+            tuple(target_pnm_ids),
+        ).fetchall()
+        target_by_id: dict[int, sqlite3.Row] = {int(row["id"]): row for row in target_rows}
 
         package_group_id = new_package_group_id()
         now = now_iso()
@@ -8933,18 +8987,22 @@ def link_pnms_package_deal(
             f"""
             UPDATE pnms
             SET package_group_id = ?, updated_at = ?
-            WHERE id IN ({placeholders})
+            WHERE id IN ({target_placeholders})
             """,
-            (package_group_id, now, *pnm_ids),
+            (package_group_id, now, *target_pnm_ids),
         )
 
         assignment_synced = False
         synced_officer_id: int | None = None
         synced_status = "unassigned"
-        if payload.sync_assignment and pnm_ids:
+        if payload.sync_assignment and target_pnm_ids:
             template_row = next(
-                (selected_by_id[pnm_id] for pnm_id in pnm_ids if selected_by_id[pnm_id]["assigned_officer_id"] is not None),
-                selected_by_id[pnm_ids[0]],
+                (
+                    selected_by_id[pnm_id]
+                    for pnm_id in requested_pnm_ids
+                    if selected_by_id[pnm_id]["assigned_officer_id"] is not None
+                ),
+                selected_by_id[requested_pnm_ids[0]],
             )
             synced_officer_id = (
                 int(template_row["assigned_officer_id"]) if template_row["assigned_officer_id"] is not None else None
@@ -8961,8 +9019,8 @@ def link_pnms_package_deal(
             due_date = template_row["assignment_due_date"] if synced_officer_id is not None else None
             notes = (template_row["assignment_notes"] or "").strip()
 
-            for target_id in pnm_ids:
-                target_row = selected_by_id[target_id]
+            for target_id in target_pnm_ids:
+                target_row = target_by_id[target_id]
                 previous_assigned = (
                     int(target_row["assigned_officer_id"]) if target_row["assigned_officer_id"] is not None else None
                 )
@@ -9022,13 +9080,15 @@ def link_pnms_package_deal(
             actor_user_id=int(user["id"]),
             action_type="pnm_package_link",
             entity_type="pnm_package",
-            entity_id=pnm_ids[0] if pnm_ids else None,
+            entity_id=requested_pnm_ids[0] if requested_pnm_ids else None,
             payload={
-                "pnm_ids": pnm_ids,
+                "requested_pnm_ids": requested_pnm_ids,
+                "linked_pnm_ids": target_pnm_ids,
                 "package_group_id": package_group_id,
                 "sync_assignment": bool(payload.sync_assignment),
                 "synced_officer_id": synced_officer_id,
                 "synced_status": synced_status,
+                "merged_existing_group_ids": existing_group_ids,
             },
         )
 
@@ -9042,19 +9102,24 @@ def link_pnms_package_deal(
                 ao.emoji AS assigned_officer_emoji
             FROM pnms p
             LEFT JOIN users ao ON ao.id = p.assigned_officer_id
-            WHERE p.id IN ({placeholders})
+            WHERE p.id IN ({target_placeholders})
             ORDER BY p.last_name ASC, p.first_name ASC
             """,
-            tuple(pnm_ids),
+            tuple(target_pnm_ids),
         ).fetchall()
 
+    merged_count = max(0, len(target_pnm_ids) - len(requested_pnm_ids))
     return {
         "message": (
-            f"Linked {len(pnm_ids)} rushees into package deal {package_group_label(package_group_id)}."
+            f"Linked {len(target_pnm_ids)} rushees into package deal {package_group_label(package_group_id)}."
+            + (f" Merged {merged_count} existing linked rushee(s)." if merged_count else "")
             + (" Assignment settings were synced." if assignment_synced else "")
         ),
         "package_group_id": package_group_id,
         "package_group_label": package_group_label(package_group_id),
+        "linked_count": len(target_pnm_ids),
+        "linked_pnm_ids": target_pnm_ids,
+        "requested_pnm_ids": requested_pnm_ids,
         "assignment_synced": assignment_synced,
         "pnms": [
             pnm_payload(
@@ -9073,6 +9138,7 @@ def unlink_pnm_package_deal(
     user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     with db_session() as conn:
+        ensure_package_link_schema(conn)
         row = conn.execute(
             "SELECT id, first_name, last_name, package_group_id FROM pnms WHERE id = ?",
             (pnm_id,),
@@ -10935,6 +11001,7 @@ def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)
 @app.get("/api/mobile/pnms")
 def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     with db_session() as conn:
+        ensure_package_link_schema(conn)
         rows = conn.execute(
             """
             SELECT
@@ -10950,6 +11017,7 @@ def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any
                 p.rating_count,
                 p.total_lunches,
                 p.photo_path,
+                p.package_group_id,
                 ao.username AS assigned_officer_username
             FROM pnms p
             LEFT JOIN users ao ON ao.id = p.assigned_officer_id
@@ -10973,6 +11041,8 @@ def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any
                 "total_lunches": int(row["total_lunches"]),
                 "days_since_first_event": (date.today() - date.fromisoformat(row["first_event_date"])).days,
                 "photo_url": resolve_pnm_photo_url(row["photo_path"], row["instagram_handle"]),
+                "package_group_id": normalize_package_group_id(row["package_group_id"]) or None,
+                "package_group_label": package_group_label(normalize_package_group_id(row["package_group_id"])),
                 "assigned_officer": (
                     {"username": row["assigned_officer_username"]}
                     if row["assigned_officer_username"]

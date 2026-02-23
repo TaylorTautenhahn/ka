@@ -2939,6 +2939,7 @@ function populateAdminPnmEditor(pnmId) {
   document.getElementById("adminEditClassYear").value = pnm.class_year || "F";
   document.getElementById("adminEditFirstEventDate").value = pnm.first_event_date || "";
   document.getElementById("adminEditHometown").value = pnm.hometown || "";
+  document.getElementById("adminEditState").value = pnm.hometown_state_code || "";
   document.getElementById("adminEditPhoneNumber").value = pnm.phone_number || "";
   document.getElementById("adminEditInstagramHandle").value = pnm.instagram_handle || "";
   document.getElementById("adminEditInterests").value = (pnm.interests || []).join(",");
@@ -4217,6 +4218,7 @@ async function handlePnmCreate(event) {
     last_name: document.getElementById("pnmLastName").value.trim(),
     class_year: document.getElementById("pnmClassYear").value,
     hometown: document.getElementById("pnmHometown").value.trim(),
+    state: document.getElementById("pnmState").value.trim(),
     phone_number: document.getElementById("pnmPhone").value.trim(),
     instagram_handle: document.getElementById("pnmInstagram").value.trim(),
     first_event_date: document.getElementById("pnmEventDate").value,
@@ -4984,6 +4986,7 @@ async function handleAdminPnmEditorSubmit(event) {
     class_year: document.getElementById("adminEditClassYear").value,
     first_event_date: document.getElementById("adminEditFirstEventDate").value,
     hometown: document.getElementById("adminEditHometown").value.trim(),
+    state: document.getElementById("adminEditState").value.trim(),
     phone_number: document.getElementById("adminEditPhoneNumber").value.trim(),
     instagram_handle: document.getElementById("adminEditInstagramHandle").value.trim(),
     interests: interestsValue,

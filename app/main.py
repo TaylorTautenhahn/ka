@@ -1954,6 +1954,21 @@ def parse_hometown_city_state(hometown: str | None) -> tuple[str, str]:
     return text, ""
 
 
+def resolve_pnm_state_code(hometown: str | None, explicit_state: str | None = None) -> str:
+    normalized_explicit = normalize_state_code(explicit_state)
+    if normalized_explicit:
+        return normalized_explicit
+    _, parsed_state = parse_hometown_city_state(hometown)
+    return parsed_state
+
+
+def pnm_state_code_for_row(row: sqlite3.Row) -> str:
+    keys = set(row.keys())
+    hometown_value = row["hometown"] if "hometown" in keys else None
+    explicit_state = row["hometown_state_code"] if "hometown_state_code" in keys else None
+    return resolve_pnm_state_code(hometown_value, explicit_state)
+
+
 def normalize_role_filter(value: str | None) -> str | None:
     token = str(value or "").strip().lower()
     if not token or token == "all":
@@ -3879,6 +3894,7 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             last_name TEXT NOT NULL,
             class_year TEXT NOT NULL CHECK (class_year IN ('F', 'S', 'J')),
             hometown TEXT NOT NULL,
+            hometown_state_code TEXT NOT NULL DEFAULT '',
             phone_number TEXT NOT NULL DEFAULT '',
             instagram_handle TEXT NOT NULL,
             first_event_date TEXT NOT NULL,
@@ -4237,6 +4253,8 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     )
 
     pnm_columns = {row["name"] for row in conn.execute("PRAGMA table_info(pnms)").fetchall()}
+    if "hometown_state_code" not in pnm_columns:
+        conn.execute("ALTER TABLE pnms ADD COLUMN hometown_state_code TEXT NOT NULL DEFAULT ''")
     if "phone_number" not in pnm_columns:
         conn.execute("ALTER TABLE pnms ADD COLUMN phone_number TEXT NOT NULL DEFAULT ''")
     if "photo_path" not in pnm_columns:
@@ -4280,6 +4298,19 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_assignment_due_date ON pnms(assignment_due_date)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_funnel_stage ON pnms(funnel_stage)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_package_group ON pnms(package_group_id)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_pnms_hometown_state_code ON pnms(hometown_state_code)")
+    conn.execute("UPDATE pnms SET hometown_state_code = '' WHERE hometown_state_code IS NULL")
+    pnm_state_rows = conn.execute(
+        "SELECT id, hometown, hometown_state_code FROM pnms"
+    ).fetchall()
+    for row in pnm_state_rows:
+        resolved_state = resolve_pnm_state_code(row["hometown"], row["hometown_state_code"])
+        stored_state = normalize_state_code(row["hometown_state_code"])
+        if resolved_state != stored_state:
+            conn.execute(
+                "UPDATE pnms SET hometown_state_code = ?, updated_at = COALESCE(NULLIF(updated_at, ''), ?) WHERE id = ?",
+                (resolved_state, now_iso(), int(row["id"])),
+            )
     conn.execute(
         """
         UPDATE pnms
@@ -5410,6 +5441,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
     ) -> int:
         interests_csv, interests_norm = encode_interests(interests)
         updated_at = now_iso()
+        hometown_state_code = resolve_pnm_state_code(hometown)
         assigned_at = iso_at(-5, 12, 0) if assigned_officer_id else None
         existing = conn.execute("SELECT id, created_at FROM pnms WHERE pnm_code = ?", (pnm_code,)).fetchone()
         if existing:
@@ -5421,6 +5453,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                     last_name = ?,
                     class_year = ?,
                     hometown = ?,
+                    hometown_state_code = ?,
                     phone_number = ?,
                     instagram_handle = ?,
                     first_event_date = ?,
@@ -5440,6 +5473,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                     last_name,
                     class_year,
                     hometown,
+                    hometown_state_code,
                     phone_number,
                     instagram_handle,
                     first_event_date,
@@ -5465,6 +5499,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                 last_name,
                 class_year,
                 hometown,
+                hometown_state_code,
                 phone_number,
                 instagram_handle,
                 first_event_date,
@@ -5480,7 +5515,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                 created_at,
                 updated_at
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 pnm_code,
@@ -5488,6 +5523,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                 last_name,
                 class_year,
                 hometown,
+                hometown_state_code,
                 phone_number,
                 instagram_handle,
                 first_event_date,
@@ -6514,7 +6550,8 @@ def pnm_payload(
 ) -> dict[str, Any]:
     days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
     keys = set(row.keys())
-    hometown_city, hometown_state_code = parse_hometown_city_state(row["hometown"])
+    hometown_city, _ = parse_hometown_city_state(row["hometown"])
+    hometown_state_code = pnm_state_code_for_row(row)
     assignment_status = (
         str(row["assignment_status"]).strip().lower()
         if "assignment_status" in keys and row["assignment_status"] is not None
@@ -6922,6 +6959,7 @@ class PNMCreateRequest(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=48)
     class_year: str
     hometown: str = Field(..., min_length=1, max_length=80)
+    state: str | None = Field(default=None, max_length=64)
     phone_number: str = Field(default="", max_length=32)
     instagram_handle: str = Field(..., min_length=1, max_length=80)
     first_event_date: str
@@ -6944,12 +6982,26 @@ class PNMCreateRequest(BaseModel):
     def validate_first_event_date(cls, value: str) -> str:
         return verify_iso_date(value, "First event date")
 
+    @field_validator("state")
+    @classmethod
+    def normalize_optional_state(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return ""
+        normalized = normalize_state_code(token)
+        if not normalized:
+            raise ValueError("State must be a valid US state name or 2-letter code.")
+        return normalized
+
 
 class PNMUpdateRequest(BaseModel):
     first_name: str | None = Field(default=None, min_length=1, max_length=48)
     last_name: str | None = Field(default=None, min_length=1, max_length=48)
     class_year: str | None = None
     hometown: str | None = Field(default=None, min_length=1, max_length=80)
+    state: str | None = Field(default=None, max_length=64)
     phone_number: str | None = Field(default=None, max_length=32)
     instagram_handle: str | None = Field(default=None, min_length=1, max_length=80)
     first_event_date: str | None = None
@@ -6974,6 +7026,19 @@ class PNMUpdateRequest(BaseModel):
         if value is None:
             return None
         return verify_iso_date(value, "First event date")
+
+    @field_validator("state")
+    @classmethod
+    def normalize_optional_state(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return ""
+        normalized = normalize_state_code(token)
+        if not normalized:
+            raise ValueError("State must be a valid US state name or 2-letter code.")
+        return normalized
 
 
 class RatingUpsertRequest(BaseModel):
@@ -8572,6 +8637,7 @@ async def import_google_form_csv(
                 if not hometown:
                     hometown = "Unknown"
                 hometown = hometown[:80]
+                hometown_state_code = resolve_pnm_state_code(hometown)
                 instagram_handle = normalize_instagram_handle(instagram_raw)
                 phone_number = normalize_phone_number(phone_raw)
                 first_event_date = verify_iso_date(first_event_raw, "First event date")
@@ -8600,6 +8666,7 @@ async def import_google_form_csv(
                     last_name,
                     class_year,
                     hometown,
+                    hometown_state_code,
                     phone_number,
                     instagram_handle,
                     first_event_date,
@@ -8612,13 +8679,14 @@ async def import_google_form_csv(
                     created_at,
                     updated_at
                 )
-                VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
+                VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?)
                 """,
                 (
                     first_name,
                     last_name,
                     class_year,
                     hometown,
+                    hometown_state_code,
                     phone_number,
                     instagram_handle,
                     first_event_date,
@@ -9504,6 +9572,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
     last_name = normalize_name(payload.last_name)
     stereotype = payload.stereotype.strip()
     hometown = payload.hometown.strip()
+    hometown_state_code = resolve_pnm_state_code(hometown, payload.state)
     if not stereotype:
         raise HTTPException(status_code=400, detail="Stereotype is required.")
     if not hometown:
@@ -9518,6 +9587,7 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
                 last_name,
                 class_year,
                 hometown,
+                hometown_state_code,
                 phone_number,
                 instagram_handle,
                 first_event_date,
@@ -9530,13 +9600,14 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
                 created_at,
                 updated_at
             )
-            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES ('TBD', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 first_name,
                 last_name,
                 payload.class_year,
                 hometown,
+                hometown_state_code,
                 phone_number,
                 instagram_handle,
                 payload.first_event_date,
@@ -9633,7 +9704,7 @@ def list_pnms(
             if not has_interest_match(row["interests_norm"], interest_filter):
                 continue
             if state_filter:
-                _, hometown_state_code = parse_hometown_city_state(row["hometown"])
+                hometown_state_code = pnm_state_code_for_row(row)
                 if hometown_state_code != state_filter:
                     continue
             filtered.append(
@@ -9683,6 +9754,7 @@ def update_pnm_details(
         and payload.last_name is None
         and payload.class_year is None
         and payload.hometown is None
+        and payload.state is None
         and payload.phone_number is None
         and payload.instagram_handle is None
         and payload.first_event_date is None
@@ -9702,6 +9774,16 @@ def update_pnm_details(
         last_name = normalize_name(payload.last_name) if payload.last_name is not None else row["last_name"]
         class_year = payload.class_year if payload.class_year is not None else row["class_year"]
         hometown = payload.hometown.strip() if payload.hometown is not None else row["hometown"]
+        existing_state_code = resolve_pnm_state_code(
+            row["hometown"],
+            row["hometown_state_code"] if "hometown_state_code" in row.keys() else None,
+        )
+        if payload.state is not None:
+            hometown_state_code = resolve_pnm_state_code(hometown, payload.state)
+        elif payload.hometown is not None:
+            hometown_state_code = resolve_pnm_state_code(hometown)
+        else:
+            hometown_state_code = existing_state_code
         phone_number_raw = payload.phone_number if payload.phone_number is not None else row["phone_number"]
         instagram_raw = payload.instagram_handle if payload.instagram_handle is not None else row["instagram_handle"]
         first_event_date = payload.first_event_date if payload.first_event_date is not None else row["first_event_date"]
@@ -9747,6 +9829,7 @@ def update_pnm_details(
                 last_name = ?,
                 class_year = ?,
                 hometown = ?,
+                hometown_state_code = ?,
                 phone_number = ?,
                 instagram_handle = ?,
                 first_event_date = ?,
@@ -9764,6 +9847,7 @@ def update_pnm_details(
                 last_name,
                 class_year,
                 hometown,
+                hometown_state_code,
                 phone_number,
                 instagram_handle,
                 first_event_date,
@@ -14921,7 +15005,7 @@ def matching(
         if not has_interest_match(row["interests_norm"], interest_filter):
             continue
         if state_filter:
-            _, hometown_state_code = parse_hometown_city_state(row["hometown"])
+            hometown_state_code = pnm_state_code_for_row(row)
             if hometown_state_code != state_filter:
                 continue
         pnms.append(

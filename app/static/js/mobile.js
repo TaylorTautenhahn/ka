@@ -1007,6 +1007,7 @@ async function handleCreateSubmit(event) {
     last_name: document.getElementById("mobilePnmLastName").value.trim(),
     class_year: document.getElementById("mobilePnmClassYear").value,
     hometown: document.getElementById("mobilePnmHometown").value.trim(),
+    state: document.getElementById("mobilePnmState").value.trim(),
     phone_number: document.getElementById("mobilePnmPhone").value.trim(),
     instagram_handle: document.getElementById("mobilePnmInstagram").value.trim(),
     first_event_date: document.getElementById("mobilePnmEventDate").value,

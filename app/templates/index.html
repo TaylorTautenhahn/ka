@@ -442,10 +442,16 @@
                   <input id="pnmEventDate" type="date" required />
                 </label>
               </div>
-              <label>
-                Hometown
-                <input id="pnmHometown" type="text" required />
-              </label>
+              <div class="inline-grid two-cols">
+                <label>
+                  Hometown
+                  <input id="pnmHometown" type="text" required />
+                </label>
+                <label>
+                  State (optional)
+                  <input id="pnmState" type="text" maxlength="64" placeholder="TX or Texas" />
+                </label>
+              </div>
               <label>
                 Phone number (optional)
                 <input id="pnmPhone" type="text" placeholder="+1 555 123 4567" />
@@ -863,10 +869,16 @@
                     <input id="adminEditFirstEventDate" type="date" required />
                   </label>
                 </div>
-                <label>
-                  Hometown
-                  <input id="adminEditHometown" type="text" required />
-                </label>
+                <div class="inline-grid two-cols">
+                  <label>
+                    Hometown
+                    <input id="adminEditHometown" type="text" required />
+                  </label>
+                  <label>
+                    State (optional)
+                    <input id="adminEditState" type="text" maxlength="64" placeholder="TX or Texas" />
+                  </label>
+                </div>
                 <label>
                   Phone number
                   <input id="adminEditPhoneNumber" type="text" placeholder="+1 555 123 4567" />

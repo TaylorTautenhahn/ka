@@ -106,6 +106,16 @@
               Password
               <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" />
             </label>
+            <div class="inline-grid two-cols">
+              <label>
+                City (optional)
+                <input id="regCity" type="text" maxlength="80" placeholder="Austin" />
+              </label>
+              <label>
+                State (optional)
+                <input id="regState" type="text" maxlength="32" placeholder="TX or Texas" />
+              </label>
+            </div>
             <button type="submit" class="secondary">Submit for Approval</button>
           </form>
           <div class="divider"></div>
@@ -170,25 +180,6 @@
           </div>
         </section>
 
-        <div class="panel filters reveal delay-2">
-          <h2>Filtering & Matching</h2>
-          <div class="inline-grid filters-grid">
-            <label>
-              Interest (ANY match)
-              <input id="filterInterest" list="interestHints" type="text" placeholder="Golf" />
-            </label>
-            <label>
-              Stereotype
-              <input id="filterStereotype" type="text" placeholder="Connector" />
-            </label>
-            <label class="btn-wrap">
-              <span>&nbsp;</span>
-              <button id="applyFiltersBtn" type="button">Apply Filters</button>
-            </label>
-          </div>
-          <datalist id="interestHints"></datalist>
-        </div>
-
         <section id="leaderboardSection" class="panel reveal delay-5">
           <div class="section-head">
             <h2>PNM Leaderboard</h2>
@@ -199,7 +190,26 @@
 
         <section id="matchingSection" class="panel reveal delay-7">
           <h2>Matching View</h2>
-          <p class="muted">Apply shared filters above to pair PNMs and members intentionally.</p>
+          <p class="muted">Filter this view only to pair PNMs and members intentionally.</p>
+          <div class="inline-grid filters-grid">
+            <label>
+              Interest (ANY match)
+              <input id="matchingFilterInterest" list="interestHints" type="text" placeholder="Golf" />
+            </label>
+            <label>
+              Stereotype
+              <input id="matchingFilterStereotype" type="text" placeholder="Connector" />
+            </label>
+            <label>
+              State
+              <input id="matchingFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyMatchingFiltersBtn" type="button">Apply Matching Filters</button>
+            </label>
+          </div>
+          <datalist id="interestHints"></datalist>
           <div class="grid-two matching-grid">
             <div>
               <h3>Filtered PNMs</h3>
@@ -536,6 +546,28 @@
           </section>
         </div>
 
+        <section id="rusheeFiltersSection" class="panel filters reveal delay-3">
+          <h2>Rushee Filters</h2>
+          <div class="inline-grid filters-grid">
+            <label>
+              Interest (ANY match)
+              <input id="rusheeFilterInterest" list="interestHints" type="text" placeholder="Leadership" />
+            </label>
+            <label>
+              Stereotype
+              <input id="rusheeFilterStereotype" type="text" placeholder="Connector" />
+            </label>
+            <label>
+              State
+              <input id="rusheeFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyRusheeFiltersBtn" type="button">Apply Rushee Filters</button>
+            </label>
+          </div>
+        </section>
+
         <section id="pnmSection" class="panel reveal delay-4">
           <div class="section-head">
             <h2>PNMs</h2>
@@ -546,8 +578,11 @@
 
         <section id="detailSection" class="panel reveal delay-6">
           <div class="section-head">
-            <h2>Selected PNM Detail</h2>
-            <p id="selectedPnmLabel" class="muted">Select a PNM to rate and review rating/lunch history.</p>
+            <div>
+              <h2>Selected PNM Detail</h2>
+              <p id="selectedPnmLabel" class="muted">Select a PNM to rate and review rating/lunch history.</p>
+            </div>
+            <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Page</a>
           </div>
 
           <div class="grid-two">
@@ -621,26 +656,58 @@
           </div>
         </section>
 
-        <section id="meetingSection" class="panel reveal delay-6">
-          <div class="section-head">
-            <h2>Meeting Packets</h2>
-            <p class="muted">Open the dedicated Meeting page for full packet view and PDF export.</p>
-          </div>
-          <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Page</a>
-          <div id="meetingView" class="meeting-view hidden"></div>
-        </section>
-
           </div>
 
           <div class="desktop-page" data-page="members">
-        <section id="approvalsPanel" class="panel hidden reveal delay-4">
-          <h2>Pending Account Approvals</h2>
-          <div id="pendingList" class="table-wrap"></div>
+        <section id="memberFiltersSection" class="panel filters reveal delay-4">
+          <h2>Member Filters</h2>
+          <div class="inline-grid filters-grid">
+            <label>
+              Role
+              <select id="memberFilterRole">
+                <option value="all">All</option>
+                <option value="Head Rush Officer">Head Rush Officer</option>
+                <option value="Rush Officer">Rush Officer</option>
+                <option value="Rusher">Rusher</option>
+              </select>
+            </label>
+            <label>
+              State
+              <input id="memberFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+            </label>
+            <label>
+              City
+              <input id="memberFilterCity" type="text" maxlength="80" placeholder="Austin" />
+            </label>
+            <label>
+              Sort
+              <select id="memberSortSelectDesktop">
+                <option value="location">Location (Default)</option>
+                <option value="username">Username</option>
+                <option value="role">Role</option>
+              </select>
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyMemberFiltersBtn" type="button">Apply Member Filters</button>
+            </label>
+          </div>
         </section>
 
         <section id="membersSection" class="panel reveal delay-6">
           <h2>Members</h2>
           <div id="memberTable" class="table-wrap"></div>
+        </section>
+
+        <section id="sameStatePnmsSection" class="panel reveal delay-6">
+          <h2>Same-State PNMs</h2>
+          <p id="sameStatePnmsHeader" class="muted">Select a member to view PNMs from the same state.</p>
+          <div id="sameStatePnmsList" class="list-box muted">No member selected.</div>
+        </section>
+
+        <section id="approvalsPanel" class="panel hidden reveal delay-4">
+          <h2>Pending Account Approvals</h2>
+          <div id="pendingList" class="table-wrap"></div>
         </section>
 
         <section id="assignedRushPanel" class="panel hidden reveal delay-6">
@@ -862,18 +929,6 @@
                   <button id="headAddAssigneeBtn" type="button">Add To Assignment Team</button>
                 </div>
                 <div id="headAssigneeList" class="list-box"></div>
-                <div class="divider"></div>
-                <h4>Package Deal Linking</h4>
-                <p class="muted">Link rushees as a package deal so assignment updates stay synced and visible together.</p>
-                <label>
-                  Link With
-                  <select id="headPackagePartnerSelect"></select>
-                </label>
-                <div class="action-row">
-                  <button id="headPackageLinkBtn" type="button">Link Package Deal</button>
-                  <button id="headPackageUnlinkBtn" type="button" class="secondary">Unlink Selected</button>
-                </div>
-                <p id="headPackageSummary" class="muted">No package deal linked for this rushee yet.</p>
               </form>
             </article>
             <article class="list-column">

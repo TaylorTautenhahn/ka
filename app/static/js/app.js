@@ -113,9 +113,19 @@ const heroPnmCount = document.getElementById("heroPnmCount");
 const heroRatingCount = document.getElementById("heroRatingCount");
 const heroLunchCount = document.getElementById("heroLunchCount");
 
-const filterInterest = document.getElementById("filterInterest");
-const filterStereotype = document.getElementById("filterStereotype");
-const applyFiltersBtn = document.getElementById("applyFiltersBtn");
+const rusheeFilterInterest = document.getElementById("rusheeFilterInterest");
+const rusheeFilterStereotype = document.getElementById("rusheeFilterStereotype");
+const rusheeFilterState = document.getElementById("rusheeFilterState");
+const applyRusheeFiltersBtn = document.getElementById("applyRusheeFiltersBtn");
+const matchingFilterInterest = document.getElementById("matchingFilterInterest");
+const matchingFilterStereotype = document.getElementById("matchingFilterStereotype");
+const matchingFilterState = document.getElementById("matchingFilterState");
+const applyMatchingFiltersBtn = document.getElementById("applyMatchingFiltersBtn");
+const memberFilterRole = document.getElementById("memberFilterRole");
+const memberFilterState = document.getElementById("memberFilterState");
+const memberFilterCity = document.getElementById("memberFilterCity");
+const memberSortSelectDesktop = document.getElementById("memberSortSelectDesktop");
+const applyMemberFiltersBtn = document.getElementById("applyMemberFiltersBtn");
 const interestHints = document.getElementById("interestHints");
 const adminNavLink = document.getElementById("adminNavLink");
 
@@ -131,10 +141,13 @@ const selectedPnmPhotoPlaceholder = document.getElementById("selectedPnmPhotoPla
 
 const pnmTable = document.getElementById("pnmTable");
 const memberTable = document.getElementById("memberTable");
+const sameStatePnmsHeader = document.getElementById("sameStatePnmsHeader");
+const sameStatePnmsList = document.getElementById("sameStatePnmsList");
 const ratingList = document.getElementById("ratingList");
 const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
-const meetingView = document.getElementById("meetingView");
+const openMeetingPageBtn = document.getElementById("openMeetingPageBtn");
+const meetingView = null;
 const ratingPnm = document.getElementById("ratingPnm");
 const lunchPnm = document.getElementById("lunchPnm");
 const lunchStartTime = document.getElementById("lunchStartTime");
@@ -389,11 +402,25 @@ const state = {
   pnms: [],
   assignedRushRows: [],
   members: [],
+  sameStatePnms: [],
   selectedPnmId: null,
+  selectedMemberId: null,
   toastTimer: null,
-  filters: {
+  rusheeFilters: {
     interest: "",
     stereotype: "",
+    state: "",
+  },
+  matchingFilters: {
+    interest: "",
+    stereotype: "",
+    state: "",
+  },
+  memberFilters: {
+    role: "all",
+    state: "",
+    city: "",
+    sort: "location",
   },
   heroStats: {
     pnmCount: 0,
@@ -2306,6 +2333,14 @@ function renderPnmSelectOptions() {
   }
 }
 
+function syncOpenMeetingLink() {
+  if (!openMeetingPageBtn) {
+    return;
+  }
+  const selectedId = Number(state.selectedPnmId || 0);
+  openMeetingPageBtn.href = selectedId ? `${MEETING_BASE}?pnm_id=${selectedId}` : MEETING_BASE;
+}
+
 function renderPnmTable() {
   if (!state.pnms.length) {
     pnmTable.innerHTML = '<p class="muted">No PNMs match current filters.</p>';
@@ -2391,26 +2426,36 @@ function renderMemberTable() {
     .map((member) => {
       const avgRating = member.avg_rating_given == null ? "Hidden" : member.avg_rating_given.toFixed(2);
       const ratingCount = member.rating_count == null ? "Hidden" : member.rating_count;
+      const city = String(member.city || "").trim();
+      const stateCode = String(member.state_code || "").trim();
+      const selectedClass = Number(state.selectedMemberId) === Number(member.user_id) ? "selected-row" : "";
       const canDisapprove =
         canDisapproveUsers &&
         state.user &&
         member.user_id !== state.user.user_id &&
         member.role !== "Head Rush Officer";
-      const actionCell = canDisapprove
+      const disapproveAction = canDisapprove
         ? `<button type="button" class="secondary disapprove-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Disapprove</button>`
-        : "-";
+        : "";
       return `
-        <tr>
+        <tr class="${selectedClass}">
           <td>${escapeHtml(member.username)}</td>
           <td>${escapeHtml(member.role)}</td>
           <td>${member.emoji ? escapeHtml(member.emoji) : "-"}</td>
+          <td>${city ? escapeHtml(city) : "-"}</td>
+          <td>${stateCode ? escapeHtml(stateCode) : "-"}</td>
           <td>${escapeHtml(member.stereotype)}</td>
           <td>${member.interests.map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join("")}</td>
           <td>${member.total_lunches}</td>
           <td>${member.lunches_per_week.toFixed(2)}</td>
           <td>${ratingCount}</td>
           <td>${avgRating}</td>
-          <td>${actionCell}</td>
+          <td>
+            <div class="action-row">
+              <button type="button" class="secondary select-member" data-user-id="${member.user_id}">Select</button>
+              ${disapproveAction}
+            </div>
+          </td>
         </tr>
       `;
     })
@@ -2423,6 +2468,8 @@ function renderMemberTable() {
           <th>Username</th>
           <th>Role</th>
           <th>Emoji</th>
+          <th>City</th>
+          <th>State</th>
           <th>Stereotype</th>
           <th>Interests</th>
           <th>Total Lunches</th>
@@ -2435,6 +2482,74 @@ function renderMemberTable() {
       <tbody>${rows}</tbody>
     </table>
   `;
+}
+
+async function loadSameStatePnms() {
+  if (!sameStatePnmsHeader || !sameStatePnmsList) {
+    return;
+  }
+  const selectedMember = state.members.find((member) => Number(member.user_id) === Number(state.selectedMemberId)) || null;
+  if (!selectedMember) {
+    state.sameStatePnms = [];
+    renderSameStatePnmsPanel();
+    return;
+  }
+  const stateCode = String(selectedMember.state_code || "").trim();
+  if (!stateCode) {
+    state.sameStatePnms = [];
+    renderSameStatePnmsPanel();
+    return;
+  }
+  try {
+    const payload = await api(`/api/pnms${toQuery({ state: stateCode })}`);
+    state.sameStatePnms = payload.pnms || [];
+  } catch {
+    state.sameStatePnms = [];
+  }
+  renderSameStatePnmsPanel();
+}
+
+function renderSameStatePnmsPanel() {
+  if (!sameStatePnmsHeader || !sameStatePnmsList) {
+    return;
+  }
+  const selectedMember = state.members.find((member) => Number(member.user_id) === Number(state.selectedMemberId)) || null;
+  if (!selectedMember) {
+    sameStatePnmsHeader.textContent = "Select a member to view PNMs from the same state.";
+    sameStatePnmsList.innerHTML = '<p class="muted">No member selected.</p>';
+    return;
+  }
+  const stateCode = String(selectedMember.state_code || "").trim();
+  if (!stateCode) {
+    sameStatePnmsHeader.textContent = `${selectedMember.username} has no state set.`;
+    sameStatePnmsList.innerHTML = '<p class="muted">No state set for this member.</p>';
+    return;
+  }
+
+  const rows = state.sameStatePnms || [];
+  sameStatePnmsHeader.textContent = `${selectedMember.username} | ${stateCode} | ${rows.length} same-state PNMs`;
+  if (!rows.length) {
+    sameStatePnmsList.innerHTML = '<p class="muted">No PNMs found in this state.</p>';
+    return;
+  }
+  sameStatePnmsList.innerHTML = rows
+    .map((pnm) => {
+      const meetingHref = `${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`;
+      return `
+        <div class="entry">
+          <div class="entry-title">
+            <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+            <span>${Number(pnm.weighted_total || 0).toFixed(2)}</span>
+          </div>
+          <div class="muted">${escapeHtml(pnm.hometown || "-")}</div>
+          <div class="action-row">
+            <button type="button" class="secondary open-same-state-pnm" data-pnm-id="${Number(pnm.pnm_id)}" data-state="${escapeHtml(stateCode)}">Open In Rushees</button>
+            <a class="quick-nav-link" href="${escapeHtml(meetingHref)}">Open Meeting</a>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
 }
 
 function renderAnalytics(overview) {
@@ -3231,6 +3346,7 @@ function renderAdminPanel() {
 }
 
 function applyRatingFormForSelected() {
+  syncOpenMeetingLink();
   if (!state.selectedPnmId) {
     ratingForm.reset();
     renderSelectedPnmPhoto(null);
@@ -3275,6 +3391,7 @@ function applyRatingFormForSelected() {
   photoForm.classList.toggle("hidden", !roleCanManagePhotos());
   renderAssignmentControls();
   renderPackageDealPanel();
+  syncOpenMeetingLink();
 }
 
 function renderRatingEntries(data) {
@@ -3486,10 +3603,8 @@ async function loadPnmDetail(pnmId) {
   if (!pnmId) {
     ratingList.innerHTML = '<p class="muted">Select a PNM to view rating entries.</p>';
     lunchHistory.innerHTML = '<p class="muted">Select a PNM to view lunch logs.</p>';
-    if (meetingView) {
-      meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
-    }
     renderSelectedPnmPhoto(null);
+    syncOpenMeetingLink();
     renderAssignmentControls();
     return;
   }
@@ -3502,7 +3617,7 @@ async function loadPnmDetail(pnmId) {
     renderRatingEntries(ratings);
     renderLunchEntries(lunches);
     renderAssignmentControls();
-    await loadMeetingView(pnmId);
+    syncOpenMeetingLink();
   } catch (error) {
     showToast(error.message || "Unable to load selected PNM details.");
   }
@@ -3514,7 +3629,7 @@ async function loadInterestHints() {
 }
 
 async function loadPnms() {
-  const query = toQuery(state.filters);
+  const query = toQuery(state.rusheeFilters);
   const payload = await api(`/api/pnms${query}`);
   state.pnms = payload.pnms || [];
   updateHeroStats();
@@ -3534,14 +3649,19 @@ async function loadPnms() {
   applyRatingFormForSelected();
   renderAssignmentControls();
   renderPackageDealPanel();
+  renderSameStatePnmsPanel();
   await loadPnmDetail(state.selectedPnmId);
 }
 
 async function loadMembers() {
-  const query = toQuery(state.filters);
+  const query = toQuery(state.memberFilters);
   const payload = await api(`/api/users${query}`);
   state.members = payload.users || [];
+  if (!state.members.some((member) => Number(member.user_id) === Number(state.selectedMemberId))) {
+    state.selectedMemberId = state.members.length ? Number(state.members[0].user_id) : null;
+  }
   renderMemberTable();
+  await loadSameStatePnms();
   renderWeeklyGoalAssignedUsers();
   renderAssignmentControls();
   renderAdminPanel();
@@ -3549,7 +3669,7 @@ async function loadMembers() {
 }
 
 async function loadMatching() {
-  const query = toQuery(state.filters);
+  const query = toQuery(state.matchingFilters);
   const payload = await api(`/api/matching${query}`);
   renderMatching(payload);
 }
@@ -3856,6 +3976,8 @@ async function handleRegister(event) {
   const username = document.getElementById("regUsername").value.trim();
   const password = document.getElementById("regAccessCode").value;
   const emoji = regEmoji.value.trim();
+  const city = document.getElementById("regCity").value.trim();
+  const stateCode = document.getElementById("regState").value.trim();
   if (!username) {
     showToast("Username is required.");
     return;
@@ -3869,6 +3991,8 @@ async function handleRegister(event) {
     username,
     emoji: emoji || null,
     password,
+    city: city || null,
+    state: stateCode || null,
   };
 
   try {
@@ -3896,6 +4020,8 @@ async function handleLogout() {
   state.pnms = [];
   state.assignedRushRows = [];
   state.members = [];
+  state.sameStatePnms = [];
+  state.selectedMemberId = null;
   state.calendarShare = null;
   state.scheduledLunches = [];
   state.rushCalendarItems = [];
@@ -3958,8 +4084,11 @@ async function handleLogout() {
   if (openLastLunchGoogleLink) {
     openLastLunchGoogleLink.href = "#";
   }
-  if (meetingView) {
-    meetingView.innerHTML = '<p class="muted">Select a PNM to load the meeting packet.</p>';
+  if (sameStatePnmsHeader) {
+    sameStatePnmsHeader.textContent = "Select a member to view PNMs from the same state.";
+  }
+  if (sameStatePnmsList) {
+    sameStatePnmsList.innerHTML = '<p class="muted">No member selected.</p>';
   }
   if (seasonArchivePhrase) {
     seasonArchivePhrase.value = "";
@@ -3978,6 +4107,7 @@ async function handleLogout() {
   renderAdminPanel();
   renderAssignmentControls();
   renderAssignedRushSection();
+  syncOpenMeetingLink();
   renderGoogleImportResult(null);
   stopLiveRefresh();
   setAuthView(false);
@@ -3985,20 +4115,91 @@ async function handleLogout() {
   showToast("Logged out.");
 }
 
-function getCurrentFilters() {
+function getRusheeFilters() {
   return {
-    interest: filterInterest.value.trim(),
-    stereotype: filterStereotype.value.trim(),
+    interest: rusheeFilterInterest ? rusheeFilterInterest.value.trim() : "",
+    stereotype: rusheeFilterStereotype ? rusheeFilterStereotype.value.trim() : "",
+    state: rusheeFilterState ? rusheeFilterState.value.trim() : "",
   };
 }
 
-async function handleApplyFilters() {
-  state.filters = getCurrentFilters();
+function getMatchingFilters() {
+  return {
+    interest: matchingFilterInterest ? matchingFilterInterest.value.trim() : "",
+    stereotype: matchingFilterStereotype ? matchingFilterStereotype.value.trim() : "",
+    state: matchingFilterState ? matchingFilterState.value.trim() : "",
+  };
+}
+
+function getMemberFilters() {
+  return {
+    role: memberFilterRole ? memberFilterRole.value.trim() || "all" : "all",
+    state: memberFilterState ? memberFilterState.value.trim() : "",
+    city: memberFilterCity ? memberFilterCity.value.trim() : "",
+    sort: memberSortSelectDesktop ? memberSortSelectDesktop.value.trim() || "location" : "location",
+  };
+}
+
+function syncFilterInputsFromState() {
+  if (rusheeFilterInterest) {
+    rusheeFilterInterest.value = state.rusheeFilters.interest || "";
+  }
+  if (rusheeFilterStereotype) {
+    rusheeFilterStereotype.value = state.rusheeFilters.stereotype || "";
+  }
+  if (rusheeFilterState) {
+    rusheeFilterState.value = state.rusheeFilters.state || "";
+  }
+  if (matchingFilterInterest) {
+    matchingFilterInterest.value = state.matchingFilters.interest || "";
+  }
+  if (matchingFilterStereotype) {
+    matchingFilterStereotype.value = state.matchingFilters.stereotype || "";
+  }
+  if (matchingFilterState) {
+    matchingFilterState.value = state.matchingFilters.state || "";
+  }
+  if (memberFilterRole) {
+    memberFilterRole.value = state.memberFilters.role || "all";
+  }
+  if (memberFilterState) {
+    memberFilterState.value = state.memberFilters.state || "";
+  }
+  if (memberFilterCity) {
+    memberFilterCity.value = state.memberFilters.city || "";
+  }
+  if (memberSortSelectDesktop) {
+    memberSortSelectDesktop.value = state.memberFilters.sort || "location";
+  }
+}
+
+async function handleApplyRusheeFilters() {
+  state.rusheeFilters = getRusheeFilters();
   try {
-    await Promise.all([loadPnms(), loadMembers(), loadMatching()]);
-    showToast("Filters applied.");
+    await loadPnms();
+    showToast("Rushee filters applied.");
   } catch (error) {
-    showToast(error.message || "Unable to apply filters.");
+    showToast(error.message || "Unable to apply rushee filters.");
+  }
+}
+
+async function handleApplyMatchingFilters() {
+  state.matchingFilters = getMatchingFilters();
+  try {
+    await loadMatching();
+    showToast("Matching filters applied.");
+  } catch (error) {
+    showToast(error.message || "Unable to apply matching filters.");
+  }
+}
+
+async function handleApplyMemberFilters() {
+  state.memberFilters = getMemberFilters();
+  try {
+    await loadMembers();
+    showToast("Member filters applied.");
+  } catch (error) {
+    showToast(error.message || "Unable to apply member filters.");
   }
 }
 
@@ -4650,6 +4851,18 @@ async function handlePendingClick(event) {
 }
 
 async function handleMemberTableClick(event) {
+  const selectButton = event.target.closest("button.select-member");
+  if (selectButton) {
+    const selectedUserId = Number(selectButton.dataset.userId || 0);
+    if (!selectedUserId) {
+      return;
+    }
+    state.selectedMemberId = selectedUserId;
+    renderMemberTable();
+    await loadSameStatePnms();
+    return;
+  }
+
   const button = event.target.closest("button.disapprove-user");
   if (!button) {
     return;
@@ -4715,6 +4928,36 @@ async function handlePromoteOfficer() {
     promoteOfficerBtn.disabled = false;
     promoteOfficerBtn.textContent = "Promote To Head";
   }
+}
+
+async function handleSameStatePnmsClick(event) {
+  const button = event.target.closest("button.open-same-state-pnm");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.pnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  const preferredState = String(button.dataset.state || "").trim();
+  if (preferredState) {
+    state.rusheeFilters = {
+      ...state.rusheeFilters,
+      state: preferredState,
+    };
+  }
+  syncFilterInputsFromState();
+  await loadPnms();
+  if (!state.pnms.some((pnm) => Number(pnm.pnm_id) === pnmId)) {
+    showToast("Rushee not visible under current filters.");
+    return;
+  }
+  state.selectedPnmId = pnmId;
+  state.headAssignmentPnmId = pnmId;
+  renderPnmTable();
+  applyRatingFormForSelected();
+  await loadPnmDetail(pnmId);
+  setActiveDesktopPage("rushees");
 }
 
 async function handleAdminPnmEditorSubmit(event) {
@@ -5529,8 +5772,15 @@ function attachEvents() {
   if (clearAssignBtn) {
     clearAssignBtn.addEventListener("click", handleClearAssignment);
   }
-
-  applyFiltersBtn.addEventListener("click", handleApplyFilters);
+  if (applyRusheeFiltersBtn) {
+    applyRusheeFiltersBtn.addEventListener("click", handleApplyRusheeFilters);
+  }
+  if (applyMatchingFiltersBtn) {
+    applyMatchingFiltersBtn.addEventListener("click", handleApplyMatchingFilters);
+  }
+  if (applyMemberFiltersBtn) {
+    applyMemberFiltersBtn.addEventListener("click", handleApplyMemberFilters);
+  }
 
   pnmForm.addEventListener("submit", handlePnmCreate);
   ratingForm.addEventListener("submit", handleRatingSave);
@@ -5633,6 +5883,9 @@ function attachEvents() {
   if (assignedRushTable) {
     assignedRushTable.addEventListener("click", handleAssignedRushTableClick);
   }
+  if (sameStatePnmsList) {
+    sameStatePnmsList.addEventListener("click", handleSameStatePnmsClick);
+  }
 
   ratingPnm.addEventListener("change", async (event) => {
     const selectedId = Number(event.target.value || 0);
@@ -5729,6 +5982,8 @@ async function init() {
   applyRatingCriteriaUi();
   setRoleEmojiRequirement();
   initializePresetTagPickers();
+  syncFilterInputsFromState();
+  syncOpenMeetingLink();
   attachEvents();
   setActiveDesktopPage(currentRequestedDesktopPage(), false);
   updateTopbarActions();

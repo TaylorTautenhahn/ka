@@ -636,6 +636,8 @@ async function handleRegister(event) {
   event.preventDefault();
   const username = document.getElementById("memberRegisterUsername").value.trim();
   const password = document.getElementById("memberRegisterPassword").value;
+  const city = document.getElementById("memberRegisterCity").value.trim();
+  const stateCode = document.getElementById("memberRegisterState").value.trim();
 
   if (!username) {
     showToast("Username is required.");
@@ -649,7 +651,12 @@ async function handleRegister(event) {
   try {
     const payload = await api("/api/auth/register-member", {
       method: "POST",
-      body: { username, password },
+      body: {
+        username,
+        password,
+        city: city || null,
+        state: stateCode || null,
+      },
     });
     memberRegisterForm.reset();
     showToast(payload.message || "Registration submitted.");

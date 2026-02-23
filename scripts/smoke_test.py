@@ -118,6 +118,8 @@ def main() -> None:
                     "username": officer_username,
                     "access_code": officer_password,
                     "emoji": "🔥",
+                    "city": "Austin",
+                    "state": "Texas",
                 },
             )
             expect_status(response, 200, "Officer registration")
@@ -176,6 +178,8 @@ def main() -> None:
                     "username": officer_two_username,
                     "access_code": officer_two_password,
                     "emoji": "⚡",
+                    "city": "Dallas",
+                    "state": "TX",
                 },
             )
             expect_status(response, 200, "Second officer registration")
@@ -192,6 +196,68 @@ def main() -> None:
             expect_status(response, 200, "Approve second officer")
             checks.append("Second officer approval flow works")
 
+            member_username = "memberqa"
+            member_password = "MemberPass123!"
+            response = client.post(
+                "/kappaalphaorder/api/auth/register-member",
+                json={
+                    "username": member_username,
+                    "access_code": member_password,
+                    "city": "College Station",
+                    "state": "TX",
+                },
+            )
+            expect_status(response, 200, "Member registration")
+
+            response = client.get("/kappaalphaorder/api/users/pending")
+            expect_status(response, 200, "Pending users list after member registration")
+            pending = response.json().get("pending", [])
+            pending_member = next((item for item in pending if item.get("username") == member_username), None)
+            if pending_member is None:
+                raise AssertionError("Pending list missing member registration.")
+            member_user_id = int(pending_member["user_id"])
+            response = client.post(f"/kappaalphaorder/api/users/pending/{member_user_id}/approve")
+            expect_status(response, 200, "Approve member")
+            checks.append("Member registration + approval flow works")
+
+            response = client.get("/kappaalphaorder/api/users?role=Rush%20Officer&state=TX&sort=location")
+            expect_status(response, 200, "Users filter by role/state/location sort")
+            filtered_officers = response.json().get("users", [])
+            if not filtered_officers:
+                raise AssertionError("Expected at least one filtered Rush Officer in TX.")
+            if not all(item.get("role") == "Rush Officer" for item in filtered_officers):
+                raise AssertionError("Role filter should only return Rush Officer users.")
+            if not all(item.get("state_code") == "TX" for item in filtered_officers):
+                raise AssertionError("State filter should only return TX users.")
+            checks.append("Users API role/state/sort filters work")
+
+            response = client.get("/kappaalphaorder/api/users?city=aus")
+            expect_status(response, 200, "Users filter by city contains")
+            city_filtered = response.json().get("users", [])
+            if not any(item.get("username") == officer_username for item in city_filtered):
+                raise AssertionError("City filter should match Austin-based officer.")
+            checks.append("Users API city contains filter works")
+
+            response = client.patch(
+                "/kappaalphaorder/api/users/me",
+                json={"city": "Tuscaloosa", "state": "Alabama"},
+            )
+            expect_status(response, 200, "Self location update")
+            me_user = (response.json() or {}).get("user", {})
+            if me_user.get("city") != "Tuscaloosa" or me_user.get("state_code") != "AL":
+                raise AssertionError("Self location update did not normalize city/state.")
+            checks.append("Self location update works")
+
+            response = client.patch(
+                f"/kappaalphaorder/api/users/{officer_user_id}/location",
+                json={"city": "San Antonio", "state": "TX"},
+            )
+            expect_status(response, 200, "Officer location update by head")
+            updated_user = (response.json() or {}).get("user", {})
+            if updated_user.get("city") != "San Antonio" or updated_user.get("state_code") != "TX":
+                raise AssertionError("Officer location patch did not persist expected values.")
+            checks.append("Head/officer location edit endpoint works")
+
             today = date.today().isoformat()
             response = client.post(
                 "/kappaalphaorder/api/pnms",
@@ -199,7 +265,7 @@ def main() -> None:
                     "first_name": "Alex",
                     "last_name": "Carter",
                     "class_year": "F",
-                    "hometown": "Austin",
+                    "hometown": "Austin, TX",
                     "phone_number": "+1 555 123 4567",
                     "instagram_handle": "@alexc",
                     "first_event_date": today,
@@ -220,7 +286,7 @@ def main() -> None:
                     "first_name": "Blake",
                     "last_name": "Donovan",
                     "class_year": "F",
-                    "hometown": "Dallas",
+                    "hometown": "Dallas, TX",
                     "phone_number": "+1 555 000 1111",
                     "instagram_handle": "@blaked",
                     "first_event_date": today,
@@ -241,7 +307,7 @@ def main() -> None:
                     "first_name": "Casey",
                     "last_name": "Ellis",
                     "class_year": "S",
-                    "hometown": "Houston",
+                    "hometown": "Boulder, CO",
                     "phone_number": "+1 555 222 3333",
                     "instagram_handle": "@caseye",
                     "first_event_date": today,
@@ -255,6 +321,24 @@ def main() -> None:
             pnm_three = response.json().get("pnm", {})
             pnm_three_id = int(pnm_three.get("pnm_id"))
             checks.append("Third PNM create works")
+
+            response = client.get("/kappaalphaorder/api/pnms?state=TX")
+            expect_status(response, 200, "PNM state filter")
+            tx_pnms = response.json().get("pnms", [])
+            tx_ids = {int(item.get("pnm_id")) for item in tx_pnms if item.get("pnm_id")}
+            if pnm_id not in tx_ids or pnm_two_id not in tx_ids or pnm_three_id in tx_ids:
+                raise AssertionError("PNM state filter should include TX PNMs and exclude non-TX PNMs.")
+            if not all(item.get("hometown_state_code") == "TX" for item in tx_pnms):
+                raise AssertionError("PNM payload should expose normalized hometown_state_code.")
+            checks.append("PNM state filter + hometown state payload fields work")
+
+            response = client.get("/kappaalphaorder/api/matching?state=TX")
+            expect_status(response, 200, "Matching state filter")
+            matching_pnms = response.json().get("pnms", [])
+            matching_ids = {int(item.get("pnm_id")) for item in matching_pnms if item.get("pnm_id")}
+            if pnm_id not in matching_ids or pnm_two_id not in matching_ids or pnm_three_id in matching_ids:
+                raise AssertionError("Matching state filter should apply to PNM results.")
+            checks.append("Matching API state filter works")
 
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Head logout")
@@ -400,6 +484,24 @@ def main() -> None:
 
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Officer logout")
+            sync_csrf_header()
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": member_username, "access_code": member_password},
+            )
+            expect_status(response, 200, "Approved member login")
+            sync_csrf_header()
+
+            response = client.patch(
+                f"/kappaalphaorder/api/users/{officer_user_id}/location",
+                json={"city": "Blocked", "state": "TX"},
+            )
+            expect_status(response, 403, "Rusher blocked from editing other user location")
+            checks.append("Location edit permissions enforce officer-only updates")
+
+            response = client.post("/kappaalphaorder/api/auth/logout")
+            expect_status(response, 200, "Member logout")
             sync_csrf_header()
 
             response = client.post(

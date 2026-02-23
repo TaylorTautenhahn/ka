@@ -168,6 +168,30 @@ def main() -> None:
             expect_status(response, 200, "Approve officer")
             checks.append("Officer approval flow works")
 
+            officer_two_username = "officerqa2"
+            officer_two_password = "OfficerTwoPass123!"
+            response = client.post(
+                "/kappaalphaorder/api/auth/register",
+                json={
+                    "username": officer_two_username,
+                    "access_code": officer_two_password,
+                    "emoji": "⚡",
+                },
+            )
+            expect_status(response, 200, "Second officer registration")
+
+            response = client.get("/kappaalphaorder/api/users/pending")
+            expect_status(response, 200, "Pending users list after second registration")
+            pending = response.json().get("pending", [])
+            pending_user_two = next((item for item in pending if item.get("username") == officer_two_username), None)
+            if pending_user_two is None:
+                raise AssertionError("Pending list missing second registered officer.")
+            officer_two_user_id = int(pending_user_two["user_id"])
+
+            response = client.post(f"/kappaalphaorder/api/users/pending/{officer_two_user_id}/approve")
+            expect_status(response, 200, "Approve second officer")
+            checks.append("Second officer approval flow works")
+
             today = date.today().isoformat()
             response = client.post(
                 "/kappaalphaorder/api/pnms",
@@ -354,6 +378,12 @@ def main() -> None:
 
             response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/meeting")
             expect_status(response, 200, "Meeting view payload")
+            meeting_payload = response.json()
+            linked_pnms = meeting_payload.get("linked_pnms", [])
+            if not isinstance(linked_pnms, list):
+                raise AssertionError("Meeting view linked_pnms should be a list.")
+            if not any(int(item.get("pnm_id") or 0) == pnm_two_id for item in linked_pnms):
+                raise AssertionError("Meeting view should include linked package rushee references.")
             checks.append("Meeting view API works")
 
             response = client.post("/kappaalphaorder/api/auth/logout")
@@ -430,6 +460,25 @@ def main() -> None:
             ):
                 raise AssertionError("Package link sync should align assigned officer across linked PNMs.")
             checks.append("Package deal merge link and assignment sync works")
+
+            response = client.post(
+                f"/kappaalphaorder/api/pnms/{pnm_id}/assignees",
+                json={
+                    "officer_user_id": officer_two_user_id,
+                    "include_package": True,
+                },
+            )
+            expect_status(response, 200, "Add secondary assignee")
+            add_assignee_payload = response.json()
+            assignment_team = (add_assignee_payload.get("pnm", {}) or {}).get("assigned_officers", [])
+            assignment_ids = {
+                int(item.get("user_id"))
+                for item in assignment_team
+                if isinstance(item, dict) and item.get("user_id")
+            }
+            if officer_user_id not in assignment_ids or officer_two_user_id not in assignment_ids:
+                raise AssertionError("Assignment team should include both primary and secondary officers.")
+            checks.append("Secondary assignee add flow works")
 
             response = client.get("/kappaalphaorder/api/mobile/pnms")
             expect_status(response, 200, "Mobile PNM payload")
@@ -530,6 +579,43 @@ def main() -> None:
             if int(status_payload.get("downloaded_count", 0)) < 1:
                 raise AssertionError("Bulk contact export should leave at least one per-user download status record.")
             checks.append("Bulk contact export updates per-user contact status")
+
+            response = client.post("/kappaalphaorder/api/auth/logout")
+            expect_status(response, 200, "Head logout before second officer checks")
+            sync_csrf_header()
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": officer_two_username, "access_code": officer_two_password},
+            )
+            expect_status(response, 200, "Second officer login")
+            sync_csrf_header()
+
+            response = client.get("/kappaalphaorder/api/assignments/mine")
+            expect_status(response, 200, "Assignments mine API for secondary officer")
+            mine_rows = response.json().get("assignments", [])
+            mine_ids = {int(item.get("pnm_id")) for item in mine_rows if item.get("pnm_id")}
+            if pnm_id not in mine_ids:
+                raise AssertionError("Secondary officer assignment list should include linked assigned PNM.")
+            checks.append("Assignments mine API works for secondary assignees")
+
+            response = client.get("/kappaalphaorder/api/export/contacts-assigned.vcf")
+            expect_status(response, 200, "Assigned contacts export for secondary officer")
+            assigned_contacts_text = response.content.decode("utf-8", errors="ignore")
+            if "BEGIN:VCARD" not in assigned_contacts_text or "Alex Carter" not in assigned_contacts_text:
+                raise AssertionError("Assigned contacts export missing expected linked PNM vCard.")
+            checks.append("Assigned contacts export works for officers")
+
+            response = client.post("/kappaalphaorder/api/auth/logout")
+            expect_status(response, 200, "Second officer logout")
+            sync_csrf_header()
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": "headseed", "access_code": "HeadSeed123!"},
+            )
+            expect_status(response, 200, "Head re-login before backup checks")
+            sync_csrf_header()
 
             response = client.get("/kappaalphaorder/api/export/csv")
             expect_status(response, 200, "CSV export API")

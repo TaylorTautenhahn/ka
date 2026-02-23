@@ -249,11 +249,15 @@ const assignedRushPanel = document.getElementById("assignedRushPanel");
 const assignedRushTitle = document.getElementById("assignedRushTitle");
 const assignedRushSubtitle = document.getElementById("assignedRushSubtitle");
 const assignedRushTable = document.getElementById("assignedRushTable");
+const assignedRushDownloadBtn = document.getElementById("assignedRushDownloadBtn");
 
 const headAssignmentForm = document.getElementById("headAssignmentForm");
 const headAssignPnmSelect = document.getElementById("headAssignPnmSelect");
 const headAssignOfficerSelect = document.getElementById("headAssignOfficerSelect");
 const headAssignClearBtn = document.getElementById("headAssignClearBtn");
+const headAddAssigneeSelect = document.getElementById("headAddAssigneeSelect");
+const headAddAssigneeBtn = document.getElementById("headAddAssigneeBtn");
+const headAssigneeList = document.getElementById("headAssigneeList");
 const headAssignmentTable = document.getElementById("headAssignmentTable");
 const headPackagePartnerSelect = document.getElementById("headPackagePartnerSelect");
 const headPackageLinkBtn = document.getElementById("headPackageLinkBtn");
@@ -383,6 +387,7 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
 const state = {
   user: null,
   pnms: [],
+  assignedRushRows: [],
   members: [],
   selectedPnmId: null,
   toastTimer: null,
@@ -493,6 +498,55 @@ function packageInfoForPnm(pnm, groups = null) {
     count: members.length,
     members,
   };
+}
+
+function linkedRusheeNamesForPnm(pnm, groups = null) {
+  const packageInfo = packageInfoForPnm(pnm, groups);
+  if (!packageInfo.id) {
+    return "None";
+  }
+  const linkedNames = packageInfo.members
+    .filter((member) => Number(member.pnm_id) !== Number(pnm.pnm_id))
+    .map((member) => `${member.first_name} ${member.last_name}`);
+  return linkedNames.length ? linkedNames.join(", ") : "None";
+}
+
+function assignmentTeamForPnm(pnm) {
+  if (!pnm || !Array.isArray(pnm.assigned_officers)) {
+    return [];
+  }
+  return pnm.assigned_officers
+    .filter((item) => item && Number(item.user_id || 0) > 0)
+    .map((item) => ({
+      user_id: Number(item.user_id),
+      username: String(item.username || "Unknown"),
+      emoji: item.emoji ? String(item.emoji) : "",
+      is_primary: Boolean(item.is_primary),
+      assigned_at: item.assigned_at || null,
+    }));
+}
+
+function assignmentTeamLabel(officers) {
+  if (!officers || !officers.length) {
+    return "Unassigned";
+  }
+  return officers
+    .map((officer) => {
+      const emoji = officer.emoji ? `${officer.emoji} ` : "";
+      return `${emoji}${officer.username}`;
+    })
+    .join(", ");
+}
+
+function primaryAssignmentLabel(pnm, officers = []) {
+  const primary = officers.find((item) => item.is_primary) || null;
+  if (primary && primary.username) {
+    return primary.username;
+  }
+  if (pnm && pnm.assigned_officer && pnm.assigned_officer.username) {
+    return pnm.assigned_officer.username;
+  }
+  return "Unassigned";
 }
 
 function applyRatingCriteriaUi() {
@@ -862,6 +916,14 @@ async function downloadFile(url, fallbackFileName) {
   URL.revokeObjectURL(objectUrl);
 }
 
+function safeFileToken(value) {
+  return String(value || "")
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
+}
+
 function setAuthView(isAuthenticated) {
   authSection.classList.toggle("hidden", isAuthenticated);
   appSection.classList.toggle("hidden", !isAuthenticated);
@@ -949,6 +1011,7 @@ function startLiveRefresh() {
         loadOfficerChatStats(),
         loadApprovals(),
         loadHeadAdminData(),
+        loadAssignedRushData(),
         loadSeasonArchiveStatus(),
       ]);
     } catch {
@@ -2030,21 +2093,28 @@ function renderAssignedRushSection() {
   if (!roleCanViewAssignedRushes()) {
     assignedRushPanel.classList.add("hidden");
     assignedRushTable.innerHTML = "";
+    if (assignedRushDownloadBtn) {
+      assignedRushDownloadBtn.classList.add("hidden");
+      assignedRushDownloadBtn.disabled = true;
+    }
     return;
   }
 
   assignedRushPanel.classList.remove("hidden");
   const isHead = state.user && state.user.role === "Head Rush Officer";
-  const rows = isHead
-    ? state.pnms
-    : state.pnms.filter((pnm) => Number(pnm.assigned_officer_id || 0) === Number(state.user.user_id));
+  const rows = Array.isArray(state.assignedRushRows) ? state.assignedRushRows : [];
 
   if (isHead) {
     assignedRushTitle.textContent = "Assignment Visibility";
-    assignedRushSubtitle.textContent = "Live overview of who each rushee is assigned to.";
+    assignedRushSubtitle.textContent = "Live view of assignment teams and primary ownership.";
   } else {
     assignedRushTitle.textContent = "My Assigned Rushees";
-    assignedRushSubtitle.textContent = `Rushees currently assigned to ${state.user.username}.`;
+    assignedRushSubtitle.textContent = `Rushees assigned to ${state.user.username} and your outreach team.`;
+  }
+
+  if (assignedRushDownloadBtn) {
+    assignedRushDownloadBtn.classList.remove("hidden");
+    assignedRushDownloadBtn.disabled = !rows.length;
   }
 
   if (!rows.length) {
@@ -2053,24 +2123,38 @@ function renderAssignedRushSection() {
   }
 
   const groups = packageGroupIndex();
+  const pnmsById = new Map((state.pnms || []).map((pnm) => [Number(pnm.pnm_id), pnm]));
   const tableRows = rows
-    .map((pnm) => {
-      const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-      const assignedAt = pnm.assigned_at ? formatLastSeen(pnm.assigned_at) : "-";
-      const packageInfo = packageInfoForPnm(pnm, groups);
-      const packageDisplay = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
-      const officerCell = isHead ? `<td>${escapeHtml(assignedOfficer)}</td>` : "";
+    .map((entry) => {
+      const pnm = pnmsById.get(Number(entry.pnm_id)) || null;
+      const linkedDisplay = pnm ? linkedRusheeNamesForPnm(pnm, groups) : "None";
+      const assignmentTeam = Array.isArray(entry.assigned_officers) ? entry.assigned_officers : [];
+      const teamDisplay = assignmentTeamLabel(assignmentTeam);
+      const primaryOfficer = primaryAssignmentLabel(entry, assignmentTeam);
+      const assignedAt = entry.assigned_at ? formatLastSeen(entry.assigned_at) : "-";
+      const officerCell = isHead ? `<td>${escapeHtml(primaryOfficer)}</td>` : "";
       const assignedAtCell = isHead ? `<td>${escapeHtml(assignedAt)}</td>` : "";
       return `
         <tr>
-          <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
-          <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
-          <td>${escapeHtml(packageDisplay)}</td>
-          <td>${escapeHtml(pnm.phone_number || "-")}</td>
+          <td><strong>${escapeHtml(entry.pnm_code || `PNM-${entry.pnm_id}`)}</strong></td>
+          <td>${escapeHtml(entry.first_name)} ${escapeHtml(entry.last_name)}</td>
+          <td>${escapeHtml(linkedDisplay)}</td>
+          <td>${escapeHtml(teamDisplay)}</td>
+          <td>${escapeHtml(entry.phone_number || "-")}</td>
           ${officerCell}
           ${assignedAtCell}
-          <td>${pnm.weighted_total.toFixed(2)}</td>
-          <td>${pnm.total_lunches}</td>
+          <td>${Number(entry.weighted_total || 0).toFixed(2)}</td>
+          <td>${Number(entry.total_lunches || 0)}</td>
+          <td>
+            <button
+              type="button"
+              class="secondary assigned-contact-btn"
+              data-pnm-id="${Number(entry.pnm_id)}"
+              data-pnm-code="${escapeHtml(entry.pnm_code || `pnm-${entry.pnm_id}`)}"
+            >
+              Add Contact
+            </button>
+          </td>
         </tr>
       `;
     })
@@ -2083,11 +2167,13 @@ function renderAssignedRushSection() {
         <tr>
           <th>Code</th>
           <th>Name</th>
-          <th>Package</th>
+          <th>Linked With</th>
+          <th>Assignment Team</th>
           <th>Phone</th>
           ${officerHeader}
           <th>Weighted Total</th>
           <th>Lunches</th>
+          <th>Contacts</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>
@@ -2231,8 +2317,7 @@ function renderPnmTable() {
       const own = pnm.own_rating;
       const ownDisplay = own ? `${own.total_score}/${RATING_TOTAL_MAX}` : "Not rated";
       const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-      const packageInfo = packageInfoForPnm(pnm);
-      const packageDisplay = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
+      const linkedDisplay = linkedRusheeNamesForPnm(pnm);
       const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / RATING_TOTAL_MAX) * 100));
       const barWidth = Math.round((weightedPct / 100) * 58);
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
@@ -2246,7 +2331,7 @@ function renderPnmTable() {
           <td>${smallPhotoCell(pnm)}</td>
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
-          <td>${escapeHtml(packageDisplay)}</td>
+          <td>${escapeHtml(linkedDisplay)}</td>
           <td>${escapeHtml(pnm.phone_number || "-")}</td>
           <td>${escapeHtml(pnm.class_year)}</td>
           <td>${pnm.days_since_first_event}</td>
@@ -2277,7 +2362,7 @@ function renderPnmTable() {
           <th>Photo</th>
           <th>Code</th>
           <th>Name</th>
-          <th>Package</th>
+          <th>Linked With</th>
           <th>Phone</th>
           <th>Class</th>
           <th>Days Since Event</th>
@@ -2761,14 +2846,13 @@ function renderAdminPnmTable() {
   const rows = state.pnms
     .map(
       (pnm) => {
-        const packageInfo = packageInfoForPnm(pnm);
-        const packageDisplay = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
+        const linkedDisplay = linkedRusheeNamesForPnm(pnm);
         return `
       <tr>
         <td>${smallPhotoCell(pnm)}</td>
         <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
         <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
-        <td>${escapeHtml(packageDisplay)}</td>
+        <td>${escapeHtml(linkedDisplay)}</td>
         <td>${escapeHtml(pnm.phone_number || "-")}</td>
         <td>${escapeHtml(pnm.instagram_handle)}</td>
         <td>${pnm.weighted_total.toFixed(2)}</td>
@@ -2793,7 +2877,7 @@ function renderAdminPnmTable() {
           <th>Photo</th>
           <th>Code</th>
           <th>Name</th>
-          <th>Package</th>
+          <th>Linked With</th>
           <th>Phone</th>
           <th>Instagram</th>
           <th>Weighted Total</th>
@@ -2814,17 +2898,78 @@ function syncHeadAssignmentSelection() {
   const pnmId = Number(headAssignPnmSelect.value || 0);
   if (!pnmId) {
     headAssignOfficerSelect.value = "";
+    renderHeadAssigneeControls();
     renderHeadPackageControls();
     return;
   }
   const pnm = state.pnms.find((item) => item.pnm_id === pnmId);
   if (!pnm || !pnm.assigned_officer_id) {
     headAssignOfficerSelect.value = "";
+    renderHeadAssigneeControls();
     renderHeadPackageControls();
     return;
   }
   headAssignOfficerSelect.value = String(pnm.assigned_officer_id);
+  renderHeadAssigneeControls();
   renderHeadPackageControls();
+}
+
+function renderHeadAssigneeControls() {
+  if (!headAddAssigneeSelect || !headAssigneeList || !headAssignPnmSelect) {
+    return;
+  }
+  const selectedPnmId = Number(headAssignPnmSelect.value || 0);
+  const selected = state.pnms.find((pnm) => pnm.pnm_id === selectedPnmId) || null;
+  if (!selected) {
+    headAddAssigneeSelect.innerHTML = '<option value="">Select a rushee first</option>';
+    headAssigneeList.innerHTML = '<p class="muted">Select a rushee to manage assignment team members.</p>';
+    if (headAddAssigneeBtn) {
+      headAddAssigneeBtn.disabled = true;
+    }
+    return;
+  }
+
+  const assignedTeam = assignmentTeamForPnm(selected);
+  const assignedIds = new Set(assignedTeam.map((item) => Number(item.user_id)));
+  const availableOfficers = rushOfficerMembers()
+    .filter((member) => !assignedIds.has(Number(member.user_id)))
+    .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+
+  const options = ['<option value="">Select Rush Officer</option>']
+    .concat(
+      availableOfficers.map((member) => {
+        const emoji = member.emoji ? `${member.emoji} ` : "";
+        return `<option value="${member.user_id}">${escapeHtml(`${emoji}${member.username}`)}</option>`;
+      })
+    )
+    .join("");
+  headAddAssigneeSelect.innerHTML = options;
+
+  if (!assignedTeam.length) {
+    headAssigneeList.innerHTML = '<p class="muted">No assignment team members yet.</p>';
+  } else {
+    headAssigneeList.innerHTML = assignedTeam
+      .map((officer) => {
+        const badge = officer.is_primary ? '<span class="pill">Primary</span>' : "";
+        const removeButton =
+          '<button type="button" class="secondary head-remove-assignee" data-user-id="' + officer.user_id + '">Remove</button>';
+        const emoji = officer.emoji ? `${officer.emoji} ` : "";
+        return `
+          <div class="entry">
+            <div class="entry-title">
+              <strong>${escapeHtml(`${emoji}${officer.username}`)}</strong>
+              ${badge}
+            </div>
+            <div class="action-row">${removeButton}</div>
+          </div>
+        `;
+      })
+      .join("");
+  }
+
+  if (headAddAssigneeBtn) {
+    headAddAssigneeBtn.disabled = availableOfficers.length === 0;
+  }
 }
 
 function renderHeadPackageControls() {
@@ -2956,7 +3101,9 @@ function renderHeadAssignmentTable() {
       return `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`);
     })
     .map((pnm) => {
-      const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+      const assignmentTeam = assignmentTeamForPnm(pnm);
+      const assignedOfficer = primaryAssignmentLabel(pnm, assignmentTeam);
+      const assignmentTeamText = assignmentTeamLabel(assignmentTeam);
       const assignedAt = pnm.assigned_at ? formatLastSeen(pnm.assigned_at) : "-";
       const packageInfo = packageInfoForPnm(pnm, groups);
       const packageMembers = packageInfo.members
@@ -2973,6 +3120,7 @@ function renderHeadAssignmentTable() {
             <strong>${escapeHtml(packageText)}</strong>
             ${packageInfo.id ? `<div class="muted">${escapeHtml(packageMembers)}</div>` : ""}
           </td>
+          <td>${escapeHtml(assignmentTeamText)}</td>
           <td>${escapeHtml(assignedOfficer)}</td>
           <td>${escapeHtml(assignedAt)}</td>
           <td>${pnm.weighted_total.toFixed(2)}</td>
@@ -2988,6 +3136,7 @@ function renderHeadAssignmentTable() {
           <th>Code</th>
           <th>Rushee</th>
           <th>Package Deal</th>
+          <th>Assignment Team</th>
           <th>Assigned Officer</th>
           <th>Assigned At</th>
           <th>Weighted Total</th>
@@ -3005,6 +3154,12 @@ function renderHeadAssignmentManager() {
   if (!roleCanUseAdminPanel()) {
     headAssignmentForm.classList.add("hidden");
     headAssignmentTable.innerHTML = "";
+    if (headAddAssigneeSelect) {
+      headAddAssigneeSelect.innerHTML = "";
+    }
+    if (headAssigneeList) {
+      headAssigneeList.innerHTML = "";
+    }
     if (headPackagePartnerSelect) {
       headPackagePartnerSelect.innerHTML = "";
     }
@@ -3044,6 +3199,7 @@ function renderHeadAssignmentManager() {
   }
   syncHeadAssignmentSelection();
   renderHeadAssignmentTable();
+  renderHeadAssigneeControls();
   renderHeadPackageControls();
 }
 
@@ -3093,11 +3249,13 @@ function applyRatingFormForSelected() {
     return;
   }
 
-  const assigned = selected.assigned_officer ? selected.assigned_officer.username : "Unassigned";
+  const assignmentTeam = assignmentTeamForPnm(selected);
+  const assigned = primaryAssignmentLabel(selected, assignmentTeam);
+  const assignmentTeamText = assignmentTeamLabel(assignmentTeam);
   const packageInfo = packageInfoForPnm(selected);
   const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
   const phone = selected.phone_number || "No phone";
-  selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Assigned: ${assigned} | Package: ${packageText}`;
+  selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Primary: ${assigned} | Team: ${assignmentTeamText} | Package: ${packageText}`;
   ratingPnm.value = String(selected.pnm_id);
   lunchPnm.value = String(selected.pnm_id);
 
@@ -3191,12 +3349,29 @@ function renderMeetingView(payload) {
   if (!meetingView) {
     return;
   }
-  const { pnm, summary, ratings, lunches, matches, rating_trend: trend, can_view_rater_identity: canSeeRaters } = payload;
+  const {
+    pnm,
+    summary,
+    ratings,
+    lunches,
+    matches,
+    linked_pnms: linkedPnms = [],
+    rating_trend: trend,
+    can_view_rater_identity: canSeeRaters,
+  } = payload;
   const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-  const packageInfo = packageInfoForPnm(pnm);
-  const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
-  const packageMembers = packageInfo.id
-    ? packageInfo.members.map((item) => `${item.first_name} ${item.last_name}`).join(", ")
+  const linkedSummaryText = Array.isArray(linkedPnms) && linkedPnms.length
+    ? linkedPnms.map((item) => `${item.first_name} ${item.last_name}`).join(", ")
+    : "None";
+  const linkedActionMarkup = Array.isArray(linkedPnms) && linkedPnms.length
+    ? `<div class="linked-meeting-actions">
+        ${linkedPnms
+          .map(
+            (item) =>
+              `<button type="button" class="secondary linked-meeting-open-btn" data-pnm-id="${Number(item.pnm_id)}">Open ${escapeHtml(item.first_name)} ${escapeHtml(item.last_name)}</button>`
+          )
+          .join("")}
+      </div>`
     : "";
   const trendPoints = trend && Array.isArray(trend.points) ? trend.points : [];
   const trendDelta = trend && typeof trend.delta_weighted_total === "number" ? trend.delta_weighted_total : null;
@@ -3252,7 +3427,8 @@ function renderMeetingView(payload) {
         <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
         <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
         <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
-        <p class="muted">Package Deal: ${escapeHtml(packageText)}${packageMembers ? ` | Members: ${escapeHtml(packageMembers)}` : ""}</p>
+        <p class="muted">Linked With: ${escapeHtml(linkedSummaryText)}</p>
+        ${linkedActionMarkup}
       </div>
     </div>
     <div class="meeting-metrics">
@@ -3544,6 +3720,21 @@ async function loadHeadAdminData() {
   renderAdminPanel();
 }
 
+async function loadAssignedRushData() {
+  if (!roleCanViewAssignedRushes()) {
+    state.assignedRushRows = [];
+    renderAssignedRushSection();
+    return;
+  }
+  try {
+    const payload = await api("/api/assignments/mine");
+    state.assignedRushRows = payload.assignments || [];
+  } catch {
+    state.assignedRushRows = [];
+  }
+  renderAssignedRushSection();
+}
+
 async function loadSeasonArchiveStatus() {
   if (!roleCanUseAdminPanel()) {
     state.seasonArchive = null;
@@ -3582,6 +3773,7 @@ async function refreshAll() {
     loadOfficerChatStats(),
     loadApprovals(),
     loadHeadAdminData(),
+    loadAssignedRushData(),
     loadSeasonArchiveStatus(),
   ]);
 }
@@ -3702,6 +3894,7 @@ async function handleLogout() {
   closeTutorialOverlay();
   state.selectedPnmId = null;
   state.pnms = [];
+  state.assignedRushRows = [];
   state.members = [];
   state.calendarShare = null;
   state.scheduledLunches = [];
@@ -4105,6 +4298,139 @@ async function handleHeadAssignmentClear() {
       clearButton.disabled = false;
       clearButton.textContent = "Clear Assignment";
     }
+  }
+}
+
+async function handleHeadAddAssignee() {
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const pnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  const officerId = Number(headAddAssigneeSelect && headAddAssigneeSelect.value ? headAddAssigneeSelect.value : 0);
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  if (!officerId) {
+    showToast("Select a Rush Officer to add.");
+    return;
+  }
+
+  const selected = state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId) || null;
+  const includePackage = Boolean(selected && selected.package_group_id);
+  if (headAddAssigneeBtn) {
+    headAddAssigneeBtn.disabled = true;
+    headAddAssigneeBtn.textContent = "Adding...";
+  }
+  try {
+    const payload = await api(`/api/pnms/${pnmId}/assignees`, {
+      method: "POST",
+      body: {
+        officer_user_id: officerId,
+        include_package: includePackage,
+        notify_officer: true,
+      },
+    });
+    state.headAssignmentPnmId = pnmId;
+    state.selectedPnmId = pnmId;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    showToast(payload.message || "Officer added to assignment team.");
+  } catch (error) {
+    showToast(error.message || "Unable to add assignment team member.");
+  } finally {
+    if (headAddAssigneeBtn) {
+      headAddAssigneeBtn.disabled = false;
+      headAddAssigneeBtn.textContent = "Add To Assignment Team";
+    }
+  }
+}
+
+async function handleHeadAssigneeListClick(event) {
+  const button = event.target.closest("button.head-remove-assignee");
+  if (!button) {
+    return;
+  }
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const pnmId = Number(headAssignPnmSelect && headAssignPnmSelect.value ? headAssignPnmSelect.value : 0);
+  const officerId = Number(button.dataset.userId || 0);
+  if (!pnmId || !officerId) {
+    return;
+  }
+  const selected = state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId) || null;
+  const includePackage = Boolean(selected && selected.package_group_id);
+  const officerName = button.closest(".entry")?.querySelector("strong")?.textContent?.trim() || "this officer";
+  const confirmed = window.confirm(`Remove ${officerName} from this assignment team?`);
+  if (!confirmed) {
+    return;
+  }
+
+  button.disabled = true;
+  try {
+    const payload = await api(`/api/pnms/${pnmId}/assignees/${officerId}${includePackage ? "?include_package=1" : ""}`, {
+      method: "DELETE",
+    });
+    state.headAssignmentPnmId = pnmId;
+    state.selectedPnmId = pnmId;
+    await refreshAll();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    showToast(payload.message || "Officer removed from assignment team.");
+  } catch (error) {
+    showToast(error.message || "Unable to remove assignment team member.");
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleAssignedContactsDownload() {
+  if (!roleCanViewAssignedRushes()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  if (assignedRushDownloadBtn) {
+    assignedRushDownloadBtn.disabled = true;
+    assignedRushDownloadBtn.textContent = "Preparing...";
+  }
+  try {
+    await downloadFile(
+      "/api/export/contacts-assigned.vcf",
+      `assigned-rushees-${new Date().toISOString().slice(0, 10)}.vcf`
+    );
+    showToast("Assigned contacts downloaded.");
+  } catch (error) {
+    showToast(error.message || "Unable to download assigned contacts.");
+  } finally {
+    if (assignedRushDownloadBtn) {
+      assignedRushDownloadBtn.disabled = false;
+      assignedRushDownloadBtn.textContent = "Download Assigned Contacts (.vcf)";
+    }
+  }
+}
+
+async function handleAssignedRushTableClick(event) {
+  const button = event.target.closest("button.assigned-contact-btn");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.pnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  const code = safeFileToken(button.dataset.pnmCode || `pnm-${pnmId}`) || `pnm-${pnmId}`;
+  button.disabled = true;
+  try {
+    await downloadFile(`/api/export/contacts/${pnmId}.vcf`, `pnm-contact-${code}.vcf`);
+    showToast("Contact downloaded.");
+  } catch (error) {
+    showToast(error.message || "Unable to download contact.");
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -5273,6 +5599,12 @@ function attachEvents() {
   if (headAssignClearBtn) {
     headAssignClearBtn.addEventListener("click", handleHeadAssignmentClear);
   }
+  if (headAddAssigneeBtn) {
+    headAddAssigneeBtn.addEventListener("click", handleHeadAddAssignee);
+  }
+  if (headAssigneeList) {
+    headAssigneeList.addEventListener("click", handleHeadAssigneeListClick);
+  }
   if (headPackagePartnerSelect) {
     headPackagePartnerSelect.addEventListener("change", () => {
       state.headPackagePartnerId = Number(headPackagePartnerSelect.value || 0) || null;
@@ -5294,6 +5626,12 @@ function attachEvents() {
   }
   if (packageUnlinkBtn) {
     packageUnlinkBtn.addEventListener("click", handlePackageDealUnlink);
+  }
+  if (assignedRushDownloadBtn) {
+    assignedRushDownloadBtn.addEventListener("click", handleAssignedContactsDownload);
+  }
+  if (assignedRushTable) {
+    assignedRushTable.addEventListener("click", handleAssignedRushTableClick);
   }
 
   ratingPnm.addEventListener("change", async (event) => {
@@ -5347,6 +5685,23 @@ function attachEvents() {
       }
       event.preventDefault();
       startTutorialMode(button.dataset.tutorialMode || TUTORIAL_MODE_GUIDED);
+    });
+  }
+  if (meetingView) {
+    meetingView.addEventListener("click", async (event) => {
+      const button = event.target.closest(".linked-meeting-open-btn");
+      if (!button) {
+        return;
+      }
+      const linkedId = Number(button.dataset.pnmId || 0);
+      if (!linkedId) {
+        return;
+      }
+      state.selectedPnmId = linkedId;
+      state.headAssignmentPnmId = linkedId;
+      renderPnmTable();
+      applyRatingFormForSelected();
+      await loadPnmDetail(linkedId);
     });
   }
   if (tutorialModeSkipBtn) {

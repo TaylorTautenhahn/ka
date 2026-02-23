@@ -2334,6 +2334,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             """
         ).fetchall()]
         pnm_rows = [dict(row) for row in conn.execute("SELECT * FROM pnms ORDER BY id ASC").fetchall()]
+        pnm_assignment_rows = [dict(row) for row in conn.execute("SELECT * FROM pnm_officer_assignments ORDER BY id ASC").fetchall()]
         rating_rows = [dict(row) for row in conn.execute("SELECT * FROM ratings ORDER BY id ASC").fetchall()]
         rating_change_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_changes ORDER BY id ASC").fetchall()]
         rating_history_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_history ORDER BY id ASC").fetchall()]
@@ -2415,6 +2416,16 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "created_at",
             "updated_at",
         ], pnm_rows))
+        zf.writestr("pnm_officer_assignments.csv", csv_bytes_from_rows(list(pnm_assignment_rows[0].keys()) if pnm_assignment_rows else [
+            "id",
+            "pnm_id",
+            "officer_user_id",
+            "assigned_by",
+            "assigned_at",
+            "is_primary",
+            "created_at",
+            "updated_at",
+        ], pnm_assignment_rows))
         zf.writestr("ratings.csv", csv_bytes_from_rows(list(rating_rows[0].keys()) if rating_rows else [
             "id",
             "pnm_id",
@@ -2758,6 +2769,265 @@ def assignment_target_rows_for_pnm(
     if not row:
         return []
     return [row]
+
+
+def fetch_assignment_links_for_pnms(
+    conn: sqlite3.Connection,
+    *,
+    pnm_ids: list[int],
+) -> dict[int, list[dict[str, Any]]]:
+    normalized_ids: list[int] = []
+    seen: set[int] = set()
+    for raw_id in pnm_ids:
+        pnm_id = int(raw_id)
+        if pnm_id <= 0 or pnm_id in seen:
+            continue
+        seen.add(pnm_id)
+        normalized_ids.append(pnm_id)
+    if not normalized_ids:
+        return {}
+
+    rows = conn.execute(
+        """
+        SELECT
+            pa.pnm_id,
+            pa.officer_user_id,
+            pa.assigned_by,
+            pa.assigned_at,
+            pa.is_primary,
+            u.username,
+            u.role,
+            u.emoji
+        FROM pnm_officer_assignments pa
+        JOIN users u ON u.id = pa.officer_user_id
+        WHERE pa.pnm_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+        ORDER BY
+            pa.pnm_id ASC,
+            pa.is_primary DESC,
+            COALESCE(pa.assigned_at, pa.created_at, pa.updated_at) ASC,
+            lower(u.username) ASC
+        """,
+        (json.dumps(normalized_ids),),
+    ).fetchall()
+
+    links_by_pnm: dict[int, list[dict[str, Any]]] = {}
+    for row in rows:
+        pnm_id = int(row["pnm_id"])
+        links_by_pnm.setdefault(pnm_id, []).append(
+            {
+                "user_id": int(row["officer_user_id"]),
+                "username": row["username"],
+                "role": row["role"],
+                "emoji": row["emoji"],
+                "is_primary": bool(row["is_primary"]),
+                "assigned_by": int(row["assigned_by"]) if row["assigned_by"] is not None else None,
+                "assigned_at": row["assigned_at"],
+            }
+        )
+    return links_by_pnm
+
+
+def merge_assigned_officers_for_pnm_row(
+    row: sqlite3.Row,
+    linked_officers: list[dict[str, Any]] | None,
+) -> list[dict[str, Any]]:
+    officers: list[dict[str, Any]] = []
+    seen: set[int] = set()
+    primary_id = int(row["assigned_officer_id"]) if "assigned_officer_id" in row.keys() and row["assigned_officer_id"] is not None else None
+
+    for raw in linked_officers or []:
+        if not isinstance(raw, dict):
+            continue
+        user_id = int(raw.get("user_id") or 0)
+        if user_id <= 0 or user_id in seen:
+            continue
+        seen.add(user_id)
+        officers.append(
+            {
+                "user_id": user_id,
+                "username": raw.get("username"),
+                "role": raw.get("role") or ROLE_RUSH_OFFICER,
+                "emoji": raw.get("emoji"),
+                "is_primary": bool(raw.get("is_primary")) or (primary_id is not None and user_id == primary_id),
+                "assigned_by": int(raw["assigned_by"]) if raw.get("assigned_by") is not None else None,
+                "assigned_at": raw.get("assigned_at"),
+            }
+        )
+
+    fallback_primary = assigned_officer_payload_from_row(row)
+    if fallback_primary:
+        fallback_user_id = int(fallback_primary["user_id"])
+        if fallback_user_id not in seen:
+            officers.insert(
+                0,
+                {
+                    "user_id": fallback_user_id,
+                    "username": fallback_primary.get("username"),
+                    "role": fallback_primary.get("role") or ROLE_RUSH_OFFICER,
+                    "emoji": fallback_primary.get("emoji"),
+                    "is_primary": True,
+                    "assigned_by": int(row["assigned_by"]) if "assigned_by" in row.keys() and row["assigned_by"] is not None else None,
+                    "assigned_at": row["assigned_at"] if "assigned_at" in row.keys() else None,
+                },
+            )
+            seen.add(fallback_user_id)
+
+    if primary_id is not None:
+        for officer in officers:
+            officer["is_primary"] = int(officer["user_id"]) == primary_id
+        if officers and not any(bool(item.get("is_primary")) for item in officers):
+            officers[0]["is_primary"] = True
+    else:
+        primary_marked = False
+        for officer in officers:
+            if bool(officer.get("is_primary")) and not primary_marked:
+                officer["is_primary"] = True
+                primary_marked = True
+            else:
+                officer["is_primary"] = False
+
+    officers.sort(
+        key=lambda item: (
+            0 if item.get("is_primary") else 1,
+            str(item.get("username") or "").lower(),
+            int(item.get("user_id") or 0),
+        )
+    )
+    return officers
+
+
+def sync_primary_assignment_links_for_pnm(
+    conn: sqlite3.Connection,
+    *,
+    pnm_id: int,
+    primary_officer_user_id: int | None,
+    assigned_by: int | None,
+    assigned_at: str | None,
+    updated_at: str | None = None,
+    clear_all_if_unassigned: bool = True,
+) -> None:
+    stamp = updated_at or now_iso()
+    if primary_officer_user_id is None:
+        if clear_all_if_unassigned:
+            conn.execute("DELETE FROM pnm_officer_assignments WHERE pnm_id = ?", (pnm_id,))
+            return
+        conn.execute(
+            """
+            UPDATE pnm_officer_assignments
+            SET is_primary = 0, updated_at = ?
+            WHERE pnm_id = ?
+            """,
+            (stamp, pnm_id),
+        )
+        return
+
+    assigned_stamp = assigned_at or stamp
+    conn.execute(
+        """
+        INSERT INTO pnm_officer_assignments (
+            pnm_id,
+            officer_user_id,
+            assigned_by,
+            assigned_at,
+            is_primary,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, 1, ?, ?)
+        ON CONFLICT(pnm_id, officer_user_id) DO UPDATE SET
+            assigned_by = COALESCE(excluded.assigned_by, pnm_officer_assignments.assigned_by),
+            assigned_at = COALESCE(pnm_officer_assignments.assigned_at, excluded.assigned_at),
+            is_primary = 1,
+            updated_at = excluded.updated_at
+        """,
+        (
+            int(pnm_id),
+            int(primary_officer_user_id),
+            int(assigned_by) if assigned_by is not None else None,
+            assigned_stamp,
+            assigned_stamp,
+            stamp,
+        ),
+    )
+    conn.execute(
+        """
+        UPDATE pnm_officer_assignments
+        SET
+            is_primary = CASE WHEN officer_user_id = ? THEN 1 ELSE 0 END,
+            updated_at = ?
+        WHERE pnm_id = ?
+        """,
+        (int(primary_officer_user_id), stamp, int(pnm_id)),
+    )
+
+
+def add_officer_assignment_link(
+    conn: sqlite3.Connection,
+    *,
+    pnm_id: int,
+    officer_user_id: int,
+    assigned_by: int | None,
+    assigned_at: str | None = None,
+) -> None:
+    stamp = now_iso()
+    assigned_stamp = assigned_at or stamp
+    conn.execute(
+        """
+        INSERT INTO pnm_officer_assignments (
+            pnm_id,
+            officer_user_id,
+            assigned_by,
+            assigned_at,
+            is_primary,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, 0, ?, ?)
+        ON CONFLICT(pnm_id, officer_user_id) DO UPDATE SET
+            assigned_by = COALESCE(excluded.assigned_by, pnm_officer_assignments.assigned_by),
+            assigned_at = COALESCE(pnm_officer_assignments.assigned_at, excluded.assigned_at),
+            updated_at = excluded.updated_at
+        """,
+        (
+            int(pnm_id),
+            int(officer_user_id),
+            int(assigned_by) if assigned_by is not None else None,
+            assigned_stamp,
+            assigned_stamp,
+            stamp,
+        ),
+    )
+
+
+def resolve_assignable_officer_or_400(conn: sqlite3.Connection, officer_user_id: int) -> sqlite3.Row:
+    officer = conn.execute(
+        "SELECT id, username, role, emoji, is_approved FROM users WHERE id = ?",
+        (int(officer_user_id),),
+    ).fetchone()
+    if not officer:
+        raise HTTPException(status_code=404, detail="Rush Officer not found.")
+    if not bool(officer["is_approved"]):
+        raise HTTPException(status_code=400, detail="Assignment target must be approved first.")
+    if officer["role"] != ROLE_RUSH_OFFICER:
+        raise HTTPException(status_code=400, detail="Assignment target must be a Rush Officer.")
+    return officer
+
+
+def pnm_payload_with_assignment_links(
+    conn: sqlite3.Connection,
+    row: sqlite3.Row,
+    own_rating: dict[str, Any] | None,
+    links_by_pnm: dict[int, list[dict[str, Any]]] | None = None,
+) -> dict[str, Any]:
+    pnm_id = int(row["id"])
+    if links_by_pnm is None:
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+    return pnm_payload(
+        row,
+        own_rating,
+        assigned_officer=assigned_officer_payload_from_row(row),
+        assigned_officers=links_by_pnm.get(pnm_id, []),
+    )
 
 
 def default_engagement_status_for_date(event_date_raw: str, *, is_cancelled: bool = False) -> str:
@@ -3411,6 +3681,18 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             updated_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS pnm_officer_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            officer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            assigned_at TEXT NOT NULL,
+            is_primary INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (pnm_id, officer_user_id)
+        );
+
         CREATE TABLE IF NOT EXISTS ratings (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
@@ -3609,6 +3891,9 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
         CREATE INDEX IF NOT EXISTS idx_pnms_interests ON pnms(interests_norm);
+        CREATE INDEX IF NOT EXISTS idx_pnm_officer_assignments_pnm ON pnm_officer_assignments(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_pnm_officer_assignments_officer ON pnm_officer_assignments(officer_user_id);
+        CREATE INDEX IF NOT EXISTS idx_pnm_officer_assignments_primary ON pnm_officer_assignments(pnm_id, is_primary);
         CREATE INDEX IF NOT EXISTS idx_ratings_pnm ON ratings(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
@@ -3791,6 +4076,70 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         SET funnel_stage_updated_at = COALESCE(funnel_stage_updated_at, updated_at, created_at)
         WHERE funnel_stage_updated_at IS NULL OR trim(funnel_stage_updated_at) = ''
         """
+    )
+
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS pnm_officer_assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            officer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            assigned_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            assigned_at TEXT NOT NULL,
+            is_primary INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE (pnm_id, officer_user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_pnm_officer_assignments_pnm ON pnm_officer_assignments(pnm_id);
+        CREATE INDEX IF NOT EXISTS idx_pnm_officer_assignments_officer ON pnm_officer_assignments(officer_user_id);
+        CREATE INDEX IF NOT EXISTS idx_pnm_officer_assignments_primary ON pnm_officer_assignments(pnm_id, is_primary);
+        """
+    )
+    link_sync_stamp = now_iso()
+    conn.execute(
+        """
+        INSERT INTO pnm_officer_assignments (
+            pnm_id,
+            officer_user_id,
+            assigned_by,
+            assigned_at,
+            is_primary,
+            created_at,
+            updated_at
+        )
+        SELECT
+            p.id,
+            p.assigned_officer_id,
+            p.assigned_by,
+            COALESCE(p.assigned_at, p.assignment_updated_at, p.updated_at, p.created_at, ?),
+            1,
+            COALESCE(p.assigned_at, p.assignment_updated_at, p.updated_at, p.created_at, ?),
+            ?
+        FROM pnms p
+        JOIN users u ON u.id = p.assigned_officer_id
+        WHERE p.assigned_officer_id IS NOT NULL
+          AND u.role = 'Rush Officer'
+          AND u.is_approved = 1
+        ON CONFLICT(pnm_id, officer_user_id) DO UPDATE SET
+            assigned_by = COALESCE(excluded.assigned_by, pnm_officer_assignments.assigned_by),
+            assigned_at = COALESCE(pnm_officer_assignments.assigned_at, excluded.assigned_at),
+            is_primary = 1,
+            updated_at = excluded.updated_at
+        """,
+        (link_sync_stamp, link_sync_stamp, link_sync_stamp),
+    )
+    conn.execute(
+        """
+        UPDATE pnm_officer_assignments
+        SET
+            is_primary = CASE
+                WHEN officer_user_id = COALESCE((SELECT assigned_officer_id FROM pnms WHERE id = pnm_id), -1) THEN 1
+                ELSE 0
+            END,
+            updated_at = ?
+        """,
+        (link_sync_stamp,),
     )
 
     lunch_columns = {row["name"] for row in conn.execute("PRAGMA table_info(lunches)").fetchall()}
@@ -5760,6 +6109,7 @@ def pnm_payload(
     row: sqlite3.Row,
     own_rating: dict[str, Any] | None,
     assigned_officer: dict[str, Any] | None = None,
+    assigned_officers: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
     keys = set(row.keys())
@@ -5777,6 +6127,7 @@ def pnm_payload(
     if funnel_stage not in PNM_FUNNEL_STAGES:
         funnel_stage = "sourced"
     package_group_id = normalize_package_group_id(row["package_group_id"]) if "package_group_id" in keys else ""
+    assignment_team = merge_assigned_officers_for_pnm_row(row, assigned_officers)
     return {
         "pnm_id": row["id"],
         "pnm_code": row["pnm_code"],
@@ -5813,6 +6164,7 @@ def pnm_payload(
         "assignment_notes": row["assignment_notes"] if "assignment_notes" in keys and row["assignment_notes"] is not None else "",
         "assignment_updated_at": row["assignment_updated_at"] if "assignment_updated_at" in keys else None,
         "assigned_officer": assigned_officer,
+        "assigned_officers": assignment_team,
         "package_group_id": package_group_id or None,
         "package_group_label": package_group_label(package_group_id),
         "funnel_stage": funnel_stage,
@@ -6268,6 +6620,12 @@ class OfficerChatMessageCreateRequest(BaseModel):
 
 class AssignOfficerRequest(BaseModel):
     officer_user_id: int | None = None
+
+
+class PnmAssigneeCreateRequest(BaseModel):
+    officer_user_id: int = Field(..., ge=1)
+    include_package: bool = False
+    notify_officer: bool = True
 
 
 class PnmAssignmentUpdateRequest(BaseModel):
@@ -7348,6 +7706,7 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
     with db_session(tenant.db_path) as conn:
         users_count = int(conn.execute("SELECT COUNT(*) AS count FROM users").fetchone()["count"])
         pnms_count = int(conn.execute("SELECT COUNT(*) AS count FROM pnms").fetchone()["count"])
+        pnm_assignment_count = int(conn.execute("SELECT COUNT(*) AS count FROM pnm_officer_assignments").fetchone()["count"])
         ratings_count = int(conn.execute("SELECT COUNT(*) AS count FROM ratings").fetchone()["count"])
         lunches_count = int(conn.execute("SELECT COUNT(*) AS count FROM lunches").fetchone()["count"])
         rush_events_count = int(conn.execute("SELECT COUNT(*) AS count FROM rush_events").fetchone()["count"])
@@ -7383,6 +7742,7 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
         "table_counts": {
             "users": users_count,
             "pnms": pnms_count,
+            "pnm_officer_assignments": pnm_assignment_count,
             "ratings": ratings_count,
             "lunches": lunches_count,
             "rush_events": rush_events_count,
@@ -7895,6 +8255,81 @@ def export_contacts_vcf(user: sqlite3.Row = Depends(current_user)) -> Response:
     cards = [build_pnm_vcard(row, tenant.display_name) for row in rows]
     payload = ("\r\n".join(cards) + ("\r\n" if cards else "")).encode("utf-8")
     filename = f"pnm-contacts-{tenant.slug}-{timestamp_slug()}.vcf"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "X-Content-Type-Options": "nosniff",
+    }
+    return Response(content=payload, media_type="text/x-vcard; charset=utf-8", headers=headers)
+
+
+@app.get("/api/export/contacts-assigned.vcf")
+def export_assigned_contacts_vcf(user: sqlite3.Row = Depends(require_officer)) -> Response:
+    tenant = CURRENT_TENANT.get()
+    if tenant is None:
+        default_row = require_tenant_exists(DEFAULT_TENANT_SLUG)
+        tenant = tenant_context_from_row(default_row)
+
+    with db_session() as conn:
+        if user["role"] == ROLE_HEAD:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT
+                    p.id,
+                    p.first_name,
+                    p.last_name,
+                    p.pnm_code,
+                    p.phone_number,
+                    p.instagram_handle,
+                    p.photo_path
+                FROM pnms p
+                WHERE
+                    p.assigned_officer_id IS NOT NULL
+                    OR EXISTS (SELECT 1 FROM pnm_officer_assignments pa WHERE pa.pnm_id = p.id)
+                ORDER BY p.last_name ASC, p.first_name ASC
+                """
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT DISTINCT
+                    p.id,
+                    p.first_name,
+                    p.last_name,
+                    p.pnm_code,
+                    p.phone_number,
+                    p.instagram_handle,
+                    p.photo_path
+                FROM pnms p
+                WHERE
+                    EXISTS (
+                        SELECT 1
+                        FROM pnm_officer_assignments pa
+                        WHERE pa.pnm_id = p.id
+                          AND pa.officer_user_id = ?
+                    )
+                    OR (
+                        p.assigned_officer_id = ?
+                        AND NOT EXISTS (SELECT 1 FROM pnm_officer_assignments pa2 WHERE pa2.pnm_id = p.id)
+                    )
+                ORDER BY p.last_name ASC, p.first_name ASC
+                """,
+                (int(user["id"]), int(user["id"])),
+            ).fetchall()
+
+        if not rows:
+            raise HTTPException(status_code=404, detail="No assigned rushee contacts available yet.")
+
+        upsert_contact_download_records(
+            conn,
+            user_id=int(user["id"]),
+            pnm_ids=[int(row["id"]) for row in rows],
+            downloaded_at=now_iso(),
+        )
+
+    cards = [build_pnm_vcard(row, tenant.display_name) for row in rows]
+    payload = ("\r\n".join(cards) + ("\r\n" if cards else "")).encode("utf-8")
+    suffix = "assigned"
+    filename = f"pnm-contacts-{suffix}-{tenant.slug}-{timestamp_slug()}.vcf"
     headers = {
         "Content-Disposition": f'attachment; filename="{filename}"',
         "X-Content-Type-Options": "nosniff",
@@ -8556,8 +8991,9 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
 
         evaluate_weekly_goal_completions(conn)
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
-    return {"pnm": pnm_payload(row, own_rating=None, assigned_officer=None)}
+    return {"pnm": pnm_payload_with_assignment_links(conn, row, own_rating=None, links_by_pnm=links_by_pnm)}
 
 
 @app.get("/api/pnms")
@@ -8593,20 +9029,24 @@ def list_pnms(
             ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
             """
         ).fetchall()
-
-    filtered = []
-    for row in rows:
-        if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
-            continue
-        if not has_interest_match(row["interests_norm"], interest_filter):
-            continue
-        filtered.append(
-            pnm_payload(
-                row,
-                own_rating_by_pnm.get(row["id"]),
-                assigned_officer=assigned_officer_payload_from_row(row),
-            )
+        links_by_pnm = fetch_assignment_links_for_pnms(
+            conn,
+            pnm_ids=[int(row["id"]) for row in rows],
         )
+        filtered = []
+        for row in rows:
+            if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
+                continue
+            if not has_interest_match(row["interests_norm"], interest_filter):
+                continue
+            filtered.append(
+                pnm_payload(
+                    row,
+                    own_rating_by_pnm.get(row["id"]),
+                    assigned_officer=assigned_officer_payload_from_row(row),
+                    assigned_officers=links_by_pnm.get(int(row["id"]), []),
+                )
+            )
 
     return {"pnms": filtered}
 
@@ -8631,7 +9071,8 @@ def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str,
         if not row:
             raise HTTPException(status_code=404, detail="PNM not found.")
         own = fetch_own_rating(conn, pnm_id, user["id"])
-    return {"pnm": pnm_payload(row, own, assigned_officer=assigned_officer_payload_from_row(row))}
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+    return {"pnm": pnm_payload_with_assignment_links(conn, row, own, links_by_pnm)}
 
 
 @app.patch("/api/pnms/{pnm_id}")
@@ -8777,10 +9218,11 @@ def update_pnm_details(
             (pnm_id,),
         ).fetchone()
         own = fetch_own_rating(conn, pnm_id, head_user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     return {
         "message": "PNM details updated.",
-        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
     }
 
 
@@ -8797,14 +9239,7 @@ def assign_pnm_officer(
 
         assigned_user_id: int | None = payload.officer_user_id
         if assigned_user_id is not None:
-            officer = conn.execute(
-                "SELECT id, username, role, emoji FROM users WHERE id = ? AND is_approved = 1",
-                (assigned_user_id,),
-            ).fetchone()
-            if not officer:
-                raise HTTPException(status_code=404, detail="Rush Officer not found.")
-            if officer["role"] != ROLE_RUSH_OFFICER:
-                raise HTTPException(status_code=400, detail="Assignment target must be a Rush Officer.")
+            officer = resolve_assignable_officer_or_400(conn, assigned_user_id)
         else:
             officer = None
 
@@ -8832,6 +9267,8 @@ def assign_pnm_officer(
             previous_status = str(target_row["assignment_status"] or "").strip().lower()
             if previous_status not in ASSIGNMENT_STATUSES:
                 previous_status = "assigned" if previous_assigned else "unassigned"
+            assigned_by_value = head_user["id"] if assigned_user_id is not None else None
+            assigned_at_value = now if assigned_user_id is not None else None
 
             if assigned_user_id is None:
                 current_status = "unassigned"
@@ -8856,13 +9293,22 @@ def assign_pnm_officer(
                 """,
                 (
                     assigned_user_id,
-                    head_user["id"] if assigned_user_id is not None else None,
-                    now if assigned_user_id is not None else None,
+                    assigned_by_value,
+                    assigned_at_value,
                     current_status,
                     now,
                     now,
                     target_pnm_id,
                 ),
+            )
+            sync_primary_assignment_links_for_pnm(
+                conn,
+                pnm_id=target_pnm_id,
+                primary_officer_user_id=assigned_user_id,
+                assigned_by=assigned_by_value,
+                assigned_at=assigned_at_value,
+                updated_at=now,
+                clear_all_if_unassigned=True,
             )
             if assigned_user_id != previous_assigned:
                 changed_assignment_count += 1
@@ -8918,6 +9364,7 @@ def assign_pnm_officer(
             (pnm_id,),
         ).fetchone()
         own = fetch_own_rating(conn, pnm_id, head_user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     affected_count = len(affected_pnm_ids)
     return {
@@ -8928,7 +9375,369 @@ def assign_pnm_officer(
         ),
         "affected_pnm_ids": affected_pnm_ids,
         "package_group_id": package_group_id or None,
-        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
+    }
+
+
+@app.post("/api/pnms/{pnm_id}/assignees")
+def add_pnm_assignee(
+    pnm_id: int,
+    payload: PnmAssigneeCreateRequest,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        ensure_package_link_schema(conn)
+        officer = resolve_assignable_officer_or_400(conn, payload.officer_user_id)
+        pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not pnm_row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
+        target_rows = assignment_target_rows_for_pnm(
+            conn,
+            pnm_id=pnm_id,
+            package_group_id=package_group_id if payload.include_package else None,
+        )
+        if not target_rows:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        now = now_iso()
+        affected_pnm_ids: list[int] = []
+        added_links = 0
+        promoted_to_primary = 0
+
+        for target_row in target_rows:
+            target_pnm_id = int(target_row["id"])
+            target_primary_id = int(target_row["assigned_officer_id"]) if target_row["assigned_officer_id"] is not None else None
+            existing_link = conn.execute(
+                """
+                SELECT id
+                FROM pnm_officer_assignments
+                WHERE pnm_id = ? AND officer_user_id = ?
+                """,
+                (target_pnm_id, int(officer["id"])),
+            ).fetchone()
+            if existing_link is None:
+                added_links += 1
+
+            if target_primary_id is None:
+                conn.execute(
+                    """
+                    UPDATE pnms
+                    SET
+                        assigned_officer_id = ?,
+                        assigned_by = ?,
+                        assigned_at = ?,
+                        assignment_status = 'assigned',
+                        assignment_updated_at = ?,
+                        updated_at = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        int(officer["id"]),
+                        int(head_user["id"]),
+                        now,
+                        now,
+                        now,
+                        target_pnm_id,
+                    ),
+                )
+                sync_primary_assignment_links_for_pnm(
+                    conn,
+                    pnm_id=target_pnm_id,
+                    primary_officer_user_id=int(officer["id"]),
+                    assigned_by=int(head_user["id"]),
+                    assigned_at=now,
+                    updated_at=now,
+                    clear_all_if_unassigned=False,
+                )
+                promoted_to_primary += 1
+            elif target_primary_id == int(officer["id"]):
+                sync_primary_assignment_links_for_pnm(
+                    conn,
+                    pnm_id=target_pnm_id,
+                    primary_officer_user_id=int(officer["id"]),
+                    assigned_by=int(target_row["assigned_by"]) if target_row["assigned_by"] is not None else int(head_user["id"]),
+                    assigned_at=target_row["assigned_at"] or now,
+                    updated_at=now,
+                    clear_all_if_unassigned=False,
+                )
+            else:
+                add_officer_assignment_link(
+                    conn,
+                    pnm_id=target_pnm_id,
+                    officer_user_id=int(officer["id"]),
+                    assigned_by=int(head_user["id"]),
+                    assigned_at=now,
+                )
+                sync_primary_assignment_links_for_pnm(
+                    conn,
+                    pnm_id=target_pnm_id,
+                    primary_officer_user_id=target_primary_id,
+                    assigned_by=int(target_row["assigned_by"]) if target_row["assigned_by"] is not None else int(head_user["id"]),
+                    assigned_at=target_row["assigned_at"] or now,
+                    updated_at=now,
+                    clear_all_if_unassigned=False,
+                )
+
+            affected_pnm_ids.append(target_pnm_id)
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="assignment_add_assignee",
+            entity_type="pnm",
+            entity_id=pnm_id,
+            payload={
+                "officer_user_id": int(officer["id"]),
+                "include_package": bool(payload.include_package),
+                "package_group_id": package_group_id or None,
+                "affected_pnm_ids": affected_pnm_ids,
+                "added_links": added_links,
+                "promoted_to_primary": promoted_to_primary,
+            },
+        )
+        if payload.notify_officer and added_links > 0:
+            create_notification(
+                conn,
+                user_id=int(officer["id"]),
+                notif_type="assignment",
+                title=f"Added to assignment: {pnm_row['first_name']} {pnm_row['last_name']}",
+                body=f"Added by {head_user['username']}",
+                link_path=f"/?pnm={pnm_id}",
+            )
+
+        refreshed = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, head_user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+
+    if added_links <= 0:
+        message = f"{officer['username']} is already on this assignment team."
+    else:
+        message = (
+            f"Added {officer['username']} to {added_links} rushee assignment team(s)."
+            + (" Package-linked rushees were updated." if payload.include_package and len(affected_pnm_ids) > 1 else "")
+        )
+
+    return {
+        "message": message,
+        "affected_pnm_ids": affected_pnm_ids,
+        "package_group_id": package_group_id or None,
+        "added_links": added_links,
+        "promoted_to_primary": promoted_to_primary,
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
+    }
+
+
+@app.delete("/api/pnms/{pnm_id}/assignees/{officer_user_id}")
+def remove_pnm_assignee(
+    pnm_id: int,
+    officer_user_id: int,
+    include_package: bool = False,
+    head_user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    target_officer_id = int(officer_user_id)
+    if target_officer_id <= 0:
+        raise HTTPException(status_code=400, detail="Invalid officer id.")
+
+    with db_session() as conn:
+        ensure_package_link_schema(conn)
+        pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        if not pnm_row:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
+        target_rows = assignment_target_rows_for_pnm(
+            conn,
+            pnm_id=pnm_id,
+            package_group_id=package_group_id if include_package else None,
+        )
+        if not target_rows:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        now = now_iso()
+        affected_pnm_ids: list[int] = []
+        removed_links = 0
+        promoted_count = 0
+        cleared_count = 0
+
+        for target_row in target_rows:
+            target_pnm_id = int(target_row["id"])
+            primary_id = int(target_row["assigned_officer_id"]) if target_row["assigned_officer_id"] is not None else None
+            link_exists = conn.execute(
+                """
+                SELECT id
+                FROM pnm_officer_assignments
+                WHERE pnm_id = ? AND officer_user_id = ?
+                """,
+                (target_pnm_id, target_officer_id),
+            ).fetchone()
+            is_primary = primary_id == target_officer_id
+            if not link_exists and not is_primary:
+                continue
+
+            conn.execute(
+                "DELETE FROM pnm_officer_assignments WHERE pnm_id = ? AND officer_user_id = ?",
+                (target_pnm_id, target_officer_id),
+            )
+
+            if is_primary:
+                fallback = conn.execute(
+                    """
+                    SELECT pa.officer_user_id, pa.assigned_by, pa.assigned_at
+                    FROM pnm_officer_assignments pa
+                    JOIN users u ON u.id = pa.officer_user_id
+                    WHERE pa.pnm_id = ?
+                      AND u.is_approved = 1
+                      AND u.role = ?
+                    ORDER BY
+                        pa.is_primary DESC,
+                        COALESCE(pa.assigned_at, pa.created_at, pa.updated_at) ASC,
+                        pa.id ASC
+                    LIMIT 1
+                    """,
+                    (target_pnm_id, ROLE_RUSH_OFFICER),
+                ).fetchone()
+                if fallback:
+                    fallback_user_id = int(fallback["officer_user_id"])
+                    fallback_assigned_by = (
+                        int(fallback["assigned_by"]) if fallback["assigned_by"] is not None else int(head_user["id"])
+                    )
+                    fallback_assigned_at = fallback["assigned_at"] or now
+                    next_status = str(target_row["assignment_status"] or "").strip().lower()
+                    if next_status not in ASSIGNMENT_STATUSES or next_status == "unassigned":
+                        next_status = "assigned"
+                    conn.execute(
+                        """
+                        UPDATE pnms
+                        SET
+                            assigned_officer_id = ?,
+                            assigned_by = ?,
+                            assigned_at = ?,
+                            assignment_status = ?,
+                            assignment_updated_at = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (
+                            fallback_user_id,
+                            fallback_assigned_by,
+                            fallback_assigned_at,
+                            next_status,
+                            now,
+                            now,
+                            target_pnm_id,
+                        ),
+                    )
+                    sync_primary_assignment_links_for_pnm(
+                        conn,
+                        pnm_id=target_pnm_id,
+                        primary_officer_user_id=fallback_user_id,
+                        assigned_by=fallback_assigned_by,
+                        assigned_at=fallback_assigned_at,
+                        updated_at=now,
+                        clear_all_if_unassigned=False,
+                    )
+                    promoted_count += 1
+                else:
+                    conn.execute(
+                        """
+                        UPDATE pnms
+                        SET
+                            assigned_officer_id = NULL,
+                            assigned_by = NULL,
+                            assigned_at = NULL,
+                            assignment_status = 'unassigned',
+                            assignment_due_date = NULL,
+                            assignment_updated_at = ?,
+                            updated_at = ?
+                        WHERE id = ?
+                        """,
+                        (now, now, target_pnm_id),
+                    )
+                    sync_primary_assignment_links_for_pnm(
+                        conn,
+                        pnm_id=target_pnm_id,
+                        primary_officer_user_id=None,
+                        assigned_by=None,
+                        assigned_at=None,
+                        updated_at=now,
+                        clear_all_if_unassigned=True,
+                    )
+                    cleared_count += 1
+            else:
+                if primary_id is not None:
+                    sync_primary_assignment_links_for_pnm(
+                        conn,
+                        pnm_id=target_pnm_id,
+                        primary_officer_user_id=primary_id,
+                        assigned_by=int(target_row["assigned_by"]) if target_row["assigned_by"] is not None else int(head_user["id"]),
+                        assigned_at=target_row["assigned_at"] or now,
+                        updated_at=now,
+                        clear_all_if_unassigned=False,
+                    )
+
+            removed_links += 1
+            affected_pnm_ids.append(target_pnm_id)
+
+        if removed_links <= 0:
+            raise HTTPException(status_code=404, detail="Officer is not assigned to this rushee.")
+
+        append_audit_entry(
+            conn,
+            actor_user_id=int(head_user["id"]),
+            action_type="assignment_remove_assignee",
+            entity_type="pnm",
+            entity_id=pnm_id,
+            payload={
+                "officer_user_id": target_officer_id,
+                "include_package": bool(include_package),
+                "package_group_id": package_group_id or None,
+                "affected_pnm_ids": affected_pnm_ids,
+                "removed_links": removed_links,
+                "promoted_count": promoted_count,
+                "cleared_count": cleared_count,
+            },
+        )
+
+        refreshed = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, head_user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+
+    return {
+        "message": f"Removed officer from {removed_links} assignment team(s).",
+        "affected_pnm_ids": affected_pnm_ids,
+        "package_group_id": package_group_id or None,
+        "removed_links": removed_links,
+        "promoted_count": promoted_count,
+        "cleared_count": cleared_count,
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
     }
 
 
@@ -9012,6 +9821,13 @@ def link_pnms_package_deal(
                 template_status = "assigned" if synced_officer_id is not None else "unassigned"
             if synced_officer_id is None:
                 template_status = "unassigned"
+            template_pnm_id = int(template_row["id"])
+            template_links = fetch_assignment_links_for_pnms(conn, pnm_ids=[template_pnm_id]).get(template_pnm_id, [])
+            template_secondary_officer_ids = [
+                int(item["user_id"])
+                for item in template_links
+                if int(item.get("user_id") or 0) > 0 and int(item["user_id"]) != int(synced_officer_id or 0)
+            ]
             synced_status = template_status
             priority = clamped_assignment_priority(
                 int(template_row["assignment_priority"]) if template_row["assignment_priority"] is not None else None
@@ -9073,6 +9889,24 @@ def link_pnms_package_deal(
                         target_id,
                     ),
                 )
+                sync_primary_assignment_links_for_pnm(
+                    conn,
+                    pnm_id=target_id,
+                    primary_officer_user_id=synced_officer_id,
+                    assigned_by=assigned_by,
+                    assigned_at=assigned_at,
+                    updated_at=now,
+                    clear_all_if_unassigned=True,
+                )
+                if synced_officer_id is not None:
+                    for extra_officer_id in template_secondary_officer_ids:
+                        add_officer_assignment_link(
+                            conn,
+                            pnm_id=target_id,
+                            officer_user_id=extra_officer_id,
+                            assigned_by=int(user["id"]),
+                            assigned_at=now,
+                        )
             assignment_synced = True
 
         append_audit_entry(
@@ -9107,6 +9941,7 @@ def link_pnms_package_deal(
             """,
             tuple(target_pnm_ids),
         ).fetchall()
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=target_pnm_ids)
 
     merged_count = max(0, len(target_pnm_ids) - len(requested_pnm_ids))
     return {
@@ -9126,6 +9961,7 @@ def link_pnms_package_deal(
                 row,
                 own_rating=None,
                 assigned_officer=assigned_officer_payload_from_row(row),
+                assigned_officers=links_by_pnm.get(int(row["id"]), []),
             )
             for row in refreshed_rows
         ],
@@ -9247,7 +10083,15 @@ def assignments_overview(
                     ao.emoji AS assigned_officer_emoji
                 FROM pnms p
                 LEFT JOIN users ao ON ao.id = p.assigned_officer_id
-                WHERE p.assigned_officer_id = ? OR p.assigned_officer_id IS NULL
+                WHERE
+                    p.assigned_officer_id IS NULL
+                    OR p.assigned_officer_id = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM pnm_officer_assignments pa
+                        WHERE pa.pnm_id = p.id
+                          AND pa.officer_user_id = ?
+                    )
                 ORDER BY
                     CASE
                         WHEN p.assignment_status = 'needs_help' THEN 0
@@ -9261,8 +10105,12 @@ def assignments_overview(
                     p.last_name ASC,
                     p.first_name ASC
                 """,
-                (user["id"],),
+                (user["id"], user["id"]),
             ).fetchall()
+        links_by_pnm = fetch_assignment_links_for_pnms(
+            conn,
+            pnm_ids=[int(row["id"]) for row in pnm_rows],
+        )
 
         officer_rows = conn.execute(
             """
@@ -9337,6 +10185,10 @@ def assignments_overview(
                 "assignment_updated_at": row["assignment_updated_at"],
                 "funnel_stage": row["funnel_stage"] if "funnel_stage" in row.keys() else "sourced",
                 "assigned_officer": assigned_officer_payload_from_row(row),
+                "assigned_officers": merge_assigned_officers_for_pnm_row(
+                    row,
+                    links_by_pnm.get(int(row["id"]), []),
+                ),
                 "package_group_id": normalize_package_group_id(row["package_group_id"]) or None,
                 "package_group_label": package_group_label(normalize_package_group_id(row["package_group_id"])),
                 "interests_norm": split_normalized_csv(row["interests_norm"]),
@@ -9445,6 +10297,111 @@ def assignments_overview(
     }
 
 
+@app.get("/api/assignments/mine")
+def assignments_mine(
+    include_completed: bool = True,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        if user["role"] == ROLE_HEAD:
+            rows = conn.execute(
+                """
+                SELECT
+                    p.*,
+                    ao.id AS assigned_officer_id,
+                    ao.username AS assigned_officer_username,
+                    ao.role AS assigned_officer_role,
+                    ao.emoji AS assigned_officer_emoji
+                FROM pnms p
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                WHERE
+                    p.assigned_officer_id IS NOT NULL
+                    OR EXISTS (SELECT 1 FROM pnm_officer_assignments pa WHERE pa.pnm_id = p.id)
+                ORDER BY p.assignment_priority DESC, p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+                """
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT
+                    p.*,
+                    ao.id AS assigned_officer_id,
+                    ao.username AS assigned_officer_username,
+                    ao.role AS assigned_officer_role,
+                    ao.emoji AS assigned_officer_emoji
+                FROM pnms p
+                LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                WHERE
+                    EXISTS (
+                        SELECT 1
+                        FROM pnm_officer_assignments pa
+                        WHERE pa.pnm_id = p.id
+                          AND pa.officer_user_id = ?
+                    )
+                    OR (
+                        p.assigned_officer_id = ?
+                        AND NOT EXISTS (
+                            SELECT 1 FROM pnm_officer_assignments pa2 WHERE pa2.pnm_id = p.id
+                        )
+                    )
+                ORDER BY p.assignment_priority DESC, p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+                """,
+                (int(user["id"]), int(user["id"])),
+            ).fetchall()
+
+        links_by_pnm = fetch_assignment_links_for_pnms(
+            conn,
+            pnm_ids=[int(row["id"]) for row in rows],
+        )
+
+    assignments: list[dict[str, Any]] = []
+    for row in rows:
+        assignment_status = str(row["assignment_status"] or "").strip().lower()
+        if assignment_status not in ASSIGNMENT_STATUSES:
+            assignment_status = "assigned" if row["assigned_officer_id"] else "unassigned"
+        if not include_completed and assignment_status == "completed":
+            continue
+
+        assigned_officers = merge_assigned_officers_for_pnm_row(row, links_by_pnm.get(int(row["id"]), []))
+        assigned_to_me = any(int(item["user_id"]) == int(user["id"]) for item in assigned_officers)
+        if user["role"] != ROLE_HEAD and not assigned_to_me:
+            continue
+
+        assignments.append(
+            {
+                "pnm_id": int(row["id"]),
+                "pnm_code": row["pnm_code"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+                "phone_number": row["phone_number"] if "phone_number" in row.keys() else "",
+                "weighted_total": round(float(row["weighted_total"]), 2),
+                "rating_count": int(row["rating_count"]),
+                "total_lunches": int(row["total_lunches"]),
+                "assigned_at": row["assigned_at"],
+                "assignment_status": assignment_status,
+                "assignment_status_label": ASSIGNMENT_STATUS_LABELS.get(assignment_status, assignment_status.title()),
+                "assignment_due_date": row["assignment_due_date"],
+                "assignment_due_state": assignment_due_state(assignment_status, row["assignment_due_date"]),
+                "assignment_priority": clamped_assignment_priority(
+                    int(row["assignment_priority"]) if row["assignment_priority"] is not None else None
+                ),
+                "assigned_officer": assigned_officer_payload_from_row(row),
+                "assigned_officers": assigned_officers,
+                "assigned_to_me": assigned_to_me,
+                "package_group_id": normalize_package_group_id(row["package_group_id"]) or None,
+                "package_group_label": package_group_label(normalize_package_group_id(row["package_group_id"])),
+            }
+        )
+
+    return {
+        "assignments": assignments,
+        "count": len(assignments),
+        "is_head_view": user["role"] == ROLE_HEAD,
+        "user_id": int(user["id"]),
+        "username": user["username"],
+    }
+
+
 @app.patch("/api/pnms/{pnm_id}/assignment")
 def update_pnm_assignment(
     pnm_id: int,
@@ -9491,14 +10448,7 @@ def update_pnm_assignment(
             assigned_officer_id = payload.officer_user_id
 
         if assigned_officer_id is not None:
-            target_officer_row = conn.execute(
-                "SELECT id, username, role, emoji FROM users WHERE id = ? AND is_approved = 1",
-                (assigned_officer_id,),
-            ).fetchone()
-            if not target_officer_row:
-                raise HTTPException(status_code=404, detail="Rush Officer not found.")
-            if target_officer_row["role"] != ROLE_RUSH_OFFICER:
-                raise HTTPException(status_code=400, detail="Assignment target must be a Rush Officer.")
+            resolve_assignable_officer_or_400(conn, assigned_officer_id)
 
         if "assignment_status" in requested_fields and payload.assignment_status is not None:
             status_token = payload.assignment_status
@@ -9599,6 +10549,15 @@ def update_pnm_assignment(
                     target_pnm_id,
                 ),
             )
+            sync_primary_assignment_links_for_pnm(
+                conn,
+                pnm_id=target_pnm_id,
+                primary_officer_user_id=assigned_officer_id,
+                assigned_by=assigned_by,
+                assigned_at=assigned_at,
+                updated_at=now,
+                clear_all_if_unassigned=True,
+            )
             if previous_assigned_officer_id != assigned_officer_id:
                 officer_changed_for_any = True
             affected_pnm_ids.append(target_pnm_id)
@@ -9673,6 +10632,7 @@ def update_pnm_assignment(
             (pnm_id,),
         ).fetchone()
         own = fetch_own_rating(conn, pnm_id, head_user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     affected_count = len(affected_pnm_ids)
     return {
@@ -9683,7 +10643,7 @@ def update_pnm_assignment(
         ),
         "affected_pnm_ids": affected_pnm_ids,
         "package_group_id": package_group_id or None,
-        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
     }
 
 
@@ -9719,9 +10679,10 @@ def update_pnm_funnel_stage(
         old_reason = str(row["funnel_stage_reason"] or "").strip()
         if old_stage == next_stage and old_reason == reason:
             own = fetch_own_rating(conn, pnm_id, user["id"])
+            links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
             return {
                 "message": "Funnel stage unchanged.",
-                "pnm": pnm_payload(row, own, assigned_officer=assigned_officer_payload_from_row(row)),
+                "pnm": pnm_payload_with_assignment_links(conn, row, own, links_by_pnm),
             }
 
         changed_at = now_iso()
@@ -9782,10 +10743,11 @@ def update_pnm_funnel_stage(
             (pnm_id,),
         ).fetchone()
         own = fetch_own_rating(conn, pnm_id, user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     return {
         "message": "PNM funnel stage updated.",
-        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
         "change": {
             "from_stage": old_stage,
             "to_stage": next_stage,
@@ -10013,10 +10975,11 @@ async def upload_pnm_photo(
                 FROM pnms p
                 LEFT JOIN users ao ON ao.id = p.assigned_officer_id
                 WHERE p.id = ?
-                """,
-                (pnm_id,),
-            ).fetchone()
-            own = fetch_own_rating(conn, pnm_id, user["id"])
+            """,
+            (pnm_id,),
+        ).fetchone()
+        own = fetch_own_rating(conn, pnm_id, user["id"])
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
     except Exception:
         target_path.unlink(missing_ok=True)
         raise
@@ -10026,7 +10989,7 @@ async def upload_pnm_photo(
 
     return {
         "message": "PNM photo uploaded.",
-        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
     }
 
 
@@ -10080,10 +11043,11 @@ def refresh_pnm_photo_from_instagram(
                 FROM pnms p
                 LEFT JOIN users ao ON ao.id = p.assigned_officer_id
                 WHERE p.id = ?
-                """,
+            """,
                 (pnm_id,),
             ).fetchone()
             own = fetch_own_rating(conn, pnm_id, user["id"])
+            links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
         except Exception:
             target_path.unlink(missing_ok=True)
             raise
@@ -10093,7 +11057,7 @@ def refresh_pnm_photo_from_instagram(
 
     return {
         "message": "Instagram photo refreshed.",
-        "pnm": pnm_payload(refreshed, own, assigned_officer=assigned_officer_payload_from_row(refreshed)),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
     }
 
 
@@ -10116,6 +11080,19 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
         ).fetchone()
         if not pnm_row:
             raise HTTPException(status_code=404, detail="PNM not found.")
+
+        package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
+        linked_rows: list[sqlite3.Row] = []
+        if package_group_id:
+            linked_rows = conn.execute(
+                """
+                SELECT id, pnm_code, first_name, last_name
+                FROM pnms
+                WHERE package_group_id = ? AND id != ?
+                ORDER BY last_name ASC, first_name ASC
+                """,
+                (package_group_id, pnm_id),
+            ).fetchall()
 
         own = fetch_own_rating(conn, pnm_id, user["id"])
         rating_rows = conn.execute(
@@ -10192,6 +11169,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             """,
             (pnm_id,),
         ).fetchall()
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     can_view_identity = user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
     ratings: list[dict[str, Any]] = []
@@ -10271,7 +11249,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
     trend_delta = (trend_end - trend_start) if trend_start is not None and trend_end is not None else None
 
     return {
-        "pnm": pnm_payload(pnm_row, own, assigned_officer=assigned_officer_payload_from_row(pnm_row)),
+        "pnm": pnm_payload_with_assignment_links(conn, pnm_row, own, links_by_pnm),
         "can_view_rater_identity": can_view_identity,
         "summary": summary,
         "rating_trend": {
@@ -10307,6 +11285,15 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             for row in lunch_rows
         ],
         "matches": matches[:10],
+        "linked_pnms": [
+            {
+                "pnm_id": int(row["id"]),
+                "pnm_code": row["pnm_code"],
+                "first_name": row["first_name"],
+                "last_name": row["last_name"],
+            }
+            for row in linked_rows
+        ],
     }
 
 
@@ -10591,6 +11578,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
             (payload.pnm_id,),
         ).fetchone()
         updated_user = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[payload.pnm_id])
 
     return {
         "rating": rating_payload(updated_rating),
@@ -10599,6 +11587,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
             updated_pnm,
             rating_payload(updated_rating),
             assigned_officer=assigned_officer_payload_from_row(updated_pnm),
+            assigned_officers=links_by_pnm.get(int(updated_pnm["id"]), []),
         ),
         "member": user_payload(updated_user, updated_user["role"], updated_user["id"]),
     }
@@ -10769,6 +11758,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             """,
             (payload.pnm_id,),
         ).fetchone()
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[payload.pnm_id])
 
     try:
         google_calendar_url = build_google_calendar_event_url(
@@ -10791,6 +11781,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             refreshed_pnm,
             own_rating=None,
             assigned_officer=assigned_officer_payload_from_row(refreshed_pnm),
+            assigned_officers=links_by_pnm.get(int(refreshed_pnm["id"]), []),
         ),
         "lunch": {
             "lunch_id": lunch_id,
@@ -11025,6 +12016,10 @@ def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any
             LIMIT 300
             """
         ).fetchall()
+        links_by_pnm = fetch_assignment_links_for_pnms(
+            conn,
+            pnm_ids=[int(row["id"]) for row in rows],
+        )
 
     return {
         "pnms": [
@@ -11047,6 +12042,10 @@ def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any
                     {"username": row["assigned_officer_username"]}
                     if row["assigned_officer_username"]
                     else None
+                ),
+                "assigned_officers": merge_assigned_officers_for_pnm_row(
+                    row,
+                    links_by_pnm.get(int(row["id"]), []),
                 ),
             }
             for row in rows
@@ -12568,8 +13567,11 @@ def notification_digest(
         assignment_where = ""
         assignment_params: list[Any] = []
         if user["role"] != ROLE_HEAD:
-            assignment_where = "WHERE p.assigned_officer_id = ?"
-            assignment_params = [user["id"]]
+            assignment_where = (
+                "WHERE EXISTS (SELECT 1 FROM pnm_officer_assignments pa WHERE pa.pnm_id = p.id AND pa.officer_user_id = ?) "
+                "OR (p.assigned_officer_id = ? AND NOT EXISTS (SELECT 1 FROM pnm_officer_assignments pa2 WHERE pa2.pnm_id = p.id))"
+            )
+            assignment_params = [user["id"], user["id"]]
 
         assignment_rows = conn.execute(
             f"""
@@ -12727,9 +13729,23 @@ def broadcast_notification_digest(
                 """
                 SELECT assignment_status, assignment_due_date
                 FROM pnms
-                WHERE assigned_officer_id = ?
+                WHERE
+                    EXISTS (
+                        SELECT 1
+                        FROM pnm_officer_assignments pa
+                        WHERE pa.pnm_id = pnms.id
+                          AND pa.officer_user_id = ?
+                    )
+                    OR (
+                        assigned_officer_id = ?
+                        AND NOT EXISTS (
+                            SELECT 1
+                            FROM pnm_officer_assignments pa2
+                            WHERE pa2.pnm_id = pnms.id
+                        )
+                    )
                 """,
-                (recipient["id"],),
+                (recipient["id"], recipient["id"]),
             ).fetchall()
             overdue_count = 0
             due_soon_count = 0
@@ -13095,6 +14111,10 @@ def matching(
             ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
             """
         ).fetchall()
+        links_by_pnm = fetch_assignment_links_for_pnms(
+            conn,
+            pnm_ids=[int(row["id"]) for row in pnm_rows],
+        )
         user_rows = conn.execute(
             "SELECT * FROM users WHERE is_approved = 1 ORDER BY username ASC"
         ).fetchall()
@@ -13110,6 +14130,7 @@ def matching(
                 row,
                 own_rating_by_pnm.get(row["id"]),
                 assigned_officer=assigned_officer_payload_from_row(row),
+                assigned_officers=links_by_pnm.get(int(row["id"]), []),
             )
         )
 

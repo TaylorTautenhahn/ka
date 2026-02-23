@@ -317,8 +317,30 @@ async function api(path, options = {}) {
 }
 
 function renderPacket(payload) {
-  const { pnm, summary, ratings, lunches, matches, rating_trend: trend, can_view_rater_identity: canSeeRaters } = payload;
+  const {
+    pnm,
+    summary,
+    ratings,
+    lunches,
+    matches,
+    linked_pnms: linkedPnms = [],
+    rating_trend: trend,
+    can_view_rater_identity: canSeeRaters,
+  } = payload;
   const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
+  const linkedSummaryText = Array.isArray(linkedPnms) && linkedPnms.length
+    ? linkedPnms.map((item) => `${item.first_name} ${item.last_name}`).join(", ")
+    : "None";
+  const linkedActionMarkup = Array.isArray(linkedPnms) && linkedPnms.length
+    ? `<div class="linked-meeting-actions">
+        ${linkedPnms
+          .map(
+            (item) =>
+              `<button type="button" class="secondary linked-meeting-open-btn" data-pnm-id="${Number(item.pnm_id)}">Open ${escapeHtml(item.first_name)} ${escapeHtml(item.last_name)}</button>`
+          )
+          .join("")}
+      </div>`
+    : "";
   const trendPoints = trend && Array.isArray(trend.points) ? trend.points : [];
   const trendDelta = trend && typeof trend.delta_weighted_total === "number" ? trend.delta_weighted_total : null;
   const trendDeltaClass = trendDelta == null ? "warn" : trendDelta > 0 ? "good" : trendDelta < 0 ? "bad" : "warn";
@@ -373,6 +395,8 @@ function renderPacket(payload) {
         <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
         <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
         <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
+        <p class="muted">Linked With: ${escapeHtml(linkedSummaryText)}</p>
+        ${linkedActionMarkup}
       </div>
     </div>
     <div class="meeting-metrics">
@@ -459,6 +483,22 @@ function attachEvents() {
   });
   pdfBtn.addEventListener("click", () => {
     window.print();
+  });
+  packetEl.addEventListener("click", async (event) => {
+    const button = event.target.closest(".linked-meeting-open-btn");
+    if (!button) {
+      return;
+    }
+    const linkedId = Number(button.dataset.pnmId || 0);
+    if (!linkedId) {
+      return;
+    }
+    currentPnmId = linkedId;
+    pnmSelect.value = String(linkedId);
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set("pnm_id", String(linkedId));
+    window.history.replaceState({}, "", nextUrl.toString());
+    await loadPacket();
   });
 }
 

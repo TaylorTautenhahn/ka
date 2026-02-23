@@ -668,6 +668,9 @@
         <section id="assignedRushPanel" class="panel hidden reveal delay-6">
           <h2 id="assignedRushTitle">Assigned Rushees</h2>
           <p id="assignedRushSubtitle" class="muted">Assignment visibility appears here for Rush Officers and Heads.</p>
+          <div class="action-row">
+            <button id="assignedRushDownloadBtn" type="button" class="secondary">Download Assigned Contacts (.vcf)</button>
+          </div>
           <div id="assignedRushTable" class="table-wrap"></div>
         </section>
           </div>
@@ -870,6 +873,17 @@
                   <button id="headAssignSaveBtn" type="submit">Save Assignment</button>
                   <button id="headAssignClearBtn" type="button" class="secondary">Clear Assignment</button>
                 </div>
+                <div class="divider"></div>
+                <h4>Assignment Team</h4>
+                <p class="muted">Attach additional Rush Officers to the same rushee for shared ownership.</p>
+                <label>
+                  Additional Rush Officer
+                  <select id="headAddAssigneeSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="headAddAssigneeBtn" type="button">Add To Assignment Team</button>
+                </div>
+                <div id="headAssigneeList" class="list-box"></div>
                 <div class="divider"></div>
                 <h4>Package Deal Linking</h4>
                 <p class="muted">Link rushees as a package deal so assignment updates stay synced and visible together.</p>

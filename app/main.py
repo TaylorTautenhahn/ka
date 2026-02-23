@@ -219,6 +219,13 @@ RATING_FIELD_LIMITS: dict[str, int] = {
     "alcohol_control": 10,
     "instagram_marketability": 5,
 }
+PNM_AVERAGE_COLUMN_BY_FIELD: dict[str, str] = {
+    "good_with_girls": "avg_good_with_girls",
+    "will_make_it": "avg_will_make_it",
+    "personable": "avg_personable",
+    "alcohol_control": "avg_alcohol_control",
+    "instagram_marketability": "avg_instagram_marketability",
+}
 DEFAULT_RATING_CRITERIA: list[dict[str, Any]] = [
     {
         "field": "good_with_girls",
@@ -2338,6 +2345,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
         rating_rows = [dict(row) for row in conn.execute("SELECT * FROM ratings ORDER BY id ASC").fetchall()]
         rating_change_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_changes ORDER BY id ASC").fetchall()]
         rating_history_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_history ORDER BY id ASC").fetchall()]
+        rating_comment_event_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_comment_events ORDER BY id ASC").fetchall()]
         lunch_rows = [dict(row) for row in conn.execute("SELECT * FROM lunches ORDER BY id ASC").fetchall()]
         rush_event_rows = [dict(row) for row in conn.execute("SELECT * FROM rush_events ORDER BY id ASC").fetchall()]
         engagement_event_rows = [dict(row) for row in conn.execute("SELECT * FROM engagement_events ORDER BY id ASC").fetchall()]
@@ -2467,6 +2475,18 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "instagram_marketability",
             "changed_at",
         ], rating_history_rows))
+        zf.writestr("rating_comment_events.csv", csv_bytes_from_rows(list(rating_comment_event_rows[0].keys()) if rating_comment_event_rows else [
+            "id",
+            "rating_id",
+            "pnm_id",
+            "user_id",
+            "event_type",
+            "old_total",
+            "new_total",
+            "delta_total",
+            "comment",
+            "changed_at",
+        ], rating_comment_event_rows))
         zf.writestr("lunches.csv", csv_bytes_from_rows(list(lunch_rows[0].keys()) if lunch_rows else [
             "id",
             "pnm_id",
@@ -2579,7 +2599,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "KAO Rush Backup Export\n"
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
             f"Database path: {db_path}\n"
-            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, lunches.csv, rush_events.csv, engagement_events.csv, weekly_goals.csv, pnm_stage_history.csv, audit_ledger.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
+            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, rating_comment_events.csv, lunches.csv, rush_events.csv, engagement_events.csv, weekly_goals.csv, pnm_stage_history.csv, audit_ledger.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
             "Password hashes are intentionally excluded from users.csv for security.\n"
         )
         zf.writestr("README.txt", readme.encode("utf-8"))
@@ -3561,6 +3581,55 @@ def write_rating_history_event(
     )
 
 
+def write_rating_comment_event(
+    conn: sqlite3.Connection,
+    *,
+    rating_id: int,
+    pnm_id: int,
+    user_id: int,
+    event_type: str,
+    old_total: int | None,
+    new_total: int,
+    delta_total: int,
+    comment: str,
+    changed_at: str,
+) -> None:
+    normalized_event = event_type.strip().lower()
+    if normalized_event not in {"create", "update"}:
+        raise ValueError("Unsupported rating comment event type.")
+    normalized_comment = re.sub(r"\s+", " ", (comment or "").strip())
+    if not normalized_comment:
+        normalized_comment = "Initial rating submitted." if normalized_event == "create" else "Rating update logged."
+
+    conn.execute(
+        """
+        INSERT INTO rating_comment_events (
+            rating_id,
+            pnm_id,
+            user_id,
+            event_type,
+            old_total,
+            new_total,
+            delta_total,
+            comment,
+            changed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            int(rating_id),
+            int(pnm_id),
+            int(user_id),
+            normalized_event,
+            int(old_total) if old_total is not None else None,
+            int(new_total),
+            int(delta_total),
+            normalized_comment,
+            changed_at,
+        ),
+    )
+
+
 def build_rating_trend_points(history_rows: list[sqlite3.Row], max_points: int = 240) -> list[dict[str, Any]]:
     latest_by_user: dict[int, tuple[int, str]] = {}
     points: list[dict[str, Any]] = []
@@ -3738,6 +3807,19 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             changed_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS rating_comment_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rating_id INTEGER NOT NULL REFERENCES ratings(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL CHECK (event_type IN ('create', 'update')),
+            old_total INTEGER,
+            new_total INTEGER NOT NULL CHECK (new_total BETWEEN 0 AND 45),
+            delta_total INTEGER NOT NULL,
+            comment TEXT NOT NULL DEFAULT '',
+            changed_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS lunches (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
@@ -3898,6 +3980,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_ratings_user ON ratings(user_id);
         CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_rating_comment_events_pnm_changed_at ON rating_comment_events(pnm_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_rating_comment_events_rating_changed_at ON rating_comment_events(rating_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
         CREATE INDEX IF NOT EXISTS idx_rush_events_date ON rush_events(event_date, start_time);
@@ -4176,6 +4260,21 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_rating_history_pnm_changed_at ON rating_history(pnm_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
+
+        CREATE TABLE IF NOT EXISTS rating_comment_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rating_id INTEGER NOT NULL REFERENCES ratings(id) ON DELETE CASCADE,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            event_type TEXT NOT NULL CHECK (event_type IN ('create', 'update')),
+            old_total INTEGER,
+            new_total INTEGER NOT NULL CHECK (new_total BETWEEN 0 AND 45),
+            delta_total INTEGER NOT NULL,
+            comment TEXT NOT NULL DEFAULT '',
+            changed_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_rating_comment_events_pnm_changed_at ON rating_comment_events(pnm_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_rating_comment_events_rating_changed_at ON rating_comment_events(rating_id, changed_at);
         """
     )
 
@@ -4405,6 +4504,73 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         )
         """,
         (now_iso(),),
+    )
+
+    # Backfill comment events for legacy data so meeting view can show all stored rating comments.
+    conn.execute(
+        """
+        INSERT INTO rating_comment_events (
+            rating_id,
+            pnm_id,
+            user_id,
+            event_type,
+            old_total,
+            new_total,
+            delta_total,
+            comment,
+            changed_at
+        )
+        SELECT
+            r.id,
+            r.pnm_id,
+            r.user_id,
+            'create',
+            NULL,
+            r.total_score,
+            0,
+            COALESCE(NULLIF(trim(r.comment), ''), 'Initial rating submitted.'),
+            COALESCE(r.created_at, r.updated_at, ?)
+        FROM ratings r
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM rating_comment_events rce
+            WHERE rce.rating_id = r.id AND rce.event_type = 'create'
+        )
+        """,
+        (now_iso(),),
+    )
+    conn.execute(
+        """
+        INSERT INTO rating_comment_events (
+            rating_id,
+            pnm_id,
+            user_id,
+            event_type,
+            old_total,
+            new_total,
+            delta_total,
+            comment,
+            changed_at
+        )
+        SELECT
+            rc.rating_id,
+            rc.pnm_id,
+            rc.user_id,
+            'update',
+            rc.old_total,
+            rc.new_total,
+            rc.delta_total,
+            COALESCE(NULLIF(trim(rc.comment), ''), 'Rating update logged.'),
+            rc.changed_at
+        FROM rating_changes rc
+        WHERE NOT EXISTS (
+            SELECT 1
+            FROM rating_comment_events rce
+            WHERE rce.rating_id = rc.rating_id
+              AND rce.event_type = 'update'
+              AND rce.changed_at = rc.changed_at
+        )
+        """
     )
 
 
@@ -5636,6 +5802,23 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                 scores=create_scores,
                 changed_at=create_stamp,
             )
+        has_create_comment_event = conn.execute(
+            "SELECT 1 FROM rating_comment_events WHERE rating_id = ? AND event_type = 'create' LIMIT 1",
+            (rating_id,),
+        ).fetchone()
+        if not has_create_comment_event:
+            write_rating_comment_event(
+                conn,
+                rating_id=rating_id,
+                pnm_id=int(pnm_id),
+                user_id=int(user_id),
+                event_type="create",
+                old_total=None,
+                new_total=create_scores["total_score"],
+                delta_total=0,
+                comment=create_comment,
+                changed_at=create_stamp,
+            )
 
         if "update" in seed:
             has_update_history = conn.execute(
@@ -5650,6 +5833,28 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                     user_id=int(user_id),
                     event_type="update",
                     scores=final_scores,
+                    changed_at=update_stamp,
+                )
+            has_update_comment_event = conn.execute(
+                """
+                SELECT 1
+                FROM rating_comment_events
+                WHERE rating_id = ? AND event_type = 'update' AND changed_at = ?
+                LIMIT 1
+                """,
+                (rating_id, update_stamp),
+            ).fetchone()
+            if not has_update_comment_event:
+                write_rating_comment_event(
+                    conn,
+                    rating_id=rating_id,
+                    pnm_id=int(pnm_id),
+                    user_id=int(user_id),
+                    event_type="update",
+                    old_total=create_scores["total_score"],
+                    new_total=final_scores["total_score"],
+                    delta_total=final_scores["total_score"] - create_scores["total_score"],
+                    comment=update_comment,
                     changed_at=update_stamp,
                 )
 
@@ -7889,6 +8094,7 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
 
         conn.execute("DELETE FROM rating_changes")
         conn.execute("DELETE FROM rating_history")
+        conn.execute("DELETE FROM rating_comment_events")
         conn.execute("DELETE FROM ratings")
         conn.execute("DELETE FROM officer_chat_mentions")
         conn.execute("DELETE FROM officer_chat_tags")
@@ -11063,6 +11269,9 @@ def refresh_pnm_photo_from_instagram(
 
 @app.get("/api/pnms/{pnm_id}/meeting")
 def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    tenant = current_tenant()
+    criteria_by_field = rating_criteria_by_field(list(tenant.rating_criteria))
+
     with db_session() as conn:
         pnm_row = conn.execute(
             """
@@ -11123,7 +11332,6 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             JOIN users u ON u.id = l.user_id
             WHERE l.pnm_id = ?
             ORDER BY l.lunch_date DESC, l.created_at DESC
-            LIMIT 40
             """,
             (pnm_id,),
         ).fetchall()
@@ -11168,6 +11376,42 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             LIMIT 20
             """,
             (pnm_id,),
+        ).fetchall()
+        rating_comment_rows = conn.execute(
+            """
+            SELECT
+                rce.id,
+                rce.rating_id,
+                rce.user_id,
+                rce.event_type,
+                rce.old_total,
+                rce.new_total,
+                rce.delta_total,
+                rce.comment,
+                rce.changed_at,
+                u.username,
+                u.role,
+                u.emoji
+            FROM rating_comment_events rce
+            JOIN users u ON u.id = rce.user_id
+            WHERE rce.pnm_id = ?
+            ORDER BY rce.changed_at DESC, rce.id DESC
+            """,
+            (pnm_id,),
+        ).fetchall()
+        ranking_rows = conn.execute(
+            """
+            SELECT
+                id,
+                avg_good_with_girls,
+                avg_will_make_it,
+                avg_personable,
+                avg_alcohol_control,
+                avg_instagram_marketability,
+                weighted_total
+            FROM pnms
+            ORDER BY id ASC
+            """
         ).fetchall()
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
@@ -11236,12 +11480,141 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
         )
 
     matches.sort(key=lambda item: (item["fit_score"], item["lunches_per_week"]), reverse=True)
+    cohort_size = len(ranking_rows)
+    weighted_values = [float(row["weighted_total"]) for row in ranking_rows]
+    weighted_target = float(pnm_row["weighted_total"])
+    weighted_rank = 1 + sum(1 for value in weighted_values if value > weighted_target + 1e-9) if weighted_values else None
+    weighted_percentile = (
+        round((sum(1 for value in weighted_values if value <= weighted_target + 1e-9) / len(weighted_values)) * 100, 1)
+        if weighted_values
+        else None
+    )
+
+    category_rankings: list[dict[str, Any]] = []
+    for field in RATING_FIELDS:
+        column = PNM_AVERAGE_COLUMN_BY_FIELD[field]
+        values = [float(row[column]) for row in ranking_rows]
+        target_value = float(pnm_row[column])
+        rank = 1 + sum(1 for value in values if value > target_value + 1e-9) if values else 1
+        percentile = (
+            round((sum(1 for value in values if value <= target_value + 1e-9) / len(values)) * 100, 1)
+            if values
+            else 100.0
+        )
+        criteria_entry = criteria_by_field.get(field, {})
+        configured_max_raw = criteria_entry.get("max", RATING_FIELD_LIMITS.get(field, 10))
+        try:
+            configured_max = int(configured_max_raw)
+        except (TypeError, ValueError):
+            configured_max = int(RATING_FIELD_LIMITS.get(field, 10))
+        configured_max = max(1, min(int(RATING_FIELD_LIMITS.get(field, configured_max)), configured_max))
+        label = sanitize_short_text(
+            criteria_entry.get("label") if isinstance(criteria_entry.get("label"), str) else "",
+            field.replace("_", " ").title(),
+            max_length=60,
+        )
+        short_label = sanitize_short_text(
+            criteria_entry.get("short_label") if isinstance(criteria_entry.get("short_label"), str) else "",
+            label,
+            max_length=20,
+        )
+        leader_value = max(values) if values else target_value
+        category_rankings.append(
+            {
+                "field": field,
+                "label": label,
+                "short_label": short_label,
+                "max": configured_max,
+                "value": round(target_value, 2),
+                "rank": rank,
+                "cohort_size": len(values),
+                "percentile": percentile,
+                "leader_value": round(float(leader_value), 2),
+                "points_from_leader": round(float(leader_value) - target_value, 2),
+            }
+        )
+
+    rating_update_comments: list[dict[str, Any]] = []
+    for row in rating_comment_rows:
+        from_me = int(row["user_id"]) == int(user["id"])
+        if not can_view_identity and not from_me:
+            continue
+        comment = str(row["comment"] or "").strip()
+        if not comment:
+            continue
+        entry: dict[str, Any] = {
+            "event_id": int(row["id"]),
+            "rating_id": int(row["rating_id"]),
+            "from_me": from_me,
+            "event_type": row["event_type"],
+            "old_total": int(row["old_total"]) if row["old_total"] is not None else None,
+            "new_total": int(row["new_total"]),
+            "delta_total": int(row["delta_total"]),
+            "comment": comment,
+            "changed_at": row["changed_at"],
+        }
+        if can_view_identity:
+            entry["author"] = {"username": row["username"], "role": row["role"], "emoji": row["emoji"]}
+        elif from_me:
+            entry["author"] = {"username": "You", "role": row["role"], "emoji": None}
+        rating_update_comments.append(entry)
+
+    lunch_comment_history: list[dict[str, Any]] = []
+    for row in lunch_rows:
+        notes = str(row["notes"] or "").strip()
+        if not notes:
+            continue
+        lunch_comment_history.append(
+            {
+                "lunch_date": row["lunch_date"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "location": row["location"],
+                "notes": notes,
+                "created_at": row["created_at"],
+                "username": row["username"],
+                "role": row["role"],
+            }
+        )
+
+    rush_comment_timeline: list[dict[str, Any]] = []
+    for row in rating_update_comments:
+        author = row.get("author") or {}
+        rush_comment_timeline.append(
+            {
+                "source": "rating_update",
+                "occurred_at": row["changed_at"],
+                "comment": row["comment"],
+                "username": author.get("username") or ("You" if row.get("from_me") else "Member"),
+                "role": author.get("role") or "",
+                "delta_total": row["delta_total"],
+                "new_total": row["new_total"],
+                "event_type": row["event_type"],
+            }
+        )
+    for row in lunch_comment_history:
+        rush_comment_timeline.append(
+            {
+                "source": "lunch_note",
+                "occurred_at": row["created_at"] or row["lunch_date"],
+                "comment": row["notes"],
+                "username": row["username"],
+                "role": row["role"],
+                "lunch_date": row["lunch_date"],
+                "location": row["location"],
+            }
+        )
+    rush_comment_timeline.sort(key=lambda item: str(item.get("occurred_at") or ""), reverse=True)
+
     summary = {
         "ratings_count": len(score_values),
         "highest_rating_total": max(score_values) if score_values else None,
         "lowest_rating_total": min(score_values) if score_values else None,
         "weighted_total": round(float(pnm_row["weighted_total"]), 2),
         "total_lunches": int(pnm_row["total_lunches"]),
+        "cohort_size": cohort_size,
+        "weighted_total_rank": weighted_rank,
+        "weighted_total_percentile": weighted_percentile,
     }
     trend_points = build_rating_trend_points(trend_rows)
     trend_start = trend_points[0]["weighted_total"] if trend_points else None
@@ -11270,6 +11643,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             }
             for row in stage_rows
         ],
+        "category_rankings": category_rankings,
         "ratings": ratings,
         "lunches": [
             {
@@ -11284,6 +11658,9 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> 
             }
             for row in lunch_rows
         ],
+        "rating_update_comments": rating_update_comments,
+        "lunch_comment_history": lunch_comment_history,
+        "rush_comment_timeline": rush_comment_timeline,
         "matches": matches[:10],
         "linked_pnms": [
             {
@@ -11482,6 +11859,18 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                     scores=new_payload,
                     changed_at=now,
                 )
+                write_rating_comment_event(
+                    conn,
+                    rating_id=int(existing["id"]),
+                    pnm_id=payload.pnm_id,
+                    user_id=int(user["id"]),
+                    event_type="update",
+                    old_total=int(existing["total_score"]),
+                    new_total=new_total,
+                    delta_total=delta_total,
+                    comment=comment,
+                    changed_at=now,
+                )
                 append_audit_entry(
                     conn,
                     actor_user_id=int(user["id"]),
@@ -11493,6 +11882,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                         "old_total": int(existing["total_score"]),
                         "new_total": new_total,
                         "delta_total": delta_total,
+                        "comment": comment,
                     },
                 )
         else:
@@ -11543,6 +11933,18 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                 user_id=int(user["id"]),
                 event_type="create",
                 scores=create_payload,
+                changed_at=now,
+            )
+            write_rating_comment_event(
+                conn,
+                rating_id=rating_id,
+                pnm_id=payload.pnm_id,
+                user_id=int(user["id"]),
+                event_type="create",
+                old_total=None,
+                new_total=new_total,
+                delta_total=0,
+                comment=(payload.comment or "").strip(),
                 changed_at=now,
             )
             append_audit_entry(

@@ -384,6 +384,18 @@ def main() -> None:
                 raise AssertionError("Meeting view linked_pnms should be a list.")
             if not any(int(item.get("pnm_id") or 0) == pnm_two_id for item in linked_pnms):
                 raise AssertionError("Meeting view should include linked package rushee references.")
+            category_rankings = meeting_payload.get("category_rankings", [])
+            if not isinstance(category_rankings, list) or not category_rankings:
+                raise AssertionError("Meeting view should include category ranking analytics.")
+            rating_update_comments = meeting_payload.get("rating_update_comments", [])
+            if not isinstance(rating_update_comments, list):
+                raise AssertionError("Meeting view rating_update_comments should be a list.")
+            lunch_comment_history = meeting_payload.get("lunch_comment_history", [])
+            if not isinstance(lunch_comment_history, list):
+                raise AssertionError("Meeting view lunch_comment_history should be a list.")
+            rush_comment_timeline = meeting_payload.get("rush_comment_timeline", [])
+            if not isinstance(rush_comment_timeline, list):
+                raise AssertionError("Meeting view rush_comment_timeline should be a list.")
             checks.append("Meeting view API works")
 
             response = client.post("/kappaalphaorder/api/auth/logout")

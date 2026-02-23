@@ -235,6 +235,77 @@ function renderTrendChart(points) {
   `;
 }
 
+function renderCategoryRankingBars(rankings) {
+  if (!Array.isArray(rankings) || !rankings.length) {
+    return '<p class="muted">Category ranking graph appears after ratings are submitted.</p>';
+  }
+  const rows = rankings
+    .map((row, index) => {
+      const max = Math.max(1, Number(row.max || 0));
+      const value = Math.max(0, Number(row.value || 0));
+      const percent = Math.max(0, Math.min(100, (value / max) * 100));
+      const rank = Number(row.rank || 0);
+      const cohort = Number(row.cohort_size || 0);
+      const percentile = Number.isFinite(Number(row.percentile)) ? Number(row.percentile) : 0;
+      const pointsFromLeader = Number.isFinite(Number(row.points_from_leader)) ? Number(row.points_from_leader) : 0;
+      const leaderLabel = pointsFromLeader <= 0 ? "Leader" : `${pointsFromLeader.toFixed(2)} behind`;
+      return `
+        <div class="meeting-bar-row" style="--bar-width: ${percent.toFixed(1)}%; --bar-delay: ${index * 45}ms;">
+          <div class="meeting-bar-head">
+            <strong>${escapeHtml(row.label || row.field || "Category")}</strong>
+            <span>${value.toFixed(2)} / ${max}</span>
+          </div>
+          <div class="meeting-bar-track"><span class="meeting-bar-fill"></span></div>
+          <div class="meeting-bar-meta">
+            <span>Rank #${rank || "-"}${cohort ? ` / ${cohort}` : ""}</span>
+            <span>${percentile.toFixed(1)} percentile</span>
+            <span>${escapeHtml(leaderLabel)}</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+  return `<div class="meeting-bar-graph">${rows}</div>`;
+}
+
+function renderRushCommentTimeline(entries) {
+  if (!Array.isArray(entries) || !entries.length) {
+    return '<p class="muted">No rush comments captured yet.</p>';
+  }
+  return `
+    <div class="meeting-comment-feed">
+      ${entries
+        .map((entry) => {
+          const source = entry.source === "rating_update" ? "Rating Update" : "Lunch Note";
+          const chipClass = entry.source === "rating_update" ? "rating" : "lunch";
+          const actor = entry.role ? `${entry.username} (${entry.role})` : `${entry.username}`;
+          const metaBits = [formatTrendTimestamp(entry.occurred_at), actor].filter(Boolean);
+          if (entry.source === "rating_update" && typeof entry.delta_total === "number") {
+            metaBits.push(`Delta ${entry.delta_total > 0 ? "+" : ""}${entry.delta_total}`);
+          }
+          if (entry.source === "lunch_note") {
+            if (entry.lunch_date) {
+              metaBits.push(entry.lunch_date);
+            }
+            if (entry.location) {
+              metaBits.push(entry.location);
+            }
+          }
+          return `
+            <article class="meeting-comment-item">
+              <div class="entry-title">
+                <span class="comment-chip ${chipClass}">${escapeHtml(source)}</span>
+                <span class="comment-meta">${escapeHtml(metaBits.join(" | "))}</span>
+              </div>
+              <p class="meeting-list-note">${escapeHtml(entry.comment || "")}</p>
+            </article>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+}
+
 function showToast(message) {
   toastEl.textContent = message;
   toastEl.classList.remove("hidden");
@@ -325,6 +396,10 @@ function renderPacket(payload) {
     matches,
     linked_pnms: linkedPnms = [],
     rating_trend: trend,
+    category_rankings: categoryRankings = [],
+    rating_update_comments: ratingUpdateComments = [],
+    lunch_comment_history: lunchCommentHistory = [],
+    rush_comment_timeline: rushCommentTimeline = [],
     can_view_rater_identity: canSeeRaters,
   } = payload;
   const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
@@ -346,6 +421,14 @@ function renderPacket(payload) {
   const trendDeltaClass = trendDelta == null ? "warn" : trendDelta > 0 ? "good" : trendDelta < 0 ? "bad" : "warn";
   const trendDeltaLabel = trendDelta == null ? "N/A" : `${trendDelta > 0 ? "+" : ""}${trendDelta.toFixed(2)}`;
   const trendEvents = trend && typeof trend.events_count === "number" ? trend.events_count : trendPoints.length;
+  const weightedRankLabel =
+    summary && Number(summary.weighted_total_rank) > 0 && Number(summary.cohort_size) > 0
+      ? `Rank #${Number(summary.weighted_total_rank)} / ${Number(summary.cohort_size)}`
+      : "Rank N/A";
+  const weightedPercentileLabel =
+    summary && Number.isFinite(Number(summary.weighted_total_percentile))
+      ? `${Number(summary.weighted_total_percentile).toFixed(1)} percentile`
+      : "Percentile N/A";
   const photoMarkup = pnm.photo_url
     ? `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}" class="meeting-photo large" loading="lazy" />`
     : '<div class="photo-placeholder large">No photo uploaded.</div>';
@@ -369,13 +452,47 @@ function renderPacket(payload) {
 
   const lunchMarkup =
     lunches
-      .slice(0, 12)
+      .slice(0, 18)
       .map((row) => {
         const timing = formatLunchWindow(row);
         const detail = timing ? ` | ${escapeHtml(timing)}` : "";
-        return `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})${detail}</li>`;
+        const notes = row.notes ? `<br /><span class="meeting-list-note">${escapeHtml(row.notes)}</span>` : "";
+        return `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})${detail}${notes}</li>`;
       })
       .join("") || "<li>No lunch logs yet.</li>";
+
+  const ratingCommentMarkup =
+    ratingUpdateComments
+      .map((row) => {
+        const author = row.author && row.author.username
+          ? `${row.author.username}${row.author.role ? ` (${row.author.role})` : ""}`
+          : row.from_me
+            ? "You"
+            : "Member";
+        const deltaText = typeof row.delta_total === "number" ? `${row.delta_total > 0 ? "+" : ""}${row.delta_total}` : "0";
+        const eventText = row.event_type === "create" ? "Initial Rating" : `Update (${deltaText})`;
+        return `
+          <li>
+            <strong>${escapeHtml(eventText)}</strong> | ${escapeHtml(formatTrendTimestamp(row.changed_at))}
+            <span class="comment-meta">${escapeHtml(author)} | ${Number(row.new_total || 0).toFixed(0)} / ${RATING_TOTAL_MAX}</span>
+            <p class="meeting-list-note">${escapeHtml(row.comment || "")}</p>
+          </li>
+        `;
+      })
+      .join("") || "<li>No rating update comments yet.</li>";
+
+  const lunchCommentMarkup =
+    lunchCommentHistory
+      .map((row) => {
+        return `
+          <li>
+            <strong>${escapeHtml(row.lunch_date)}</strong> | ${escapeHtml(row.username)} (${escapeHtml(row.role)})
+            <span class="comment-meta">${escapeHtml(formatLunchWindow(row) || row.location || "")}</span>
+            <p class="meeting-list-note">${escapeHtml(row.notes || "")}</p>
+          </li>
+        `;
+      })
+      .join("") || "<li>No lunch notes yet.</li>";
 
   const matchMarkup =
     matches
@@ -400,7 +517,11 @@ function renderPacket(payload) {
       </div>
     </div>
     <div class="meeting-metrics">
-      <article class="card"><strong>Weighted Total</strong><p>${summary.weighted_total.toFixed(2)} / ${RATING_TOTAL_MAX}</p></article>
+      <article class="card">
+        <strong>Weighted Total</strong>
+        <p>${summary.weighted_total.toFixed(2)} / ${RATING_TOTAL_MAX}</p>
+        <small class="metric-sub">${escapeHtml(weightedRankLabel)} | ${escapeHtml(weightedPercentileLabel)}</small>
+      </article>
       <article class="card"><strong>Ratings Count</strong><p>${summary.ratings_count}</p></article>
       <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
       <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>
@@ -413,6 +534,14 @@ function renderPacket(payload) {
       <p class="muted">Weighted total trajectory over time from rating history events: ${trendEvents}</p>
       ${renderTrendChart(trendPoints)}
     </article>
+    <article class="list-column">
+      <div class="entry-title">
+        <h3>Category Ranking Averages</h3>
+        <span class="warn">${Number(summary.cohort_size || 0)} PNMs</span>
+      </div>
+      <p class="muted">Weighted category averages with standing across the active roster.</p>
+      ${renderCategoryRankingBars(categoryRankings)}
+    </article>
     <div class="grid-two">
       <article class="list-column">
         <h3>Ratings</h3>
@@ -423,6 +552,20 @@ function renderPacket(payload) {
         <ul class="meeting-list">${lunchMarkup}</ul>
       </article>
     </div>
+    <div class="grid-two">
+      <article class="list-column">
+        <h3>All Rating Update Comments</h3>
+        <ul class="meeting-list meeting-list-detailed">${ratingCommentMarkup}</ul>
+      </article>
+      <article class="list-column">
+        <h3>All Lunch Notes</h3>
+        <ul class="meeting-list meeting-list-detailed">${lunchCommentMarkup}</ul>
+      </article>
+    </div>
+    <article class="list-column">
+      <h3>Rush Comment Timeline</h3>
+      ${renderRushCommentTimeline(rushCommentTimeline)}
+    </article>
     <article class="list-column">
       <h3>Best Member Matches</h3>
       <ul class="meeting-list">${matchMarkup}</ul>

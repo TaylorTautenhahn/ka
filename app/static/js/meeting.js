@@ -24,6 +24,7 @@ function readAppConfig() {
 const APP_CONFIG = readAppConfig();
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
+const DESKTOP_ROUTES = APP_CONFIG.desktop_routes || {};
 
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -141,10 +142,15 @@ const pnmSelect = document.getElementById("meetingPnmSelect");
 const loadBtn = document.getElementById("meetingLoadBtn");
 const refreshBtn = document.getElementById("meetingRefreshBtn");
 const pdfBtn = document.getElementById("meetingPdfBtn");
+const logoutBtn = document.getElementById("meetingLogoutBtn");
+const adminNavLink = document.getElementById("meetingAdminNavLink");
+const sessionTitle = document.getElementById("meetingSessionTitle");
+const sessionSubtitle = document.getElementById("meetingSessionSubtitle");
 const packetEl = document.getElementById("meetingPacket");
 const toastEl = document.getElementById("meetingToast");
 
 let currentPnmId = null;
+let currentUser = null;
 
 function escapeHtml(input) {
   return String(input)
@@ -311,6 +317,36 @@ function showToast(message) {
   toastEl.classList.remove("hidden");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2600);
+}
+
+function desktopRoutePath(key, fallbackSuffix) {
+  const fromConfig = DESKTOP_ROUTES && DESKTOP_ROUTES[key] ? String(DESKTOP_ROUTES[key]) : "";
+  if (fromConfig) {
+    return fromConfig;
+  }
+  return `${BASE_PATH}/${fallbackSuffix}`;
+}
+
+function applySessionHeader(user) {
+  if (!sessionTitle || !sessionSubtitle) {
+    return;
+  }
+  if (!user) {
+    sessionTitle.textContent = "Meeting Packets";
+    sessionSubtitle.textContent = "";
+    return;
+  }
+  sessionTitle.textContent = user.username || "Meeting Packets";
+  const emoji = user.emoji ? `${user.emoji} ` : "";
+  sessionSubtitle.textContent = `${emoji}${user.role || ""}`.trim();
+}
+
+function applyRoleNavVisibility(user) {
+  if (!adminNavLink) {
+    return;
+  }
+  const isHead = Boolean(user && user.role === "Head Rush Officer");
+  adminNavLink.classList.toggle("hidden", !isHead);
 }
 
 function resolveApiPath(path) {
@@ -604,10 +640,28 @@ async function loadPnms() {
 
 async function ensureSession() {
   try {
-    await api("/api/auth/me");
+    const payload = await api("/api/auth/me");
+    currentUser = payload && payload.user ? payload.user : null;
+    if (currentUser && currentUser.role === "Rusher" && APP_CONFIG.member_base) {
+      window.location.replace(APP_CONFIG.member_base);
+      return false;
+    }
+    applySessionHeader(currentUser);
+    applyRoleNavVisibility(currentUser);
+    return true;
   } catch {
     window.location.href = BASE_PATH || "/";
+    return false;
   }
+}
+
+async function handleLogout() {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+  } catch {
+    // Fallback to redirect below even if logout call fails.
+  }
+  window.location.href = desktopRoutePath("dashboard", "dashboard");
 }
 
 function attachEvents() {
@@ -627,6 +681,9 @@ function attachEvents() {
   pdfBtn.addEventListener("click", () => {
     window.print();
   });
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", handleLogout);
+  }
   packetEl.addEventListener("click", async (event) => {
     const button = event.target.closest(".linked-meeting-open-btn");
     if (!button) {
@@ -646,7 +703,10 @@ function attachEvents() {
 }
 
 async function init() {
-  await ensureSession();
+  const ok = await ensureSession();
+  if (!ok) {
+    return;
+  }
   const fromQuery = Number(new URLSearchParams(window.location.search).get("pnm_id") || 0);
   if (fromQuery) {
     currentPnmId = fromQuery;

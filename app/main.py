@@ -1027,6 +1027,13 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
     base_path = f"/{tenant.slug}"
     member_base = f"{base_path}/member"
     member_signup_qr_path = f"{base_path}/member-signup-qr.svg"
+    desktop_routes = {
+        "dashboard": f"{base_path}/dashboard",
+        "rushees": f"{base_path}/rushees",
+        "team": f"{base_path}/team",
+        "calendar": f"{base_path}/calendar",
+        "admin": f"{base_path}/admin",
+    }
     return {
         "base_path": base_path,
         "api_base": f"{base_path}/api",
@@ -1051,6 +1058,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         },
         "default_interest_tags": list(tenant.default_interest_tags),
         "default_stereotype_tags": list(tenant.default_stereotype_tags),
+        "desktop_routes": desktop_routes,
         "member_signup_path": member_base,
         "member_signup_qr_path": member_signup_qr_path,
         "calendar_timezone": CALENDAR_TIMEZONE,

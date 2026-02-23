@@ -1263,21 +1263,21 @@ function userOnboardingState() {
 function tutorialRoleSummary(role) {
   if (role === ROLE_HEAD) {
     return [
-      { title: "Head Controls", body: "Manage approvals, assignments, season reset, and officer promotions." },
-      { title: "Operations Command", body: "Run events, goals, chat, notifications, and calendar strategy." },
-      { title: "Meeting Decisions", body: "Move from ratings to meeting packets with full accountability context." },
+      { title: "Leadership Controls", body: "Manage approvals, assignments, promotions, and season lifecycle safely." },
+      { title: "Calendar Command", body: "Run events, goals, chat, and notifications in one timeline workflow." },
+      { title: "Decision Intelligence", body: "Move from live scoring to meeting packets with full audit context." },
     ];
   }
   if (role === ROLE_RUSH_OFFICER) {
     return [
-      { title: "Daily Execution", body: "Add rushees, log lunches, and submit rating updates instantly." },
-      { title: "Coordination", body: "Track assignments, notifications, and officer chat in one flow." },
-      { title: "Meeting Prep", body: "Use leaderboard and packets to keep decisions sharp and consistent." },
+      { title: "Daily Execution", body: "Add rushees, log lunches, and submit weighted rating updates quickly." },
+      { title: "Team Coordination", body: "Track assignments, state coverage, goals, and chat in one system." },
+      { title: "Meeting Readiness", body: "Use leaderboard and packets to keep decisions consistent and accountable." },
     ];
   }
   return [
-    { title: "Member View", body: "Find rushees quickly and submit simplified ratings." },
-    { title: "Participation", body: "Contribute feedback without seeing role-restricted officer analytics." },
+    { title: "Member View", body: "Find priority rushees quickly and submit simplified ratings." },
+    { title: "Participation", body: "Contribute feedback while officer-only analytics stay role-restricted." },
   ];
 }
 
@@ -1286,20 +1286,29 @@ function tutorialBaseStepsForRole(role) {
     {
       page: "overview",
       target: "#desktopPageNav",
-      title: "Use Page Tabs As Your Command Rail",
-      body: "Switch between Overview, Operations, Rushees, Members, and Head Console from one fixed navigation bar.",
-      hint: "Pro tip: keep this on Overview during meetings, then jump to Rushees for live updates.",
+      title: "Use Navigation As The Command Rail",
+      body: "Move between Dashboard, Rushees, Team, Calendar, and Admin from the top route navigation.",
+      hint: "Open each page from this bar so your workflow stays predictable during rush week.",
       advanced:
-        "Advanced workflow: keep one browser tab on Operations and one on Rushees during rush week for faster context switching.",
+        "Advanced workflow: keep one tab on Calendar and one on Rushees during live events for faster execution.",
     },
     {
       page: "overview",
       target: "#matchingSection",
       title: "Run Interest + Stereotype Matching",
-      body: "Apply shared filters to intentionally pair rushees with the best-fit members and officers.",
+      body: "Use matching filters to pair rushees with the best-fit officers and members intentionally.",
       hint: "Filter by one interest first, then add stereotype only when you need tighter matching.",
       advanced:
         "Advanced workflow: run matching before each event block and create officer assignments based on strongest overlap.",
+    },
+    {
+      page: "rushees",
+      target: "#rusheeFiltersSection",
+      title: "Filter The Rushee Board By State",
+      body: "Use page-local filters for interest, stereotype, and state to quickly narrow active targets.",
+      hint: "State filtering is best for hometown outreach and assignment balancing.",
+      advanced:
+        "Advanced workflow: stack state + stereotype to find high-priority clusters before planning lunches.",
     },
     {
       page: "rushees",
@@ -1321,12 +1330,21 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "rushees",
+      target: "#openMeetingPageBtn",
+      title: "Open Meeting Packets From Rushee Detail",
+      body: "Jump straight into the dedicated meeting view for deep analytics, trend history, and decision packets.",
+      hint: "Use this after selecting a rushee so packet context stays aligned with live updates.",
+      advanced:
+        "Advanced workflow: keep meeting packets open during final discussions while officers continue logging updates.",
+    },
+    {
+      page: "rushees",
       target: "#lunchForm",
-      title: "Schedule Lunches From The App",
-      body: "Lunch scheduling updates member and rushee stats and can be opened in Google Calendar instantly.",
+      title: "Schedule Lunches Directly In The Workflow",
+      body: "Lunch scheduling updates member and rushee stats immediately and can open in Google Calendar.",
       hint: "Add location/time to make coordination easier for the full team.",
       advanced:
-        "Advanced workflow: schedule lunches by assignment owner so accountability is clear before key decision meetings.",
+        "Advanced workflow: schedule lunches by assignment owner so accountability is clear before key decisions.",
     },
     {
       page: "operations",
@@ -1357,6 +1375,24 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "members",
+      target: "#memberFiltersSection",
+      title: "Filter Team Coverage By Role + Location",
+      body: "Use Team filters to sort members by role, state, city, and location-first ordering.",
+      hint: "This is the fastest way to verify member coverage by region.",
+      advanced:
+        "Advanced workflow: audit coverage by state before each round and rebalance assignments proactively.",
+    },
+    {
+      page: "members",
+      target: "#sameStatePnmsSection",
+      title: "Use Same-State Discovery",
+      body: "Select a member to instantly see PNMs from the same state for stronger local connections.",
+      hint: "If no results appear, confirm the member has a state set in their profile.",
+      advanced:
+        "Advanced workflow: use same-state lists to assign warm introductions before high-stakes events.",
+    },
+    {
+      page: "members",
       target: "#assignedRushPanel",
       title: "Check Assigned Rushee Ownership",
       body: "Assignment visibility keeps outreach accountable and prevents coverage gaps.",
@@ -1371,7 +1407,7 @@ function tutorialBaseStepsForRole(role) {
       {
         page: "admin",
         target: "#headAdminSummary",
-        title: "Use Head Console As Mission Control",
+        title: "Use Admin As Head Mission Control",
         body: "Head-only metrics summarize officer output, approvals, and chapter-level recruiting health.",
         hint: "Review this panel daily before assigning priorities.",
         advanced:
@@ -1403,7 +1439,7 @@ function tutorialBaseStepsForRole(role) {
       {
         page: "members",
         target: "#approvalsPanel",
-        title: "Approve New Team Accounts",
+        title: "Approve New Team Accounts Quickly",
         body: "Rush Officers can approve pending users so new members can contribute quickly.",
         hint: "Approve only known accounts to keep data quality and security tight.",
         advanced:
@@ -1430,7 +1466,7 @@ function buildTutorialSteps(role, mode) {
     return [];
   }
   if (mode === TUTORIAL_MODE_QUICK) {
-    const selectedIndices = [0, 2, 3, 7, base.length - 1];
+    const selectedIndices = [0, 3, 4, 6, base.length - 1];
     const seen = new Set();
     return selectedIndices
       .filter((index) => index >= 0 && index < base.length)
@@ -1465,17 +1501,41 @@ function clearTutorialHighlight() {
   }
 }
 
+function setTutorialDock(side = "right") {
+  if (!tutorialLayer) {
+    return;
+  }
+  const resolved = side === "left" ? "left" : "right";
+  tutorialLayer.dataset.dock = resolved;
+  tutorialLayer.classList.toggle("tutorial-dock-left", resolved === "left");
+  tutorialLayer.classList.toggle("tutorial-dock-right", resolved === "right");
+}
+
+function updateTutorialDockForTarget(target) {
+  if (!target) {
+    setTutorialDock("right");
+    return;
+  }
+  const rect = target.getBoundingClientRect();
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const targetCenterX = rect.left + rect.width / 2;
+  setTutorialDock(targetCenterX > viewportWidth * 0.58 ? "left" : "right");
+}
+
 function setTutorialHighlight(selector) {
   clearTutorialHighlight();
   if (!selector) {
+    updateTutorialDockForTarget(null);
     return null;
   }
   const target = document.querySelector(selector);
   if (!target) {
+    updateTutorialDockForTarget(null);
     return null;
   }
   state.tutorial.highlightedEl = target;
   target.classList.add("tutorial-highlight");
+  updateTutorialDockForTarget(target);
   if (typeof target.scrollIntoView === "function") {
     target.scrollIntoView({ behavior: "smooth", block: "center", inline: "nearest" });
   }
@@ -1492,6 +1552,7 @@ function setTutorialLayerVisible(visible) {
 
 function closeTutorialOverlay(reset = true) {
   clearTutorialHighlight();
+  setTutorialDock("right");
   setTutorialLayerVisible(false);
   if (tutorialModeCard) {
     tutorialModeCard.classList.add("hidden");
@@ -1537,6 +1598,7 @@ function openTutorialModeChooser() {
   state.tutorial.index = 0;
   state.tutorial.completing = false;
   clearTutorialHighlight();
+  setTutorialDock("right");
   renderTutorialModeCard();
   tutorialStepCard.classList.add("hidden");
   tutorialModeCard.classList.remove("hidden");

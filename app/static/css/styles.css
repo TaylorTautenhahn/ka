@@ -2475,11 +2475,20 @@ body::after {
   position: fixed;
   inset: 0;
   z-index: 360;
-  display: grid;
-  place-items: center;
-  padding: 0.9rem;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: clamp(0.85rem, 1.8vw, 1.3rem);
   pointer-events: none;
   isolation: isolate;
+}
+
+.tutorial-layer.tutorial-dock-left {
+  justify-content: flex-start;
+}
+
+.tutorial-layer.tutorial-dock-right {
+  justify-content: flex-end;
 }
 
 .tutorial-scrim {
@@ -2491,8 +2500,8 @@ body::after {
 
 .tutorial-card {
   position: relative;
-  width: min(620px, calc(100% - 0.5rem));
-  max-height: min(82vh, 720px);
+  width: min(520px, calc(100% - 0.5rem));
+  max-height: min(78vh, 720px);
   overflow: auto;
   z-index: 2;
   pointer-events: auto;
@@ -2733,8 +2742,19 @@ html.light-mode .tutorial-step-hint {
     white-space: nowrap;
   }
 
+  .tutorial-layer {
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0.7rem;
+  }
+
+  .tutorial-layer.tutorial-dock-left,
+  .tutorial-layer.tutorial-dock-right {
+    justify-content: center;
+  }
+
   .tutorial-card {
-    width: min(96vw, 500px);
+    width: min(96vw, 520px);
     max-height: min(82vh, 720px);
     border-radius: 18px;
     padding: 0.9rem;

@@ -18,6 +18,10 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/tokens.css" />
+    <link rel="stylesheet" href="/static/css/layout.css" />
+    <link rel="stylesheet" href="/static/css/components.css" />
+    <link rel="stylesheet" href="/static/css/pages.css" />
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/meeting.js" defer></script>
   </head>
@@ -31,7 +35,7 @@
     </div>
     <main class="shell">
       <header class="hero reveal">
-        <div class="hero-shell">
+        <div class="hero-shell hero-shell-single">
           <div class="hero-copy">
             {% if app_config.logo_path %}
             <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
@@ -40,34 +44,60 @@
             <h1>Meeting Packet</h1>
             <p>Dedicated meeting context for one rushee at a time, optimized for review and print-to-PDF exports.</p>
           </div>
-          <aside class="hero-visuals" aria-label="Meeting visuals">
-            <div class="media-slot-grid">
-              <article class="media-slot">
-                <p class="media-slot-label">Meeting Branding</p>
-                <h3 class="media-slot-title">Packet Logo Slot</h3>
-                <p class="media-slot-note">Displays your chapter identity during formal packet review.</p>
-                {% if app_config and app_config.logo_path %}
-                <div class="media-slot-preview logo">
-                  <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
-                </div>
-                {% else %}
-                <div class="media-slot-empty">No logo found. Upload one in Platform Admin.</div>
-                {% endif %}
-              </article>
-              <article class="media-slot">
-                <p class="media-slot-label">Presentation Visual</p>
-                <h3 class="media-slot-title">Meeting Backdrop Slot</h3>
-                <p class="media-slot-note">Space for chapter visual art used in live review sessions.</p>
-                <div class="media-slot-empty">Use this pane for your own chapter meeting visual.</div>
-              </article>
-            </div>
-          </aside>
         </div>
       </header>
 
+      <section class="panel topbar reveal delay-1">
+        <div>
+          <p class="eyebrow">Session</p>
+          <h2 id="meetingSessionTitle">Meeting Packets</h2>
+          <p id="meetingSessionSubtitle" class="muted"></p>
+        </div>
+        <div class="action-row">
+          <a
+            id="meetingOpenDashboardBtn"
+            class="quick-nav-link"
+            href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}"
+          >
+            Open Dashboard
+          </a>
+          <button id="meetingLogoutBtn" type="button" class="secondary">Logout</button>
+        </div>
+      </section>
+
       <nav class="panel quick-nav" aria-label="Tabs">
-        <a href="{{ app_config.base_path }}" class="quick-nav-link">Dashboard</a>
-        <a href="{{ app_config.meeting_base }}" class="quick-nav-link">Meeting Packets</a>
+        <a
+          href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}"
+          class="quick-nav-link"
+        >
+          Dashboard
+        </a>
+        <a
+          href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}"
+          class="quick-nav-link"
+        >
+          Rushees
+        </a>
+        <a
+          href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}"
+          class="quick-nav-link"
+        >
+          Team
+        </a>
+        <a
+          href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}"
+          class="quick-nav-link"
+        >
+          Calendar
+        </a>
+        <a
+          id="meetingAdminNavLink"
+          href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}"
+          class="quick-nav-link"
+        >
+          Admin
+        </a>
+        <a href="{{ app_config.meeting_base }}" class="quick-nav-link desktop-page-link is-active">Meeting Packets</a>
       </nav>
 
       <section class="panel">

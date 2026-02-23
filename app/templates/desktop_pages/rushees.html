@@ -35,7 +35,7 @@
                 </label>
                 <label>
                   State (optional)
-                  <input id="pnmState" type="text" maxlength="64" placeholder="TX or Texas" />
+                  <input id="pnmState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" />
                 </label>
               </div>
               <label>
@@ -49,12 +49,14 @@
               <label>
                 Interests
                 <div id="pnmInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
-                <input id="pnmInterests" type="text" placeholder="Custom interests (comma-separated)" />
+                <input id="pnmInterests" type="hidden" value="" />
+                <p class="muted">Choose approved interest tags only.</p>
               </label>
               <label>
                 Stereotype
                 <div id="pnmStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
-                <input id="pnmStereotype" type="text" required placeholder="Select default or type custom" />
+                <input id="pnmStereotype" type="hidden" value="" />
+                <p class="muted">Choose one approved stereotype tag.</p>
               </label>
               <label>
                 Lunch stats (optional)
@@ -147,11 +149,11 @@
             </label>
             <label>
               Stereotype
-              <input id="rusheeFilterStereotype" type="text" placeholder="Connector" />
+              <input id="rusheeFilterStereotype" list="stereotypeFilterHints" type="text" placeholder="Connector" />
             </label>
             <label>
               State
-              <input id="rusheeFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+              <input id="rusheeFilterState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
             </label>
             <label class="btn-wrap">
               <span>&nbsp;</span>

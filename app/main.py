@@ -265,17 +265,26 @@ DEFAULT_RATING_CRITERIA: list[dict[str, Any]] = [
 ]
 DEFAULT_INTEREST_TAG_SUGGESTIONS = [
     "Leadership",
+    "Academics",
+    "Career",
+    "Community",
+    "Culture",
+    "Service",
     "Sports",
     "Fitness",
     "Finance",
+    "Business",
     "Outdoors",
     "Music",
+    "Technology",
+    "Wellness",
     "Faith",
-    "Academics",
-    "Entrepreneurship",
     "Philanthropy",
     "Gaming",
     "Travel",
+    "Food",
+    "Fashion",
+    "Entrepreneurship",
 ]
 DEFAULT_STEREOTYPE_TAG_SUGGESTIONS = [
     "Leader",
@@ -1058,6 +1067,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         },
         "default_interest_tags": list(tenant.default_interest_tags),
         "default_stereotype_tags": list(tenant.default_stereotype_tags),
+        "state_options": [{"code": code, "name": name} for code, name in sorted(US_STATE_CODE_TO_NAME.items())],
         "desktop_routes": desktop_routes,
         "member_signup_path": member_base,
         "member_signup_qr_path": member_signup_qr_path,
@@ -2131,6 +2141,96 @@ def parse_interests(payload: str | list[str]) -> list[str]:
     if not normalized:
         raise ValueError("Provide at least one interest.")
     return normalized
+
+
+def allowed_interest_map_for_tenant(tenant: TenantContext | None = None) -> dict[str, str]:
+    resolved = tenant if tenant is not None else CURRENT_TENANT.get()
+    source = list(resolved.default_interest_tags) if resolved else list(DEFAULT_INTEREST_TAG_SUGGESTIONS)
+    allowed: dict[str, str] = {}
+    for raw in source:
+        try:
+            normalized = normalize_interest(str(raw))
+        except ValueError:
+            continue
+        key = normalized.lower()
+        if key in allowed:
+            continue
+        allowed[key] = normalized
+    if allowed:
+        return allowed
+    fallback: dict[str, str] = {}
+    for raw in DEFAULT_INTEREST_TAG_SUGGESTIONS:
+        normalized = normalize_interest(raw)
+        fallback[normalized.lower()] = normalized
+    return fallback
+
+
+def allowed_stereotype_map_for_tenant(tenant: TenantContext | None = None) -> dict[str, str]:
+    resolved = tenant if tenant is not None else CURRENT_TENANT.get()
+    source = list(resolved.default_stereotype_tags) if resolved else list(DEFAULT_STEREOTYPE_TAG_SUGGESTIONS)
+    allowed: dict[str, str] = {}
+    for raw in source:
+        token = sanitize_short_text(str(raw), "", max_length=48)
+        if not token:
+            continue
+        key = token.lower()
+        if key in allowed:
+            continue
+        allowed[key] = token
+    if allowed:
+        return allowed
+    fallback: dict[str, str] = {}
+    for raw in DEFAULT_STEREOTYPE_TAG_SUGGESTIONS:
+        token = sanitize_short_text(raw, "", max_length=48)
+        if token:
+            fallback[token.lower()] = token
+    return fallback
+
+
+def default_interest_tag_for_tenant(tenant: TenantContext | None = None) -> str:
+    allowed = allowed_interest_map_for_tenant(tenant)
+    return next(iter(allowed.values()))
+
+
+def default_stereotype_tag_for_tenant(tenant: TenantContext | None = None) -> str:
+    allowed = allowed_stereotype_map_for_tenant(tenant)
+    return next(iter(allowed.values()))
+
+
+def enforce_allowed_interests(interests: list[str], tenant: TenantContext | None = None) -> list[str]:
+    allowed = allowed_interest_map_for_tenant(tenant)
+    normalized: list[str] = []
+    seen: set[str] = set()
+    invalid: list[str] = []
+    for item in interests:
+        key = item.lower()
+        canonical = allowed.get(key)
+        if not canonical:
+            invalid.append(item)
+            continue
+        canonical_key = canonical.lower()
+        if canonical_key in seen:
+            continue
+        seen.add(canonical_key)
+        normalized.append(canonical)
+    if invalid:
+        raise ValueError(
+            f"Interests must be selected from approved options. Unsupported: {', '.join(sorted(set(invalid), key=str.lower))}."
+        )
+    if not normalized:
+        raise ValueError("Select at least one approved interest.")
+    return normalized
+
+
+def enforce_allowed_stereotype(stereotype: str, tenant: TenantContext | None = None) -> str:
+    token = sanitize_short_text(stereotype, "", max_length=48)
+    if not token:
+        raise ValueError("Stereotype is required.")
+    allowed = allowed_stereotype_map_for_tenant(tenant)
+    canonical = allowed.get(token.lower())
+    if not canonical:
+        raise ValueError("Stereotype must be selected from approved options.")
+    return canonical
 
 
 def encode_interests(interests: list[str]) -> tuple[str, str]:
@@ -8751,10 +8851,9 @@ async def import_google_form_csv(
                 instagram_handle = normalize_instagram_handle(instagram_raw)
                 phone_number = normalize_phone_number(phone_raw)
                 first_event_date = verify_iso_date(first_event_raw, "First event date")
-                interests = parse_interests("Recruitment")
+                interests = [default_interest_tag_for_tenant()]
                 interests_csv, interests_norm = encode_interests(interests)
-                stereotype = "Unassigned"
-                stereotype = stereotype[:48]
+                stereotype = default_stereotype_tag_for_tenant()
                 notes = ""
             except ValueError as exc:
                 total_errors += 1
@@ -9023,8 +9122,8 @@ def register(payload: RegisterRequest) -> dict[str, str]:
     first_name = normalize_name((parts[0] if parts else "Rush")[:48])
     last_name = normalize_name((parts[1] if len(parts) > 1 else "Officer")[:48])
     pledge_class = "Open"
-    stereotype = "Unassigned"
-    interests_csv, interests_norm = encode_interests(["Recruitment"])
+    stereotype = default_stereotype_tag_for_tenant()
+    interests_csv, interests_norm = encode_interests([default_interest_tag_for_tenant()])
     emoji = payload.emoji if payload.emoji else "🛡️"
     city = payload.city if payload.city is not None else ""
     state_code = payload.state if payload.state is not None else ""
@@ -9095,8 +9194,8 @@ def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
     first_name = normalize_name((parts[0] if parts else "Fraternity")[:48])
     last_name = normalize_name((parts[1] if len(parts) > 1 else "Member")[:48])
     pledge_class = "Brotherhood"
-    stereotype = "Member"
-    interests_csv, interests_norm = encode_interests(["Brotherhood"])
+    stereotype = default_stereotype_tag_for_tenant()
+    interests_csv, interests_norm = encode_interests([default_interest_tag_for_tenant()])
     city = payload.city if payload.city is not None else ""
     state_code = payload.state if payload.state is not None else ""
 
@@ -9590,14 +9689,14 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
         state_code_value = normalize_state_code(existing["state_code"]) if "state_code" in existing.keys() else ""
 
         if payload.stereotype is not None:
-            stereotype = payload.stereotype.strip()
-            if not stereotype:
-                raise HTTPException(status_code=400, detail="Stereotype cannot be empty.")
-            stereotype_value = stereotype
+            try:
+                stereotype_value = enforce_allowed_stereotype(payload.stereotype)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
 
         if payload.interests is not None:
             try:
-                interests = parse_interests(payload.interests)
+                interests = enforce_allowed_interests(parse_interests(payload.interests))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             interests_csv, interests_norm = encode_interests(interests)
@@ -9670,9 +9769,10 @@ def update_user_location(
 @app.post("/api/pnms")
 def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     try:
-        interests = parse_interests(payload.interests)
+        interests = enforce_allowed_interests(parse_interests(payload.interests))
         instagram_handle = normalize_instagram_handle(payload.instagram_handle)
         phone_number = normalize_phone_number(payload.phone_number)
+        stereotype = enforce_allowed_stereotype(payload.stereotype)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -9680,11 +9780,8 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
     created_at = now_iso()
     first_name = normalize_name(payload.first_name)
     last_name = normalize_name(payload.last_name)
-    stereotype = payload.stereotype.strip()
     hometown = payload.hometown.strip()
     hometown_state_code = resolve_pnm_state_code(hometown, payload.state)
-    if not stereotype:
-        raise HTTPException(status_code=400, detail="Stereotype is required.")
     if not hometown:
         raise HTTPException(status_code=400, detail="Hometown is required.")
 
@@ -9897,13 +9994,18 @@ def update_pnm_details(
         phone_number_raw = payload.phone_number if payload.phone_number is not None else row["phone_number"]
         instagram_raw = payload.instagram_handle if payload.instagram_handle is not None else row["instagram_handle"]
         first_event_date = payload.first_event_date if payload.first_event_date is not None else row["first_event_date"]
-        stereotype = payload.stereotype.strip() if payload.stereotype is not None else row["stereotype"]
+        stereotype = row["stereotype"]
         lunch_stats = payload.lunch_stats.strip() if payload.lunch_stats is not None else row["lunch_stats"]
         notes = payload.notes.strip() if payload.notes is not None else row["notes"]
 
         if not hometown:
             raise HTTPException(status_code=400, detail="Hometown cannot be empty.")
-        if not stereotype:
+        if payload.stereotype is not None:
+            try:
+                stereotype = enforce_allowed_stereotype(payload.stereotype)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+        elif not stereotype:
             raise HTTPException(status_code=400, detail="Stereotype cannot be empty.")
 
         try:
@@ -9916,7 +10018,7 @@ def update_pnm_details(
         interests_norm = row["interests_norm"]
         if payload.interests is not None:
             try:
-                interests = parse_interests(payload.interests)
+                interests = enforce_allowed_interests(parse_interests(payload.interests))
             except ValueError as exc:
                 raise HTTPException(status_code=400, detail=str(exc)) from exc
             interests_csv, interests_norm = encode_interests(interests)
@@ -15231,18 +15333,6 @@ def pnm_leaderboard(limit: int = 100, _: sqlite3.Row = Depends(current_user)) ->
 
 @app.get("/api/interests")
 def list_interests(_: sqlite3.Row = Depends(current_user)) -> dict[str, list[str]]:
-    with db_session() as conn:
-        rows = conn.execute(
-            """
-            SELECT interests FROM users WHERE is_approved = 1
-            UNION ALL
-            SELECT interests FROM pnms
-            """
-        ).fetchall()
-
-    values: set[str] = set()
-    for row in rows:
-        for interest in decode_interests(row["interests"]):
-            values.add(interest)
-
-    return {"interests": sorted(values)}
+    tenant = CURRENT_TENANT.get()
+    values = list(tenant.default_interest_tags) if tenant else list(DEFAULT_INTEREST_TAG_SUGGESTIONS)
+    return {"interests": values}

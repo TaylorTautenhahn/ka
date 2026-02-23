@@ -148,7 +148,7 @@
                   </label>
                   <label>
                     State (optional)
-                    <input id="adminEditState" type="text" maxlength="64" placeholder="TX or Texas" />
+                    <input id="adminEditState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" />
                   </label>
                 </div>
                 <label>
@@ -162,12 +162,14 @@
                 <label>
                   Interests
                   <div id="adminEditInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
-                  <input id="adminEditInterests" type="text" placeholder="Custom interests (comma-separated)" />
+                  <input id="adminEditInterests" type="hidden" value="" />
+                  <p class="muted">Choose approved interest tags only.</p>
                 </label>
                 <label>
                   Stereotype
                   <div id="adminEditStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
-                  <input id="adminEditStereotype" type="text" required placeholder="Select default or type custom" />
+                  <input id="adminEditStereotype" type="hidden" value="" />
+                  <p class="muted">Choose one approved stereotype tag.</p>
                 </label>
                 <label>
                   Lunch stats

@@ -17,17 +17,26 @@ const MOBILE_BASE = (APP_CONFIG.mobile_base || `${BASE_PATH}/mobile`).replace(/\
 const MOBILE_PAGE = (document.body && document.body.dataset.mobilePage) || "";
 const BASE_DEFAULT_INTEREST_TAGS = [
   "Leadership",
+  "Academics",
+  "Career",
+  "Community",
+  "Culture",
+  "Service",
   "Sports",
   "Fitness",
   "Finance",
+  "Business",
   "Outdoors",
   "Music",
+  "Technology",
+  "Wellness",
   "Faith",
-  "Academics",
-  "Entrepreneurship",
   "Philanthropy",
   "Gaming",
   "Travel",
+  "Food",
+  "Fashion",
+  "Entrepreneurship",
 ];
 const BASE_DEFAULT_STEREOTYPE_TAGS = [
   "Leader",
@@ -133,11 +142,39 @@ function parseConfiguredTagList(raw, fallback) {
   return out.length ? out.slice(0, 20) : [...fallback];
 }
 
+function normalizeStateCodeToken(value) {
+  const token = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(token) ? token : "";
+}
+
+function parseStateOptions(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out = [];
+  const seen = new Set();
+  raw.forEach((item) => {
+    if (!item || typeof item !== "object") {
+      return;
+    }
+    const code = normalizeStateCodeToken(item.code);
+    const name = toTitleCase(item.name || "");
+    if (!code || !name || seen.has(code)) {
+      return;
+    }
+    seen.add(code);
+    out.push({ code, name });
+  });
+  return out;
+}
+
 const DEFAULT_INTEREST_TAGS = parseConfiguredTagList(APP_CONFIG.default_interest_tags, BASE_DEFAULT_INTEREST_TAGS);
 const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
   APP_CONFIG.default_stereotype_tags,
   BASE_DEFAULT_STEREOTYPE_TAGS
 );
+const STATE_OPTIONS = parseStateOptions(APP_CONFIG.state_options);
+const mobileStateHints = document.getElementById("mobileStateHints");
 
 const toastEl = document.getElementById("mobileToast");
 let mobileCalendarShare = null;
@@ -274,6 +311,32 @@ function renderTagPickerButtons(pickerEl, tags, selectedSet) {
     .join("");
 }
 
+function renderMobileStateHints(options) {
+  if (!mobileStateHints) {
+    return;
+  }
+  const rows = [];
+  const seen = new Set();
+  (options || []).forEach((entry) => {
+    const code = normalizeStateCodeToken(entry && entry.code);
+    const name = toTitleCase(entry && entry.name ? entry.name : "");
+    if (!code || !name) {
+      return;
+    }
+    const keyCode = `code:${code}`;
+    if (!seen.has(keyCode)) {
+      rows.push(`<option value="${escapeHtml(code)}">${escapeHtml(name)}</option>`);
+      seen.add(keyCode);
+    }
+    const keyName = `name:${name.toLowerCase()}`;
+    if (!seen.has(keyName)) {
+      rows.push(`<option value="${escapeHtml(name)}">${escapeHtml(code)}</option>`);
+      seen.add(keyName);
+    }
+  });
+  mobileStateHints.innerHTML = rows.join("");
+}
+
 function syncInterestPickerFromInput(inputId, pickerId) {
   const input = document.getElementById(inputId);
   const picker = document.getElementById(pickerId);
@@ -304,6 +367,7 @@ function bindInterestPicker(inputId, pickerId) {
   if (!input || !picker || picker.dataset.bound === "1") {
     return;
   }
+  input.readOnly = true;
   picker.dataset.bound = "1";
 
   const applyTagToggle = (tag) => {
@@ -355,6 +419,7 @@ function bindStereotypePicker(inputId, pickerId) {
   if (!input || !picker || picker.dataset.bound === "1") {
     return;
   }
+  input.readOnly = true;
   picker.dataset.bound = "1";
 
   const applyStereotype = (tag) => {
@@ -999,7 +1064,12 @@ async function handleCreateSubmit(event) {
   event.preventDefault();
   const interestsValue = document.getElementById("mobilePnmInterests").value.trim();
   if (!interestsValue) {
-    showToast("Select or type at least one interest.");
+    showToast("Select at least one approved interest tag.");
+    return;
+  }
+  const stereotypeValue = document.getElementById("mobilePnmStereotype").value.trim();
+  if (!stereotypeValue) {
+    showToast("Select one approved stereotype tag.");
     return;
   }
   const body = {
@@ -1012,7 +1082,7 @@ async function handleCreateSubmit(event) {
     instagram_handle: document.getElementById("mobilePnmInstagram").value.trim(),
     first_event_date: document.getElementById("mobilePnmEventDate").value,
     interests: interestsValue,
-    stereotype: document.getElementById("mobilePnmStereotype").value.trim(),
+    stereotype: stereotypeValue,
     lunch_stats: document.getElementById("mobilePnmLunchStats").value.trim(),
     notes: document.getElementById("mobilePnmNotes").value.trim(),
   };
@@ -1163,6 +1233,7 @@ async function loadPageData() {
 }
 
 async function init() {
+  renderMobileStateHints(STATE_OPTIONS);
   await ensureSession();
   attachPageEvents();
   await loadPageData();

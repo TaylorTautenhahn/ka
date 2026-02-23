@@ -127,6 +127,8 @@ const memberFilterCity = document.getElementById("memberFilterCity");
 const memberSortSelectDesktop = document.getElementById("memberSortSelectDesktop");
 const applyMemberFiltersBtn = document.getElementById("applyMemberFiltersBtn");
 const interestHints = document.getElementById("interestHints");
+const stereotypeFilterHints = document.getElementById("stereotypeFilterHints");
+const stateFilterHints = document.getElementById("stateFilterHints");
 const adminNavLink = document.getElementById("adminNavLink");
 
 const pnmForm = document.getElementById("pnmForm");
@@ -282,17 +284,26 @@ const TUTORIAL_MODE_QUICK = "quick";
 const TUTORIAL_VERSION = 1;
 const BASE_DEFAULT_INTEREST_TAGS = [
   "Leadership",
+  "Academics",
+  "Career",
+  "Community",
+  "Culture",
+  "Service",
   "Sports",
   "Fitness",
   "Finance",
+  "Business",
   "Outdoors",
   "Music",
+  "Technology",
+  "Wellness",
   "Faith",
-  "Academics",
-  "Entrepreneurship",
   "Philanthropy",
   "Gaming",
   "Travel",
+  "Food",
+  "Fashion",
+  "Entrepreneurship",
 ];
 const BASE_DEFAULT_STEREOTYPE_TAGS = [
   "Leader",
@@ -354,6 +365,32 @@ function parseConfiguredTagList(raw, fallback) {
   return out.length ? out.slice(0, 20) : [...fallback];
 }
 
+function normalizeStateCodeToken(value) {
+  const token = String(value || "").trim().toUpperCase();
+  return /^[A-Z]{2}$/.test(token) ? token : "";
+}
+
+function parseStateOptions(raw) {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  const out = [];
+  const seen = new Set();
+  raw.forEach((item) => {
+    if (!item || typeof item !== "object") {
+      return;
+    }
+    const code = normalizeStateCodeToken(item.code);
+    const name = toTitleCase(item.name || "");
+    if (!code || !name || seen.has(code)) {
+      return;
+    }
+    seen.add(code);
+    out.push({ code, name });
+  });
+  return out;
+}
+
 function parseRatingCriteria(raw) {
   const byField = new Map();
   if (Array.isArray(raw)) {
@@ -391,6 +428,7 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
   APP_CONFIG.default_stereotype_tags,
   BASE_DEFAULT_STEREOTYPE_TAGS
 );
+const STATE_OPTIONS = parseStateOptions(APP_CONFIG.state_options);
 
 const state = {
   user: null,
@@ -657,6 +695,7 @@ function bindInterestPicker(inputId, pickerId) {
   if (!input || !picker || picker.dataset.bound === "1") {
     return;
   }
+  input.readOnly = true;
   picker.dataset.bound = "1";
 
   const applyTagToggle = (tag) => {
@@ -708,6 +747,7 @@ function bindStereotypePicker(inputId, pickerId) {
   if (!input || !picker || picker.dataset.bound === "1") {
     return;
   }
+  input.readOnly = true;
   picker.dataset.bound = "1";
 
   const applyStereotype = (tag) => {
@@ -2523,7 +2563,50 @@ function renderAssignmentControls() {
 }
 
 function renderInterestHints(interests) {
+  if (!interestHints) {
+    return;
+  }
   interestHints.innerHTML = interests.map((interest) => `<option value="${escapeHtml(interest)}"></option>`).join("");
+}
+
+function renderStereotypeFilterHints(stereotypes) {
+  if (!stereotypeFilterHints) {
+    return;
+  }
+  stereotypeFilterHints.innerHTML = (stereotypes || [])
+    .map((stereotype) => `<option value="${escapeHtml(stereotype)}"></option>`)
+    .join("");
+}
+
+function renderStateFilterHints(options) {
+  if (!stateFilterHints) {
+    return;
+  }
+  const rows = [];
+  const seen = new Set();
+  (options || []).forEach((entry) => {
+    const code = normalizeStateCodeToken(entry && entry.code);
+    const name = toTitleCase(entry && entry.name ? entry.name : "");
+    if (!code || !name) {
+      return;
+    }
+    const keyCode = `code:${code}`;
+    if (!seen.has(keyCode)) {
+      rows.push(`<option value="${escapeHtml(code)}">${escapeHtml(name)}</option>`);
+      seen.add(keyCode);
+    }
+    const keyName = `name:${name.toLowerCase()}`;
+    if (!seen.has(keyName)) {
+      rows.push(`<option value="${escapeHtml(name)}">${escapeHtml(code)}</option>`);
+      seen.add(keyName);
+    }
+  });
+  stateFilterHints.innerHTML = rows.join("");
+}
+
+function initializeFilterHintLists() {
+  renderStereotypeFilterHints(DEFAULT_STEREOTYPE_TAGS);
+  renderStateFilterHints(STATE_OPTIONS);
 }
 
 function renderPnmSelectOptions() {
@@ -3647,8 +3730,12 @@ async function loadPnmDetail(pnmId) {
 }
 
 async function loadInterestHints() {
-  const payload = await api("/api/interests");
-  renderInterestHints(payload.interests || []);
+  try {
+    const payload = await api("/api/interests");
+    renderInterestHints(payload.interests || DEFAULT_INTEREST_TAGS);
+  } catch {
+    renderInterestHints(DEFAULT_INTEREST_TAGS);
+  }
 }
 
 async function loadPnms(options = {}) {
@@ -4242,7 +4329,12 @@ async function handlePnmCreate(event) {
 
   const interestsValue = document.getElementById("pnmInterests").value.trim();
   if (!interestsValue) {
-    showToast("Select or type at least one interest.");
+    showToast("Select at least one approved interest tag.");
+    return;
+  }
+  const stereotypeValue = document.getElementById("pnmStereotype").value.trim();
+  if (!stereotypeValue) {
+    showToast("Select one approved stereotype tag.");
     return;
   }
   const photoFile = pnmPhotoInput.files && pnmPhotoInput.files.length ? pnmPhotoInput.files[0] : null;
@@ -4256,7 +4348,7 @@ async function handlePnmCreate(event) {
     instagram_handle: document.getElementById("pnmInstagram").value.trim(),
     first_event_date: document.getElementById("pnmEventDate").value,
     interests: interestsValue,
-    stereotype: document.getElementById("pnmStereotype").value.trim(),
+    stereotype: stereotypeValue,
     lunch_stats: document.getElementById("pnmLunchStats").value.trim(),
     notes: document.getElementById("pnmNotes").value.trim(),
     auto_photo_from_instagram: !photoFile,
@@ -4920,7 +5012,12 @@ async function handleAdminPnmEditorSubmit(event) {
 
   const interestsValue = document.getElementById("adminEditInterests").value.trim();
   if (!interestsValue) {
-    showToast("Select or type at least one interest.");
+    showToast("Select at least one approved interest tag.");
+    return;
+  }
+  const stereotypeValue = document.getElementById("adminEditStereotype").value.trim();
+  if (!stereotypeValue) {
+    showToast("Select one approved stereotype tag.");
     return;
   }
   const saveButton = document.getElementById("saveAdminPnmBtn");
@@ -4934,7 +5031,7 @@ async function handleAdminPnmEditorSubmit(event) {
     phone_number: document.getElementById("adminEditPhoneNumber").value.trim(),
     instagram_handle: document.getElementById("adminEditInstagramHandle").value.trim(),
     interests: interestsValue,
-    stereotype: document.getElementById("adminEditStereotype").value.trim(),
+    stereotype: stereotypeValue,
     lunch_stats: document.getElementById("adminEditLunchStats").value.trim(),
     notes: document.getElementById("adminEditNotes").value.trim(),
   };
@@ -5899,6 +5996,7 @@ async function init() {
   applyRatingCriteriaUi();
   setRoleEmojiRequirement();
   initializePresetTagPickers();
+  initializeFilterHintLists();
   syncFilterInputsFromState();
   syncOpenMeetingLink();
   attachEvents();

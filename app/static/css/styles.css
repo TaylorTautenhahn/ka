@@ -552,32 +552,6 @@ h3 {
   margin-bottom: 0.05rem;
 }
 
-.workflow-tips {
-  border: 1px solid rgba(var(--gold-rgb), 0.32);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.66), rgba(255, 247, 227, 0.64));
-}
-
-.tips-grid {
-  display: grid;
-  gap: 0.7rem;
-  grid-template-columns: 1fr;
-}
-
-.tips-grid article {
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  border-radius: 12px;
-  padding: 0.55rem 0.62rem;
-  background: rgba(255, 255, 255, 0.64);
-}
-
-.tips-grid strong {
-  display: block;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 0.92rem;
-  color: var(--accent);
-  margin-bottom: 0.24rem;
-}
-
 .emphasis-panel {
   border: 1px solid rgba(var(--accent-rgb), 0.36);
   box-shadow: 0 16px 30px rgba(var(--accent-shadow-rgb), 0.16);
@@ -1957,10 +1931,6 @@ td strong {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .tips-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .tenant-picker-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2408,12 +2378,6 @@ body::after {
   gap: 1rem;
 }
 
-.workflow-tips {
-  border: 1px solid rgba(var(--gold-rgb), 0.34);
-  background: linear-gradient(160deg, rgba(252, 255, 255, 0.94), rgba(255, 251, 240, 0.92));
-}
-
-.tips-grid article,
 .card,
 .list-box,
 .list-column,

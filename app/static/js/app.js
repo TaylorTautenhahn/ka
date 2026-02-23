@@ -1284,6 +1284,15 @@ function tutorialRoleSummary(role) {
 function tutorialBaseStepsForRole(role) {
   const commonOfficerSteps = [
     {
+      page: "rushees",
+      target: "#pnmForm",
+      title: "Core Workflow: Add, Rate, Run Meeting",
+      body: "Use the same three-step sequence every cycle: 1) Add + Select a rushee, 2) Rate + Log activity, 3) Run Meeting packets for final decisions.",
+      hint: "Step 1 starts in Rushees form, Step 2 in the rating and lunch forms, Step 3 from Open Meeting Page.",
+      advanced:
+        "Advanced workflow: keep this sequence strict after every event block so decisions stay consistent and auditable.",
+    },
+    {
       page: "overview",
       target: "#desktopPageNav",
       title: "Use Navigation As The Command Rail",
@@ -1466,7 +1475,7 @@ function buildTutorialSteps(role, mode) {
     return [];
   }
   if (mode === TUTORIAL_MODE_QUICK) {
-    const selectedIndices = [0, 3, 4, 6, base.length - 1];
+    const selectedIndices = [0, 4, 5, 6, base.length - 1];
     const seen = new Set();
     return selectedIndices
       .filter((index) => index >= 0 && index < base.length)

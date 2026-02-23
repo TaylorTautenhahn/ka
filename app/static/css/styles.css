@@ -2475,31 +2475,44 @@ body::after {
   position: fixed;
   inset: 0;
   z-index: 360;
+  display: grid;
+  place-items: center;
+  padding: 0.9rem;
+  pointer-events: none;
+  isolation: isolate;
 }
 
 .tutorial-scrim {
   position: absolute;
   inset: 0;
-  background: rgba(8, 13, 22, 0.66);
-  backdrop-filter: blur(4px);
+  background: radial-gradient(circle at 20% 12%, rgba(var(--accent-rgb), 0.22), rgba(8, 13, 22, 0.26) 46%, rgba(8, 13, 22, 0.34) 100%);
+  pointer-events: none;
 }
 
 .tutorial-card {
-  position: absolute;
-  width: min(580px, calc(100% - 1.5rem));
-  max-height: min(78vh, 700px);
+  position: relative;
+  width: min(620px, calc(100% - 0.5rem));
+  max-height: min(82vh, 720px);
   overflow: auto;
-  left: 50%;
-  top: 50%;
-  transform: translate(-50%, -50%);
   z-index: 2;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background: linear-gradient(150deg, rgba(11, 21, 39, 0.95), rgba(19, 34, 58, 0.88));
+  pointer-events: auto;
+  border-radius: 24px;
+  border: 1px solid rgba(var(--accent-rgb), 0.42);
+  background: linear-gradient(160deg, rgba(9, 20, 43, 0.98), rgba(13, 34, 69, 0.96));
   box-shadow:
-    0 28px 60px rgba(4, 8, 14, 0.48),
-    0 0 0 1px rgba(var(--accent-rgb), 0.14) inset;
+    0 30px 72px rgba(3, 8, 18, 0.58),
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset;
   padding: clamp(1rem, 2.2vw, 1.4rem);
+  color: #f6fbff;
+}
+
+.tutorial-card .muted {
+  color: rgba(225, 236, 255, 0.9);
+}
+
+.tutorial-card .entry {
+  border-color: rgba(164, 190, 236, 0.28);
+  background: linear-gradient(145deg, rgba(18, 36, 70, 0.65), rgba(13, 29, 57, 0.56));
 }
 
 .tutorial-mode-grid {
@@ -2517,9 +2530,9 @@ body::after {
   gap: 0.45rem;
   padding: 0.8rem 0.86rem;
   border-radius: 14px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  background: linear-gradient(148deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.03));
-  color: #f5f8ff;
+  border: 1px solid rgba(163, 191, 240, 0.38);
+  background: linear-gradient(148deg, rgba(67, 114, 195, 0.3), rgba(24, 54, 102, 0.38));
+  color: #f8fbff;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
@@ -2529,7 +2542,7 @@ body::after {
 }
 
 .tutorial-mode-btn span {
-  color: rgba(235, 242, 255, 0.8);
+  color: rgba(236, 244, 255, 0.9);
   font-size: 0.81rem;
   line-height: 1.45;
 }
@@ -2556,9 +2569,9 @@ body::after {
   margin-top: 0.58rem;
   padding: 0.62rem 0.68rem;
   border-radius: 12px;
-  border: 1px solid rgba(var(--gold-rgb), 0.32);
-  background: rgba(var(--gold-rgb), 0.12);
-  color: rgba(255, 250, 238, 0.94);
+  border: 1px solid rgba(var(--gold-rgb), 0.5);
+  background: linear-gradient(135deg, rgba(var(--gold-rgb), 0.24), rgba(var(--accent-rgb), 0.17));
+  color: #fff8ea;
   font-size: 0.86rem;
 }
 
@@ -2616,17 +2629,30 @@ body::after {
 }
 
 html.light-mode .tutorial-scrim {
-  background: rgba(8, 13, 22, 0.52);
+  background: radial-gradient(circle at 18% 10%, rgba(var(--accent-rgb), 0.12), rgba(15, 25, 40, 0.08) 48%, rgba(15, 25, 40, 0.14) 100%);
 }
 
 html.light-mode .tutorial-card {
-  border-color: rgba(27, 40, 63, 0.14);
-  background: linear-gradient(156deg, rgba(250, 252, 255, 0.97), rgba(238, 245, 252, 0.95));
+  border-color: rgba(27, 56, 98, 0.28);
+  background: linear-gradient(156deg, rgba(252, 254, 255, 0.99), rgba(240, 247, 255, 0.98));
+  box-shadow:
+    0 28px 60px rgba(16, 34, 64, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.92) inset;
+  color: #0f2440;
+}
+
+html.light-mode .tutorial-card .muted {
+  color: rgba(23, 45, 76, 0.84);
+}
+
+html.light-mode .tutorial-card .entry {
+  border-color: rgba(36, 69, 116, 0.2);
+  background: linear-gradient(145deg, rgba(250, 252, 255, 0.98), rgba(236, 243, 255, 0.95));
 }
 
 html.light-mode .tutorial-mode-btn {
   background: linear-gradient(148deg, rgba(255, 255, 255, 0.94), rgba(241, 247, 255, 0.96));
-  border-color: rgba(26, 50, 87, 0.16);
+  border-color: rgba(26, 50, 87, 0.24);
   color: #10213b;
 }
 

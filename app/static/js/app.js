@@ -836,6 +836,20 @@ function resolveApiPath(path) {
   return path;
 }
 
+function resolveTenantPath(path) {
+  const raw = String(path || "").trim();
+  if (!raw) {
+    return raw;
+  }
+  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("mailto:") || raw.startsWith("tel:") || raw.startsWith("#")) {
+    return raw;
+  }
+  if (raw.startsWith("/") && BASE_PATH && !raw.startsWith(`${BASE_PATH}/`) && raw !== BASE_PATH) {
+    return `${BASE_PATH}${raw}`;
+  }
+  return raw;
+}
+
 function readCookie(name) {
   const needle = `${name}=`;
   const parts = document.cookie ? document.cookie.split(";") : [];
@@ -960,12 +974,66 @@ function availableDesktopPages() {
   return desktopPages.map((panel) => panel.dataset.page).filter(Boolean);
 }
 
-function currentRequestedDesktopPage() {
-  const requested = new URLSearchParams(window.location.search).get("view");
-  if (!requested) {
-    return DEFAULT_DESKTOP_PAGE;
+function mapDesktopRouteToPage(value) {
+  const token = String(value || "").trim().toLowerCase();
+  if (!token) {
+    return "";
   }
-  return requested.trim().toLowerCase();
+  if (token === "dashboard" || token === "overview") {
+    return "overview";
+  }
+  if (token === "calendar" || token === "operations") {
+    return "operations";
+  }
+  if (token === "team" || token === "members") {
+    return "members";
+  }
+  if (token === "rushees") {
+    return "rushees";
+  }
+  if (token === "admin") {
+    return "admin";
+  }
+  return "";
+}
+
+function desktopRoutePathForPage(page) {
+  const routeMap = APP_CONFIG.desktop_routes || {};
+  if (page === "overview") {
+    return routeMap.dashboard || `${BASE_PATH}/dashboard`;
+  }
+  if (page === "operations") {
+    return routeMap.calendar || `${BASE_PATH}/calendar`;
+  }
+  if (page === "members") {
+    return routeMap.team || `${BASE_PATH}/team`;
+  }
+  if (page === "rushees") {
+    return routeMap.rushees || `${BASE_PATH}/rushees`;
+  }
+  if (page === "admin") {
+    return routeMap.admin || `${BASE_PATH}/admin`;
+  }
+  return routeMap.dashboard || `${BASE_PATH}/dashboard`;
+}
+
+function currentRequestedDesktopPage() {
+  const fromConfig = mapDesktopRouteToPage(APP_CONFIG.desktop_page);
+  if (fromConfig) {
+    return fromConfig;
+  }
+  const viewRequested = mapDesktopRouteToPage(new URLSearchParams(window.location.search).get("view"));
+  if (viewRequested) {
+    return viewRequested;
+  }
+  const path = window.location.pathname || "";
+  const segments = path.split("/").filter(Boolean);
+  const maybeRoute = segments.length ? segments[segments.length - 1] : "";
+  const fromPath = mapDesktopRouteToPage(maybeRoute);
+  if (fromPath) {
+    return fromPath;
+  }
+  return DEFAULT_DESKTOP_PAGE;
 }
 
 function setActiveDesktopPage(page, updateUrl = true) {
@@ -988,9 +1056,12 @@ function setActiveDesktopPage(page, updateUrl = true) {
   if (!updateUrl) {
     return;
   }
-  const url = new URL(window.location.href);
-  url.searchParams.set("view", target);
-  window.history.replaceState({}, "", url.toString());
+  const nextPath = desktopRoutePathForPage(target);
+  const current = window.location.pathname;
+  if (!nextPath || current === nextPath) {
+    return;
+  }
+  window.history.replaceState({}, "", nextPath);
 }
 
 function updateTopbarActions() {
@@ -1058,6 +1129,21 @@ function setSessionHeading() {
   sessionTitle.textContent = state.user.username;
   const emoji = state.user.emoji ? `${state.user.emoji} ` : "";
   sessionSubtitle.textContent = `${emoji}${state.user.role} | Stereotype: ${state.user.stereotype}`;
+}
+
+function showRouteNoticeFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const notice = String(params.get("notice") || "").trim().toLowerCase();
+  if (!notice) {
+    return;
+  }
+  if (notice === "admin-access-denied") {
+    showToast("Admin access is limited to Head Rush Officers.");
+  }
+  params.delete("notice");
+  const nextQuery = params.toString();
+  const nextUrl = `${window.location.pathname}${nextQuery ? `?${nextQuery}` : ""}${window.location.hash || ""}`;
+  window.history.replaceState({}, "", nextUrl);
 }
 
 function roleCanSeeRaters() {
@@ -1920,7 +2006,7 @@ function renderNotifications() {
         ? ""
         : `<button type="button" class="secondary" data-notification-read="${item.notification_id}">Mark Read</button>`;
       const linkBtn = item.link_path
-        ? `<a class="quick-nav-link" href="${escapeHtml(item.link_path)}">Open</a>`
+        ? `<a class="quick-nav-link" href="${escapeHtml(resolveTenantPath(item.link_path))}">Open</a>`
         : "";
       return `
         <div class="entry${readClass}">
@@ -5619,8 +5705,7 @@ function attachEvents() {
       if (!link) {
         return;
       }
-      event.preventDefault();
-      setActiveDesktopPage((link.dataset.page || DEFAULT_DESKTOP_PAGE).toLowerCase());
+      setActiveDesktopPage((link.dataset.page || DEFAULT_DESKTOP_PAGE).toLowerCase(), false);
     });
   }
 
@@ -5685,6 +5770,7 @@ async function init() {
   renderRushCalendar();
   setupPwaInstall();
   await ensureSession();
+  showRouteNoticeFromQuery();
 }
 
 init();

@@ -1,0 +1,17 @@
+#operations {
+  border-color: rgba(var(--accent-rgb), 0.22);
+}
+
+#operations .quick-nav-link {
+  min-width: 220px;
+}
+
+@media (max-width: 1024px) {
+  .topbar .action-row {
+    width: 100%;
+  }
+
+  .topbar .action-row button {
+    flex: 1 1 160px;
+  }
+}

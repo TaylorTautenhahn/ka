@@ -1,0 +1,233 @@
+          <div class="desktop-page{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}" data-page="admin">
+        <section id="adminPanel" class="panel hidden reveal delay-6">
+          <div class="section-head">
+            <h2>Head Rush Officer Console</h2>
+            <p class="muted">Leadership controls, officer metrics, and rushee profile management.</p>
+          </div>
+
+          <div id="headAdminSummary" class="cards"></div>
+
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Season Archive + Reset</h3>
+              <p class="muted">Archives the current rush season and resets for next season. Only one season archive is retained.</p>
+              <div id="seasonArchiveSummary" class="list-box muted">Loading season archive status...</div>
+              <label>
+                Confirmation phrase
+                <input id="seasonArchivePhrase" type="text" placeholder="Type confirmation phrase exactly" />
+              </label>
+              <label>
+                Archive label (optional)
+                <input id="seasonArchiveLabel" type="text" placeholder="Fall 2026 Rush" />
+              </label>
+              <label class="checkbox-line">
+                <input id="seasonHeadChairConfirm" type="checkbox" />
+                I confirm all head rush chairs approved this reset.
+              </label>
+              <div class="action-row">
+                <button id="seasonResetBtn" type="button">Archive + Reset Season</button>
+                <button id="seasonArchiveDownloadBtn" type="button" class="secondary hidden">Download Archived Season</button>
+              </div>
+            </article>
+            <article class="list-column">
+              <h3>What Gets Reset</h3>
+              <div class="list-box">
+                <div class="entry">
+                  <div class="entry-title"><strong>Archived</strong><span>One season snapshot</span></div>
+                  <p class="muted">A single SQLite archive is kept and replaced on each new season reset.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Cleared</strong><span>Next season clean slate</span></div>
+                  <p class="muted">PNMs, ratings, lunches, and rush-season participation counters reset to zero.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Kept</strong><span>Team accounts + roles</span></div>
+                  <p class="muted">Members and permissions remain so the rush team can continue immediately.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Google Form Import</h3>
+              <p class="muted">Have rushees submit this info in a Google Form, then download responses as CSV and import here.</p>
+              <div class="action-row">
+                <button id="downloadGoogleImportTemplateBtn" type="button" class="secondary">Download Google Form Template CSV</button>
+              </div>
+              <p class="muted">Recommended questions: First Name, Last Name, Class Year (F/S/J), Hometown, Phone Number, Instagram Handle.</p>
+              <form id="googleImportForm" class="stack">
+                <label>
+                  Google Form responses CSV
+                  <input id="googleImportFile" type="file" accept=".csv,text/csv" required />
+                </label>
+                <button id="googleImportBtn" type="submit">Import Google Form CSV</button>
+              </form>
+              <div id="googleImportResult" class="list-box muted">No imports yet.</div>
+            </article>
+            <article class="list-column">
+              <h3>Google Form Setup (1-Min)</h3>
+              <div class="list-box">
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 1</strong><span>Create Form</span></div>
+                  <p class="muted">Create a Google Form with the 6 required questions shown above.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 2</strong><span>Collect Responses</span></div>
+                  <p class="muted">Open the Responses sheet and keep one row per rushee.</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 3</strong><span>Download CSV</span></div>
+                  <p class="muted">In Google Sheets: File > Download > Comma Separated Values (.csv).</p>
+                </div>
+                <div class="entry">
+                  <div class="entry-title"><strong>Step 4</strong><span>Import</span></div>
+                  <p class="muted">Upload that CSV above. Duplicates by Instagram handle are skipped automatically.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Leadership Management</h3>
+              <p class="muted">Promote an approved Rush Officer to Head Rush Officer.</p>
+              <label>
+                Rush Officer
+                <select id="promoteOfficerSelect"></select>
+              </label>
+              <label class="checkbox-line">
+                <input id="demoteExistingHeads" type="checkbox" />
+                Transfer leadership (demote current heads to Rush Officer)
+              </label>
+              <div class="action-row">
+                <button id="promoteOfficerBtn" type="button">Promote To Head</button>
+              </div>
+              <h3>Current Head Team</h3>
+              <div id="currentHeadsList" class="list-box"></div>
+            </article>
+
+            <article class="list-column">
+              <h3>Edit Rushee Profile</h3>
+              <form id="adminPnmEditorForm" class="stack">
+                <label>
+                  Select rushee
+                  <select id="adminEditPnmSelect"></select>
+                </label>
+                <div class="inline-grid">
+                  <label>
+                    First name
+                    <input id="adminEditFirstName" type="text" required />
+                  </label>
+                  <label>
+                    Last name
+                    <input id="adminEditLastName" type="text" required />
+                  </label>
+                </div>
+                <div class="inline-grid">
+                  <label>
+                    Class year
+                    <select id="adminEditClassYear" required>
+                      <option value="F">F</option>
+                      <option value="S">S</option>
+                      <option value="J">J</option>
+                    </select>
+                  </label>
+                  <label>
+                    First event date
+                    <input id="adminEditFirstEventDate" type="date" required />
+                  </label>
+                </div>
+                <div class="inline-grid two-cols">
+                  <label>
+                    Hometown
+                    <input id="adminEditHometown" type="text" required />
+                  </label>
+                  <label>
+                    State (optional)
+                    <input id="adminEditState" type="text" maxlength="64" placeholder="TX or Texas" />
+                  </label>
+                </div>
+                <label>
+                  Phone number
+                  <input id="adminEditPhoneNumber" type="text" placeholder="+1 555 123 4567" />
+                </label>
+                <label>
+                  Instagram handle
+                  <input id="adminEditInstagramHandle" type="text" required placeholder="@username" />
+                </label>
+                <label>
+                  Interests
+                  <div id="adminEditInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
+                  <input id="adminEditInterests" type="text" placeholder="Custom interests (comma-separated)" />
+                </label>
+                <label>
+                  Stereotype
+                  <div id="adminEditStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
+                  <input id="adminEditStereotype" type="text" required placeholder="Select default or type custom" />
+                </label>
+                <label>
+                  Lunch stats
+                  <input id="adminEditLunchStats" type="text" placeholder="3 lunches this week" />
+                </label>
+                <label>
+                  Notes
+                  <textarea id="adminEditNotes" rows="3" placeholder="Meeting notes, fit context, concerns"></textarea>
+                </label>
+                <div class="action-row">
+                  <button id="saveAdminPnmBtn" type="submit">Save Rushee Changes</button>
+                </div>
+              </form>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <div class="grid-two">
+            <article class="list-column">
+              <h3>Assignment Manager</h3>
+              <p class="muted">Assign rushees to Rush Officers directly from Head Console.</p>
+              <form id="headAssignmentForm" class="stack">
+                <label>
+                  Rushee
+                  <select id="headAssignPnmSelect"></select>
+                </label>
+                <label>
+                  Rush Officer
+                  <select id="headAssignOfficerSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="headAssignSaveBtn" type="submit">Save Assignment</button>
+                  <button id="headAssignClearBtn" type="button" class="secondary">Clear Assignment</button>
+                </div>
+                <div class="divider"></div>
+                <h4>Assignment Team</h4>
+                <p class="muted">Attach additional Rush Officers to the same rushee for shared ownership.</p>
+                <label>
+                  Additional Rush Officer
+                  <select id="headAddAssigneeSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="headAddAssigneeBtn" type="button">Add To Assignment Team</button>
+                </div>
+                <div id="headAssigneeList" class="list-box"></div>
+              </form>
+            </article>
+            <article class="list-column">
+              <h3>Assignment Board</h3>
+              <p class="muted">Live assignment view across all rushees.</p>
+              <div id="headAssignmentTable" class="table-wrap"></div>
+            </article>
+          </div>
+
+          <div class="divider"></div>
+          <h3>Rush Officer Metrics</h3>
+          <div id="officerMetricsTable" class="table-wrap"></div>
+
+          <div class="divider"></div>
+          <h3>Rushee Roster Controls</h3>
+          <div id="adminPnmTable" class="table-wrap"></div>
+        </section>
+          </div>

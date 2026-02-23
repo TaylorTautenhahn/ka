@@ -1,0 +1,61 @@
+          <div class="desktop-page{% if app_config and app_config.desktop_page == 'members' %} is-active{% endif %}" data-page="members">
+        <section id="memberFiltersSection" class="panel filters reveal delay-4">
+          <h2>Member Filters</h2>
+          <div class="inline-grid filters-grid">
+            <label>
+              Role
+              <select id="memberFilterRole">
+                <option value="all">All</option>
+                <option value="Head Rush Officer">Head Rush Officer</option>
+                <option value="Rush Officer">Rush Officer</option>
+                <option value="Rusher">Rusher</option>
+              </select>
+            </label>
+            <label>
+              State
+              <input id="memberFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+            </label>
+            <label>
+              City
+              <input id="memberFilterCity" type="text" maxlength="80" placeholder="Austin" />
+            </label>
+            <label>
+              Sort
+              <select id="memberSortSelectDesktop">
+                <option value="location">Location (Default)</option>
+                <option value="username">Username</option>
+                <option value="role">Role</option>
+              </select>
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyMemberFiltersBtn" type="button">Apply Member Filters</button>
+            </label>
+          </div>
+        </section>
+
+        <section id="membersSection" class="panel reveal delay-6">
+          <h2>Members</h2>
+          <div id="memberTable" class="table-wrap"></div>
+        </section>
+
+        <section id="sameStatePnmsSection" class="panel reveal delay-6">
+          <h2>Same-State PNMs</h2>
+          <p id="sameStatePnmsHeader" class="muted">Select a member to view PNMs from the same state.</p>
+          <div id="sameStatePnmsList" class="list-box muted">No member selected.</div>
+        </section>
+
+        <section id="approvalsPanel" class="panel hidden reveal delay-4">
+          <h2>Pending Account Approvals</h2>
+          <div id="pendingList" class="table-wrap"></div>
+        </section>
+
+        <section id="assignedRushPanel" class="panel hidden reveal delay-6">
+          <h2 id="assignedRushTitle">Assigned Rushees</h2>
+          <p id="assignedRushSubtitle" class="muted">Assignment visibility appears here for Rush Officers and Heads.</p>
+          <div class="action-row">
+            <button id="assignedRushDownloadBtn" type="button" class="secondary">Download Assigned Contacts (.vcf)</button>
+          </div>
+          <div id="assignedRushTable" class="table-wrap"></div>
+        </section>
+          </div>

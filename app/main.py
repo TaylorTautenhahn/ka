@@ -1059,11 +1059,105 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
     }
 
 
+DESKTOP_ROUTE_TO_PAGE_KEY: dict[str, str] = {
+    "dashboard": "overview",
+    "rushees": "rushees",
+    "team": "members",
+    "calendar": "operations",
+    "admin": "admin",
+}
+DEFAULT_DESKTOP_ROUTE = "dashboard"
+LEGACY_VIEW_TO_ROUTE: dict[str, str] = {
+    "overview": "dashboard",
+    "rushees": "rushees",
+    "members": "team",
+    "admin": "admin",
+}
+
+
+def normalize_desktop_route(route: str | None) -> str:
+    token = str(route or "").strip().lower()
+    if token in DESKTOP_ROUTE_TO_PAGE_KEY:
+        return token
+    return DEFAULT_DESKTOP_ROUTE
+
+
+def desktop_routes_for_tenant(tenant: TenantContext) -> dict[str, str]:
+    return {
+        route: f"/{tenant.slug}/{route}"
+        for route in DESKTOP_ROUTE_TO_PAGE_KEY
+    }
+
+
+def legacy_view_redirect_url(tenant: TenantContext, view: str | None) -> str | None:
+    token = str(view or "").strip().lower()
+    if not token:
+        return None
+    if token == "operations":
+        # Keep legacy bookmark compatibility to dashboard section.
+        return f"/{tenant.slug}/dashboard#operations"
+    mapped_route = LEGACY_VIEW_TO_ROUTE.get(token)
+    if not mapped_route:
+        return None
+    return f"/{tenant.slug}/{mapped_route}"
+
+
+def desktop_context(
+    request: Request,
+    tenant: TenantContext,
+    desktop_route: str,
+    *,
+    is_demo_mode: bool = False,
+) -> dict[str, Any]:
+    resolved_route = normalize_desktop_route(desktop_route)
+    app_config = app_config_for_tenant(tenant)
+    app_config["desktop_page"] = DESKTOP_ROUTE_TO_PAGE_KEY.get(resolved_route, DESKTOP_ROUTE_TO_PAGE_KEY[DEFAULT_DESKTOP_ROUTE])
+    app_config["desktop_route"] = resolved_route
+    app_config["desktop_routes"] = desktop_routes_for_tenant(tenant)
+    return {
+        "request": request,
+        "tenant": tenant,
+        "app_config": app_config,
+        "desktop_route": resolved_route,
+        "is_demo_mode": is_demo_mode,
+    }
+
+
+def render_desktop_page(
+    request: Request,
+    *,
+    desktop_route: str,
+    is_demo_mode: bool = False,
+) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not isinstance(tenant, TenantContext):
+        raise HTTPException(status_code=404, detail="Organization context required.")
+
+    legacy_redirect = legacy_view_redirect_url(tenant, request.query_params.get("view"))
+    if legacy_redirect:
+        return RedirectResponse(url=legacy_redirect, status_code=307)
+
+    session_role = request_session_role(request)
+    if session_role == ROLE_RUSHER:
+        return RedirectResponse(url=f"/{tenant.slug}/member", status_code=307)
+    if request_prefers_mobile(request) and bool(session_role):
+        return RedirectResponse(url=f"/{tenant.slug}/mobile", status_code=307)
+
+    resolved_route = normalize_desktop_route(desktop_route)
+    if resolved_route == "admin" and session_role and session_role != ROLE_HEAD:
+        return RedirectResponse(url=f"/{tenant.slug}/dashboard?notice=admin-access-denied", status_code=307)
+
+    return templates.TemplateResponse(
+        "desktop_shell.html",
+        desktop_context(request, tenant, resolved_route, is_demo_mode=is_demo_mode),
+    )
+
+
 def manifest_payload_for_tenant(tenant: TenantContext | None) -> dict[str, Any]:
     if tenant:
         display_name = tenant.display_name.strip() or "BidBoard"
         chapter_short = (tenant.chapter_name or display_name).strip()
-        start_url = f"/{tenant.slug}/"
+        start_url = f"/{tenant.slug}/dashboard"
         scope = f"/{tenant.slug}/"
         return {
             "name": f"{display_name} | BidBoard",
@@ -7491,19 +7585,10 @@ def startup() -> None:
 async def home(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if tenant:
-        session_role = request_session_role(request)
-        if session_role == ROLE_RUSHER:
-            return RedirectResponse(url=f"/{tenant.slug}/member", status_code=307)
-        if request_prefers_mobile(request) and bool(session_role):
-            return RedirectResponse(url=f"/{tenant.slug}/mobile", status_code=307)
-        return templates.TemplateResponse(
-            "index.html",
-            {
-                "request": request,
-                "tenant": tenant,
-                "app_config": app_config_for_tenant(tenant),
-            },
-        )
+        legacy_redirect = legacy_view_redirect_url(tenant, request.query_params.get("view"))
+        if legacy_redirect:
+            return RedirectResponse(url=legacy_redirect, status_code=307)
+        return RedirectResponse(url=f"/{tenant.slug}/{DEFAULT_DESKTOP_ROUTE}", status_code=307)
 
     tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
     return templates.TemplateResponse(
@@ -7665,15 +7750,7 @@ async def demo_page(request: Request) -> HTMLResponse:
     if not tenant:
         raise HTTPException(status_code=404, detail="Demo is currently unavailable.")
 
-    response = templates.TemplateResponse(
-        "index.html",
-        {
-            "request": request,
-            "tenant": tenant,
-            "app_config": app_config_for_tenant(tenant),
-            "is_demo_mode": True,
-        },
-    )
+    response = templates.TemplateResponse("desktop_shell.html", desktop_context(request, tenant, DEFAULT_DESKTOP_ROUTE, is_demo_mode=True))
     if DEMO_AUTO_LOGIN and request.query_params.get("autologin", "1") != "0":
         ensure_demo_head_session(request, response, tenant)
     return response
@@ -7710,6 +7787,31 @@ async def meeting_page(request: Request) -> HTMLResponse:
             "app_config": app_config_for_tenant(tenant),
         },
     )
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def desktop_dashboard_page(request: Request) -> HTMLResponse:
+    return render_desktop_page(request, desktop_route="dashboard")
+
+
+@app.get("/rushees", response_class=HTMLResponse)
+async def desktop_rushees_page(request: Request) -> HTMLResponse:
+    return render_desktop_page(request, desktop_route="rushees")
+
+
+@app.get("/team", response_class=HTMLResponse)
+async def desktop_team_page(request: Request) -> HTMLResponse:
+    return render_desktop_page(request, desktop_route="team")
+
+
+@app.get("/calendar", response_class=HTMLResponse)
+async def desktop_calendar_page(request: Request) -> HTMLResponse:
+    return render_desktop_page(request, desktop_route="calendar")
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def desktop_admin_page(request: Request) -> HTMLResponse:
+    return render_desktop_page(request, desktop_route="admin")
 
 
 @app.get("/member", response_class=HTMLResponse)

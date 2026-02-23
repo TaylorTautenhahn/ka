@@ -1,0 +1,19 @@
+.shell {
+  width: min(calc(100% - 1.2rem), 1520px);
+}
+
+.quick-nav {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.quick-nav-link {
+  white-space: nowrap;
+}
+
+@media (max-width: 1280px) {
+  .shell {
+    width: min(calc(100% - 1rem), 1440px);
+  }
+}

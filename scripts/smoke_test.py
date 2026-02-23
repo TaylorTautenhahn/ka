@@ -103,14 +103,46 @@ def main() -> None:
                 raise AssertionError("Root manifest short_name should be BidBoard.")
             checks.append("Root web manifest responds")
 
-            response = client.get("/kappaalphaorder")
-            expect_status(response, 200, "Tenant web app page")
-            checks.append("Tenant route responds")
+            response = client.get("/kappaalphaorder", follow_redirects=False)
+            expect_status(response, 307, "Tenant root redirect")
+            if response.headers.get("location") != "/kappaalphaorder/dashboard":
+                raise AssertionError("Tenant root should redirect to /{tenant}/dashboard.")
+            checks.append("Tenant root redirects to dashboard route")
+
+            response = client.get("/kappaalphaorder?view=overview", follow_redirects=False)
+            expect_status(response, 307, "Legacy overview redirect")
+            if response.headers.get("location") != "/kappaalphaorder/dashboard":
+                raise AssertionError("Legacy ?view=overview should redirect to dashboard.")
+            checks.append("Legacy overview query redirect works")
+
+            response = client.get("/kappaalphaorder?view=operations", follow_redirects=False)
+            expect_status(response, 307, "Legacy operations redirect")
+            if response.headers.get("location") != "/kappaalphaorder/dashboard#operations":
+                raise AssertionError("Legacy ?view=operations should redirect to dashboard#operations.")
+            checks.append("Legacy operations query redirect works")
+
+            response = client.get("/kappaalphaorder?view=members", follow_redirects=False)
+            expect_status(response, 307, "Legacy members redirect")
+            if response.headers.get("location") != "/kappaalphaorder/team":
+                raise AssertionError("Legacy ?view=members should redirect to /team.")
+            checks.append("Legacy members query redirect works")
+
+            response = client.get("/kappaalphaorder/dashboard")
+            expect_status(response, 200, "Dashboard route")
+            response = client.get("/kappaalphaorder/rushees")
+            expect_status(response, 200, "Rushees route")
+            response = client.get("/kappaalphaorder/team")
+            expect_status(response, 200, "Team route")
+            response = client.get("/kappaalphaorder/calendar")
+            expect_status(response, 200, "Calendar route")
+            response = client.get("/kappaalphaorder/admin")
+            expect_status(response, 200, "Admin route (anonymous login shell)")
+            checks.append("Desktop route pages respond")
 
             response = client.get("/kappaalphaorder/manifest.webmanifest")
             expect_status(response, 200, "Tenant manifest")
             tenant_manifest = response.json()
-            if tenant_manifest.get("start_url") != "/kappaalphaorder/":
+            if tenant_manifest.get("start_url") != "/kappaalphaorder/dashboard":
                 raise AssertionError("Tenant manifest start_url is incorrect.")
             checks.append("Tenant web manifest responds")
 
@@ -172,6 +204,10 @@ def main() -> None:
                 raise AssertionError("Remember-me login did not store remember session TTL.")
             checks.append("Head login works")
             checks.append("Remember-me session TTL stored for tenant user")
+
+            response = client.get("/kappaalphaorder/admin")
+            expect_status(response, 200, "Head can open admin route")
+            checks.append("Head can access admin route")
 
             response = client.get("/kappaalphaorder/api/users/pending")
             expect_status(response, 200, "Pending users list")
@@ -369,6 +405,12 @@ def main() -> None:
             expect_status(response, 200, "Approved officer login")
             sync_csrf_header()
             checks.append("Approved officer login works")
+
+            response = client.get("/kappaalphaorder/admin", follow_redirects=False)
+            expect_status(response, 307, "Officer blocked from admin route")
+            if response.headers.get("location") != "/kappaalphaorder/dashboard?notice=admin-access-denied":
+                raise AssertionError("Non-head admin route access should redirect to dashboard with notice.")
+            checks.append("Admin route guard redirects non-head users")
 
             response = client.post(
                 "/kappaalphaorder/api/ratings",

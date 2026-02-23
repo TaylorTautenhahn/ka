@@ -1,0 +1,251 @@
+          <div class="desktop-page{% if app_config and app_config.desktop_page == 'rushees' %} is-active{% endif %}" data-page="rushees">
+
+        <div id="createSection" class="grid-two reveal delay-3">
+          <section class="panel emphasis-panel">
+            <h2>Create PNM</h2>
+            <form id="pnmForm" class="stack">
+              <div class="inline-grid">
+                <label>
+                  First name
+                  <input id="pnmFirstName" type="text" required />
+                </label>
+                <label>
+                  Last name
+                  <input id="pnmLastName" type="text" required />
+                </label>
+              </div>
+              <div class="inline-grid">
+                <label>
+                  Class year
+                  <select id="pnmClassYear" required>
+                    <option>F</option>
+                    <option>S</option>
+                    <option>J</option>
+                  </select>
+                </label>
+                <label>
+                  First event date
+                  <input id="pnmEventDate" type="date" required />
+                </label>
+              </div>
+              <div class="inline-grid two-cols">
+                <label>
+                  Hometown
+                  <input id="pnmHometown" type="text" required />
+                </label>
+                <label>
+                  State (optional)
+                  <input id="pnmState" type="text" maxlength="64" placeholder="TX or Texas" />
+                </label>
+              </div>
+              <label>
+                Phone number (optional)
+                <input id="pnmPhone" type="text" placeholder="+1 555 123 4567" />
+              </label>
+              <label>
+                Instagram handle
+                <input id="pnmInstagram" type="text" required placeholder="@username" />
+              </label>
+              <label>
+                Interests
+                <div id="pnmInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
+                <input id="pnmInterests" type="text" placeholder="Custom interests (comma-separated)" />
+              </label>
+              <label>
+                Stereotype
+                <div id="pnmStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
+                <input id="pnmStereotype" type="text" required placeholder="Select default or type custom" />
+              </label>
+              <label>
+                Lunch stats (optional)
+                <input id="pnmLunchStats" type="text" placeholder="3 lunches this week" />
+              </label>
+              <label>
+                Notes (optional)
+                <textarea id="pnmNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea>
+              </label>
+              <label>
+                PNM photo (optional)
+                <input id="pnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+              </label>
+              <button type="submit">Add PNM</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <h2>Schedule Lunch</h2>
+            <p class="muted">Schedule a lunch with a specific rushee and it instantly appears on the shared calendar feed.</p>
+            <form id="lunchForm" class="stack">
+              <label>
+                PNM
+                <select id="lunchPnm" required></select>
+              </label>
+              <label>
+                Date
+                <input id="lunchDate" type="date" required />
+              </label>
+              <div class="inline-grid two-cols">
+                <label>
+                  Start time (optional)
+                  <input id="lunchStartTime" type="time" />
+                </label>
+                <label>
+                  End time (optional)
+                  <input id="lunchEndTime" type="time" />
+                </label>
+              </div>
+              <label>
+                Location (optional)
+                <input id="lunchLocation" type="text" placeholder="Main Street Cafe" />
+              </label>
+              <label>
+                Notes
+                <textarea id="lunchNotes" rows="3" placeholder="Optional lunch context"></textarea>
+              </label>
+              <label class="checkbox-line">
+                <input id="autoOpenGoogleLunchEvent" type="checkbox" checked />
+                Open Google event page after scheduling (then press Save)
+              </label>
+              <button type="submit">Schedule Lunch</button>
+            </form>
+            <div id="lastLunchCalendarActions" class="action-row hidden">
+              <a id="openLastLunchGoogleLink" class="quick-nav-link" href="#" target="_blank" rel="noopener">Open In Google Calendar</a>
+            </div>
+
+            <div id="sharedCalendarPanel" class="calendar-share">
+              <h3>Shared Rush Calendar</h3>
+              <p class="muted">Subscribe once and everyone can view the same chapter rush calendar.</p>
+              <p class="muted">Google can delay external calendar sync. Use "Open In Google Calendar" for immediate event creation.</p>
+              <div class="action-row">
+                <button id="copyCalendarFeedBtn" type="button" class="secondary">Copy Calendar URL</button>
+                <a id="openGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
+              </div>
+              <p id="calendarFeedPreview" class="muted breakable">Loading shared calendar link...</p>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="section-head">
+              <h3>Scheduled Lunches (Shared)</h3>
+              <button id="refreshScheduledLunchesBtn" type="button" class="secondary">Refresh Schedule</button>
+            </div>
+            <div id="scheduledLunchesList" class="list-box muted">Loading scheduled lunches...</div>
+
+            <div class="divider"></div>
+
+            <h2>Analytics Snapshot</h2>
+            <div id="analyticsCards" class="cards"></div>
+          </section>
+        </div>
+
+        <section id="rusheeFiltersSection" class="panel filters reveal delay-3">
+          <h2>Rushee Filters</h2>
+          <div class="inline-grid filters-grid">
+            <label>
+              Interest (ANY match)
+              <input id="rusheeFilterInterest" list="interestHints" type="text" placeholder="Leadership" />
+            </label>
+            <label>
+              Stereotype
+              <input id="rusheeFilterStereotype" type="text" placeholder="Connector" />
+            </label>
+            <label>
+              State
+              <input id="rusheeFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyRusheeFiltersBtn" type="button">Apply Rushee Filters</button>
+            </label>
+          </div>
+        </section>
+
+        <section id="pnmSection" class="panel reveal delay-4">
+          <div class="section-head">
+            <h2>PNMs</h2>
+            <p class="muted">Weighted totals and per-category averages auto-update with every rating change.</p>
+          </div>
+          <div id="pnmTable" class="table-wrap"></div>
+        </section>
+
+        <section id="detailSection" class="panel reveal delay-6">
+          <div class="section-head">
+            <div>
+              <h2>Selected PNM Detail</h2>
+              <p id="selectedPnmLabel" class="muted">Select a PNM to rate and review rating/lunch history.</p>
+            </div>
+            <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Page</a>
+          </div>
+
+          <div class="grid-two">
+            <article>
+              <h3>Rate / Update Rating</h3>
+              <form id="ratingForm" class="stack">
+                <label>
+                  PNM
+                  <select id="ratingPnm" required></select>
+                </label>
+                <div class="inline-grid five-cols compact-inputs">
+                  <label><span id="rateGirlsLabel">Girls (0-10)</span><input id="rateGirls" type="number" min="0" max="10" required /></label>
+                  <label><span id="rateProcessLabel">Process (0-10)</span><input id="rateProcess" type="number" min="0" max="10" required /></label>
+                  <label><span id="ratePersonableLabel">Personable (0-10)</span><input id="ratePersonable" type="number" min="0" max="10" required /></label>
+                  <label><span id="rateAlcoholLabel">Alcohol (0-10)</span><input id="rateAlcohol" type="number" min="0" max="10" required /></label>
+                  <label><span id="rateIgLabel">IG (0-5)</span><input id="rateIg" type="number" min="0" max="5" required /></label>
+                </div>
+                <label>
+                  Comment (required on updates; must exceed 5 words)
+                  <textarea id="rateComment" rows="3" placeholder="Explain what changed and why"></textarea>
+                </label>
+                <button type="submit">Save Rating</button>
+              </form>
+            </article>
+
+            <article>
+              <h3>PNM Photo</h3>
+              <div class="meeting-photo-wrap">
+                <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected PNM" />
+                <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
+              </div>
+              <form id="photoForm" class="stack compact-upload">
+                <label>
+                  Update photo
+                  <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+                </label>
+                <div class="action-row">
+                  <button type="submit" class="secondary">Upload Photo</button>
+                  <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                </div>
+              </form>
+              <h3>Ratings View</h3>
+              <div id="ratingList" class="list-box muted">Select a PNM to view rating entries.</div>
+              <h3>Lunch History</h3>
+              <div id="lunchHistory" class="list-box muted">Select a PNM to view lunch logs.</div>
+              <div id="assignPanel" class="stack hidden">
+                <h3>Assign Rush Officer (Head Only)</h3>
+                <label>
+                  Assigned officer
+                  <select id="assignOfficerSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="assignOfficerBtn" type="button">Assign</button>
+                  <button id="clearAssignBtn" type="button" class="secondary">Clear</button>
+                </div>
+              </div>
+              <div id="packageDealPanel" class="stack">
+                <h3>Package Deals</h3>
+                <p class="muted">Link the selected rushee to another as a package deal so they are tracked together.</p>
+                <label>
+                  Link selected rushee with
+                  <select id="packagePartnerSelect"></select>
+                </label>
+                <div class="action-row">
+                  <button id="packageLinkBtn" type="button">Link Package Deal</button>
+                  <button id="packageUnlinkBtn" type="button" class="secondary">Unlink Selected</button>
+                </div>
+                <p id="packageDealSummary" class="muted">No package deal linked for this rushee yet.</p>
+              </div>
+            </article>
+          </div>
+        </section>
+
+          </div>

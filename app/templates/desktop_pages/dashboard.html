@@ -1,0 +1,77 @@
+          <div class="desktop-page{% if app_config and app_config.desktop_page == 'overview' %} is-active{% endif %}" data-page="overview">
+
+        <section class="panel workflow-tips reveal delay-2">
+          <h2>Fast Workflow</h2>
+          <div class="tips-grid">
+            <article>
+              <strong>1. Add + Select</strong>
+              <p class="muted">Create a rushee, upload photo, then select them from the PNM table.</p>
+            </article>
+            <article>
+              <strong>2. Rate + Log</strong>
+              <p class="muted">Capture rating updates and lunches immediately after each interaction.</p>
+            </article>
+            <article>
+              <strong>3. Run Meeting</strong>
+              <p class="muted">Open Meeting View for full packet details before final vote.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="leaderboardSection" class="panel reveal delay-5">
+          <div class="section-head">
+            <h2>PNM Leaderboard</h2>
+            <p class="muted">Overall rankings across all PNMs by weighted total score, then participation metrics.</p>
+          </div>
+          <div id="leaderboardTable" class="table-wrap"></div>
+        </section>
+
+        <section id="matchingSection" class="panel reveal delay-7">
+          <h2>Matching View</h2>
+          <p class="muted">Filter this view only to pair PNMs and members intentionally.</p>
+          <div class="inline-grid filters-grid">
+            <label>
+              Interest (ANY match)
+              <input id="matchingFilterInterest" list="interestHints" type="text" placeholder="Golf" />
+            </label>
+            <label>
+              Stereotype
+              <input id="matchingFilterStereotype" type="text" placeholder="Connector" />
+            </label>
+            <label>
+              State
+              <input id="matchingFilterState" type="text" maxlength="32" placeholder="TX or Texas" />
+            </label>
+            <label class="btn-wrap">
+              <span>&nbsp;</span>
+              <button id="applyMatchingFiltersBtn" type="button">Apply Matching Filters</button>
+            </label>
+          </div>
+          <datalist id="interestHints"></datalist>
+          <div class="grid-two matching-grid">
+            <div>
+              <h3>Filtered PNMs</h3>
+              <div id="matchingPnms" class="list-box"></div>
+            </div>
+            <div>
+              <h3>Filtered Members</h3>
+              <div id="matchingMembers" class="list-box"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="operations" class="panel reveal delay-7">
+          <div class="section-head">
+            <h2>Operations Workspace</h2>
+            <p class="muted">Calendar, tasks, and officer chat now live on the dedicated Calendar page.</p>
+          </div>
+          <div class="action-row">
+            <a
+              class="quick-nav-link"
+              href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}"
+            >
+              Open Calendar Workspace
+            </a>
+          </div>
+        </section>
+          </div>

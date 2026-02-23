@@ -1,0 +1,22 @@
+:root {
+  --bg: #dbe9f5;
+  --bg-2: #eef5fc;
+  --bg-3: #cfdfee;
+  --ink: #0f2538;
+  --ink-soft: #2c4761;
+  --heading: #123252;
+  --panel: rgba(248, 252, 255, 0.92);
+  --panel-strong: rgba(255, 255, 255, 0.97);
+  --stroke: rgba(202, 219, 237, 0.78);
+  --glass-highlight: rgba(255, 255, 255, 0.92);
+  --shadow: 0 16px 34px rgba(16, 38, 61, 0.14);
+}
+
+html.light-mode {
+  --ink: #10283d;
+  --ink-soft: #2e4b66;
+  --heading: #123555;
+  --panel: rgba(248, 252, 255, 0.94);
+  --panel-strong: rgba(255, 255, 255, 0.98);
+  --stroke: rgba(193, 213, 234, 0.84);
+}

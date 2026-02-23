@@ -133,6 +133,11 @@ ROLE_HEAD = "Head Rush Officer"
 ROLE_RUSH_OFFICER = "Rush Officer"
 ROLE_RUSHER = "Rusher"
 ALLOWED_ROLES = {ROLE_HEAD, ROLE_RUSH_OFFICER, ROLE_RUSHER}
+ROLE_SORT_ORDER: dict[str, int] = {
+    ROLE_HEAD: 0,
+    ROLE_RUSH_OFFICER: 1,
+    ROLE_RUSHER: 2,
+}
 ONBOARDING_TUTORIAL_MODES = {"quick", "guided", "advanced"}
 ONBOARDING_DEFAULT_MODE = "guided"
 ONBOARDING_TUTORIAL_VERSION = 1
@@ -360,6 +365,70 @@ GOOGLE_FORM_COLUMN_ALIASES = {
         "instagram username",
     },
 }
+US_STATE_CODE_TO_NAME: dict[str, str] = {
+    "AL": "Alabama",
+    "AK": "Alaska",
+    "AZ": "Arizona",
+    "AR": "Arkansas",
+    "CA": "California",
+    "CO": "Colorado",
+    "CT": "Connecticut",
+    "DE": "Delaware",
+    "FL": "Florida",
+    "GA": "Georgia",
+    "HI": "Hawaii",
+    "ID": "Idaho",
+    "IL": "Illinois",
+    "IN": "Indiana",
+    "IA": "Iowa",
+    "KS": "Kansas",
+    "KY": "Kentucky",
+    "LA": "Louisiana",
+    "ME": "Maine",
+    "MD": "Maryland",
+    "MA": "Massachusetts",
+    "MI": "Michigan",
+    "MN": "Minnesota",
+    "MS": "Mississippi",
+    "MO": "Missouri",
+    "MT": "Montana",
+    "NE": "Nebraska",
+    "NV": "Nevada",
+    "NH": "New Hampshire",
+    "NJ": "New Jersey",
+    "NM": "New Mexico",
+    "NY": "New York",
+    "NC": "North Carolina",
+    "ND": "North Dakota",
+    "OH": "Ohio",
+    "OK": "Oklahoma",
+    "OR": "Oregon",
+    "PA": "Pennsylvania",
+    "RI": "Rhode Island",
+    "SC": "South Carolina",
+    "SD": "South Dakota",
+    "TN": "Tennessee",
+    "TX": "Texas",
+    "UT": "Utah",
+    "VT": "Vermont",
+    "VA": "Virginia",
+    "WA": "Washington",
+    "WV": "West Virginia",
+    "WI": "Wisconsin",
+    "WY": "Wyoming",
+    "DC": "District of Columbia",
+}
+US_STATE_NAME_TO_CODE: dict[str, str] = {name.lower(): code for code, name in US_STATE_CODE_TO_NAME.items()}
+US_STATE_NAME_TO_CODE.update(
+    {
+        "district columbia": "DC",
+        "washington dc": "DC",
+        "washington d c": "DC",
+    }
+)
+US_STATE_NAMES_DESC: tuple[str, ...] = tuple(
+    sorted(US_STATE_NAME_TO_CODE.keys(), key=lambda item: (-len(item), item))
+)
 
 app = FastAPI(
     title="KA Recruitment Evaluation",
@@ -1819,6 +1888,101 @@ def normalize_name(value: str) -> str:
     if not value:
         raise ValueError("Name fields cannot be empty.")
     return value[0].upper() + value[1:].strip()
+
+
+def normalize_city_value(value: str | None) -> str:
+    if value is None:
+        return ""
+    return re.sub(r"\s+", " ", value.strip())
+
+
+def normalize_state_code(value: str | None) -> str:
+    token = re.sub(r"\s+", " ", str(value or "").strip())
+    if not token:
+        return ""
+
+    direct_code = re.sub(r"[^A-Za-z]", "", token).upper()
+    if len(direct_code) == 2 and direct_code in US_STATE_CODE_TO_NAME:
+        return direct_code
+
+    normalized_name = re.sub(r"[^A-Za-z ]", " ", token).lower()
+    normalized_name = re.sub(r"\s+", " ", normalized_name).strip()
+    if not normalized_name:
+        return ""
+    return US_STATE_NAME_TO_CODE.get(normalized_name, "")
+
+
+def parse_state_filter(raw_state: str | None) -> str | None:
+    if raw_state is None:
+        return None
+    token = raw_state.strip()
+    if not token:
+        return None
+    normalized = normalize_state_code(token)
+    if not normalized:
+        raise ValueError("State must be a valid US state name or 2-letter code.")
+    return normalized
+
+
+def parse_hometown_city_state(hometown: str | None) -> tuple[str, str]:
+    text = re.sub(r"\s+", " ", str(hometown or "").strip())
+    if not text:
+        return "", ""
+
+    if "," in text:
+        city_part, state_part = text.rsplit(",", 1)
+        state_code = normalize_state_code(state_part)
+        if state_code:
+            return city_part.strip(), state_code
+
+    trailing_code_match = re.match(r"^(?P<city>.+?)\s+([A-Za-z]{2})$", text)
+    if trailing_code_match:
+        state_code = normalize_state_code(trailing_code_match.group(2))
+        if state_code:
+            return trailing_code_match.group("city").strip(" ,"), state_code
+
+    lowered = text.lower()
+    for state_name in US_STATE_NAMES_DESC:
+        if lowered == state_name:
+            return "", US_STATE_NAME_TO_CODE[state_name]
+        suffix = f" {state_name}"
+        if lowered.endswith(suffix):
+            city_part = text[: -len(suffix)].strip(" ,")
+            if city_part:
+                return city_part, US_STATE_NAME_TO_CODE[state_name]
+
+    return text, ""
+
+
+def normalize_role_filter(value: str | None) -> str | None:
+    token = str(value or "").strip().lower()
+    if not token or token == "all":
+        return None
+    if token in {"head rush officer", "head"}:
+        return ROLE_HEAD
+    if token in {"rush officer", "officer"}:
+        return ROLE_RUSH_OFFICER
+    if token in {"rusher", "member", "general member"}:
+        return ROLE_RUSHER
+    raise ValueError("Role must be Head Rush Officer, Rush Officer, Rusher, or all.")
+
+
+def role_sort_value(role: str | None) -> int:
+    return ROLE_SORT_ORDER.get(str(role or "").strip(), 99)
+
+
+def user_location_sort_key(row: sqlite3.Row) -> tuple[Any, ...]:
+    keys = set(row.keys())
+    state_code = normalize_state_code(row["state_code"]) if "state_code" in keys else ""
+    city = normalize_city_value(row["city"] if "city" in keys else "")
+    username = str(row["username"] or "").strip().lower()
+    return (
+        state_code == "",
+        state_code,
+        city == "",
+        city.lower(),
+        username,
+    )
 
 
 def normalize_interest(raw: str) -> str:
@@ -3686,6 +3850,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             stereotype TEXT NOT NULL,
             interests TEXT NOT NULL,
             interests_norm TEXT NOT NULL,
+            city TEXT NOT NULL DEFAULT '',
+            state_code TEXT NOT NULL DEFAULT '',
             access_code_hash TEXT NOT NULL,
             is_approved INTEGER NOT NULL DEFAULT 0,
             approved_by INTEGER REFERENCES users(id),
@@ -3969,6 +4135,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             lunch_count INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE INDEX IF NOT EXISTS idx_users_state_code ON users(state_code);
+        CREATE INDEX IF NOT EXISTS idx_users_city ON users(city);
         CREATE INDEX IF NOT EXISTS idx_users_stereotype ON users(stereotype);
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
@@ -4015,6 +4183,32 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN onboarding_completed_at TEXT")
     if "onboarding_version" not in user_columns:
         conn.execute("ALTER TABLE users ADD COLUMN onboarding_version INTEGER NOT NULL DEFAULT 0")
+    if "city" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN city TEXT NOT NULL DEFAULT ''")
+    if "state_code" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN state_code TEXT NOT NULL DEFAULT ''")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_users_state_code ON users(state_code)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_users_city ON users(city)")
+    conn.execute("UPDATE users SET city = '' WHERE city IS NULL")
+    conn.execute("UPDATE users SET state_code = '' WHERE state_code IS NULL")
+    state_rows = conn.execute(
+        "SELECT id, state_code FROM users WHERE state_code IS NOT NULL AND trim(state_code) != ''"
+    ).fetchall()
+    for row in state_rows:
+        normalized_state = normalize_state_code(row["state_code"])
+        if normalized_state != str(row["state_code"] or "").strip():
+            conn.execute(
+                "UPDATE users SET state_code = ?, updated_at = COALESCE(NULLIF(updated_at, ''), ?) WHERE id = ?",
+                (normalized_state, now_iso(), int(row["id"])),
+            )
+    city_rows = conn.execute(
+        "SELECT id, city FROM users WHERE city IS NOT NULL AND city != trim(city)"
+    ).fetchall()
+    for row in city_rows:
+        conn.execute(
+            "UPDATE users SET city = ?, updated_at = COALESCE(NULLIF(updated_at, ''), ?) WHERE id = ?",
+            (normalize_city_value(row["city"]), now_iso(), int(row["id"])),
+        )
     conn.execute(
         "UPDATE users SET onboarding_mode = ? WHERE onboarding_mode IS NULL OR trim(onboarding_mode) = ''",
         (ONBOARDING_DEFAULT_MODE,),
@@ -6284,6 +6478,8 @@ def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str
         onboarding_mode = ONBOARDING_DEFAULT_MODE
     onboarding_completed_at = row["onboarding_completed_at"] if "onboarding_completed_at" in keys else None
     onboarding_version = int(row["onboarding_version"]) if "onboarding_version" in keys and row["onboarding_version"] is not None else 0
+    city = normalize_city_value(row["city"]) if "city" in keys else ""
+    state_code = normalize_state_code(row["state_code"]) if "state_code" in keys else ""
     payload = {
         "user_id": row["id"],
         "username": row["username"],
@@ -6291,6 +6487,8 @@ def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str
         "emoji": row["emoji"] if row["role"] == ROLE_RUSH_OFFICER else None,
         "stereotype": row["stereotype"],
         "interests": decode_interests(row["interests"]),
+        "city": city,
+        "state_code": state_code,
         "is_approved": bool(row["is_approved"]),
         "total_lunches": int(row["total_lunches"]),
         "lunches_per_week": round(float(row["lunches_per_week"]), 2),
@@ -6318,6 +6516,7 @@ def pnm_payload(
 ) -> dict[str, Any]:
     days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
     keys = set(row.keys())
+    hometown_city, hometown_state_code = parse_hometown_city_state(row["hometown"])
     assignment_status = (
         str(row["assignment_status"]).strip().lower()
         if "assignment_status" in keys and row["assignment_status"] is not None
@@ -6340,6 +6539,8 @@ def pnm_payload(
         "last_name": row["last_name"],
         "class_year": row["class_year"],
         "hometown": row["hometown"],
+        "hometown_city": hometown_city,
+        "hometown_state_code": hometown_state_code,
         "phone_number": row["phone_number"] if "phone_number" in row.keys() else "",
         "instagram_handle": row["instagram_handle"],
         "first_event_date": row["first_event_date"],
@@ -6544,6 +6745,8 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
     emoji: str | None = None
     access_code: str = Field(..., min_length=8, max_length=128)
+    city: str | None = Field(default=None, max_length=80)
+    state: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="before")
     @classmethod
@@ -6570,10 +6773,32 @@ class RegisterRequest(BaseModel):
         emoji = value.strip()
         return emoji or None
 
+    @field_validator("city")
+    @classmethod
+    def normalize_optional_city(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_city_value(value)
+
+    @field_validator("state")
+    @classmethod
+    def normalize_optional_state(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return ""
+        normalized = normalize_state_code(token)
+        if not normalized:
+            raise ValueError("State must be a valid US state name or 2-letter code.")
+        return normalized
+
 
 class MemberRegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
     access_code: str = Field(..., min_length=8, max_length=128)
+    city: str | None = Field(default=None, max_length=80)
+    state: str | None = Field(default=None, max_length=64)
 
     @model_validator(mode="before")
     @classmethod
@@ -6591,6 +6816,26 @@ class MemberRegisterRequest(BaseModel):
         if not re.fullmatch(r"[A-Za-z0-9._-]{3,64}", username):
             raise ValueError("Username may only include letters, numbers, dots, underscores, and hyphens.")
         return username
+
+    @field_validator("city")
+    @classmethod
+    def normalize_optional_city(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_city_value(value)
+
+    @field_validator("state")
+    @classmethod
+    def normalize_optional_state(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return ""
+        normalized = normalize_state_code(token)
+        if not normalized:
+            raise ValueError("State must be a valid US state name or 2-letter code.")
+        return normalized
 
 
 class LoginRequest(BaseModel):
@@ -6625,6 +6870,53 @@ class SelfUpdateRequest(BaseModel):
     stereotype: str | None = Field(default=None, min_length=1, max_length=48)
     interests: str | list[str] | None = None
     emoji: str | None = None
+    city: str | None = Field(default=None, max_length=80)
+    state: str | None = Field(default=None, max_length=64)
+
+    @field_validator("city")
+    @classmethod
+    def normalize_optional_city(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_city_value(value)
+
+    @field_validator("state")
+    @classmethod
+    def normalize_optional_state(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return ""
+        normalized = normalize_state_code(token)
+        if not normalized:
+            raise ValueError("State must be a valid US state name or 2-letter code.")
+        return normalized
+
+
+class UserLocationUpdateRequest(BaseModel):
+    city: str | None = Field(default=None, max_length=80)
+    state: str | None = Field(default=None, max_length=64)
+
+    @field_validator("city")
+    @classmethod
+    def normalize_optional_city(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return normalize_city_value(value)
+
+    @field_validator("state")
+    @classmethod
+    def normalize_optional_state(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        if not token:
+            return ""
+        normalized = normalize_state_code(token)
+        if not normalized:
+            raise ValueError("State must be a valid US state name or 2-letter code.")
+        return normalized
 
 
 class PNMCreateRequest(BaseModel):
@@ -8558,6 +8850,8 @@ def register(payload: RegisterRequest) -> dict[str, str]:
     stereotype = "Unassigned"
     interests_csv, interests_norm = encode_interests(["Recruitment"])
     emoji = payload.emoji if payload.emoji else "🛡️"
+    city = payload.city if payload.city is not None else ""
+    state_code = payload.state if payload.state is not None else ""
 
     with db_session() as conn:
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
@@ -8578,12 +8872,14 @@ def register(payload: RegisterRequest) -> dict[str, str]:
                     stereotype,
                     interests,
                     interests_norm,
+                    city,
+                    state_code,
                     access_code_hash,
                     is_approved,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """,
                 (
                     username,
@@ -8595,6 +8891,8 @@ def register(payload: RegisterRequest) -> dict[str, str]:
                     stereotype,
                     interests_csv,
                     interests_norm,
+                    city,
+                    state_code,
                     hash_access_code(payload.access_code),
                     created_at,
                     created_at,
@@ -8623,6 +8921,8 @@ def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
     pledge_class = "Brotherhood"
     stereotype = "Member"
     interests_csv, interests_norm = encode_interests(["Brotherhood"])
+    city = payload.city if payload.city is not None else ""
+    state_code = payload.state if payload.state is not None else ""
 
     with db_session() as conn:
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
@@ -8643,12 +8943,14 @@ def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
                     stereotype,
                     interests,
                     interests_norm,
+                    city,
+                    state_code,
                     access_code_hash,
                     is_approved,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                 """,
                 (
                     username,
@@ -8660,6 +8962,8 @@ def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
                     stereotype,
                     interests_csv,
                     interests_norm,
+                    city,
+                    state_code,
                     hash_access_code(payload.access_code),
                     created_at,
                     created_at,
@@ -9031,34 +9335,70 @@ def promote_officer_to_head(
 def list_users(
     interest: str | None = None,
     stereotype: str | None = None,
+    role: str | None = "all",
+    state: str | None = None,
+    city: str | None = None,
+    sort: str | None = "location",
     user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     try:
         interest_filter = parse_interest_filter(interest)
+        role_filter = normalize_role_filter(role)
+        state_filter = parse_state_filter(state)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    normalized_stereotype = stereotype.strip().lower() if stereotype else None
+    normalized_stereotype = stereotype.strip().lower() if stereotype and stereotype.strip() else None
+    city_token = normalize_city_value(city) if city is not None else ""
+    city_filter = city_token.lower() if city_token else None
+    sort_token = str(sort or "location").strip().lower() or "location"
+    if sort_token not in {"location", "username", "role"}:
+        raise HTTPException(status_code=400, detail="Sort must be one of: location, username, role.")
 
     with db_session() as conn:
-        rows = conn.execute(
-            "SELECT * FROM users WHERE is_approved = 1 ORDER BY role ASC, username ASC"
-        ).fetchall()
+        rows = conn.execute("SELECT * FROM users WHERE is_approved = 1").fetchall()
 
-    filtered = []
+    filtered: list[sqlite3.Row] = []
     for row in rows:
+        if role_filter and row["role"] != role_filter:
+            continue
         if normalized_stereotype and row["stereotype"].lower() != normalized_stereotype:
             continue
         if not has_interest_match(row["interests_norm"], interest_filter):
             continue
-        filtered.append(user_payload(row, user["role"], user["id"]))
+        row_state = normalize_state_code(row["state_code"]) if "state_code" in row.keys() else ""
+        if state_filter and row_state != state_filter:
+            continue
+        if city_filter:
+            row_city = normalize_city_value(row["city"]) if "city" in row.keys() else ""
+            if city_filter not in row_city.lower():
+                continue
+        filtered.append(row)
 
-    return {"users": filtered}
+    if sort_token == "username":
+        filtered.sort(key=lambda row: (str(row["username"]).lower(), int(row["id"])))
+    elif sort_token == "role":
+        filtered.sort(
+            key=lambda row: (
+                role_sort_value(row["role"]),
+                str(row["username"]).lower(),
+            )
+        )
+    else:
+        filtered.sort(key=user_location_sort_key)
+
+    return {"users": [user_payload(row, user["role"], user["id"]) for row in filtered]}
 
 
 @app.patch("/api/users/me")
 def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
-    if payload.stereotype is None and payload.interests is None and payload.emoji is None:
+    if (
+        payload.stereotype is None
+        and payload.interests is None
+        and payload.emoji is None
+        and payload.city is None
+        and payload.state is None
+    ):
         raise HTTPException(status_code=400, detail="No changes provided.")
 
     with db_session() as conn:
@@ -9070,6 +9410,8 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
         interests_csv = existing["interests"]
         interests_norm = existing["interests_norm"]
         emoji_value = existing["emoji"]
+        city_value = normalize_city_value(existing["city"]) if "city" in existing.keys() else ""
+        state_code_value = normalize_state_code(existing["state_code"]) if "state_code" in existing.keys() else ""
 
         if payload.stereotype is not None:
             stereotype = payload.stereotype.strip()
@@ -9091,17 +9433,62 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
                 raise HTTPException(status_code=400, detail="Emoji cannot be empty for Rush Officers.")
             emoji_value = payload.emoji.strip()
 
+        if payload.city is not None:
+            city_value = payload.city
+        if payload.state is not None:
+            state_code_value = payload.state
+
         conn.execute(
             """
             UPDATE users
-            SET stereotype = ?, interests = ?, interests_norm = ?, emoji = ?, updated_at = ?
+            SET stereotype = ?, interests = ?, interests_norm = ?, emoji = ?, city = ?, state_code = ?, updated_at = ?
             WHERE id = ?
             """,
-            (stereotype_value, interests_csv, interests_norm, emoji_value, now_iso(), user["id"]),
+            (
+                stereotype_value,
+                interests_csv,
+                interests_norm,
+                emoji_value,
+                city_value,
+                state_code_value,
+                now_iso(),
+                user["id"],
+            ),
         )
         refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user["id"],)).fetchone()
 
     return {"user": user_payload(refreshed, refreshed["role"], refreshed["id"])}
+
+
+@app.patch("/api/users/{user_id}/location")
+def update_user_location(
+    user_id: int,
+    payload: UserLocationUpdateRequest,
+    actor: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    if payload.city is None and payload.state is None:
+        raise HTTPException(status_code=400, detail="No location changes provided.")
+
+    with db_session() as conn:
+        existing = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not existing:
+            raise HTTPException(status_code=404, detail="User not found.")
+
+        city_value = normalize_city_value(existing["city"]) if "city" in existing.keys() else ""
+        state_code_value = normalize_state_code(existing["state_code"]) if "state_code" in existing.keys() else ""
+
+        if payload.city is not None:
+            city_value = payload.city
+        if payload.state is not None:
+            state_code_value = payload.state
+
+        conn.execute(
+            "UPDATE users SET city = ?, state_code = ?, updated_at = ? WHERE id = ?",
+            (city_value, state_code_value, now_iso(), user_id),
+        )
+        refreshed = conn.execute("SELECT * FROM users WHERE id = ?", (user_id,)).fetchone()
+
+    return {"user": user_payload(refreshed, actor["role"], actor["id"])}
 
 
 @app.post("/api/pnms")
@@ -9206,10 +9593,12 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
 def list_pnms(
     interest: str | None = None,
     stereotype: str | None = None,
+    state: str | None = None,
     user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     try:
         interest_filter = parse_interest_filter(interest)
+        state_filter = parse_state_filter(state)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -9245,6 +9634,10 @@ def list_pnms(
                 continue
             if not has_interest_match(row["interests_norm"], interest_filter):
                 continue
+            if state_filter:
+                _, hometown_state_code = parse_hometown_city_state(row["hometown"])
+                if hometown_state_code != state_filter:
+                    continue
             filtered.append(
                 pnm_payload(
                     row,
@@ -14487,10 +14880,12 @@ def officer_chat_stats(_: sqlite3.Row = Depends(require_officer)) -> dict[str, A
 def matching(
     interest: str | None = None,
     stereotype: str | None = None,
+    state: str | None = None,
     user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     try:
         interest_filter = parse_interest_filter(interest)
+        state_filter = parse_state_filter(state)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -14527,6 +14922,10 @@ def matching(
             continue
         if not has_interest_match(row["interests_norm"], interest_filter):
             continue
+        if state_filter:
+            _, hometown_state_code = parse_hometown_city_state(row["hometown"])
+            if hometown_state_code != state_filter:
+                continue
         pnms.append(
             pnm_payload(
                 row,
@@ -14548,6 +14947,7 @@ def matching(
         "filters": {
             "interest": sorted(list(interest_filter)),
             "stereotype": stereotype.strip() if stereotype else "",
+            "state": state_filter or "",
         },
         "pnms": pnms,
         "members": members,

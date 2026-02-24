@@ -148,7 +148,15 @@ def main() -> None:
 
             response = client.get("/kappaalphaorder/mobile")
             expect_status(response, 200, "Tenant mobile page")
-            checks.append("Mobile route responds")
+            response = client.get("/kappaalphaorder/mobile/pnms")
+            expect_status(response, 200, "Tenant mobile rushees page")
+            response = client.get("/kappaalphaorder/mobile/members")
+            expect_status(response, 200, "Tenant mobile team page")
+            response = client.get("/kappaalphaorder/mobile/calendar")
+            expect_status(response, 200, "Tenant mobile calendar page")
+            response = client.get("/kappaalphaorder/mobile/admin")
+            expect_status(response, 200, "Tenant mobile admin page")
+            checks.append("Mobile routes respond")
 
             response = client.get("/platform")
             expect_status(response, 200, "Platform admin page")
@@ -411,6 +419,12 @@ def main() -> None:
             if response.headers.get("location") != "/kappaalphaorder/dashboard?notice=admin-access-denied":
                 raise AssertionError("Non-head admin route access should redirect to dashboard with notice.")
             checks.append("Admin route guard redirects non-head users")
+
+            response = client.get("/kappaalphaorder/mobile/admin", follow_redirects=False)
+            expect_status(response, 307, "Officer blocked from mobile admin route")
+            if response.headers.get("location") != "/kappaalphaorder/mobile?notice=admin-access-denied":
+                raise AssertionError("Non-head mobile admin route access should redirect to mobile dashboard with notice.")
+            checks.append("Mobile admin route guard redirects non-head users")
 
             response = client.post(
                 "/kappaalphaorder/api/ratings",

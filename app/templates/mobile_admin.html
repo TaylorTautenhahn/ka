@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="{{ app_config.theme_primary }}" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
+    <title>{{ app_config.tenant_name }} Admin</title>
+    <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+    <script src="/static/js/pwa_shell.js" defer></script>
+    <script src="/static/js/mobile.js" defer></script>
+  </head>
+  <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="admin">
+    <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
+      <div class="pwa-splash-card">
+        <p class="eyebrow">{{ app_config.chapter_name }}</p>
+        <h2>BidBoard</h2>
+        <p>Loading head console...</p>
+      </div>
+    </div>
+    <main class="shell mobile-shell">
+      <header class="hero mobile-hero">
+        <p class="eyebrow">{{ app_config.chapter_name }}</p>
+        <h1>Admin</h1>
+        <p>Head Rush controls for approvals, officer metrics, backups, and storage status.</p>
+      </header>
+
+      <section id="mobileAdminDeniedPanel" class="panel mobile-panel hidden">
+        <h2>Access Limited</h2>
+        <p class="muted">Only Head Rush Officers can open the mobile admin panel.</p>
+      </section>
+
+      <section id="mobileAdminPanel" class="hidden">
+        <section class="panel mobile-panel">
+          <h2>Admin Snapshot</h2>
+          <div class="mobile-kpi-grid">
+            <article class="card"><strong id="mobileAdminPendingCount">0</strong><p>Pending Users</p></article>
+            <article class="card"><strong id="mobileAdminOfficerCount">0</strong><p>Rush Officers</p></article>
+            <article class="card"><strong id="mobileAdminActiveAssignments">0</strong><p>Active Assignments</p></article>
+          </div>
+          <div class="action-row">
+            <button id="mobileAdminRefreshBtn" type="button" class="secondary">Refresh</button>
+          </div>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Backups</h2>
+          <div class="mobile-action-grid">
+            <button id="mobileAdminBackupCsvBtn" type="button">Backup CSV</button>
+            <button id="mobileAdminBackupDbBtn" type="button" class="secondary">Backup DB</button>
+          </div>
+          <p class="muted">Use backups before major roster updates or season reset actions.</p>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Pending Approvals</h2>
+          <div id="mobileAdminPendingList" class="mobile-list"></div>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Officer Metrics</h2>
+          <div id="mobileAdminOfficerList" class="mobile-list"></div>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Storage Diagnostics</h2>
+          <div id="mobileAdminStorage" class="mobile-list"></div>
+        </section>
+      </section>
+    </main>
+
+    <nav class="mobile-tabs" aria-label="Mobile Navigation">
+      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Dashboard</a>
+      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
+      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
+      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Calendar</a>
+      <a href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-tab is-active">Admin</a>
+    </nav>
+
+    <div id="mobileToast" class="toast hidden"></div>
+  </body>
+</html>

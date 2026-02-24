@@ -14,6 +14,15 @@ const APP_CONFIG = readAppConfig();
 const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const MOBILE_BASE = (APP_CONFIG.mobile_base || `${BASE_PATH}/mobile`).replace(/\/$/, "");
+const MOBILE_ROUTES = {
+  dashboard: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.dashboard ? APP_CONFIG.mobile_routes.dashboard : MOBILE_BASE,
+  rushees: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.rushees ? APP_CONFIG.mobile_routes.rushees : `${MOBILE_BASE}/pnms`,
+  team: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.team ? APP_CONFIG.mobile_routes.team : `${MOBILE_BASE}/members`,
+  calendar: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.calendar ? APP_CONFIG.mobile_routes.calendar : `${MOBILE_BASE}/calendar`,
+  admin: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.admin ? APP_CONFIG.mobile_routes.admin : `${MOBILE_BASE}/admin`,
+  create: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.create ? APP_CONFIG.mobile_routes.create : `${MOBILE_BASE}/create`,
+  meeting: APP_CONFIG.mobile_routes && APP_CONFIG.mobile_routes.meeting ? APP_CONFIG.mobile_routes.meeting : `${MOBILE_BASE}/meeting`,
+};
 const MOBILE_PAGE = (document.body && document.body.dataset.mobilePage) || "";
 const BASE_DEFAULT_INTEREST_TAGS = [
   "Leadership",
@@ -175,15 +184,30 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
 );
 const STATE_OPTIONS = parseStateOptions(APP_CONFIG.state_options);
 const mobileStateHints = document.getElementById("mobileStateHints");
+const mobilePnmStateHints = document.getElementById("mobilePnmStateHints");
+const mobileMemberStateHints = document.getElementById("mobileMemberStateHints");
 
 const toastEl = document.getElementById("mobileToast");
 let mobileCalendarShare = null;
 let mobilePnmRows = [];
+let mobileMemberRows = [];
 let mobileCurrentUser = null;
 const mobileContactDownloads = new Map();
 let mobileSelectedContactPnmId = null;
 let mobilePackagePrimaryPnmId = null;
 let mobilePackagePartnerPnmId = null;
+let mobileSelectedTeamMemberId = null;
+const mobileFilters = {
+  pnms: {
+    state: "",
+  },
+  members: {
+    role: "all",
+    state: "",
+    city: "",
+    sort: "location",
+  },
+};
 
 function escapeHtml(input) {
   return String(input)
@@ -312,7 +336,8 @@ function renderTagPickerButtons(pickerEl, tags, selectedSet) {
 }
 
 function renderMobileStateHints(options) {
-  if (!mobileStateHints) {
+  const hintTargets = [mobileStateHints, mobilePnmStateHints, mobileMemberStateHints].filter(Boolean);
+  if (!hintTargets.length) {
     return;
   }
   const rows = [];
@@ -334,7 +359,39 @@ function renderMobileStateHints(options) {
       seen.add(keyName);
     }
   });
-  mobileStateHints.innerHTML = rows.join("");
+  const markup = rows.join("");
+  hintTargets.forEach((target) => {
+    target.innerHTML = markup;
+  });
+}
+
+function normalizeStateFilterInput(value) {
+  const token = String(value || "").trim();
+  if (!token) {
+    return "";
+  }
+  const directCode = normalizeStateCodeToken(token);
+  if (directCode) {
+    return directCode;
+  }
+  const byName = STATE_OPTIONS.find((entry) => entry.name.toLowerCase() === token.toLowerCase());
+  if (byName) {
+    return byName.code;
+  }
+  return "";
+}
+
+function buildQueryString(params) {
+  const query = new URLSearchParams();
+  Object.entries(params || {}).forEach(([key, rawValue]) => {
+    const value = String(rawValue || "").trim();
+    if (!value) {
+      return;
+    }
+    query.set(key, value);
+  });
+  const serialized = query.toString();
+  return serialized ? `?${serialized}` : "";
 }
 
 function syncInterestPickerFromInput(inputId, pickerId) {
@@ -897,14 +954,52 @@ async function ensureSession() {
 
 function renderMobileCalendarShare(data) {
   mobileCalendarShare = data;
-  const googleLink = document.getElementById("mobileGoogleSubscribeLink");
-  const preview = document.getElementById("mobileCalendarFeedPreview");
-  if (googleLink) {
-    googleLink.href = data.google_subscribe_url || "#";
-    googleLink.classList.toggle("hidden", !data.google_subscribe_url);
+  const mainSubscribeLinks = [
+    document.getElementById("mobileGoogleSubscribeLink"),
+    document.getElementById("mobileCalendarGoogleSubscribeLink"),
+  ].filter(Boolean);
+  mainSubscribeLinks.forEach((link) => {
+    link.href = data.google_subscribe_url || "#";
+    link.classList.toggle("hidden", !data.google_subscribe_url);
+  });
+
+  const lunchSubscribeLink = document.getElementById("mobileCalendarGoogleLunchSubscribeLink");
+  if (lunchSubscribeLink) {
+    lunchSubscribeLink.href = data.lunch_google_subscribe_url || "#";
+    lunchSubscribeLink.classList.toggle("hidden", !data.lunch_google_subscribe_url);
   }
-  if (preview) {
-    preview.textContent = data.feed_url || "Calendar URL unavailable.";
+
+  const mainPreview = document.getElementById("mobileCalendarFeedPreview");
+  if (mainPreview) {
+    mainPreview.textContent = data.feed_url || "Calendar URL unavailable.";
+  }
+
+  const lunchPreview = document.getElementById("mobileCalendarLunchFeedPreview");
+  if (lunchPreview) {
+    lunchPreview.textContent = data.lunch_feed_url || "Lunch feed URL unavailable.";
+  }
+}
+
+async function copyTextToClipboard(value, successMessage) {
+  const token = String(value || "").trim();
+  if (!token) {
+    showToast("Nothing to copy.");
+    return;
+  }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(token);
+    } else {
+      const input = document.createElement("input");
+      input.value = token;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+    showToast(successMessage);
+  } catch {
+    showToast("Unable to copy URL.");
   }
 }
 
@@ -913,21 +1008,7 @@ async function handleMobileCopyCalendar() {
     showToast("Calendar URL is not ready yet.");
     return;
   }
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(mobileCalendarShare.feed_url);
-    } else {
-      const input = document.createElement("input");
-      input.value = mobileCalendarShare.feed_url;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      input.remove();
-    }
-    showToast("Calendar URL copied.");
-  } catch {
-    showToast("Unable to copy URL.");
-  }
+  await copyTextToClipboard(mobileCalendarShare.feed_url, "Calendar URL copied.");
 }
 
 function renderHomeStats(stats) {
@@ -986,7 +1067,10 @@ function renderPnmCards(pnms) {
       const assigned = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
       const downloaded = isContactDownloaded(pnm.pnm_id);
       const packageInfo = mobilePackageInfoForPnm(pnm);
-      const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
+      const linkedNames = packageInfo.members
+        .filter((item) => Number(item.pnm_id) !== Number(pnm.pnm_id))
+        .map((item) => `${item.first_name} ${item.last_name}`);
+      const packageText = linkedNames.length ? linkedNames.join(", ") : "None";
       return `
         <article class="entry mobile-card">
           <div class="entry-title">
@@ -997,14 +1081,15 @@ function renderPnmCards(pnms) {
             ${photo}
             <div>
               <div class="muted">${escapeHtml(pnm.phone_number || "No phone")} | ${escapeHtml(pnm.instagram_handle)}</div>
+              <div class="muted">Hometown: ${escapeHtml(pnm.hometown || "Unknown")} ${escapeHtml(pnm.hometown_state_code || "")}</div>
               <div class="muted">Assigned: ${escapeHtml(assigned)}</div>
-              <div class="muted">Package: ${escapeHtml(packageText)}</div>
+              <div class="muted">Linked With: ${escapeHtml(packageText)}</div>
               <div class="muted">Contact export: ${downloaded ? "✓ Downloaded" : "○ Pending"}</div>
               <div class="muted">Interests: ${pnm.interests.map((x) => escapeHtml(x)).join(", ")}</div>
             </div>
           </div>
           <div class="action-row">
-            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_BASE}/meeting?pnm_id=${pnm.pnm_id}`)}">Meeting Packet</a>
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Meeting Packet</a>
           </div>
         </article>
       `;
@@ -1019,21 +1104,93 @@ function renderMembers(members) {
   }
   if (!members.length) {
     listEl.innerHTML = '<p class="muted">No members available.</p>';
+    const header = document.getElementById("mobileSameStateHeader");
+    const hint = document.getElementById("mobileSameStateHint");
+    const sameStateList = document.getElementById("mobileSameStateList");
+    if (header) {
+      header.textContent = "Same-State Rushees";
+    }
+    if (hint) {
+      hint.textContent = "No member results for current filters.";
+    }
+    if (sameStateList) {
+      sameStateList.innerHTML = "";
+    }
     return;
   }
   listEl.innerHTML = members
     .map((member) => {
       const avg = member.avg_rating_given == null ? "-" : member.avg_rating_given.toFixed(2);
       const ratings = member.rating_count == null ? "-" : member.rating_count;
+      const stateCode = String(member.state_code || "").trim();
+      const city = String(member.city || "").trim();
+      const location = stateCode ? `${city ? `${city}, ` : ""}${stateCode}` : city || "No location set";
+      const selectedClass = Number(member.user_id) === Number(mobileSelectedTeamMemberId) ? " is-selected" : "";
+      const stateActionDisabled = stateCode ? "" : " disabled";
       return `
-        <article class="entry mobile-card">
+        <article class="entry mobile-card${selectedClass}" data-member-id="${member.user_id}">
           <div class="entry-title">
             <strong>${escapeHtml(member.username)}</strong>
             <span>${escapeHtml(member.role)}</span>
           </div>
           <div class="muted">Stereotype: ${escapeHtml(member.stereotype)}</div>
+          <div class="muted">Location: ${escapeHtml(location)}</div>
           <div class="muted">Lunches: ${member.total_lunches} | Week: ${member.lunches_per_week.toFixed(2)}</div>
           <div class="muted">Ratings: ${ratings} | Avg Given: ${avg}</div>
+          <div class="action-row">
+            <button type="button" class="secondary mobile-member-same-state-btn" data-member-id="${member.user_id}"${stateActionDisabled}>Same-State Rushees</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderSameStatePnms(member, pnms, errorMessage = "") {
+  const header = document.getElementById("mobileSameStateHeader");
+  const hint = document.getElementById("mobileSameStateHint");
+  const listEl = document.getElementById("mobileSameStateList");
+  if (!header || !hint || !listEl) {
+    return;
+  }
+  if (errorMessage) {
+    header.textContent = "Same-State Rushees";
+    hint.textContent = errorMessage;
+    listEl.innerHTML = "";
+    return;
+  }
+  if (!member) {
+    header.textContent = "Same-State Rushees";
+    hint.textContent = "Select a member card to load same-state rushees.";
+    listEl.innerHTML = "";
+    return;
+  }
+
+  const stateCode = String(member.state_code || "").trim();
+  const labelName = String(member.username || "Selected member");
+  header.textContent = `Same-State Rushees • ${labelName}`;
+  if (!stateCode) {
+    hint.textContent = "No state set for this member.";
+    listEl.innerHTML = "";
+    return;
+  }
+  hint.textContent = `${pnms.length} result(s) in ${stateCode}.`;
+  if (!pnms.length) {
+    listEl.innerHTML = '<p class="muted">No rushees found for this state.</p>';
+    return;
+  }
+  listEl.innerHTML = pnms
+    .map((pnm) => {
+      return `
+        <article class="entry mobile-card">
+          <div class="entry-title">
+            <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+            <span>${Number(pnm.weighted_total || 0).toFixed(2)}</span>
+          </div>
+          <div class="muted">${escapeHtml(pnm.hometown || "")}${pnm.hometown_state_code ? `, ${escapeHtml(pnm.hometown_state_code)}` : ""}</div>
+          <div class="action-row">
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Meeting</a>
+          </div>
         </article>
       `;
     })
@@ -1050,14 +1207,332 @@ async function loadHomePage() {
 }
 
 async function loadPnmsPage() {
-  const [pnmPayload] = await Promise.all([api("/api/mobile/pnms"), loadContactDownloadStatuses()]);
+  const stateFilter = normalizeStateFilterInput(mobileFilters.pnms.state);
+  const query = buildQueryString({ state: stateFilter });
+  const [pnmPayload] = await Promise.all([api(`/api/pnms${query}`), loadContactDownloadStatuses()]);
   mobilePnmRows = Array.isArray(pnmPayload.pnms) ? pnmPayload.pnms : [];
   updateContactsUi();
 }
 
 async function loadMembersPage() {
-  const payload = await api("/api/mobile/members");
-  renderMembers(payload.users || []);
+  const roleFilter = String(mobileFilters.members.role || "all").trim() || "all";
+  const stateFilter = normalizeStateFilterInput(mobileFilters.members.state);
+  const cityFilter = String(mobileFilters.members.city || "").trim();
+  const sortFilter = String(mobileFilters.members.sort || "location").trim() || "location";
+  const query = buildQueryString({
+    role: roleFilter,
+    state: stateFilter,
+    city: cityFilter,
+    sort: sortFilter,
+  });
+  const payload = await api(`/api/users${query}`);
+  mobileMemberRows = Array.isArray(payload.users) ? payload.users : [];
+  renderMembers(mobileMemberRows);
+
+  if (!mobileMemberRows.length) {
+    mobileSelectedTeamMemberId = null;
+    renderSameStatePnms(null, []);
+    return;
+  }
+  const existing = mobileMemberRows.find((item) => Number(item.user_id) === Number(mobileSelectedTeamMemberId));
+  const fallback = existing || mobileMemberRows[0];
+  mobileSelectedTeamMemberId = fallback ? Number(fallback.user_id) : null;
+  if (fallback) {
+    await loadSameStatePnmsForMember(fallback);
+  } else {
+    renderSameStatePnms(null, []);
+  }
+}
+
+async function loadSameStatePnmsForMember(member) {
+  if (!member) {
+    renderSameStatePnms(null, []);
+    return;
+  }
+  const stateCode = normalizeStateFilterInput(member.state_code);
+  if (!stateCode) {
+    renderSameStatePnms(member, []);
+    return;
+  }
+  try {
+    const payload = await api(`/api/pnms${buildQueryString({ state: stateCode })}`);
+    const rows = Array.isArray(payload.pnms) ? payload.pnms : [];
+    renderSameStatePnms(member, rows);
+  } catch (error) {
+    renderSameStatePnms(member, [], error.message || "Unable to load same-state rushees.");
+  }
+}
+
+function renderCalendarStats(stats) {
+  const totalEl = document.getElementById("mobileCalendarTotalCount");
+  const eventEl = document.getElementById("mobileCalendarEventCount");
+  const lunchEl = document.getElementById("mobileCalendarLunchCount");
+  if (!totalEl || !eventEl || !lunchEl) {
+    return;
+  }
+  totalEl.textContent = String(Number(stats.total_count || 0));
+  eventEl.textContent = String(Number(stats.official_event_count || 0));
+  lunchEl.textContent = String(Number(stats.lunch_count || 0));
+}
+
+function renderCalendarItems(items) {
+  const listEl = document.getElementById("mobileCalendarList");
+  if (!listEl) {
+    return;
+  }
+  if (!items.length) {
+    listEl.innerHTML = '<p class="muted">No upcoming rush events or lunches.</p>';
+    return;
+  }
+  listEl.innerHTML = items
+    .map((item) => {
+      const typeLabel = item.item_type === "lunch" ? "Lunch" : "Rush Event";
+      const timeLabel =
+        item.start_time && item.end_time
+          ? `${item.start_time} - ${item.end_time}`
+          : item.start_time
+            ? `${item.start_time}`
+            : "All Day";
+      const pnmMeta = item.pnm_code ? ` | ${item.pnm_code}` : "";
+      const location = item.location ? ` | ${item.location}` : "";
+      const details = item.details ? `<div class="muted">${escapeHtml(item.details)}</div>` : "";
+      const googleAction = item.google_calendar_url
+        ? `<a class="quick-nav-link" href="${escapeHtml(item.google_calendar_url)}" target="_blank" rel="noopener">Open in Google</a>`
+        : "";
+      return `
+        <article class="entry mobile-card">
+          <div class="entry-title">
+            <strong>${escapeHtml(item.title || typeLabel)}</strong>
+            <span>${escapeHtml(typeLabel)}</span>
+          </div>
+          <div class="muted">${escapeHtml(item.event_date || "")} | ${escapeHtml(timeLabel)}${escapeHtml(pnmMeta)}${escapeHtml(location)}</div>
+          ${details}
+          <div class="action-row">
+            ${googleAction}
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+async function loadCalendarPage() {
+  const payload = await api("/api/rush-calendar?limit=250");
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  renderCalendarItems(items);
+  renderCalendarStats(payload.stats || {});
+  if (payload.calendar_share) {
+    renderMobileCalendarShare(payload.calendar_share);
+  }
+}
+
+async function createMobileRushEvent(form) {
+  const button = document.getElementById("mobileRushEventCreateBtn");
+  const body = {
+    title: String(document.getElementById("mobileRushEventTitle")?.value || "").trim(),
+    event_type: String(document.getElementById("mobileRushEventType")?.value || "official").trim() || "official",
+    event_date: String(document.getElementById("mobileRushEventDate")?.value || "").trim(),
+    start_time: String(document.getElementById("mobileRushEventStart")?.value || "").trim() || null,
+    end_time: String(document.getElementById("mobileRushEventEnd")?.value || "").trim() || null,
+    location: String(document.getElementById("mobileRushEventLocation")?.value || "").trim(),
+    details: String(document.getElementById("mobileRushEventDetails")?.value || "").trim(),
+    is_official: true,
+  };
+  if (!body.title || !body.event_date) {
+    showToast("Title and date are required.");
+    return;
+  }
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Creating...";
+  }
+  try {
+    await api("/api/rush-events", {
+      method: "POST",
+      body,
+    });
+    showToast("Rush event created.");
+    if (form) {
+      form.reset();
+    }
+    await loadCalendarPage();
+  } catch (error) {
+    showToast(error.message || "Unable to create rush event.");
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Create Event";
+    }
+  }
+}
+
+async function downloadBackupFile(button, path, fallbackName) {
+  if (!button) {
+    return;
+  }
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Preparing...";
+  try {
+    const response = await fetch(resolveApiPath(path), {
+      method: "GET",
+      credentials: "same-origin",
+    });
+    if (!response.ok) {
+      let detail = "Backup request failed.";
+      const contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        const payload = await response.json().catch(() => ({}));
+        detail = String(payload.detail || detail);
+      }
+      throw new Error(detail);
+    }
+    const blob = await response.blob();
+    const disposition = response.headers.get("content-disposition") || "";
+    const filename = fileNameFromDisposition(disposition, fallbackName);
+    const objectUrl = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = filename;
+    anchor.rel = "noopener";
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
+    showToast("Backup download started.");
+  } catch (error) {
+    showToast(error.message || "Unable to download backup.");
+  } finally {
+    button.disabled = false;
+    button.textContent = originalLabel;
+  }
+}
+
+function renderMobileAdminSummary(pendingRows, officerPayload, assignmentsPayload) {
+  const pendingEl = document.getElementById("mobileAdminPendingCount");
+  const officerEl = document.getElementById("mobileAdminOfficerCount");
+  const activeAssignmentsEl = document.getElementById("mobileAdminActiveAssignments");
+  const pendingCount = Array.isArray(pendingRows) ? pendingRows.length : 0;
+  const officerCount = Number((officerPayload && officerPayload.summary && officerPayload.summary.officer_count) || 0);
+  const statusCounts = (assignmentsPayload && assignmentsPayload.status_counts) || {};
+  const activeAssignments =
+    Number(statusCounts.assigned || 0) + Number(statusCounts.in_progress || 0) + Number(statusCounts.needs_help || 0);
+  if (pendingEl) {
+    pendingEl.textContent = String(pendingCount);
+  }
+  if (officerEl) {
+    officerEl.textContent = String(officerCount);
+  }
+  if (activeAssignmentsEl) {
+    activeAssignmentsEl.textContent = String(activeAssignments);
+  }
+}
+
+function renderMobileAdminPending(pendingRows) {
+  const listEl = document.getElementById("mobileAdminPendingList");
+  if (!listEl) {
+    return;
+  }
+  if (!pendingRows.length) {
+    listEl.innerHTML = '<p class="muted">No pending approvals.</p>';
+    return;
+  }
+  listEl.innerHTML = pendingRows
+    .map((entry) => {
+      return `
+        <article class="entry mobile-card">
+          <div class="entry-title">
+            <strong>${escapeHtml(entry.username)}</strong>
+            <span>${escapeHtml(entry.role || "")}</span>
+          </div>
+          <div class="muted">Stereotype: ${escapeHtml(entry.stereotype || "-")}</div>
+          <div class="action-row">
+            <button type="button" data-approve-user-id="${entry.user_id}">Approve</button>
+            <button type="button" class="secondary" data-disapprove-user-id="${entry.user_id}">Disapprove</button>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderMobileAdminOfficers(officerPayload) {
+  const listEl = document.getElementById("mobileAdminOfficerList");
+  if (!listEl) {
+    return;
+  }
+  const rows = Array.isArray(officerPayload && officerPayload.rush_officers) ? officerPayload.rush_officers : [];
+  if (!rows.length) {
+    listEl.innerHTML = '<p class="muted">No officer metrics available.</p>';
+    return;
+  }
+  listEl.innerHTML = rows
+    .map((officer) => {
+      return `
+        <article class="entry mobile-card">
+          <div class="entry-title">
+            <strong>${escapeHtml(officer.username)}</strong>
+            <span>${escapeHtml(officer.emoji || "")}</span>
+          </div>
+          <div class="muted">Ratings: ${Number(officer.rating_count || 0)} | Lunches: ${Number(officer.total_lunches || 0)}</div>
+          <div class="muted">Avg Given: ${Number(officer.avg_rating_given || 0).toFixed(2)} | Participation: ${Number(officer.participation_score || 0).toFixed(2)}</div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderMobileAdminStorage(storagePayload) {
+  const listEl = document.getElementById("mobileAdminStorage");
+  if (!listEl) {
+    return;
+  }
+  const counters = (storagePayload && storagePayload.counters) || {};
+  const warnings = Array.isArray(storagePayload && storagePayload.warnings) ? storagePayload.warnings : [];
+  listEl.innerHTML = `
+    <article class="entry mobile-card">
+      <div class="entry-title">
+        <strong>Persistent Paths</strong>
+        <span>${storagePayload && storagePayload.persistent_paths_ok ? "OK" : "Check"}</span>
+      </div>
+      <div class="muted">Tenants: ${Number(storagePayload && storagePayload.active_tenants ? storagePayload.active_tenants : 0)}</div>
+      <div class="muted">PNMs: ${Number(counters.pnms || 0)} | Users: ${Number(counters.users || 0)}</div>
+      <div class="muted">Ratings: ${Number(counters.ratings || 0)} | Lunches: ${Number(counters.lunches || 0)}</div>
+      ${warnings.length ? `<div class="muted">${escapeHtml(warnings.join(" | "))}</div>` : ""}
+    </article>
+  `;
+}
+
+async function loadAdminPage() {
+  const deniedPanel = document.getElementById("mobileAdminDeniedPanel");
+  const adminPanel = document.getElementById("mobileAdminPanel");
+  if (!mobileCurrentUser || mobileCurrentUser.role !== "Head Rush Officer") {
+    if (deniedPanel) {
+      deniedPanel.classList.remove("hidden");
+    }
+    if (adminPanel) {
+      adminPanel.classList.add("hidden");
+    }
+    return;
+  }
+  if (deniedPanel) {
+    deniedPanel.classList.add("hidden");
+  }
+  if (adminPanel) {
+    adminPanel.classList.remove("hidden");
+  }
+
+  const [pendingPayload, officerPayload, assignmentsPayload, storagePayload] = await Promise.all([
+    api("/api/users/pending"),
+    api("/api/admin/rush-officers"),
+    api("/api/assignments/overview"),
+    api("/api/admin/storage"),
+  ]);
+  const pendingRows = Array.isArray(pendingPayload && pendingPayload.pending) ? pendingPayload.pending : [];
+  renderMobileAdminSummary(pendingRows, officerPayload, assignmentsPayload);
+  renderMobileAdminPending(pendingRows);
+  renderMobileAdminOfficers(officerPayload || {});
+  renderMobileAdminStorage(storagePayload || {});
 }
 
 async function handleCreateSubmit(event) {
@@ -1113,7 +1588,7 @@ async function handleCreateSubmit(event) {
     syncInterestPickerFromInput("mobilePnmInterests", "mobileInterestTags");
     syncStereotypePickerFromInput("mobilePnmStereotype", "mobileStereotypeTags");
     showToast("PNM created.");
-    window.location.href = `${MOBILE_BASE}/pnms`;
+    window.location.href = MOBILE_ROUTES.rushees;
   } catch (error) {
     showToast(error.message || "Unable to create PNM.");
   } finally {
@@ -1132,6 +1607,8 @@ function attachPageEvents() {
 
   if (MOBILE_PAGE === "pnms") {
     const refreshBtn = document.getElementById("mobileRefreshPnmsBtn");
+    const applyFiltersBtn = document.getElementById("mobileApplyPnmFiltersBtn");
+    const stateInput = document.getElementById("mobilePnmStateFilter");
     const downloadBtn = document.getElementById("mobileDownloadContactsBtn");
     const downloadSelectedBtn = document.getElementById("mobileDownloadSelectedContactBtn");
     const contactSelect = document.getElementById("mobileContactPnmSelect");
@@ -1146,6 +1623,33 @@ function attachPageEvents() {
           showToast("Refreshed.");
         } catch (error) {
           showToast(error.message || "Unable to refresh PNMs.");
+        }
+      });
+    }
+    if (applyFiltersBtn) {
+      applyFiltersBtn.addEventListener("click", async () => {
+        mobileFilters.pnms.state = stateInput ? stateInput.value : "";
+        try {
+          await loadPnmsPage();
+          showToast("Rushee filters applied.");
+        } catch (error) {
+          showToast(error.message || "Unable to apply filters.");
+        }
+      });
+    }
+    if (stateInput) {
+      stateInput.value = mobileFilters.pnms.state;
+      stateInput.addEventListener("keydown", async (event) => {
+        if (event.key !== "Enter") {
+          return;
+        }
+        event.preventDefault();
+        mobileFilters.pnms.state = stateInput.value;
+        try {
+          await loadPnmsPage();
+          showToast("Rushee filters applied.");
+        } catch (error) {
+          showToast(error.message || "Unable to apply filters.");
         }
       });
     }
@@ -1190,6 +1694,41 @@ function attachPageEvents() {
 
   if (MOBILE_PAGE === "members") {
     const refreshBtn = document.getElementById("mobileRefreshMembersBtn");
+    const applyFiltersBtn = document.getElementById("mobileApplyMemberFiltersBtn");
+    const roleInput = document.getElementById("mobileMemberRoleFilter");
+    const stateInput = document.getElementById("mobileMemberStateFilter");
+    const cityInput = document.getElementById("mobileMemberCityFilter");
+    const sortInput = document.getElementById("mobileMemberSortFilter");
+    const memberList = document.getElementById("mobileMemberList");
+    if (roleInput) {
+      roleInput.value = mobileFilters.members.role;
+    }
+    if (stateInput) {
+      stateInput.value = mobileFilters.members.state;
+    }
+    if (cityInput) {
+      cityInput.value = mobileFilters.members.city;
+    }
+    if (sortInput) {
+      sortInput.value = mobileFilters.members.sort;
+    }
+    const applyMemberFilters = async () => {
+      mobileFilters.members.role = roleInput ? roleInput.value : "all";
+      mobileFilters.members.state = stateInput ? stateInput.value : "";
+      mobileFilters.members.city = cityInput ? cityInput.value : "";
+      mobileFilters.members.sort = sortInput ? sortInput.value : "location";
+      await loadMembersPage();
+    };
+    if (applyFiltersBtn) {
+      applyFiltersBtn.addEventListener("click", async () => {
+        try {
+          await applyMemberFilters();
+          showToast("Team filters applied.");
+        } catch (error) {
+          showToast(error.message || "Unable to apply team filters.");
+        }
+      });
+    }
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
         try {
@@ -1200,6 +1739,25 @@ function attachPageEvents() {
         }
       });
     }
+    if (memberList) {
+      memberList.addEventListener("click", async (event) => {
+        const trigger = event.target.closest("[data-member-id]");
+        if (!trigger) {
+          return;
+        }
+        const memberId = Number(trigger.dataset.memberId || 0);
+        if (!memberId) {
+          return;
+        }
+        const member = mobileMemberRows.find((item) => Number(item.user_id) === memberId);
+        if (!member) {
+          return;
+        }
+        mobileSelectedTeamMemberId = memberId;
+        renderMembers(mobileMemberRows);
+        await loadSameStatePnmsForMember(member);
+      });
+    }
   }
 
   if (MOBILE_PAGE === "create") {
@@ -1208,6 +1766,111 @@ function attachPageEvents() {
       form.addEventListener("submit", handleCreateSubmit);
     }
     initializeMobileTagPickers();
+  }
+
+  if (MOBILE_PAGE === "calendar") {
+    const copyFeedBtn = document.getElementById("mobileCalendarCopyFeedBtn");
+    const copyLunchFeedBtn = document.getElementById("mobileCalendarCopyLunchFeedBtn");
+    const refreshBtn = document.getElementById("mobileRefreshCalendarBtn");
+    const form = document.getElementById("mobileRushEventForm");
+    const headTools = document.getElementById("mobileCalendarHeadTools");
+    const dateInput = document.getElementById("mobileRushEventDate");
+
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().slice(0, 10);
+    }
+    if (headTools) {
+      headTools.classList.toggle("hidden", !mobileCurrentUser || mobileCurrentUser.role !== "Head Rush Officer");
+    }
+    if (copyFeedBtn) {
+      copyFeedBtn.addEventListener("click", async () => {
+        await copyTextToClipboard(mobileCalendarShare && mobileCalendarShare.feed_url, "Main calendar feed copied.");
+      });
+    }
+    if (copyLunchFeedBtn) {
+      copyLunchFeedBtn.addEventListener("click", async () => {
+        await copyTextToClipboard(
+          mobileCalendarShare && mobileCalendarShare.lunch_feed_url,
+          "Lunch calendar feed copied."
+        );
+      });
+    }
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", async () => {
+        try {
+          await loadCalendarPage();
+          showToast("Calendar refreshed.");
+        } catch (error) {
+          showToast(error.message || "Unable to refresh calendar.");
+        }
+      });
+    }
+    if (form) {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await createMobileRushEvent(form);
+      });
+    }
+  }
+
+  if (MOBILE_PAGE === "admin") {
+    const refreshBtn = document.getElementById("mobileAdminRefreshBtn");
+    const pendingList = document.getElementById("mobileAdminPendingList");
+    const csvBtn = document.getElementById("mobileAdminBackupCsvBtn");
+    const dbBtn = document.getElementById("mobileAdminBackupDbBtn");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", async () => {
+        try {
+          await loadAdminPage();
+          showToast("Admin panel refreshed.");
+        } catch (error) {
+          showToast(error.message || "Unable to refresh admin panel.");
+        }
+      });
+    }
+    if (csvBtn) {
+      csvBtn.addEventListener("click", () => {
+        downloadBackupFile(csvBtn, "/api/export/csv", `bidboard-backup-${new Date().toISOString().slice(0, 10)}.zip`);
+      });
+    }
+    if (dbBtn) {
+      dbBtn.addEventListener("click", () => {
+        downloadBackupFile(dbBtn, "/api/export/sqlite", `bidboard-db-${new Date().toISOString().slice(0, 10)}.db`);
+      });
+    }
+    if (pendingList) {
+      pendingList.addEventListener("click", async (event) => {
+        const approveTrigger = event.target.closest("[data-approve-user-id]");
+        if (approveTrigger) {
+          const userId = Number(approveTrigger.dataset.approveUserId || 0);
+          if (!userId) {
+            return;
+          }
+          try {
+            await api(`/api/users/pending/${userId}/approve`, { method: "POST" });
+            await loadAdminPage();
+            showToast("User approved.");
+          } catch (error) {
+            showToast(error.message || "Unable to approve user.");
+          }
+          return;
+        }
+        const disapproveTrigger = event.target.closest("[data-disapprove-user-id]");
+        if (disapproveTrigger) {
+          const userId = Number(disapproveTrigger.dataset.disapproveUserId || 0);
+          if (!userId) {
+            return;
+          }
+          try {
+            await api(`/api/users/${userId}/disapprove`, { method: "POST" });
+            await loadAdminPage();
+            showToast("User moved back to pending.");
+          } catch (error) {
+            showToast(error.message || "Unable to disapprove user.");
+          }
+        }
+      });
+    }
   }
 }
 
@@ -1229,6 +1892,15 @@ async function loadPageData() {
     if (dateInput && !dateInput.value) {
       dateInput.value = new Date().toISOString().slice(0, 10);
     }
+    return;
+  }
+  if (MOBILE_PAGE === "calendar") {
+    await loadCalendarPage();
+    return;
+  }
+  if (MOBILE_PAGE === "admin") {
+    await loadAdminPage();
+    return;
   }
 }
 

@@ -82,11 +82,11 @@
     <datalist id="mobileStateHints"></datalist>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_base }}" class="mobile-tab">Home</a>
-      <a href="{{ app_config.mobile_base }}/pnms" class="mobile-tab">PNMs</a>
-      <a href="{{ app_config.mobile_base }}/create" class="mobile-tab is-active">Create</a>
-      <a href="{{ app_config.mobile_base }}/members" class="mobile-tab">Members</a>
-      <a href="{{ app_config.mobile_base }}/meeting" class="mobile-tab">Meeting</a>
+      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Dashboard</a>
+      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab is-active">Rushees</a>
+      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
+      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Calendar</a>
+      <a href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-tab">Admin</a>
     </nav>
 
     <div id="mobileToast" class="toast hidden"></div>

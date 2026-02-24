@@ -1036,6 +1036,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
     base_path = f"/{tenant.slug}"
     member_base = f"{base_path}/member"
     member_signup_qr_path = f"{base_path}/member-signup-qr.svg"
+    mobile_base = f"{base_path}/mobile"
     desktop_routes = {
         "dashboard": f"{base_path}/dashboard",
         "rushees": f"{base_path}/rushees",
@@ -1043,13 +1044,22 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         "calendar": f"{base_path}/calendar",
         "admin": f"{base_path}/admin",
     }
+    mobile_routes = {
+        "dashboard": mobile_base,
+        "rushees": f"{mobile_base}/pnms",
+        "team": f"{mobile_base}/members",
+        "calendar": f"{mobile_base}/calendar",
+        "admin": f"{mobile_base}/admin",
+        "create": f"{mobile_base}/create",
+        "meeting": f"{mobile_base}/meeting",
+    }
     return {
         "base_path": base_path,
         "api_base": f"{base_path}/api",
         "meeting_base": f"{base_path}/meeting",
         "member_base": member_base,
         "platform_base": "/platform",
-        "mobile_base": f"{base_path}/mobile",
+        "mobile_base": mobile_base,
         "tenant_slug": tenant.slug,
         "tenant_name": tenant.display_name,
         "chapter_name": tenant.chapter_name,
@@ -1069,6 +1079,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         "default_stereotype_tags": list(tenant.default_stereotype_tags),
         "state_options": [{"code": code, "name": name} for code, name in sorted(US_STATE_CODE_TO_NAME.items())],
         "desktop_routes": desktop_routes,
+        "mobile_routes": mobile_routes,
         "member_signup_path": member_base,
         "member_signup_qr_path": member_signup_qr_path,
         "calendar_timezone": CALENDAR_TIMEZONE,
@@ -7997,6 +8008,41 @@ async def mobile_members_page(request: Request) -> HTMLResponse:
             "tenant": tenant,
             "app_config": app_config_for_tenant(tenant),
             "mobile_page": "members",
+        },
+    )
+
+
+@app.get("/mobile/calendar", response_class=HTMLResponse)
+async def mobile_calendar_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_calendar.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "calendar",
+        },
+    )
+
+
+@app.get("/mobile/admin", response_class=HTMLResponse)
+async def mobile_admin_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    session_role = request_session_role(request)
+    if session_role and session_role != ROLE_HEAD:
+        return RedirectResponse(url=f"/{tenant.slug}/mobile?notice=admin-access-denied", status_code=307)
+    return templates.TemplateResponse(
+        "mobile_admin.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "admin",
         },
     )
 

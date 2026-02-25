@@ -1,5 +1,109 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'overview' %} is-active{% endif %}" data-page="overview">
 
+        <section id="commandCenterSection" class="panel reveal delay-3 command-center-panel">
+          <div class="section-head">
+            <div>
+              <h2>Rating Command Center</h2>
+              <p class="muted">Prioritized queue for immediate ratings, lunch scheduling, and meeting prep in one workflow.</p>
+            </div>
+            <p id="commandWindowLabel" class="muted">Window: last 72 hours</p>
+          </div>
+
+          <div class="command-summary-row">
+            <article class="card">
+              <p>Queue</p>
+              <strong id="commandQueueCount">0</strong>
+            </article>
+            <article class="card">
+              <p>Stale Alerts</p>
+              <strong id="commandStaleCount">0</strong>
+            </article>
+            <article class="card">
+              <p>Recent Changes</p>
+              <strong id="commandRecentCount">0</strong>
+            </article>
+          </div>
+
+          <div class="command-center-grid">
+            <article class="list-column command-queue-column">
+              <div class="section-head">
+                <h3>Rate Queue</h3>
+                <span class="muted">Recent activity first</span>
+              </div>
+              <div id="commandCenterQueue" class="list-box command-list"></div>
+              <div class="divider"></div>
+              <h3>Stale Rating Alerts</h3>
+              <div id="commandStaleList" class="list-box command-list compact"></div>
+            </article>
+
+            <article class="list-column command-composer-column">
+              <div class="command-selected-head">
+                <div class="meeting-photo-wrap command-selected-photo-wrap">
+                  <img id="commandSelectedPhoto" class="meeting-photo hidden" alt="Selected queue PNM" />
+                  <div id="commandSelectedPhotoPlaceholder" class="photo-placeholder">Select a queue item to begin.</div>
+                </div>
+                <div>
+                  <h3 id="commandSelectedName">Select a PNM from queue</h3>
+                  <p id="commandSelectedMeta" class="muted">Queue details, assignment ownership, and latest touchpoint appear here.</p>
+                  <div class="action-row">
+                    <a id="commandOpenMeetingBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
+                  </div>
+                </div>
+              </div>
+
+              <form id="commandRatingForm" class="stack">
+                <div class="inline-grid five-cols compact-inputs">
+                  <label><span id="commandRateGirlsLabel">Girls (0-10)</span><input id="commandRateGirls" type="number" min="0" max="10" required /></label>
+                  <label><span id="commandRateProcessLabel">Process (0-10)</span><input id="commandRateProcess" type="number" min="0" max="10" required /></label>
+                  <label><span id="commandRatePersonableLabel">Personable (0-10)</span><input id="commandRatePersonable" type="number" min="0" max="10" required /></label>
+                  <label><span id="commandRateAlcoholLabel">Alcohol (0-10)</span><input id="commandRateAlcohol" type="number" min="0" max="10" required /></label>
+                  <label><span id="commandRateIgLabel">IG (0-5)</span><input id="commandRateIg" type="number" min="0" max="5" required /></label>
+                </div>
+                <label>
+                  Comment (required on updates; must exceed 5 words)
+                  <textarea id="commandRateComment" rows="3" placeholder="Explain what changed after the latest touchpoint"></textarea>
+                </label>
+                <div class="action-row">
+                  <button id="commandSaveBtn" type="submit">Save Rating</button>
+                  <button id="commandSaveNextBtn" type="button" class="secondary">Save &amp; Next</button>
+                </div>
+              </form>
+            </article>
+
+            <article class="list-column command-rail-column">
+              <h3>Execution Rail</h3>
+              <form id="commandLunchForm" class="stack">
+                <label>
+                  Lunch Date
+                  <input id="commandLunchDate" type="date" required />
+                </label>
+                <div class="inline-grid two-cols">
+                  <label>
+                    Start (optional)
+                    <input id="commandLunchStartTime" type="time" />
+                  </label>
+                  <label>
+                    End (optional)
+                    <input id="commandLunchEndTime" type="time" />
+                  </label>
+                </div>
+                <label>
+                  Location (optional)
+                  <input id="commandLunchLocation" type="text" placeholder="Main Street Cafe" />
+                </label>
+                <label>
+                  Notes
+                  <textarea id="commandLunchNotes" rows="2" placeholder="Optional touchpoint context"></textarea>
+                </label>
+                <button id="commandLunchBtn" type="submit">Schedule Lunch</button>
+              </form>
+              <div class="divider"></div>
+              <h3>Recent Rating Changes</h3>
+              <div id="commandRecentChanges" class="list-box command-list"></div>
+            </article>
+          </div>
+        </section>
+
         <section id="leaderboardSection" class="panel reveal delay-5">
           <div class="section-head">
             <h2>PNM Leaderboard</h2>

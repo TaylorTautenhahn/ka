@@ -15216,6 +15216,296 @@ def officer_chat_stats(_: sqlite3.Row = Depends(require_officer)) -> dict[str, A
     }
 
 
+@app.get("/api/dashboard/command-center")
+def dashboard_command_center(
+    window_hours: int = Query(default=72, ge=24, le=168),
+    limit: int = Query(default=30, ge=1, le=100),
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    window_hours = max(24, min(int(window_hours), 168))
+    limit = max(1, min(int(limit), 100))
+    now_dt = datetime.now(timezone.utc)
+    cutoff_dt = now_dt - timedelta(hours=window_hours)
+    cutoff_iso = cutoff_dt.isoformat()
+
+    def parse_timestamp(raw_value: Any) -> datetime | None:
+        token = str(raw_value or "").strip()
+        if not token:
+            return None
+        candidate = token.replace("Z", "+00:00")
+        try:
+            parsed = datetime.fromisoformat(candidate)
+        except ValueError:
+            try:
+                parsed_day = date.fromisoformat(token)
+            except ValueError:
+                return None
+            parsed = datetime(parsed_day.year, parsed_day.month, parsed_day.day, tzinfo=timezone.utc)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        else:
+            parsed = parsed.astimezone(timezone.utc)
+        return parsed
+
+    def newest_timestamp(values: list[str | None]) -> str | None:
+        latest_dt: datetime | None = None
+        latest_raw: str | None = None
+        for raw in values:
+            parsed = parse_timestamp(raw)
+            if not parsed:
+                continue
+            if latest_dt is None or parsed > latest_dt:
+                latest_dt = parsed
+                latest_raw = parsed.isoformat()
+        return latest_raw
+
+    urgency_rank = {
+        "needs_help": 4,
+        "in_progress": 3,
+        "assigned": 2,
+        "unassigned": 1,
+        "completed": 0,
+    }
+
+    with db_session() as conn:
+        own_rows = conn.execute("SELECT * FROM ratings WHERE user_id = ?", (user["id"],)).fetchall()
+        own_rating_by_pnm = {int(row["pnm_id"]): rating_payload(row) for row in own_rows}
+        own_updated_at_by_pnm = {int(row["pnm_id"]): row["updated_at"] for row in own_rows}
+
+        pnm_rows = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+            """
+        ).fetchall()
+        pnm_ids = [int(row["id"]) for row in pnm_rows]
+        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=pnm_ids)
+
+        lunch_rows = conn.execute(
+            """
+            SELECT
+                l.pnm_id,
+                MAX(COALESCE(l.created_at, l.lunch_date)) AS last_lunch_at
+            FROM lunches l
+            WHERE l.pnm_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+            GROUP BY l.pnm_id
+            """,
+            (json.dumps(pnm_ids),),
+        ).fetchall() if pnm_ids else []
+        lunch_by_pnm = {int(row["pnm_id"]): row["last_lunch_at"] for row in lunch_rows}
+
+        rating_touch_rows = conn.execute(
+            """
+            SELECT pnm_id, MAX(last_seen_at) AS last_rating_activity_at
+            FROM (
+                SELECT rce.pnm_id, rce.changed_at AS last_seen_at
+                FROM rating_comment_events rce
+                WHERE rce.pnm_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+                UNION ALL
+                SELECT r.pnm_id, r.updated_at AS last_seen_at
+                FROM ratings r
+                WHERE r.pnm_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))
+            ) combined
+            GROUP BY pnm_id
+            """,
+            (json.dumps(pnm_ids), json.dumps(pnm_ids)),
+        ).fetchall() if pnm_ids else []
+        rating_touch_by_pnm = {int(row["pnm_id"]): row["last_rating_activity_at"] for row in rating_touch_rows}
+
+        recent_change_rows = conn.execute(
+            """
+            SELECT
+                rce.id,
+                rce.rating_id,
+                rce.pnm_id,
+                rce.event_type,
+                rce.old_total,
+                rce.new_total,
+                rce.delta_total,
+                rce.comment,
+                rce.changed_at,
+                u.id AS changed_by_user_id,
+                u.username AS changed_by_username,
+                u.role AS changed_by_role,
+                u.emoji AS changed_by_emoji,
+                p.pnm_code,
+                p.first_name,
+                p.last_name
+            FROM rating_comment_events rce
+            JOIN users u ON u.id = rce.user_id
+            JOIN pnms p ON p.id = rce.pnm_id
+            WHERE rce.changed_at >= ?
+            ORDER BY rce.changed_at DESC
+            LIMIT ?
+            """,
+            (cutoff_iso, max(30, limit * 3)),
+        ).fetchall()
+
+    queue_rows: list[dict[str, Any]] = []
+    stale_rows: list[dict[str, Any]] = []
+
+    for row in pnm_rows:
+        pnm_id = int(row["id"])
+        own_rating = own_rating_by_pnm.get(pnm_id)
+        pnm = pnm_payload(
+            row,
+            own_rating,
+            assigned_officer=assigned_officer_payload_from_row(row),
+            assigned_officers=links_by_pnm.get(pnm_id, []),
+        )
+
+        last_lunch_at = lunch_by_pnm.get(pnm_id)
+        last_rating_activity_at = rating_touch_by_pnm.get(pnm_id)
+        last_touchpoint_at = newest_timestamp([last_lunch_at, last_rating_activity_at])
+        last_touchpoint_dt = parse_timestamp(last_touchpoint_at)
+        has_recent_touchpoint = bool(last_touchpoint_dt and last_touchpoint_dt >= cutoff_dt)
+
+        last_rating_by_me_at = own_updated_at_by_pnm.get(pnm_id)
+        last_rating_by_me_dt = parse_timestamp(last_rating_by_me_at)
+        has_recent_rating_by_me = bool(last_rating_by_me_dt and last_rating_by_me_dt >= cutoff_dt)
+
+        needs_rating_update = False
+        stale_reason = ""
+        if not last_rating_by_me_dt:
+            needs_rating_update = True
+            stale_reason = "never_rated"
+        elif last_touchpoint_dt and last_rating_by_me_dt < last_touchpoint_dt:
+            needs_rating_update = True
+            stale_reason = "rating_older_than_recent_touchpoint"
+        elif has_recent_touchpoint and not has_recent_rating_by_me:
+            needs_rating_update = True
+            stale_reason = "no_recent_rating"
+
+        assignment_status = str(pnm.get("assignment_status") or "").strip().lower()
+        assignment_urgency = urgency_rank.get(assignment_status, 0)
+        assigned_to_me = any(
+            int(item.get("user_id") or 0) == int(user["id"])
+            for item in (pnm.get("assigned_officers") or [])
+            if isinstance(item, dict)
+        ) or int(pnm.get("assigned_officer_id") or 0) == int(user["id"])
+
+        touchpoint_epoch = int(last_touchpoint_dt.timestamp()) if last_touchpoint_dt else 0
+        weighted_total = float(pnm.get("weighted_total") or 0.0)
+        priority_score = (
+            (1_000_000_000 if has_recent_touchpoint else 0)
+            + (100_000_000 if needs_rating_update else 0)
+            + (10_000_000 if assigned_to_me else 0)
+            + assignment_urgency * 1_000_000
+            + touchpoint_epoch
+            + weighted_total
+        )
+
+        queue_item = {
+            "pnm_id": pnm_id,
+            "pnm_code": pnm["pnm_code"],
+            "name": f"{pnm['first_name']} {pnm['last_name']}",
+            "photo_url": pnm["photo_url"],
+            "weighted_total": round(weighted_total, 2),
+            "rating_count": int(pnm["rating_count"]),
+            "total_lunches": int(pnm["total_lunches"]),
+            "assigned_officer_username": (pnm.get("assigned_officer") or {}).get("username", ""),
+            "assigned_officers": pnm.get("assigned_officers") or [],
+            "own_rating": pnm.get("own_rating"),
+            "last_touchpoint_at": last_touchpoint_at,
+            "last_lunch_at": newest_timestamp([last_lunch_at]),
+            "last_rating_by_me_at": last_rating_by_me_dt.isoformat() if last_rating_by_me_dt else None,
+            "needs_rating_update": needs_rating_update,
+            "stale_reason": stale_reason,
+            "priority_score": round(float(priority_score), 2),
+            "assignment_status": pnm.get("assignment_status"),
+            "assignment_status_label": pnm.get("assignment_status_label"),
+            "is_assigned_to_me": assigned_to_me,
+            "_sort_recent": 1 if has_recent_touchpoint else 0,
+            "_sort_needs": 1 if needs_rating_update else 0,
+            "_sort_assigned_to_me": 1 if assigned_to_me else 0,
+            "_sort_urgency": assignment_urgency,
+            "_sort_touch_epoch": touchpoint_epoch,
+            "_sort_weighted_total": weighted_total,
+        }
+        queue_rows.append(queue_item)
+        if needs_rating_update:
+            stale_rows.append(queue_item)
+
+    queue_rows.sort(
+        key=lambda item: (
+            -int(item["_sort_recent"]),
+            -int(item["_sort_needs"]),
+            -int(item["_sort_assigned_to_me"]),
+            -int(item["_sort_urgency"]),
+            -int(item["_sort_touch_epoch"]),
+            -float(item["_sort_weighted_total"]),
+            str(item["name"]).lower(),
+        )
+    )
+
+    stale_rows.sort(
+        key=lambda item: (
+            -int(item["_sort_recent"]),
+            -int(item["_sort_assigned_to_me"]),
+            -int(item["_sort_urgency"]),
+            -int(item["_sort_touch_epoch"]),
+            str(item["name"]).lower(),
+        )
+    )
+
+    for row in queue_rows:
+        row.pop("_sort_recent", None)
+        row.pop("_sort_needs", None)
+        row.pop("_sort_assigned_to_me", None)
+        row.pop("_sort_urgency", None)
+        row.pop("_sort_touch_epoch", None)
+        row.pop("_sort_weighted_total", None)
+
+    recent_rating_changes: list[dict[str, Any]] = []
+    for row in recent_change_rows:
+        recent_rating_changes.append(
+            {
+                "event_id": int(row["id"]),
+                "rating_id": int(row["rating_id"]),
+                "pnm_id": int(row["pnm_id"]),
+                "pnm_code": row["pnm_code"],
+                "pnm_name": f"{row['first_name']} {row['last_name']}",
+                "event_type": row["event_type"],
+                "old_total": int(row["old_total"]) if row["old_total"] is not None else None,
+                "new_total": int(row["new_total"]),
+                "delta_total": int(row["delta_total"]),
+                "comment": row["comment"] or "",
+                "changed_at": row["changed_at"],
+                "changed_by": {
+                    "user_id": int(row["changed_by_user_id"]),
+                    "username": row["changed_by_username"],
+                    "role": row["changed_by_role"],
+                    "emoji": row["changed_by_emoji"],
+                },
+            }
+        )
+
+    queue = queue_rows[:limit]
+    stale_alerts = stale_rows[: min(40, limit)]
+
+    return {
+        "queue": queue,
+        "stale_alerts": stale_alerts,
+        "recent_rating_changes": recent_rating_changes,
+        "summary": {
+            "window_hours": window_hours,
+            "queue_count": len(queue),
+            "queue_total": len(queue_rows),
+            "stale_count": len(stale_alerts),
+            "stale_total": len(stale_rows),
+            "recent_change_count": len(recent_rating_changes),
+            "generated_at": now_dt.isoformat(),
+        },
+    }
+
+
 @app.get("/api/matching")
 def matching(
     interest: str | None = None,

@@ -57,6 +57,22 @@ const BASE_DEFAULT_STEREOTYPE_TAGS = [
   "Mentor",
   "Builder",
 ];
+const ROLE_HEAD = "Head Rush Officer";
+const ROLE_RUSH_OFFICER = "Rush Officer";
+const BASE_RATING_CRITERIA = [
+  { field: "good_with_girls", label: "Good with girls", short_label: "Girls", max: 10 },
+  { field: "will_make_it", label: "Will make it through process", short_label: "Process", max: 10 },
+  { field: "personable", label: "Personable", short_label: "Personable", max: 10 },
+  { field: "alcohol_control", label: "Alcohol control", short_label: "Alcohol", max: 10 },
+  { field: "instagram_marketability", label: "Instagram marketability", short_label: "IG", max: 5 },
+];
+const RATING_FIELD_LIMITS = {
+  good_with_girls: 10,
+  will_make_it: 10,
+  personable: 10,
+  alcohol_control: 10,
+  instagram_marketability: 5,
+};
 
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -151,6 +167,32 @@ function parseConfiguredTagList(raw, fallback) {
   return out.length ? out.slice(0, 20) : [...fallback];
 }
 
+function parseRatingCriteria(raw) {
+  const byField = new Map();
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => {
+      if (!item || typeof item !== "object" || !item.field) {
+        return;
+      }
+      byField.set(String(item.field), item);
+    });
+  }
+  return BASE_RATING_CRITERIA.map((base) => {
+    const incoming = byField.get(base.field) || {};
+    const limit = RATING_FIELD_LIMITS[base.field] || base.max;
+    const parsedMax = Number.parseInt(String(incoming.max ?? base.max), 10);
+    const max = Number.isFinite(parsedMax) ? Math.max(1, Math.min(limit, parsedMax)) : base.max;
+    const label = String(incoming.label || base.label).trim() || base.label;
+    const shortLabel = String(incoming.short_label || base.short_label).trim() || base.short_label;
+    return {
+      field: base.field,
+      label,
+      short_label: shortLabel,
+      max,
+    };
+  });
+}
+
 function normalizeStateCodeToken(value) {
   const token = String(value || "").trim().toUpperCase();
   return /^[A-Z]{2}$/.test(token) ? token : "";
@@ -182,6 +224,8 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
   APP_CONFIG.default_stereotype_tags,
   BASE_DEFAULT_STEREOTYPE_TAGS
 );
+const RATING_CRITERIA = parseRatingCriteria(APP_CONFIG.rating_criteria);
+const RATING_CRITERIA_BY_FIELD = new Map(RATING_CRITERIA.map((item) => [item.field, item]));
 const STATE_OPTIONS = parseStateOptions(APP_CONFIG.state_options);
 const mobileStateHints = document.getElementById("mobileStateHints");
 const mobilePnmStateHints = document.getElementById("mobilePnmStateHints");
@@ -197,6 +241,16 @@ let mobileSelectedContactPnmId = null;
 let mobilePackagePrimaryPnmId = null;
 let mobilePackagePartnerPnmId = null;
 let mobileSelectedTeamMemberId = null;
+const mobileCommandCenter = {
+  queue: [],
+  staleAlerts: [],
+  recentChanges: [],
+  summary: null,
+  selectedPnmId: null,
+  windowHours: 72,
+  limit: 30,
+  error: "",
+};
 const mobileFilters = {
   pnms: {
     state: "",
@@ -226,6 +280,25 @@ function showToast(message) {
   toastEl.classList.remove("hidden");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2500);
+}
+
+function ratingCriteriaForField(field) {
+  return RATING_CRITERIA_BY_FIELD.get(field) || BASE_RATING_CRITERIA.find((item) => item.field === field);
+}
+
+function ratingLabelWithRange(field) {
+  const criterion = ratingCriteriaForField(field);
+  if (!criterion) {
+    return `${field} (0-10)`;
+  }
+  return `${criterion.short_label} (0-${criterion.max})`;
+}
+
+function mobileCanUseCommandCenter() {
+  return Boolean(
+    mobileCurrentUser &&
+      (mobileCurrentUser.role === ROLE_HEAD || mobileCurrentUser.role === ROLE_RUSH_OFFICER)
+  );
 }
 
 function contactDownloadedAt(pnmId) {
@@ -1050,6 +1123,275 @@ function renderHomeLeaderboard(rows) {
     .join("");
 }
 
+function mobileCommandStaleLabel(value) {
+  if (value === "never_rated") {
+    return "Never Rated";
+  }
+  if (value === "rating_older_than_recent_touchpoint") {
+    return "Behind Touchpoint";
+  }
+  if (value === "no_recent_rating") {
+    return "No Recent Rating";
+  }
+  return "Needs Update";
+}
+
+function mobileCommandSelectedItem() {
+  const selectedId = Number(mobileCommandCenter.selectedPnmId || 0);
+  if (!selectedId) {
+    return null;
+  }
+  return mobileCommandCenter.queue.find((item) => Number(item.pnm_id) === selectedId) || null;
+}
+
+function applyMobileCommandRatingCriteriaUi() {
+  const fields = [
+    { field: "good_with_girls", inputId: "mobileCommandRateGirls", labelId: "mobileCommandRateGirlsLabel" },
+    { field: "will_make_it", inputId: "mobileCommandRateProcess", labelId: "mobileCommandRateProcessLabel" },
+    { field: "personable", inputId: "mobileCommandRatePersonable", labelId: "mobileCommandRatePersonableLabel" },
+    { field: "alcohol_control", inputId: "mobileCommandRateAlcohol", labelId: "mobileCommandRateAlcoholLabel" },
+    { field: "instagram_marketability", inputId: "mobileCommandRateIg", labelId: "mobileCommandRateIgLabel" },
+  ];
+  fields.forEach(({ field, inputId, labelId }) => {
+    const criterion = ratingCriteriaForField(field);
+    const input = document.getElementById(inputId);
+    const label = document.getElementById(labelId);
+    if (input && criterion) {
+      input.min = "0";
+      input.max = String(criterion.max);
+    }
+    if (label) {
+      label.textContent = ratingLabelWithRange(field);
+    }
+  });
+}
+
+function renderMobileCommandCenterVisibility() {
+  const officerSection = document.getElementById("mobileOfficerCommandCenter");
+  const noticeSection = document.getElementById("mobileNonOfficerNotice");
+  const stickyActions = document.getElementById("mobileCommandStickyActions");
+  const canUse = mobileCanUseCommandCenter();
+  if (officerSection) {
+    officerSection.classList.toggle("hidden", !canUse);
+  }
+  if (stickyActions) {
+    stickyActions.classList.toggle("hidden", !canUse);
+  }
+  if (noticeSection) {
+    noticeSection.classList.toggle("hidden", canUse);
+  }
+}
+
+function renderMobileCommandSelection() {
+  const metaEl = document.getElementById("mobileCommandSelectedMeta");
+  const stickyMeetingLink = document.getElementById("mobileCommandStickyMeetingLink");
+  const selected = mobileCommandSelectedItem();
+  if (!selected) {
+    if (metaEl) {
+      metaEl.textContent = "Select a queue item to start rating.";
+    }
+    if (stickyMeetingLink) {
+      stickyMeetingLink.href = MOBILE_ROUTES.meeting;
+    }
+    const ratingForm = document.getElementById("mobileCommandRatingForm");
+    if (ratingForm) {
+      ratingForm.reset();
+    }
+    return;
+  }
+
+  const assigned = selected.assigned_officer_username || "Unassigned";
+  const touchpoint = selected.last_touchpoint_at ? formatDownloadStamp(selected.last_touchpoint_at) : "None";
+  const mine = selected.last_rating_by_me_at ? formatDownloadStamp(selected.last_rating_by_me_at) : "Never";
+  const stale = selected.needs_rating_update ? mobileCommandStaleLabel(selected.stale_reason) : "Fresh";
+  if (metaEl) {
+    metaEl.textContent =
+      `${selected.pnm_code} | ${selected.name} | Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assigned} | Touchpoint: ${touchpoint} | My Rating: ${mine} | ${stale}`;
+  }
+  if (stickyMeetingLink) {
+    stickyMeetingLink.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
+  }
+
+  const own = selected.own_rating || null;
+  const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
+  const processMax = ratingCriteriaForField("will_make_it")?.max || 10;
+  const personableMax = ratingCriteriaForField("personable")?.max || 10;
+  const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
+  const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
+  const girlsInput = document.getElementById("mobileCommandRateGirls");
+  const processInput = document.getElementById("mobileCommandRateProcess");
+  const personableInput = document.getElementById("mobileCommandRatePersonable");
+  const alcoholInput = document.getElementById("mobileCommandRateAlcohol");
+  const igInput = document.getElementById("mobileCommandRateIg");
+  const commentInput = document.getElementById("mobileCommandRateComment");
+  if (girlsInput) {
+    girlsInput.value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
+  }
+  if (processInput) {
+    processInput.value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
+  }
+  if (personableInput) {
+    personableInput.value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
+  }
+  if (alcoholInput) {
+    alcoholInput.value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
+  }
+  if (igInput) {
+    igInput.value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
+  }
+  if (commentInput) {
+    commentInput.value = own && own.comment ? own.comment : "";
+  }
+}
+
+function renderMobileCommandCenter() {
+  renderMobileCommandCenterVisibility();
+  if (!mobileCanUseCommandCenter()) {
+    return;
+  }
+
+  const summary = mobileCommandCenter.summary || {};
+  const queueCountEl = document.getElementById("mobileCommandQueueCount");
+  const staleCountEl = document.getElementById("mobileCommandStaleCount");
+  const recentCountEl = document.getElementById("mobileCommandRecentCount");
+  const windowLabelEl = document.getElementById("mobileCommandWindowLabel");
+  if (queueCountEl) {
+    queueCountEl.textContent = String(Number(summary.queue_count || 0));
+  }
+  if (staleCountEl) {
+    staleCountEl.textContent = String(Number(summary.stale_count || 0));
+  }
+  if (recentCountEl) {
+    recentCountEl.textContent = String(Number(summary.recent_change_count || 0));
+  }
+  if (windowLabelEl) {
+    windowLabelEl.textContent = `Last ${Number(summary.window_hours || mobileCommandCenter.windowHours || 72)}h`;
+  }
+
+  const queueEl = document.getElementById("mobileCommandQueueList");
+  const queueRows = Array.isArray(mobileCommandCenter.queue) ? mobileCommandCenter.queue : [];
+  if (!mobileCommandCenter.selectedPnmId || !queueRows.some((item) => Number(item.pnm_id) === Number(mobileCommandCenter.selectedPnmId))) {
+    mobileCommandCenter.selectedPnmId = queueRows.length ? Number(queueRows[0].pnm_id) : null;
+  }
+  if (queueEl) {
+    if (!queueRows.length) {
+      const detail = mobileCommandCenter.error || "No queue items available yet.";
+      queueEl.innerHTML = `<p class="muted">${escapeHtml(detail)}</p>`;
+    } else {
+      queueEl.innerHTML = queueRows
+        .map((item) => {
+          const selectedClass = Number(item.pnm_id) === Number(mobileCommandCenter.selectedPnmId) ? " is-selected" : "";
+          const staleBadge = item.needs_rating_update
+            ? `<span class="pill warn">${escapeHtml(mobileCommandStaleLabel(item.stale_reason))}</span>`
+            : '<span class="pill good">Fresh</span>';
+          const assignedBadge = item.is_assigned_to_me ? '<span class="pill">Assigned To Me</span>' : "";
+          const touchpoint = item.last_touchpoint_at ? formatDownloadStamp(item.last_touchpoint_at) : "No touchpoint";
+          return `
+            <article class="entry mobile-card${selectedClass}">
+              <button type="button" class="mobile-command-queue-btn" data-mobile-command-pnm-id="${Number(item.pnm_id)}">
+                <div class="entry-title">
+                  <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
+                  <span>${Number(item.weighted_total || 0).toFixed(2)}</span>
+                </div>
+                <div class="muted">Touchpoint: ${escapeHtml(touchpoint)}</div>
+                <div class="muted">Assigned: ${escapeHtml(item.assigned_officer_username || "Unassigned")}</div>
+                <div class="command-chip-row">${staleBadge}${assignedBadge}</div>
+              </button>
+            </article>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  const recentEl = document.getElementById("mobileCommandRecentChanges");
+  const changeRows = Array.isArray(mobileCommandCenter.recentChanges) ? mobileCommandCenter.recentChanges : [];
+  if (recentEl) {
+    if (!changeRows.length) {
+      recentEl.innerHTML = '<p class="muted">No rating changes in this window.</p>';
+    } else {
+      recentEl.innerHTML = changeRows
+        .map((item) => {
+          const delta = Number(item.delta_total || 0);
+          const deltaClass = delta > 0 ? "good" : delta < 0 ? "bad" : "";
+          const deltaLabel = delta > 0 ? `+${delta}` : `${delta}`;
+          const changedBy = item.changed_by && item.changed_by.username ? item.changed_by.username : "Member";
+          return `
+            <article class="entry mobile-card">
+              <div class="entry-title">
+                <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.pnm_name)}</strong>
+                <span class="${deltaClass}">${escapeHtml(deltaLabel)}</span>
+              </div>
+              <div class="muted">${escapeHtml(changedBy)} | ${escapeHtml(formatDownloadStamp(item.changed_at))}</div>
+              <div class="muted">${escapeHtml(String(item.comment || "").trim() || "Rating update logged.")}</div>
+            </article>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  renderMobileCommandSelection();
+}
+
+async function loadMobileCommandCenter(options = {}) {
+  const surfaceErrors = Boolean(options.surfaceErrors);
+  if (!mobileCanUseCommandCenter()) {
+    mobileCommandCenter.queue = [];
+    mobileCommandCenter.staleAlerts = [];
+    mobileCommandCenter.recentChanges = [];
+    mobileCommandCenter.summary = null;
+    mobileCommandCenter.selectedPnmId = null;
+    mobileCommandCenter.error = "";
+    renderMobileCommandCenter();
+    return;
+  }
+
+  const query = buildQueryString({
+    window_hours: mobileCommandCenter.windowHours || 72,
+    limit: mobileCommandCenter.limit || 30,
+  });
+  try {
+    const payload = await api(`/api/dashboard/command-center${query}`);
+    mobileCommandCenter.queue = Array.isArray(payload.queue) ? payload.queue : [];
+    mobileCommandCenter.staleAlerts = Array.isArray(payload.stale_alerts) ? payload.stale_alerts : [];
+    mobileCommandCenter.recentChanges = Array.isArray(payload.recent_rating_changes) ? payload.recent_rating_changes : [];
+    mobileCommandCenter.summary = payload.summary || null;
+    mobileCommandCenter.error = "";
+  } catch (error) {
+    mobileCommandCenter.queue = [];
+    mobileCommandCenter.staleAlerts = [];
+    mobileCommandCenter.recentChanges = [];
+    mobileCommandCenter.summary = {
+      window_hours: mobileCommandCenter.windowHours || 72,
+      queue_count: 0,
+      stale_count: 0,
+      recent_change_count: 0,
+    };
+    mobileCommandCenter.selectedPnmId = null;
+    mobileCommandCenter.error = error.message || "Unable to load command center.";
+    if (surfaceErrors) {
+      throw error;
+    }
+  }
+
+  if (!mobileCommandCenter.selectedPnmId) {
+    mobileCommandCenter.selectedPnmId = mobileCommandCenter.queue.length
+      ? Number(mobileCommandCenter.queue[0].pnm_id)
+      : null;
+  }
+  renderMobileCommandCenter();
+}
+
+async function loadHomeSnapshot() {
+  const payload = await api("/api/mobile/home");
+  renderHomeStats(payload.stats || {});
+  renderHomeLeaderboard(payload.leaderboard || []);
+  if (payload.calendar_share) {
+    renderMobileCalendarShare(payload.calendar_share);
+  }
+}
+
 function renderPnmCards(pnms) {
   const listEl = document.getElementById("mobilePnmList");
   if (!listEl) {
@@ -1198,11 +1540,132 @@ function renderSameStatePnms(member, pnms, errorMessage = "") {
 }
 
 async function loadHomePage() {
-  const payload = await api("/api/mobile/home");
-  renderHomeStats(payload.stats || {});
-  renderHomeLeaderboard(payload.leaderboard || []);
-  if (payload.calendar_share) {
-    renderMobileCalendarShare(payload.calendar_share);
+  await loadHomeSnapshot();
+  await loadMobileCommandCenter();
+}
+
+function handleMobileCommandQueueSelect(event) {
+  const trigger = event.target.closest("[data-mobile-command-pnm-id]");
+  if (!trigger) {
+    return;
+  }
+  const pnmId = Number(trigger.dataset.mobileCommandPnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  mobileCommandCenter.selectedPnmId = pnmId;
+  renderMobileCommandCenter();
+}
+
+async function handleMobileCommandSaveRating() {
+  if (!mobileCanUseCommandCenter()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const selected = mobileCommandSelectedItem();
+  if (!selected) {
+    showToast("Select a queue item first.");
+    return;
+  }
+  const girlsInput = document.getElementById("mobileCommandRateGirls");
+  const processInput = document.getElementById("mobileCommandRateProcess");
+  const personableInput = document.getElementById("mobileCommandRatePersonable");
+  const alcoholInput = document.getElementById("mobileCommandRateAlcohol");
+  const igInput = document.getElementById("mobileCommandRateIg");
+  const commentInput = document.getElementById("mobileCommandRateComment");
+  if (!girlsInput || !processInput || !personableInput || !alcoholInput || !igInput || !commentInput) {
+    showToast("Rating controls are unavailable.");
+    return;
+  }
+
+  const saveBtn = document.getElementById("mobileCommandStickySaveBtn");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+  }
+  try {
+    const payload = await api("/api/ratings", {
+      method: "POST",
+      body: {
+        pnm_id: Number(selected.pnm_id),
+        good_with_girls: Number(girlsInput.value),
+        will_make_it: Number(processInput.value),
+        personable: Number(personableInput.value),
+        alcohol_control: Number(alcoholInput.value),
+        instagram_marketability: Number(igInput.value),
+        comment: String(commentInput.value || "").trim(),
+      },
+    });
+    await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+    if (payload.change && Number(payload.change.delta_total) > 0) {
+      showToast(`Rating up +${payload.change.delta_total}.`);
+    } else {
+      showToast("Rating saved.");
+    }
+  } catch (error) {
+    showToast(error.message || "Unable to save rating.");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Rating";
+    }
+  }
+}
+
+async function handleMobileCommandScheduleLunch() {
+  if (!mobileCanUseCommandCenter()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const selected = mobileCommandSelectedItem();
+  if (!selected) {
+    showToast("Select a queue item first.");
+    return;
+  }
+  const dateInput = document.getElementById("mobileCommandLunchDate");
+  const startInput = document.getElementById("mobileCommandLunchStartTime");
+  const endInput = document.getElementById("mobileCommandLunchEndTime");
+  const locationInput = document.getElementById("mobileCommandLunchLocation");
+  const notesInput = document.getElementById("mobileCommandLunchNotes");
+  if (!dateInput || !startInput || !endInput || !locationInput || !notesInput) {
+    showToast("Lunch controls are unavailable.");
+    return;
+  }
+  if (!String(dateInput.value || "").trim()) {
+    showToast("Lunch date is required.");
+    return;
+  }
+
+  const lunchBtn = document.getElementById("mobileCommandStickyLunchBtn");
+  if (lunchBtn) {
+    lunchBtn.disabled = true;
+    lunchBtn.textContent = "Scheduling...";
+  }
+  try {
+    await api("/api/lunches", {
+      method: "POST",
+      body: {
+        pnm_id: Number(selected.pnm_id),
+        lunch_date: dateInput.value,
+        start_time: startInput.value ? startInput.value : null,
+        end_time: endInput.value ? endInput.value : null,
+        location: locationInput.value.trim(),
+        notes: notesInput.value.trim(),
+      },
+    });
+    startInput.value = "";
+    endInput.value = "";
+    locationInput.value = "";
+    notesInput.value = "";
+    await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+    showToast("Lunch scheduled.");
+  } catch (error) {
+    showToast(error.message || "Unable to schedule lunch.");
+  } finally {
+    if (lunchBtn) {
+      lunchBtn.disabled = false;
+      lunchBtn.textContent = "Schedule Lunch";
+    }
   }
 }
 
@@ -1600,8 +2063,38 @@ async function handleCreateSubmit(event) {
 function attachPageEvents() {
   if (MOBILE_PAGE === "home") {
     const copyBtn = document.getElementById("mobileCopyCalendarBtn");
+    const queueList = document.getElementById("mobileCommandQueueList");
+    const ratingForm = document.getElementById("mobileCommandRatingForm");
+    const lunchForm = document.getElementById("mobileCommandLunchForm");
+    const stickySaveBtn = document.getElementById("mobileCommandStickySaveBtn");
+    const stickyLunchBtn = document.getElementById("mobileCommandStickyLunchBtn");
     if (copyBtn) {
       copyBtn.addEventListener("click", handleMobileCopyCalendar);
+    }
+    if (queueList) {
+      queueList.addEventListener("click", handleMobileCommandQueueSelect);
+    }
+    if (ratingForm) {
+      ratingForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await handleMobileCommandSaveRating();
+      });
+    }
+    if (lunchForm) {
+      lunchForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await handleMobileCommandScheduleLunch();
+      });
+    }
+    if (stickySaveBtn) {
+      stickySaveBtn.addEventListener("click", () => {
+        handleMobileCommandSaveRating();
+      });
+    }
+    if (stickyLunchBtn) {
+      stickyLunchBtn.addEventListener("click", () => {
+        handleMobileCommandScheduleLunch();
+      });
     }
   }
 
@@ -1906,8 +2399,13 @@ async function loadPageData() {
 
 async function init() {
   renderMobileStateHints(STATE_OPTIONS);
+  applyMobileCommandRatingCriteriaUi();
   await ensureSession();
   attachPageEvents();
+  const commandLunchDateInput = document.getElementById("mobileCommandLunchDate");
+  if (commandLunchDateInput && !commandLunchDateInput.value) {
+    commandLunchDateInput.value = new Date().toISOString().slice(0, 10);
+  }
   await loadPageData();
 }
 

@@ -426,6 +426,20 @@ def main() -> None:
                 raise AssertionError("Non-head mobile admin route access should redirect to mobile dashboard with notice.")
             checks.append("Mobile admin route guard redirects non-head users")
 
+            response = client.get("/kappaalphaorder/api/dashboard/command-center?window_hours=72&limit=25")
+            expect_status(response, 200, "Officer command center API")
+            command_payload = response.json()
+            if not isinstance(command_payload.get("queue"), list):
+                raise AssertionError("Command center queue payload should be a list.")
+            if not isinstance(command_payload.get("stale_alerts"), list):
+                raise AssertionError("Command center stale_alerts payload should be a list.")
+            if not isinstance(command_payload.get("recent_rating_changes"), list):
+                raise AssertionError("Command center recent_rating_changes payload should be a list.")
+            summary = command_payload.get("summary", {})
+            if int(summary.get("window_hours", 0)) != 72:
+                raise AssertionError("Command center summary should reflect requested 72-hour window.")
+            checks.append("Officer command center API works")
+
             response = client.post(
                 "/kappaalphaorder/api/ratings",
                 json={
@@ -566,6 +580,10 @@ def main() -> None:
             )
             expect_status(response, 200, "Approved member login")
             sync_csrf_header()
+
+            response = client.get("/kappaalphaorder/api/dashboard/command-center")
+            expect_status(response, 403, "Rusher blocked from command center API")
+            checks.append("Command center endpoint enforces officer-only access")
 
             response = client.patch(
                 f"/kappaalphaorder/api/users/{officer_user_id}/location",

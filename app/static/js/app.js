@@ -193,6 +193,27 @@ const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
 const matchingMembers = document.getElementById("matchingMembers");
 const leaderboardTable = document.getElementById("leaderboardTable");
+const commandCenterSection = document.getElementById("commandCenterSection");
+const commandWindowLabel = document.getElementById("commandWindowLabel");
+const commandQueueCount = document.getElementById("commandQueueCount");
+const commandStaleCount = document.getElementById("commandStaleCount");
+const commandRecentCount = document.getElementById("commandRecentCount");
+const commandCenterQueue = document.getElementById("commandCenterQueue");
+const commandStaleList = document.getElementById("commandStaleList");
+const commandRecentChanges = document.getElementById("commandRecentChanges");
+const commandSelectedPhoto = document.getElementById("commandSelectedPhoto");
+const commandSelectedPhotoPlaceholder = document.getElementById("commandSelectedPhotoPlaceholder");
+const commandSelectedName = document.getElementById("commandSelectedName");
+const commandSelectedMeta = document.getElementById("commandSelectedMeta");
+const commandOpenMeetingBtn = document.getElementById("commandOpenMeetingBtn");
+const commandRatingForm = document.getElementById("commandRatingForm");
+const commandSaveNextBtn = document.getElementById("commandSaveNextBtn");
+const commandLunchForm = document.getElementById("commandLunchForm");
+const commandLunchDate = document.getElementById("commandLunchDate");
+const commandLunchStartTime = document.getElementById("commandLunchStartTime");
+const commandLunchEndTime = document.getElementById("commandLunchEndTime");
+const commandLunchLocation = document.getElementById("commandLunchLocation");
+const commandLunchNotes = document.getElementById("commandLunchNotes");
 const copyCalendarFeedBtn = document.getElementById("copyCalendarFeedBtn");
 const openGoogleSubscribeBtn = document.getElementById("openGoogleSubscribeBtn");
 const calendarFeedPreview = document.getElementById("calendarFeedPreview");
@@ -449,6 +470,16 @@ const state = {
     stereotype: "",
     state: "",
   },
+  commandCenter: {
+    queue: [],
+    staleAlerts: [],
+    recentChanges: [],
+    summary: null,
+    selectedQueuePnmId: null,
+    windowHours: 72,
+    limit: 30,
+    error: "",
+  },
   memberFilters: {
     role: "all",
     state: "",
@@ -611,23 +642,55 @@ function primaryAssignmentLabel(pnm, officers = []) {
 
 function applyRatingCriteriaUi() {
   const fields = [
-    { field: "good_with_girls", inputId: "rateGirls", labelId: "rateGirlsLabel" },
-    { field: "will_make_it", inputId: "rateProcess", labelId: "rateProcessLabel" },
-    { field: "personable", inputId: "ratePersonable", labelId: "ratePersonableLabel" },
-    { field: "alcohol_control", inputId: "rateAlcohol", labelId: "rateAlcoholLabel" },
-    { field: "instagram_marketability", inputId: "rateIg", labelId: "rateIgLabel" },
+    {
+      field: "good_with_girls",
+      targets: [
+        { inputId: "rateGirls", labelId: "rateGirlsLabel" },
+        { inputId: "commandRateGirls", labelId: "commandRateGirlsLabel" },
+      ],
+    },
+    {
+      field: "will_make_it",
+      targets: [
+        { inputId: "rateProcess", labelId: "rateProcessLabel" },
+        { inputId: "commandRateProcess", labelId: "commandRateProcessLabel" },
+      ],
+    },
+    {
+      field: "personable",
+      targets: [
+        { inputId: "ratePersonable", labelId: "ratePersonableLabel" },
+        { inputId: "commandRatePersonable", labelId: "commandRatePersonableLabel" },
+      ],
+    },
+    {
+      field: "alcohol_control",
+      targets: [
+        { inputId: "rateAlcohol", labelId: "rateAlcoholLabel" },
+        { inputId: "commandRateAlcohol", labelId: "commandRateAlcoholLabel" },
+      ],
+    },
+    {
+      field: "instagram_marketability",
+      targets: [
+        { inputId: "rateIg", labelId: "rateIgLabel" },
+        { inputId: "commandRateIg", labelId: "commandRateIgLabel" },
+      ],
+    },
   ];
-  fields.forEach(({ field, inputId, labelId }) => {
+  fields.forEach(({ field, targets }) => {
     const criterion = ratingCriteriaForField(field);
-    const input = document.getElementById(inputId);
-    const label = document.getElementById(labelId);
-    if (input && criterion) {
-      input.min = "0";
-      input.max = String(criterion.max);
-    }
-    if (label) {
-      label.textContent = ratingLabelWithRange(field);
-    }
+    (targets || []).forEach(({ inputId, labelId }) => {
+      const input = document.getElementById(inputId);
+      const label = document.getElementById(labelId);
+      if (input && criterion) {
+        input.min = "0";
+        input.max = String(criterion.max);
+      }
+      if (label) {
+        label.textContent = ratingLabelWithRange(field);
+      }
+    });
   });
 }
 
@@ -1176,6 +1239,7 @@ function refreshLoadersForActivePage() {
   return [
     () => loadPnms({ includeDetail: false }),
     () => loadMembers({ includeSameState: false }),
+    loadCommandCenter,
     loadMatching,
     loadAnalytics,
     loadLeaderboard,
@@ -1267,6 +1331,10 @@ function roleCanAssignOfficer() {
 }
 
 function roleCanViewAssignedRushes() {
+  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+}
+
+function roleCanUseCommandCenter() {
   return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
 }
 
@@ -2513,6 +2581,9 @@ function setDefaultDates() {
   const today = new Date().toISOString().slice(0, 10);
   document.getElementById("pnmEventDate").value = today;
   document.getElementById("lunchDate").value = today;
+  if (commandLunchDate) {
+    commandLunchDate.value = today;
+  }
   if (rushEventDate) {
     rushEventDate.value = today;
   }
@@ -2965,6 +3036,237 @@ function renderMatching(data) {
     `
       )
       .join("") || '<p class="muted">No matching members.</p>';
+}
+
+function staleReasonLabel(value) {
+  if (value === "never_rated") {
+    return "Never Rated";
+  }
+  if (value === "rating_older_than_recent_touchpoint") {
+    return "Behind Touchpoint";
+  }
+  if (value === "no_recent_rating") {
+    return "No Recent Rating";
+  }
+  return "Needs Update";
+}
+
+function commandQueueSelectedItem() {
+  const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
+  if (!selectedId) {
+    return null;
+  }
+  return (
+    (state.commandCenter.queue || []).find((item) => Number(item.pnm_id) === selectedId) ||
+    null
+  );
+}
+
+function syncCommandMeetingLink() {
+  if (!commandOpenMeetingBtn) {
+    return;
+  }
+  const selected = commandQueueSelectedItem();
+  const selectedId = selected ? Number(selected.pnm_id || 0) : 0;
+  commandOpenMeetingBtn.href = selectedId ? `${MEETING_BASE}?pnm_id=${selectedId}` : MEETING_BASE;
+}
+
+function renderCommandSelectedPhoto(item) {
+  if (!commandSelectedPhoto || !commandSelectedPhotoPlaceholder) {
+    return;
+  }
+  if (!item || !item.photo_url) {
+    commandSelectedPhoto.classList.add("hidden");
+    commandSelectedPhoto.removeAttribute("src");
+    commandSelectedPhotoPlaceholder.classList.remove("hidden");
+    return;
+  }
+  commandSelectedPhoto.src = item.photo_url;
+  commandSelectedPhoto.alt = item.name || "Selected PNM";
+  commandSelectedPhoto.classList.remove("hidden");
+  commandSelectedPhotoPlaceholder.classList.add("hidden");
+}
+
+function applyCommandRatingFormForSelected() {
+  if (!commandRatingForm) {
+    return;
+  }
+  const selected = commandQueueSelectedItem();
+  renderCommandSelectedPhoto(selected);
+  if (!selected) {
+    commandRatingForm.reset();
+    if (commandSelectedName) {
+      commandSelectedName.textContent = "Select a PNM from queue";
+    }
+    if (commandSelectedMeta) {
+      commandSelectedMeta.textContent = "Queue details, assignment ownership, and latest touchpoint appear here.";
+    }
+    syncCommandMeetingLink();
+    return;
+  }
+
+  const own = selected.own_rating || null;
+  const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
+  const processMax = ratingCriteriaForField("will_make_it")?.max || 10;
+  const personableMax = ratingCriteriaForField("personable")?.max || 10;
+  const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
+  const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
+  const assignedTeam = Array.isArray(selected.assigned_officers) ? selected.assigned_officers : [];
+  const assignedLabel = assignedTeam.length
+    ? assignedTeam
+        .map((officer) => {
+          const emoji = officer && officer.emoji ? `${officer.emoji} ` : "";
+          return `${emoji}${officer && officer.username ? officer.username : "Unknown"}`;
+        })
+        .join(", ")
+    : selected.assigned_officer_username || "Unassigned";
+  const touchpointLabel = selected.last_touchpoint_at ? formatTrendTimestamp(selected.last_touchpoint_at) : "None";
+  const mineLabel = selected.last_rating_by_me_at ? formatTrendTimestamp(selected.last_rating_by_me_at) : "Never";
+  const staleLabel = selected.needs_rating_update ? staleReasonLabel(selected.stale_reason) : "Fresh";
+  if (commandSelectedName) {
+    commandSelectedName.textContent = `${selected.pnm_code} | ${selected.name}`;
+  }
+  if (commandSelectedMeta) {
+    commandSelectedMeta.textContent =
+      `Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assignedLabel} | Touchpoint: ${touchpointLabel} | My Rating: ${mineLabel} | ${staleLabel}`;
+  }
+  const girlsInput = document.getElementById("commandRateGirls");
+  const processInput = document.getElementById("commandRateProcess");
+  const personableInput = document.getElementById("commandRatePersonable");
+  const alcoholInput = document.getElementById("commandRateAlcohol");
+  const igInput = document.getElementById("commandRateIg");
+  const commentInput = document.getElementById("commandRateComment");
+  if (girlsInput) {
+    girlsInput.value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
+  }
+  if (processInput) {
+    processInput.value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
+  }
+  if (personableInput) {
+    personableInput.value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
+  }
+  if (alcoholInput) {
+    alcoholInput.value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
+  }
+  if (igInput) {
+    igInput.value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
+  }
+  if (commentInput) {
+    commentInput.value = own && own.comment ? own.comment : "";
+  }
+  syncCommandMeetingLink();
+}
+
+function renderCommandCenter() {
+  if (!commandCenterSection) {
+    return;
+  }
+  const canUse = roleCanUseCommandCenter();
+  commandCenterSection.classList.toggle("hidden", !canUse);
+  if (!canUse) {
+    return;
+  }
+
+  const summary = state.commandCenter.summary || {};
+  if (commandQueueCount) {
+    commandQueueCount.textContent = String(Number(summary.queue_count || 0));
+  }
+  if (commandStaleCount) {
+    commandStaleCount.textContent = String(Number(summary.stale_count || 0));
+  }
+  if (commandRecentCount) {
+    commandRecentCount.textContent = String(Number(summary.recent_change_count || 0));
+  }
+  if (commandWindowLabel) {
+    commandWindowLabel.textContent = `Window: last ${Number(summary.window_hours || state.commandCenter.windowHours || 72)} hours`;
+  }
+
+  const queue = Array.isArray(state.commandCenter.queue) ? state.commandCenter.queue : [];
+  if (!state.commandCenter.selectedQueuePnmId || !queue.some((item) => Number(item.pnm_id) === Number(state.commandCenter.selectedQueuePnmId))) {
+    state.commandCenter.selectedQueuePnmId = queue.length ? Number(queue[0].pnm_id) : null;
+  }
+
+  if (commandCenterQueue) {
+    if (!queue.length) {
+      const detail = state.commandCenter.error || "No queue items available yet.";
+      commandCenterQueue.innerHTML = `<p class="muted">${escapeHtml(detail)}</p>`;
+    } else {
+      commandCenterQueue.innerHTML = queue
+        .map((item) => {
+          const isSelected = Number(item.pnm_id) === Number(state.commandCenter.selectedQueuePnmId);
+          const selectedClass = isSelected ? " selected-row" : "";
+          const staleBadge = item.needs_rating_update
+            ? `<span class="pill warn">${escapeHtml(staleReasonLabel(item.stale_reason))}</span>`
+            : '<span class="pill good">Fresh</span>';
+          const assignedBadge = item.is_assigned_to_me ? '<span class="pill">Assigned To Me</span>' : "";
+          const touchpoint = item.last_touchpoint_at ? formatTrendTimestamp(item.last_touchpoint_at) : "No touchpoint";
+          return `
+            <div class="entry${selectedClass}">
+              <button type="button" class="command-queue-btn" data-command-queue-pnm-id="${Number(item.pnm_id)}">
+                <div class="entry-title">
+                  <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
+                  <span>${Number(item.weighted_total || 0).toFixed(2)}</span>
+                </div>
+                <div class="muted">Touchpoint: ${escapeHtml(touchpoint)}</div>
+                <div class="muted">Assigned: ${escapeHtml(item.assigned_officer_username || "Unassigned")}</div>
+                <div class="command-chip-row">${staleBadge}${assignedBadge}</div>
+              </button>
+            </div>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  if (commandStaleList) {
+    const staleRows = Array.isArray(state.commandCenter.staleAlerts) ? state.commandCenter.staleAlerts : [];
+    if (!staleRows.length) {
+      commandStaleList.innerHTML = '<p class="muted">No stale alerts in this window.</p>';
+    } else {
+      commandStaleList.innerHTML = staleRows
+        .map(
+          (item) => `
+            <div class="entry">
+              <div class="entry-title">
+                <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
+                <span>${escapeHtml(staleReasonLabel(item.stale_reason))}</span>
+              </div>
+              <div class="muted">Last touchpoint: ${escapeHtml(item.last_touchpoint_at ? formatTrendTimestamp(item.last_touchpoint_at) : "None")}</div>
+            </div>
+          `
+        )
+        .join("");
+    }
+  }
+
+  if (commandRecentChanges) {
+    const changes = Array.isArray(state.commandCenter.recentChanges) ? state.commandCenter.recentChanges : [];
+    if (!changes.length) {
+      commandRecentChanges.innerHTML = '<p class="muted">No rating changes in this window.</p>';
+    } else {
+      commandRecentChanges.innerHTML = changes
+        .map((item) => {
+          const delta = Number(item.delta_total || 0);
+          const deltaClass = delta > 0 ? "good" : delta < 0 ? "bad" : "";
+          const deltaLabel = delta > 0 ? `+${delta}` : `${delta}`;
+          const changedBy = item.changed_by && item.changed_by.username ? item.changed_by.username : "Member";
+          const comment = String(item.comment || "").trim();
+          return `
+            <div class="entry">
+              <div class="entry-title">
+                <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.pnm_name)}</strong>
+                <span class="${deltaClass}">${escapeHtml(deltaLabel)}</span>
+              </div>
+              <div class="muted">${escapeHtml(changedBy)} | ${escapeHtml(formatTrendTimestamp(item.changed_at))}</div>
+              <div class="muted">${escapeHtml(comment || "Rating update logged.")}</div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+  }
+
+  applyCommandRatingFormForSelected();
 }
 
 function renderPendingApprovals(data) {
@@ -3790,6 +4092,54 @@ async function loadMembers(options = {}) {
   renderAssignedRushSection();
 }
 
+async function loadCommandCenter(options = {}) {
+  const surfaceErrors = Boolean(options.surfaceErrors);
+  if (!roleCanUseCommandCenter()) {
+    state.commandCenter.queue = [];
+    state.commandCenter.staleAlerts = [];
+    state.commandCenter.recentChanges = [];
+    state.commandCenter.summary = null;
+    state.commandCenter.selectedQueuePnmId = null;
+    state.commandCenter.error = "";
+    renderCommandCenter();
+    return;
+  }
+  const query = toQuery({
+    window_hours: state.commandCenter.windowHours || 72,
+    limit: state.commandCenter.limit || 30,
+  });
+  try {
+    const payload = await api(`/api/dashboard/command-center${query}`);
+    state.commandCenter.queue = Array.isArray(payload.queue) ? payload.queue : [];
+    state.commandCenter.staleAlerts = Array.isArray(payload.stale_alerts) ? payload.stale_alerts : [];
+    state.commandCenter.recentChanges = Array.isArray(payload.recent_rating_changes) ? payload.recent_rating_changes : [];
+    state.commandCenter.summary = payload.summary || null;
+    state.commandCenter.error = "";
+  } catch (error) {
+    state.commandCenter.queue = [];
+    state.commandCenter.staleAlerts = [];
+    state.commandCenter.recentChanges = [];
+    state.commandCenter.summary = {
+      window_hours: state.commandCenter.windowHours || 72,
+      queue_count: 0,
+      stale_count: 0,
+      recent_change_count: 0,
+    };
+    state.commandCenter.selectedQueuePnmId = null;
+    state.commandCenter.error = error.message || "Unable to load command center right now.";
+    if (surfaceErrors) {
+      throw error;
+    }
+  }
+
+  if (!state.commandCenter.selectedQueuePnmId) {
+    state.commandCenter.selectedQueuePnmId = state.commandCenter.queue.length
+      ? Number(state.commandCenter.queue[0].pnm_id)
+      : null;
+  }
+  renderCommandCenter();
+}
+
 async function loadMatching() {
   const query = toQuery(state.matchingFilters);
   const payload = await api(`/api/matching${query}`);
@@ -4003,6 +4353,7 @@ async function refreshAll() {
     loadInterestHints(),
     loadPnms({ includeDetail: state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin" }),
     loadMembers({ includeSameState: state.activeDesktopPage === "members" }),
+    loadCommandCenter(),
     loadMatching(),
     loadAnalytics(),
     loadLeaderboard(),
@@ -4144,6 +4495,16 @@ async function handleLogout() {
   state.members = [];
   state.sameStatePnms = [];
   state.selectedMemberId = null;
+  state.commandCenter = {
+    queue: [],
+    staleAlerts: [],
+    recentChanges: [],
+    summary: null,
+    selectedQueuePnmId: null,
+    windowHours: 72,
+    limit: 30,
+    error: "",
+  };
   state.calendarShare = null;
   state.scheduledLunches = [];
   state.rushCalendarItems = [];
@@ -4229,6 +4590,7 @@ async function handleLogout() {
   renderAssignmentControls();
   renderAssignedRushSection();
   syncOpenMeetingLink();
+  renderCommandCenter();
   renderGoogleImportResult(null);
   stopLiveRefresh();
   setAuthView(false);
@@ -4485,6 +4847,196 @@ async function handleRatingSave(event) {
   } catch (error) {
     showToast(error.message || "Unable to save rating.");
   }
+}
+
+function nextCommandQueuePnmId(previousId) {
+  const rows = Array.isArray(state.commandCenter.queue) ? state.commandCenter.queue : [];
+  if (!rows.length) {
+    return null;
+  }
+  const safePrevious = Number(previousId || 0);
+  if (!safePrevious) {
+    return Number(rows[0].pnm_id);
+  }
+  const index = rows.findIndex((item) => Number(item.pnm_id) === safePrevious);
+  if (index < 0) {
+    return Number(rows[0].pnm_id);
+  }
+  if (rows[index + 1]) {
+    return Number(rows[index + 1].pnm_id);
+  }
+  return Number(rows[0].pnm_id);
+}
+
+async function refreshCommandCenterDependencies() {
+  await Promise.all([
+    loadCommandCenter(),
+    loadLeaderboard(),
+    loadAnalytics(),
+    loadPnms({ includeDetail: state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin" }),
+    loadAssignedRushData(),
+    loadNotifications(),
+  ]);
+}
+
+async function submitCommandRating(options = {}) {
+  const advance = Boolean(options.advance);
+  if (!roleCanUseCommandCenter()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const selected = commandQueueSelectedItem();
+  if (!selected) {
+    showToast("Select a queue item first.");
+    return;
+  }
+  const girlsInput = document.getElementById("commandRateGirls");
+  const processInput = document.getElementById("commandRateProcess");
+  const personableInput = document.getElementById("commandRatePersonable");
+  const alcoholInput = document.getElementById("commandRateAlcohol");
+  const igInput = document.getElementById("commandRateIg");
+  const commentInput = document.getElementById("commandRateComment");
+  if (!girlsInput || !processInput || !personableInput || !alcoholInput || !igInput || !commentInput) {
+    showToast("Rating controls are unavailable.");
+    return;
+  }
+
+  const selectedId = Number(selected.pnm_id || 0);
+  if (!selectedId) {
+    showToast("Invalid queue selection.");
+    return;
+  }
+
+  const saveBtn = document.getElementById("commandSaveBtn");
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = advance ? "Saving + Advancing..." : "Saving...";
+  }
+  if (commandSaveNextBtn) {
+    commandSaveNextBtn.disabled = true;
+  }
+
+  try {
+    const payload = await api("/api/ratings", {
+      method: "POST",
+      body: {
+        pnm_id: selectedId,
+        good_with_girls: Number(girlsInput.value),
+        will_make_it: Number(processInput.value),
+        personable: Number(personableInput.value),
+        alcohol_control: Number(alcoholInput.value),
+        instagram_marketability: Number(igInput.value),
+        comment: String(commentInput.value || "").trim(),
+      },
+    });
+    const currentId = selectedId;
+    await refreshCommandCenterDependencies();
+    if (advance) {
+      state.commandCenter.selectedQueuePnmId = nextCommandQueuePnmId(currentId);
+      renderCommandCenter();
+    }
+
+    if (payload.change && Number(payload.change.delta_total) > 0) {
+      spawnSuccessBurst();
+      showToast(`Rating increased to ${payload.change.new_total}/${RATING_TOTAL_MAX} (+${payload.change.delta_total}).`);
+    } else {
+      showToast(advance ? "Rating saved. Advanced to next." : "Rating saved.");
+    }
+  } catch (error) {
+    showToast(error.message || "Unable to save rating.");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "Save Rating";
+    }
+    if (commandSaveNextBtn) {
+      commandSaveNextBtn.disabled = false;
+    }
+  }
+}
+
+async function handleQuickRatingSave(event) {
+  event.preventDefault();
+  await submitCommandRating({ advance: false });
+}
+
+async function handleQuickRatingSaveNext() {
+  await submitCommandRating({ advance: true });
+}
+
+async function handleQuickLunchFromDashboard(event) {
+  event.preventDefault();
+  if (!roleCanUseCommandCenter()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const selected = commandQueueSelectedItem();
+  if (!selected) {
+    showToast("Select a queue item first.");
+    return;
+  }
+  if (!commandLunchDate || !commandLunchStartTime || !commandLunchEndTime || !commandLunchLocation || !commandLunchNotes) {
+    showToast("Lunch controls are unavailable.");
+    return;
+  }
+  if (!String(commandLunchDate.value || "").trim()) {
+    showToast("Lunch date is required.");
+    return;
+  }
+
+  const selectedId = Number(selected.pnm_id || 0);
+  if (!selectedId) {
+    showToast("Invalid queue selection.");
+    return;
+  }
+
+  const lunchBtn = document.getElementById("commandLunchBtn");
+  if (lunchBtn) {
+    lunchBtn.disabled = true;
+    lunchBtn.textContent = "Scheduling...";
+  }
+  try {
+    await api("/api/lunches", {
+      method: "POST",
+      body: {
+        pnm_id: selectedId,
+        lunch_date: commandLunchDate.value,
+        start_time: commandLunchStartTime.value ? commandLunchStartTime.value : null,
+        end_time: commandLunchEndTime.value ? commandLunchEndTime.value : null,
+        location: commandLunchLocation.value.trim(),
+        notes: commandLunchNotes.value.trim(),
+      },
+    });
+    commandLunchStartTime.value = "";
+    commandLunchEndTime.value = "";
+    commandLunchLocation.value = "";
+    commandLunchNotes.value = "";
+    await Promise.all([refreshCommandCenterDependencies(), loadCalendarShare(), loadScheduledLunches()]);
+    showToast("Lunch scheduled from Command Center.");
+  } catch (error) {
+    showToast(error.message || "Unable to schedule lunch.");
+  } finally {
+    if (lunchBtn) {
+      lunchBtn.disabled = false;
+      lunchBtn.textContent = "Schedule Lunch";
+    }
+  }
+}
+
+function handleQueueSelect(event) {
+  const button = event.target.closest("[data-command-queue-pnm-id]");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.commandQueuePnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  state.commandCenter.selectedQueuePnmId = pnmId;
+  state.selectedPnmId = pnmId;
+  renderPnmTable();
+  applyRatingFormForSelected();
+  renderCommandCenter();
 }
 
 async function handleLunchLog(event) {
@@ -5824,6 +6376,18 @@ function attachEvents() {
   }
   if (applyMemberFiltersBtn) {
     applyMemberFiltersBtn.addEventListener("click", handleApplyMemberFilters);
+  }
+  if (commandRatingForm) {
+    commandRatingForm.addEventListener("submit", handleQuickRatingSave);
+  }
+  if (commandSaveNextBtn) {
+    commandSaveNextBtn.addEventListener("click", handleQuickRatingSaveNext);
+  }
+  if (commandLunchForm) {
+    commandLunchForm.addEventListener("submit", handleQuickLunchFromDashboard);
+  }
+  if (commandCenterQueue) {
+    commandCenterQueue.addEventListener("click", handleQueueSelect);
   }
 
   pnmForm.addEventListener("submit", handlePnmCreate);

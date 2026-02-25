@@ -36,20 +36,87 @@
         {% endif %}
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Dashboard</h1>
-        <p>{{ app_config.setup_tagline if app_config.setup_tagline else app_config.tenant_name ~ ' rush operations, optimized for iPhone use during events.' }}</p>
+        <p>{{ app_config.setup_tagline if app_config.setup_tagline else app_config.tenant_name ~ ' command center optimized for iPhone use during rush events.' }}</p>
       </header>
 
-      <section class="panel mobile-panel">
+      <section id="mobileOfficerCommandCenter" class="hidden">
+        <section class="panel mobile-panel">
+          <div class="section-head">
+            <h2>Rate Queue</h2>
+            <span id="mobileCommandWindowLabel" class="muted">Last 72h</span>
+          </div>
+          <div class="mobile-kpi-grid">
+            <article class="card"><strong id="mobileCommandQueueCount">0</strong><p>Queue</p></article>
+            <article class="card"><strong id="mobileCommandStaleCount">0</strong><p>Stale</p></article>
+            <article class="card"><strong id="mobileCommandRecentCount">0</strong><p>Changes</p></article>
+          </div>
+          <div id="mobileCommandQueueList" class="mobile-list"></div>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Quick Rating</h2>
+          <p id="mobileCommandSelectedMeta" class="muted">Select a queue item to start rating.</p>
+          <form id="mobileCommandRatingForm" class="stack">
+            <div class="inline-grid two-cols compact-inputs">
+              <label><span id="mobileCommandRateGirlsLabel">Girls (0-10)</span><input id="mobileCommandRateGirls" type="number" min="0" max="10" required /></label>
+              <label><span id="mobileCommandRateProcessLabel">Process (0-10)</span><input id="mobileCommandRateProcess" type="number" min="0" max="10" required /></label>
+              <label><span id="mobileCommandRatePersonableLabel">Personable (0-10)</span><input id="mobileCommandRatePersonable" type="number" min="0" max="10" required /></label>
+              <label><span id="mobileCommandRateAlcoholLabel">Alcohol (0-10)</span><input id="mobileCommandRateAlcohol" type="number" min="0" max="10" required /></label>
+              <label><span id="mobileCommandRateIgLabel">IG (0-5)</span><input id="mobileCommandRateIg" type="number" min="0" max="5" required /></label>
+            </div>
+            <label>
+              Comment (required on updates; must exceed 5 words)
+              <textarea id="mobileCommandRateComment" rows="3" placeholder="What changed after the latest touchpoint?"></textarea>
+            </label>
+          </form>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Quick Lunch</h2>
+          <form id="mobileCommandLunchForm" class="stack">
+            <label>
+              Date
+              <input id="mobileCommandLunchDate" type="date" required />
+            </label>
+            <div class="inline-grid two-cols">
+              <label>
+                Start (optional)
+                <input id="mobileCommandLunchStartTime" type="time" />
+              </label>
+              <label>
+                End (optional)
+                <input id="mobileCommandLunchEndTime" type="time" />
+              </label>
+            </div>
+            <label>
+              Location (optional)
+              <input id="mobileCommandLunchLocation" type="text" placeholder="Main Street Cafe" />
+            </label>
+            <label>
+              Notes
+              <textarea id="mobileCommandLunchNotes" rows="2" placeholder="Optional touchpoint context"></textarea>
+            </label>
+          </form>
+        </section>
+
+        <section class="panel mobile-panel">
+          <h2>Recent Rating Changes</h2>
+          <div id="mobileCommandRecentChanges" class="mobile-list"></div>
+        </section>
+      </section>
+
+      <section id="mobileNonOfficerNotice" class="panel mobile-panel hidden">
+        <h2>Summary Dashboard</h2>
+        <p class="muted">Command Center actions are available to Head Rush Officers and Rush Officers. You still have access to core views below.</p>
+      </section>
+
+      <section id="mobileHomeSecondarySection" class="panel mobile-panel">
         <h2>Live Snapshot</h2>
         <div class="mobile-kpi-grid">
           <article class="card"><strong id="mobilePnmCount">0</strong><p>PNMs</p></article>
           <article class="card"><strong id="mobileRatingCount">0</strong><p>Ratings</p></article>
           <article class="card"><strong id="mobileLunchCount">0</strong><p>Lunches</p></article>
         </div>
-      </section>
-
-      <section class="panel mobile-panel">
-        <h2>Quick Actions</h2>
         <div class="mobile-action-grid">
           <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
           <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="quick-nav-link">Open Team</a>
@@ -58,20 +125,29 @@
         </div>
       </section>
 
-      <section class="panel mobile-panel">
-        <h2>Top PNM Leaderboard</h2>
+      <details class="panel mobile-panel mobile-collapsible">
+        <summary>Leaderboard</summary>
         <div id="mobileLeaderboard" class="mobile-list"></div>
-      </section>
+      </details>
 
-      <section class="panel mobile-panel">
-        <h2>Shared Lunch Calendar</h2>
+      <details class="panel mobile-panel mobile-collapsible">
+        <summary>Shared Calendar</summary>
         <div class="mobile-action-grid">
           <button id="mobileCopyCalendarBtn" type="button" class="secondary">Copy Calendar URL</button>
           <a id="mobileGoogleSubscribeLink" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
         </div>
         <p id="mobileCalendarFeedPreview" class="muted breakable">Loading shared calendar link...</p>
-      </section>
+      </details>
+
+      <div id="mobileCommandStickyActions" class="mobile-command-sticky hidden">
+        <button id="mobileCommandStickySaveBtn" type="button">Save Rating</button>
+        <button id="mobileCommandStickyLunchBtn" type="button" class="secondary">Schedule Lunch</button>
+        <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
+      </div>
     </main>
+
+    <datalist id="mobileStateHints"></datalist>
+    <datalist id="mobileCommandStateHints"></datalist>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
       <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab is-active">Dashboard</a>

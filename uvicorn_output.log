@@ -1,0 +1,25 @@
+INFO:     Will watch for changes in these directories: ['/app']
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [9637] using WatchFiles
+INFO:     Started server process [9754]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+[startup] storage config: DATA_ROOT=/app/app DB_PATH=/app/app/recruitment.db PLATFORM_DB_PATH=/app/app/platform.db TENANTS_DB_DIR=/app/app/tenants UPLOADS_DIR=/app/app/uploads
+[startup] warning: Using local app directory for SQLite storage. Configure persistent DATA_ROOT/DB_PATH/UPLOADS_DIR in production.
+[startup] PLATFORM_ADMIN_ACCESS_CODE not provided. Generated an in-memory bootstrap credential. Set PLATFORM_ADMIN_ACCESS_CODE in production to disable runtime generation.
+[startup] default tenant db path: slug=kappaalphaorder db_path=/app/app/recruitment.db
+INFO:     127.0.0.1:50570 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50570 - "GET /static/css/landing.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50584 - "GET /static/js/pwa_shell.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50598 - "GET /static/js/landing.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50598 - "GET /service-worker.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50584 - "GET /static/js/app.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50598 - "GET /static/css/styles.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50570 - "GET /static/js/member_portal.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50598 - "GET /static/js/meeting.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50570 - "GET /static/js/demo.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50584 - "GET /static/js/mobile.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50598 - "GET /static/js/platform_admin.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50570 - "GET /static/manifest.webmanifest HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50584 - "GET /static/icons/icon-192.png HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50598 - "GET /static/icons/icon-512.png HTTP/1.1" 200 OK

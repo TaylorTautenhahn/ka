@@ -84,21 +84,17 @@ def main() -> None:
             raise AssertionError("Hometown parser should preserve unknown format city with empty state.")
         checks.append("State normalization + hometown parsing helpers work")
 
-        if main_module.normalized_idle_ttl_seconds(3600, 7200) != 3600:
-            raise AssertionError("normalized_idle_ttl_seconds should return the integer directly.")
-        if main_module.normalized_idle_ttl_seconds("1800", 7200) != 1800:
-            raise AssertionError("normalized_idle_ttl_seconds should parse valid integer strings.")
-        if main_module.normalized_idle_ttl_seconds(3600.5, 7200) != 3600:
-            raise AssertionError("normalized_idle_ttl_seconds should truncate floats to integers.")
-        if main_module.normalized_idle_ttl_seconds("1800.9", 7200) != 1800:
-            raise AssertionError("normalized_idle_ttl_seconds should truncate string floats to integers.")
-        if main_module.normalized_idle_ttl_seconds("invalid", 7200) != 7200:
-            raise AssertionError("normalized_idle_ttl_seconds should return fallback for invalid strings.")
-        if main_module.normalized_idle_ttl_seconds(None, 7200) != 7200:
-            raise AssertionError("normalized_idle_ttl_seconds should return fallback for None.")
-        if main_module.normalized_idle_ttl_seconds([], 7200) != 7200:
-            raise AssertionError("normalized_idle_ttl_seconds should return fallback for uncastable types.")
-        checks.append("normalized_idle_ttl_seconds helper works")
+        if main_module.normalize_samesite("lax") != "lax":
+            raise AssertionError("Samesite normalization should handle valid lowercase input (lax).")
+        if main_module.normalize_samesite("Strict") != "strict":
+            raise AssertionError("Samesite normalization should handle mixed-case valid input (Strict).")
+        if main_module.normalize_samesite("NONE") != "none":
+            raise AssertionError("Samesite normalization should handle uppercase valid input (NONE).")
+        if main_module.normalize_samesite("invalid") != "strict":
+            raise AssertionError("Samesite normalization should default invalid input to strict.")
+        if main_module.normalize_samesite("") != "strict":
+            raise AssertionError("Samesite normalization should default empty string to strict.")
+        checks.append("Samesite normalization works for valid and invalid inputs")
 
         with TestClient(app) as client:
             client.headers.update({"Origin": "http://testserver"})

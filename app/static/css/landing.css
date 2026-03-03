@@ -1743,3 +1743,106 @@ html[data-theme="light"] .bb-media-slot-ghost {
     transition: none;
   }
 }
+
+/* Mock UI Panel Styles */
+.bb-mock-pnm {
+  justify-content: flex-start;
+  padding: 0.5rem 1rem;
+  height: 56px;
+  gap: 1rem;
+}
+
+.bb-mock-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.bb-mock-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.bb-mock-name {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--bb-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bb-mock-meta {
+  font-size: 0.75rem;
+  color: var(--bb-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bb-mock-score-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.2rem;
+}
+
+.bb-mock-score {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--bb-text);
+}
+
+.bb-mock-trend {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.bb-mock-trend.positive {
+  color: #6de9bd;
+}
+
+.bb-mock-trend.negative {
+  color: #ff98bc;
+}
+
+.bb-mock-trend.neutral {
+  color: #92b6e8;
+}
+
+html[data-theme="light"] .bb-mock-trend.positive {
+  color: #1a5b4e;
+}
+
+html[data-theme="light"] .bb-mock-trend.negative {
+  color: #b3395c;
+}
+
+html[data-theme="light"] .bb-mock-trend.neutral {
+  color: #3969b8;
+}
+
+html[data-theme="light"] .bb-mock-name,
+html[data-theme="light"] .bb-mock-score {
+  color: #112349;
+}
+
+html[data-theme="light"] .bb-mock-meta {
+  color: #5b7297;
+}
+
+
+.bb-mock-avatar.bg-blue { background: linear-gradient(135deg, #3a81ff, #5f98ec); }
+.bb-mock-avatar.bg-red { background: linear-gradient(135deg, #ff5f56, #ff98bc); }
+.bb-mock-avatar.bg-yellow { background: linear-gradient(135deg, #ffbd2e, #f2c94c); }
+.bb-mock-avatar.bg-green { background: linear-gradient(135deg, #27c93f, #6de9bd); }

@@ -98,6 +98,8 @@ def main() -> None:
             raise AssertionError("normalized_idle_ttl_seconds should return fallback for None.")
         if main_module.normalized_idle_ttl_seconds([], 7200) != 7200:
             raise AssertionError("normalized_idle_ttl_seconds should return fallback for uncastable types.")
+        if main_module.normalized_idle_ttl_seconds(100, 7200) != 900:
+            raise AssertionError("normalized_idle_ttl_seconds should enforce a minimum floor of 900 seconds.")
         checks.append("normalized_idle_ttl_seconds helper works")
 
         with TestClient(app) as client:

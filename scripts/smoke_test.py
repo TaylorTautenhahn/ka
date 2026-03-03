@@ -66,6 +66,18 @@ def main() -> None:
             raise AssertionError("Hometown parser should preserve unknown format city with empty state.")
         checks.append("State normalization + hometown parsing helpers work")
 
+        if main_module.normalize_samesite("lax") != "lax":
+            raise AssertionError("Samesite normalization should handle valid lowercase input (lax).")
+        if main_module.normalize_samesite("Strict") != "strict":
+            raise AssertionError("Samesite normalization should handle mixed-case valid input (Strict).")
+        if main_module.normalize_samesite("NONE") != "none":
+            raise AssertionError("Samesite normalization should handle uppercase valid input (NONE).")
+        if main_module.normalize_samesite("invalid") != "strict":
+            raise AssertionError("Samesite normalization should default invalid input to strict.")
+        if main_module.normalize_samesite("") != "strict":
+            raise AssertionError("Samesite normalization should default empty string to strict.")
+        checks.append("Samesite normalization works for valid and invalid inputs")
+
         with TestClient(app) as client:
             client.headers.update({"Origin": "http://testserver"})
 

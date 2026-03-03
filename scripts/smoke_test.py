@@ -47,9 +47,27 @@ def main() -> None:
 
         from fastapi.testclient import TestClient
         from app import main as main_module
-        from app.main import app
+        from app.main import app, normalize_samesite
 
         checks: list[str] = []
+
+        # Pure function tests
+        if normalize_samesite("strict") != "strict":
+            raise AssertionError("normalize_samesite('strict') should return 'strict'")
+        if normalize_samesite("lax") != "lax":
+            raise AssertionError("normalize_samesite('lax') should return 'lax'")
+        if normalize_samesite("none") != "none":
+            raise AssertionError("normalize_samesite('none') should return 'none'")
+        if normalize_samesite("STRICT") != "strict":
+            raise AssertionError("normalize_samesite('STRICT') should return 'strict'")
+        if normalize_samesite("Lax") != "lax":
+            raise AssertionError("normalize_samesite('Lax') should return 'lax'")
+        if normalize_samesite("invalid") != "strict":
+            raise AssertionError("normalize_samesite('invalid') should return 'strict'")
+        if normalize_samesite("") != "strict":
+            raise AssertionError("normalize_samesite('') should return 'strict'")
+
+        checks.append("normalize_samesite pure function tests pass")
 
         if main_module.normalize_state_code("Texas") != "TX":
             raise AssertionError("State normalization should map full state names.")

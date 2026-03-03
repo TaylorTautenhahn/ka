@@ -564,8 +564,9 @@ def enforce_host_configuration_if_required() -> None:
 
 
 def normalize_samesite(value: str) -> str:
-    if value in {"lax", "strict", "none"}:
-        return value
+    val = value.lower()
+    if val in {"strict", "lax", "none"}:
+        return val
     return "strict"
 
 

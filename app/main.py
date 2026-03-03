@@ -15083,15 +15083,16 @@ def create_officer_chat_message(
                 """,
                 (json.dumps(mention_usernames),),
             ).fetchall()
-            for mentioned in mentioned_rows:
-                conn.execute(
+            if mentioned_rows:
+                conn.executemany(
                     "INSERT OR IGNORE INTO officer_chat_mentions (message_id, user_id, created_at) VALUES (?, ?, ?)",
-                    (message_id, int(mentioned["id"]), created_at),
+                    [(message_id, int(m["id"]), created_at) for m in mentioned_rows],
                 )
-                if int(mentioned["id"]) != int(user["id"]):
-                    create_notification(
+                other_user_ids = [int(m["id"]) for m in mentioned_rows if int(m["id"]) != int(user["id"])]
+                if other_user_ids:
+                    create_notifications_for_users(
                         conn,
-                        user_id=int(mentioned["id"]),
+                        other_user_ids,
                         notif_type="chat_mention",
                         title=f"Mentioned by {user['username']}",
                         body=message[:220],

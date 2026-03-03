@@ -675,7 +675,7 @@ def mark_response_private(response: Response) -> None:
 
 def normalized_idle_ttl_seconds(raw_value: Any, fallback_seconds: int) -> int:
     try:
-        parsed = int(raw_value)
+        parsed = int(float(raw_value))
     except (TypeError, ValueError):
         parsed = fallback_seconds
     return max(900, parsed)

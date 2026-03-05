@@ -1403,10 +1403,10 @@ td strong {
 }
 
 .entry {
-  padding: 0.5rem;
+  padding: 0.62rem;
   border-radius: 9px;
   border: 1px solid rgba(255, 255, 255, 0.5);
-  margin-bottom: 0.45rem;
+  margin-bottom: 0.55rem;
   background: rgba(255, 255, 255, 0.62);
   transition: transform 0.16s ease, box-shadow 0.16s ease;
   backdrop-filter: blur(9px);
@@ -1430,8 +1430,8 @@ td strong {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 0.5rem;
-  margin-bottom: 0.24rem;
+  gap: 0.62rem;
+  margin-bottom: 0.3rem;
 }
 
 .muted {
@@ -1501,31 +1501,31 @@ td strong {
 
 .command-summary-row {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.72rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin-bottom: 0.72rem;
+  margin-bottom: 0.85rem;
 }
 
 .command-center-grid {
   display: grid;
-  gap: 0.72rem;
+  gap: 0.9rem;
   grid-template-columns: minmax(260px, 1fr) minmax(340px, 1.35fr) minmax(260px, 1fr);
 }
 
 .command-list {
-  max-height: 300px;
+  max-height: 360px;
 }
 
 .command-list.compact {
-  max-height: 190px;
+  max-height: 240px;
 }
 
 .command-selected-head {
   display: grid;
-  gap: 0.72rem;
+  gap: 0.9rem;
   grid-template-columns: 140px minmax(0, 1fr);
   align-items: start;
-  margin-bottom: 0.7rem;
+  margin-bottom: 0.85rem;
 }
 
 .command-selected-photo-wrap .meeting-photo,
@@ -1537,8 +1537,8 @@ td strong {
 .command-chip-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.38rem;
+  gap: 0.42rem;
+  margin-top: 0.48rem;
 }
 
 .command-queue-btn,
@@ -1548,7 +1548,7 @@ td strong {
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.9);
   text-align: left;
-  padding: 0.48rem 0.52rem;
+  padding: 0.72rem 0.78rem;
   color: inherit;
   cursor: pointer;
   font: inherit;

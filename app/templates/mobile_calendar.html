@@ -11,12 +11,6 @@
     <title>{{ app_config.tenant_name }} Calendar</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/mobile.js" defer></script>
@@ -32,7 +26,7 @@
     <main class="shell mobile-shell">
       <header class="hero mobile-hero">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
-        <h1>Calendar</h1>
+        <h1>Operations</h1>
         <p>One timeline for rush events and lunches with shared subscription links.</p>
       </header>
 
@@ -93,10 +87,10 @@
     </main>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Dashboard</a>
+      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Command</a>
       <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
       <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab is-active">Calendar</a>
+      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab is-active">Operations</a>
       <a href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-tab">Admin</a>
     </nav>
 

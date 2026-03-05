@@ -11,12 +11,6 @@
     <title>{{ app_config.tenant_name }} Mobile</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/mobile.js" defer></script>
@@ -35,9 +29,30 @@
         <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
         {% endif %}
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
-        <h1>Dashboard</h1>
+        <h1>Command</h1>
         <p>{{ app_config.setup_tagline if app_config.setup_tagline else app_config.tenant_name ~ ' command center optimized for iPhone use during rush events.' }}</p>
       </header>
+
+      {% if app_config.is_demo_tenant %}
+      <details class="panel mobile-panel demo-banner demo-guide-panel" open>
+        <summary class="demo-guide-summary">
+          <div>
+            <strong>Demo Quick Start</strong>
+            <span>Simple walkthrough</span>
+          </div>
+          <span class="demo-guide-summary-action">Collapse</span>
+        </summary>
+        <div class="demo-guide-body">
+          <p class="muted">This sandbox uses seeded sample data. Rate a PNM, schedule a lunch, then open Meeting to experience the full workflow.</p>
+          <div class="mobile-action-grid">
+            <a href="#mobileOfficerCommandCenter" class="quick-nav-link">Jump to Queue</a>
+            <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
+            <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="quick-nav-link">Open Calendar</a>
+            <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting</a>
+          </div>
+        </div>
+      </details>
+      {% endif %}
 
       <section id="mobileOfficerCommandCenter" class="hidden">
         <section class="panel mobile-panel">
@@ -150,10 +165,10 @@
     <datalist id="mobileCommandStateHints"></datalist>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab is-active">Dashboard</a>
+      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab is-active">Command</a>
       <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
       <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Calendar</a>
+      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
       <a href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-tab">Admin</a>
     </nav>
 

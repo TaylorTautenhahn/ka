@@ -1,72 +1,65 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BidBoard | Organization Selection</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-  </head>
-  <body class="backend-ui">
-    <main class="shell">
-      <header class="hero reveal">
-        <div class="hero-shell hero-shell-single">
-          <div class="hero-copy">
-            <p class="eyebrow">BidBoard Multi-Organization</p>
-            <h1>Select An Organization Workspace</h1>
-            <p>Choose your fraternity or sorority chapter. Each workspace has isolated data, branding, and role-based access.</p>
-          </div>
-        </div>
-      </header>
+{% extends "marketing_base.html" %}
+{% set nav_key = 'organizations' %}
 
-      <section class="panel">
-        <div class="section-head">
-          <h2>Organizations</h2>
-          <div class="action-row platform-home-actions">
-            <a href="/" class="quick-nav-link">Back To BidBoard</a>
-            <a href="/demo" class="quick-nav-link">Open Live Demo</a>
-            <a href="/platform" class="quick-nav-link">Open Platform Admin</a>
+{% block title %}BidBoard | Organization Login{% endblock %}
+{% block description %}Choose your BidBoard organization workspace and open the recruitment command console.{% endblock %}
+{% block body_class %}bb-page-organizations{% endblock %}
+
+{% block page_content %}
+<section class="bb-page-hero bb-reveal" data-delay="20">
+  <p class="bb-kicker">Organization Login</p>
+  <h1 class="bb-page-title">Choose the workspace for your chapter.</h1>
+  <p class="bb-page-subtitle">
+    Every organization gets isolated data, independent approvals, custom branding, and its own recruitment command surface.
+  </p>
+  <div class="bb-hero-actions">
+    <a class="bb-cta bb-cta-ghost" href="/">Back Home</a>
+    <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
+  </div>
+</section>
+
+<section class="bb-section bb-reveal" data-delay="35">
+  <div class="bb-section-head">
+    <p class="bb-kicker">Available Workspaces</p>
+    <h2>Open the right dashboard without crossing organization data.</h2>
+  </div>
+  <div class="bb-org-grid">
+    {% for tenant in tenants %}
+    <article class="bb-org-card">
+      <a class="bb-org-card-main" href="/{{ tenant.slug }}" aria-label="Open {{ tenant.display_name }} dashboard">
+        <div class="bb-org-card-top">
+          {% if tenant.logo_path %}
+          <img src="{{ tenant.logo_path }}" alt="{{ tenant.display_name }} logo" class="bb-org-logo" />
+          {% else %}
+          <div class="bb-org-logo bb-org-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</div>
+          {% endif %}
+          <div>
+            <strong>{{ tenant.display_name }}</strong>
+            <p>{{ tenant.chapter_name }}</p>
           </div>
         </div>
-        <div class="tenant-picker-grid">
-          {% for tenant in tenants %}
-          <article class="tenant-card reveal">
-            <a class="tenant-card-link" href="/{{ tenant.slug }}" aria-label="Open {{ tenant.display_name }} dashboard">
-              <div class="tenant-card-top">
-                {% if tenant.logo_path %}
-                <img src="{{ tenant.logo_path }}" alt="{{ tenant.display_name }} logo" class="tenant-logo" />
-                {% else %}
-                <div class="tenant-logo tenant-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</div>
-                {% endif %}
-                <div>
-                  <strong>{{ tenant.display_name }}</strong>
-                  <p class="muted">{{ tenant.chapter_name }}</p>
-                </div>
-              </div>
-              <p class="muted tenant-path">Path: /{{ tenant.slug }}</p>
-            </a>
-            <div class="action-row platform-card-actions">
-              <a class="quick-nav-link" href="/{{ tenant.slug }}">Dashboard</a>
-              <a class="quick-nav-link" href="/{{ tenant.slug }}/meeting">Meeting</a>
-            </div>
-          </article>
-          {% endfor %}
-          {% if not tenants %}
-          <article class="tenant-card">
-            <strong>No organizations configured yet</strong>
-            <p class="muted">Use Platform Admin to create your first organization workspace and upload its logo.</p>
-            <div class="action-row platform-card-actions">
-              <a class="quick-nav-link" href="/platform">Open Platform Admin</a>
-            </div>
-          </article>
-          {% endif %}
+        <div class="bb-chip-row bb-chip-row-org">
+          <span>{{ tenant.org_type }}</span>
+          <span>/{{ tenant.slug }}</span>
         </div>
-      </section>
-    </main>
-  </body>
-</html>
+      </a>
+      <div class="bb-org-card-actions">
+        <a class="bb-cta bb-cta-ghost" href="/{{ tenant.slug }}">Open Workspace</a>
+        <a class="bb-link-inline" href="/{{ tenant.slug }}/meeting">Meeting Packets</a>
+      </div>
+    </article>
+    {% endfor %}
+
+    {% if not tenants %}
+    <article class="bb-org-card bb-org-card-empty">
+      <p class="bb-bento-label">No Organizations Configured</p>
+      <h3>Create your first workspace in Platform Admin.</h3>
+      <p>Set up the organization, upload the logo, and return here to open its dedicated console.</p>
+      <div class="bb-org-card-actions">
+        <a class="bb-cta bb-cta-strong" href="/platform">Open Platform Admin</a>
+      </div>
+    </article>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

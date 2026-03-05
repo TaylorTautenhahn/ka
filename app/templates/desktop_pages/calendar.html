@@ -1,188 +1,206 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'operations' %} is-active{% endif %}" data-page="operations">
         <section class="panel reveal delay-2">
           <div class="section-head">
-            <h2>Rush Operations Calendar</h2>
-            <p class="muted">One shared calendar for all rush events and scheduled lunches.</p>
+            <div>
+              <h2>Operations Workspace</h2>
+              <p class="muted">Timeline, goals, notifications, and officer chat in one coordinated command surface.</p>
+            </div>
+            <div class="operation-tab-bar" id="operationsTabBar">
+              <button type="button" class="secondary operation-tab-btn is-active" data-operations-tab="timeline">Timeline</button>
+              <button type="button" class="secondary operation-tab-btn" data-operations-tab="goals">Goals</button>
+              <button type="button" class="secondary operation-tab-btn" data-operations-tab="comms">Comms</button>
+            </div>
           </div>
-          <div class="grid-two">
-            <article class="list-column">
-              <h3>Head Rush Event Controls</h3>
-              <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove non-lunch events. Use the Schedule Lunch section to add lunch items.</p>
-              <form id="rushEventForm" class="stack">
-                <label>
-                  Event title
-                  <input id="rushEventTitle" type="text" required placeholder="Open House - Round 1" />
-                </label>
-                <div class="inline-grid two-cols">
+          <div id="operationsSummaryCards" class="cards"></div>
+        </section>
+
+        <section class="desktop-subpage is-active reveal delay-3" data-operations-tab="timeline">
+          <section class="panel">
+            <div class="section-head">
+              <h2>Timeline + Calendar</h2>
+              <p class="muted">One shared calendar for rush events and scheduled lunches.</p>
+            </div>
+            <div class="grid-two">
+              <article class="list-column">
+                <h3>Head Rush Event Controls</h3>
+                <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove non-lunch events. Use the Schedule Lunch section to add lunch items.</p>
+                <form id="rushEventForm" class="stack">
                   <label>
-                    Event type
-                    <select id="rushEventType">
-                      <option value="official">Official</option>
-                      <option value="roundtable">Roundtable</option>
-                      <option value="mixer">Mixer</option>
-                      <option value="philanthropy">Philanthropy</option>
-                      <option value="brotherhood">Brotherhood</option>
-                      <option value="interview">Interview</option>
-                      <option value="meeting">Meeting</option>
-                      <option value="social">Social</option>
-                      <option value="other">Other</option>
+                    Event title
+                    <input id="rushEventTitle" type="text" required placeholder="Open House - Round 1" />
+                  </label>
+                  <div class="inline-grid two-cols">
+                    <label>
+                      Event type
+                      <select id="rushEventType">
+                        <option value="official">Official</option>
+                        <option value="roundtable">Roundtable</option>
+                        <option value="mixer">Mixer</option>
+                        <option value="philanthropy">Philanthropy</option>
+                        <option value="brotherhood">Brotherhood</option>
+                        <option value="interview">Interview</option>
+                        <option value="meeting">Meeting</option>
+                        <option value="social">Social</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </label>
+                    <label>
+                      Date
+                      <input id="rushEventDate" type="date" required />
+                    </label>
+                  </div>
+                  <div class="inline-grid two-cols">
+                    <label>
+                      Start time (optional)
+                      <input id="rushEventStartTime" type="time" />
+                    </label>
+                    <label>
+                      End time (optional)
+                      <input id="rushEventEndTime" type="time" />
+                    </label>
+                  </div>
+                  <label>
+                    Location (optional)
+                    <input id="rushEventLocation" type="text" placeholder="Chapter House" />
+                  </label>
+                  <label>
+                    Details (optional)
+                    <textarea id="rushEventDetails" rows="3" placeholder="Agenda, dress code, talking points"></textarea>
+                  </label>
+                  <label class="checkbox-line">
+                    <input id="rushEventOfficial" type="checkbox" checked />
+                    Mark as official rush event
+                  </label>
+                  <button id="rushEventSubmitBtn" type="submit">Create Event</button>
+                </form>
+              </article>
+              <article class="list-column">
+                <h3>Shared Calendar Links</h3>
+                <p class="muted">Subscribe once to the chapter rush calendar (events + lunches).</p>
+                <div class="action-row">
+                  <button id="copyRushCalendarFeedBtn" type="button" class="secondary">Copy Rush Feed URL</button>
+                  <a id="openRushGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
+                </div>
+                <p id="rushCalendarFeedPreview" class="muted breakable">Loading rush calendar link...</p>
+                <div class="divider"></div>
+                <h3>Calendar Snapshot</h3>
+                <div id="rushCalendarStats" class="cards"></div>
+              </article>
+            </div>
+            <div class="divider"></div>
+            <h3>Upcoming Calendar Timeline</h3>
+            <div id="rushCalendarTable" class="table-wrap"></div>
+          </section>
+        </section>
+
+        <section class="desktop-subpage reveal delay-3" data-operations-tab="goals">
+          <section class="panel">
+            <div class="section-head">
+              <h2>Weekly Goals + Tasks</h2>
+              <p class="muted">Assign measurable goals and track progress automatically each week.</p>
+            </div>
+            <div class="grid-two">
+              <article class="list-column">
+                <h3>Create Weekly Goal</h3>
+                <form id="weeklyGoalForm" class="stack">
+                  <label>
+                    Goal title
+                    <input id="weeklyGoalTitle" type="text" required placeholder="Get 40 total ratings this week" />
+                  </label>
+                  <label>
+                    Description (optional)
+                    <textarea id="weeklyGoalDescription" rows="3" placeholder="What success looks like"></textarea>
+                  </label>
+                  <div class="inline-grid two-cols">
+                    <label>
+                      Metric type
+                      <select id="weeklyGoalMetric"></select>
+                    </label>
+                    <label>
+                      Target count
+                      <input id="weeklyGoalTarget" type="number" min="1" max="1000" value="10" required />
+                    </label>
+                  </div>
+                  <div class="inline-grid two-cols">
+                    <label>
+                      Week start
+                      <input id="weeklyGoalWeekStart" type="date" />
+                    </label>
+                    <label>
+                      Week end
+                      <input id="weeklyGoalWeekEnd" type="date" />
+                    </label>
+                  </div>
+                  <label>
+                    Assign to member (optional)
+                    <select id="weeklyGoalAssignedUser">
+                      <option value="">Team goal (unassigned)</option>
                     </select>
                   </label>
-                  <label>
-                    Date
-                    <input id="rushEventDate" type="date" required />
-                  </label>
-                </div>
-                <div class="inline-grid two-cols">
-                  <label>
-                    Start time (optional)
-                    <input id="rushEventStartTime" type="time" />
-                  </label>
-                  <label>
-                    End time (optional)
-                    <input id="rushEventEndTime" type="time" />
-                  </label>
-                </div>
-                <label>
-                  Location (optional)
-                  <input id="rushEventLocation" type="text" placeholder="Chapter House" />
-                </label>
-                <label>
-                  Details (optional)
-                  <textarea id="rushEventDetails" rows="3" placeholder="Agenda, dress code, talking points"></textarea>
-                </label>
-                <label class="checkbox-line">
-                  <input id="rushEventOfficial" type="checkbox" checked />
-                  Mark as official rush event
-                </label>
-                <button id="rushEventSubmitBtn" type="submit">Create Event</button>
-              </form>
-            </article>
-            <article class="list-column">
-              <h3>Shared Calendar Links</h3>
-              <p class="muted">Subscribe once to the chapter rush calendar (events + lunches).</p>
-              <div class="action-row">
-                <button id="copyRushCalendarFeedBtn" type="button" class="secondary">Copy Rush Feed URL</button>
-                <a id="openRushGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
-              </div>
-              <p id="rushCalendarFeedPreview" class="muted breakable">Loading rush calendar link...</p>
-              <div class="divider"></div>
-              <h3>Calendar Snapshot</h3>
-              <div id="rushCalendarStats" class="cards"></div>
-            </article>
-          </div>
-          <div class="divider"></div>
-          <h3>Upcoming Calendar Timeline</h3>
-          <div id="rushCalendarTable" class="table-wrap"></div>
+                  <button id="weeklyGoalSubmitBtn" type="submit">Create Goal</button>
+                </form>
+              </article>
+              <article class="list-column">
+                <h3>Weekly Goal Metrics</h3>
+                <div id="weeklyGoalSummary" class="cards"></div>
+                <p class="muted">Auto metrics update from real actions: ratings, lunches, PNM adds, chat, and rush events.</p>
+                <div id="weeklyGoalsList" class="list-box muted">Loading weekly goals...</div>
+              </article>
+            </div>
+          </section>
         </section>
 
-        <section class="panel reveal delay-3">
-          <div class="section-head">
-            <h2>Weekly Goals + Tasks</h2>
-            <p class="muted">Assign measurable goals and track progress automatically each week.</p>
-          </div>
-          <div class="grid-two">
-            <article class="list-column">
-              <h3>Create Weekly Goal</h3>
-              <form id="weeklyGoalForm" class="stack">
-                <label>
-                  Goal title
-                  <input id="weeklyGoalTitle" type="text" required placeholder="Get 40 total ratings this week" />
-                </label>
-                <label>
-                  Description (optional)
-                  <textarea id="weeklyGoalDescription" rows="3" placeholder="What success looks like"></textarea>
-                </label>
-                <div class="inline-grid two-cols">
-                  <label>
-                    Metric type
-                    <select id="weeklyGoalMetric"></select>
-                  </label>
-                  <label>
-                    Target count
-                    <input id="weeklyGoalTarget" type="number" min="1" max="1000" value="10" required />
-                  </label>
+        <section class="desktop-subpage reveal delay-3" data-operations-tab="comms">
+          <section class="panel">
+            <div class="section-head">
+              <h2>Officer Chat + Notifications</h2>
+              <p class="muted">Live officer communication with mentions, tags, and engagement stats.</p>
+            </div>
+            <div class="officer-chat-layout">
+              <aside class="list-column officer-chat-rail">
+                <div class="section-head">
+                  <h3>Notifications</h3>
+                  <button id="notificationsReadAllBtn" type="button" class="secondary">Mark All Read</button>
                 </div>
-                <div class="inline-grid two-cols">
-                  <label>
-                    Week start
-                    <input id="weeklyGoalWeekStart" type="date" />
-                  </label>
-                  <label>
-                    Week end
-                    <input id="weeklyGoalWeekEnd" type="date" />
-                  </label>
+                <div id="notificationsList" class="list-box muted officer-notification-list">Loading notifications...</div>
+                <div class="divider"></div>
+                <h3>Thread Stats</h3>
+                <div id="officerChatStats" class="cards officer-chat-stats"></div>
+              </aside>
+
+              <article class="list-column officer-chat-room">
+                <div class="officer-chat-head">
+                  <div>
+                    <h3># rush-team-thread</h3>
+                    <p class="muted">Discord-style rush coordination. Use @username for mentions and Shift+Enter for new lines.</p>
+                  </div>
+                  <div class="officer-chat-hint">Live updates every few seconds</div>
                 </div>
-                <label>
-                  Assign to member (optional)
-                  <select id="weeklyGoalAssignedUser">
-                    <option value="">Team goal (unassigned)</option>
-                  </select>
-                </label>
-                <button id="weeklyGoalSubmitBtn" type="submit">Create Goal</button>
-              </form>
-            </article>
-            <article class="list-column">
-              <h3>Weekly Goal Metrics</h3>
-              <div id="weeklyGoalSummary" class="cards"></div>
-              <p class="muted">Auto metrics update from real actions: ratings, lunches, PNM adds, chat, and rush events.</p>
-              <p class="muted">Manual goals support direct +1 progress updates.</p>
-            </article>
-          </div>
-          <div class="divider"></div>
-          <h3>Goal Board</h3>
-          <div id="weeklyGoalsList" class="list-box muted">Loading weekly goals...</div>
+
+                <div id="officerChatList" class="list-box muted officer-chat-feed" aria-live="polite">Loading chat...</div>
+
+                <form id="officerChatForm" class="officer-chat-composer">
+                  <label>
+                    Message
+                    <textarea id="officerChatMessage" rows="3" placeholder="Type a message... Enter to send"></textarea>
+                  </label>
+                  <div id="officerChatQuickTags" class="officer-chat-quick-tags">
+                    <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="events">#events</button>
+                    <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="followup">#followup</button>
+                    <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="priority">#priority</button>
+                    <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="concerns">#concerns</button>
+                    <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="wins">#wins</button>
+                  </div>
+                  <div class="officer-chat-composer-foot">
+                    <label>
+                      Tags (optional)
+                      <input id="officerChatTags" type="text" placeholder="events, followup, concerns" />
+                    </label>
+                    <button id="officerChatSubmitBtn" type="submit">Send Message</button>
+                  </div>
+                </form>
+              </article>
+            </div>
+          </section>
         </section>
-
-        <section class="panel reveal delay-4">
-          <div class="section-head">
-            <h2>Officer Chat + Notifications</h2>
-            <p class="muted">Live officer communication with mentions, tags, and engagement stats.</p>
-          </div>
-          <div class="officer-chat-layout">
-            <aside class="list-column officer-chat-rail">
-              <div class="section-head">
-                <h3>Notifications</h3>
-                <button id="notificationsReadAllBtn" type="button" class="secondary">Mark All Read</button>
-              </div>
-              <div id="notificationsList" class="list-box muted officer-notification-list">Loading notifications...</div>
-              <div class="divider"></div>
-              <h3>Thread Stats</h3>
-              <div id="officerChatStats" class="cards officer-chat-stats"></div>
-            </aside>
-
-            <article class="list-column officer-chat-room">
-              <div class="officer-chat-head">
-                <div>
-                  <h3># rush-team-thread</h3>
-                  <p class="muted">Discord-style rush coordination. Use @username for mentions and Shift+Enter for new lines.</p>
-                </div>
-                <div class="officer-chat-hint">Live updates every few seconds</div>
-              </div>
-
-              <div id="officerChatList" class="list-box muted officer-chat-feed" aria-live="polite">Loading chat...</div>
-
-              <form id="officerChatForm" class="officer-chat-composer">
-                <label>
-                  Message
-                  <textarea id="officerChatMessage" rows="3" placeholder="Type a message... Enter to send"></textarea>
-                </label>
-                <div id="officerChatQuickTags" class="officer-chat-quick-tags">
-                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="events">#events</button>
-                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="followup">#followup</button>
-                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="priority">#priority</button>
-                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="concerns">#concerns</button>
-                  <button type="button" class="secondary chat-tag-btn" data-chat-quick-tag="wins">#wins</button>
-                </div>
-                <div class="officer-chat-composer-foot">
-                  <label>
-                    Tags (optional)
-                    <input id="officerChatTags" type="text" placeholder="events, followup, concerns" />
-                  </label>
-                  <button id="officerChatSubmitBtn" type="submit">Send Message</button>
-                </div>
-              </form>
-            </article>
-          </div>
-        </section>
-          </div>
+      </div>

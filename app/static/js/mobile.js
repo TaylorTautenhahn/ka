@@ -1018,7 +1018,11 @@ async function handleMobilePackageUnlink(button) {
 async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
-    mobileCurrentUser = payload && payload.user ? payload.user : null;
+    mobileCurrentUser = payload && payload.authenticated && payload.user ? payload.user : null;
+    if (!mobileCurrentUser) {
+      window.location.href = BASE_PATH || "/";
+      throw new Error("Not authenticated");
+    }
   } catch {
     window.location.href = BASE_PATH || "/";
     throw new Error("Not authenticated");

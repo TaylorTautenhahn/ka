@@ -64,32 +64,44 @@
     });
   }
 
-  const cursorGlow = document.querySelector(".bb-cursor-glow");
-  if (cursorGlow && !disableMotion) {
-    let currentX = window.innerWidth * 0.5;
-    let currentY = window.innerHeight * 0.3;
-    let targetX = currentX;
-    let targetY = currentY;
+  const navToggle = document.getElementById("bbNavToggle");
+  const primaryNav = document.getElementById("bbPrimaryNav");
 
-    function onPointerMove(event) {
-      targetX = event.clientX;
-      targetY = event.clientY;
-      cursorGlow.style.opacity = "0.86";
+  function closeNav() {
+    body.classList.remove("bb-nav-open");
+    if (navToggle) {
+      navToggle.setAttribute("aria-expanded", "false");
     }
+  }
 
-    window.addEventListener("pointermove", onPointerMove, { passive: true });
-    window.addEventListener("pointerleave", () => {
-      cursorGlow.style.opacity = "0";
+  if (navToggle && primaryNav) {
+    navToggle.addEventListener("click", () => {
+      const next = !body.classList.contains("bb-nav-open");
+      body.classList.toggle("bb-nav-open", next);
+      navToggle.setAttribute("aria-expanded", next ? "true" : "false");
     });
 
-    const animateCursor = () => {
-      currentX += (targetX - currentX) * 0.14;
-      currentY += (targetY - currentY) * 0.14;
-      doc.style.setProperty("--bb-cursor-x", `${currentX}px`);
-      doc.style.setProperty("--bb-cursor-y", `${currentY}px`);
-      window.requestAnimationFrame(animateCursor);
-    };
-    window.requestAnimationFrame(animateCursor);
+    primaryNav.querySelectorAll("a").forEach((link) => {
+      link.addEventListener("click", () => {
+        closeNav();
+      });
+    });
+
+    window.addEventListener("resize", () => {
+      if (window.innerWidth > 940) {
+        closeNav();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!body.classList.contains("bb-nav-open")) {
+        return;
+      }
+      if (navToggle.contains(event.target) || primaryNav.contains(event.target)) {
+        return;
+      }
+      closeNav();
+    });
   }
 
   const counters = Array.from(document.querySelectorAll("[data-count]"));
@@ -314,7 +326,7 @@
           labelShadow: "rgba(44, 91, 173, 0.22)",
           connectionStart: (alpha) => `rgba(19, 174, 131, ${alpha.toFixed(3)})`,
           connectionMid: (alpha) => `rgba(53, 121, 220, ${alpha.toFixed(3)})`,
-          connectionEnd: (alpha) => `rgba(91, 97, 228, ${alpha.toFixed(3)})`,
+          connectionEnd: (alpha) => `rgba(23, 150, 255, ${alpha.toFixed(3)})`,
           connectionShadowActive: "rgba(66, 131, 228, 0.58)",
           connectionShadowIdle: "rgba(86, 122, 186, 0.2)",
           pulseFill: "rgba(255, 255, 255, 0.98)",
@@ -322,7 +334,7 @@
           rusheeNode: "rgba(18, 184, 137, 0.95)",
           interestNode: "rgba(45, 107, 212, 0.97)",
           officerNode: "rgba(16, 120, 232, 0.96)",
-          memberNode: "rgba(106, 102, 233, 0.94)",
+          memberNode: "rgba(13, 179, 133, 0.94)",
           fallbackNode: "rgba(86, 126, 201, 0.9)",
           pointerNode: "rgba(33, 92, 181, 0.94)",
         };
@@ -336,15 +348,15 @@
         labelShadow: "rgba(117, 166, 244, 0.2)",
         connectionStart: (alpha) => `rgba(69, 230, 184, ${alpha.toFixed(3)})`,
         connectionMid: (alpha) => `rgba(184, 214, 255, ${alpha.toFixed(3)})`,
-        connectionEnd: (alpha) => `rgba(53, 203, 255, ${alpha.toFixed(3)})`,
+        connectionEnd: (alpha) => `rgba(116, 255, 191, ${alpha.toFixed(3)})`,
         connectionShadowActive: "rgba(72, 190, 255, 0.66)",
         connectionShadowIdle: "rgba(122, 167, 236, 0.24)",
         pulseFill: "rgba(213, 233, 255, 0.95)",
         pulseShadow: "rgba(125, 185, 255, 0.76)",
         rusheeNode: "rgba(69, 230, 184, 0.95)",
-        interestNode: "rgba(220, 235, 255, 0.95)",
+        interestNode: "rgba(195, 240, 255, 0.95)",
         officerNode: "rgba(53, 203, 255, 0.95)",
-        memberNode: "rgba(149, 151, 255, 0.94)",
+        memberNode: "rgba(116, 255, 191, 0.94)",
         fallbackNode: "rgba(153, 183, 238, 0.9)",
         pointerNode: "rgba(214, 230, 255, 0.94)",
       };
@@ -732,48 +744,48 @@
 
     const states = {
       capture: {
-        title: "Event Intake",
-        badge: "New",
+        title: "Capture Queue",
+        badge: "Live",
         items: [
-          "First Name: Mason",
-          "Last Name: Carter",
-          "Class Year: Sophomore",
-          "Instagram: @masoncarter",
+          "Rushee: Mason Carter",
+          "Source: Brotherhood event",
+          "Profile sync: 1.2s",
+          "Owner requested: Jack M.",
         ],
-        footer: "Synced to chapter board in 1.2s",
+        footer: "Profile is visible to the team immediately after first contact.",
       },
       score: {
-        title: "Scoring Live",
-        badge: "Weighted",
+        title: "Weighted Scoring",
+        badge: "Live",
         items: [
           "Officer Score: 34/45",
           "Member Score: 29/45",
           "Weighted Total: 32.0",
-          "Trend: +3.2 this week",
+          "Delta: +3.2 this week",
         ],
-        footer: "Leaderboard rank updated instantly",
+        footer: "Rank, analytics, and meeting context update the moment the score changes.",
       },
       coordinate: {
-        title: "Officer Assignment",
-        badge: "Scheduled",
+        title: "Coordination Layer",
+        badge: "Assigned",
         items: [
-          "Owner: Jack M. 🔥",
+          "Primary Owner: Jack M. 🔥",
           "Lunch: Tue 12:30 PM",
-          "Event: Brotherhood Mixer",
-          "Status: Touchpoint planned",
+          "Next Event: Brotherhood Mixer",
+          "Status: Touchpoint scheduled",
         ],
-        footer: "Shared rush calendar auto-updated",
+        footer: "Assignments and shared calendar stay in sync without side threads.",
       },
       decide: {
         title: "Meeting Packet",
-        badge: "Decision",
+        badge: "Ready",
         items: [
           "Rating Trend: Upward",
-          "Top Notes: Strong fit",
+          "Top Notes: Strong social fit",
           "Officer Recommendation: Move forward",
-          "Board Vote: Ready",
+          "Packet Export: Ready",
         ],
-        footer: "Export packet PDF for chapter review",
+        footer: "Chapter discussion starts with current signal, not memory.",
       },
     };
 

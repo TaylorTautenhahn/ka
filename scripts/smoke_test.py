@@ -152,6 +152,8 @@ def main() -> None:
             expect_status(response, 200, "Dashboard route")
             response = client.get("/kappaalphaorder/rushees")
             expect_status(response, 200, "Rushees route")
+            response = client.get("/kappaalphaorder/meetings")
+            expect_status(response, 200, "Meetings route")
             response = client.get("/kappaalphaorder/team")
             expect_status(response, 200, "Team route")
             response = client.get("/kappaalphaorder/calendar")
@@ -184,8 +186,22 @@ def main() -> None:
             checks.append("Platform route responds")
 
             response = client.get("/kappaalphaorder/api/auth/me")
-            expect_status(response, 401, "Anonymous auth check")
-            checks.append("Anonymous API access blocked")
+            expect_status(response, 200, "Anonymous tenant auth check")
+            auth_payload = response.json()
+            if auth_payload.get("authenticated") is not False or auth_payload.get("user") is not None:
+                raise AssertionError("Anonymous tenant auth probe should return authenticated=false with no user.")
+            checks.append("Anonymous tenant auth probe stays clean")
+
+            response = client.get("/platform/api/auth/me")
+            expect_status(response, 200, "Anonymous platform auth check")
+            platform_auth_payload = response.json()
+            if platform_auth_payload.get("authenticated") is not False or platform_auth_payload.get("admin") is not None:
+                raise AssertionError("Anonymous platform auth probe should return authenticated=false with no admin.")
+            checks.append("Anonymous platform auth probe stays clean")
+
+            response = client.get("/kappaalphaorder/api/pnms")
+            expect_status(response, 401, "Anonymous protected API check")
+            checks.append("Anonymous protected API access blocked")
 
             officer_username = "officerqa"
             officer_password = "OfficerPass123!"
@@ -473,6 +489,48 @@ def main() -> None:
             if int(summary.get("window_hours", 0)) != 72:
                 raise AssertionError("Command center summary should reflect requested 72-hour window.")
             checks.append("Officer command center API works")
+
+            response = client.get("/kappaalphaorder/api/workspace/command")
+            expect_status(response, 200, "Command workspace API")
+            command_workspace = response.json()
+            if "command_center" not in command_workspace or "team_pulse" not in command_workspace:
+                raise AssertionError("Command workspace payload should include command_center and team_pulse.")
+            checks.append("Command workspace API works")
+
+            response = client.get("/kappaalphaorder/api/workspace/rushees?state=TX")
+            expect_status(response, 200, "Rushees workspace API")
+            rushee_workspace = response.json()
+            if not isinstance(rushee_workspace.get("pnms"), list):
+                raise AssertionError("Rushees workspace should include a pnm list.")
+            checks.append("Rushees workspace API works")
+
+            response = client.get("/kappaalphaorder/api/workspace/team?role=Rush%20Officer&state=TX")
+            expect_status(response, 200, "Team workspace API")
+            team_workspace = response.json()
+            if "users" not in team_workspace or "assignment_overview" not in team_workspace:
+                raise AssertionError("Team workspace payload should include users and assignment_overview.")
+            checks.append("Team workspace API works")
+
+            response = client.get("/kappaalphaorder/api/workspace/operations")
+            expect_status(response, 200, "Operations workspace API")
+            operations_workspace = response.json()
+            if "calendar" not in operations_workspace or "chat" not in operations_workspace:
+                raise AssertionError("Operations workspace payload should include calendar and chat data.")
+            checks.append("Operations workspace API works")
+
+            response = client.get("/kappaalphaorder/api/workspace/meetings")
+            expect_status(response, 200, "Meetings workspace API")
+            meetings_workspace = response.json()
+            if "shortlist" not in meetings_workspace or "candidates" not in meetings_workspace:
+                raise AssertionError("Meetings workspace payload should include shortlist and candidates.")
+            checks.append("Meetings workspace API works")
+
+            response = client.get("/kappaalphaorder/api/search/global?q=alex")
+            expect_status(response, 200, "Global search API")
+            search_payload = response.json()
+            if "pnms" not in search_payload or "members" not in search_payload or "commands" not in search_payload:
+                raise AssertionError("Global search payload should include pnms, members, and commands.")
+            checks.append("Global search API works")
 
             response = client.post(
                 "/kappaalphaorder/api/ratings",

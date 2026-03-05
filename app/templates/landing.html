@@ -1,331 +1,287 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#090b14" />
-    <title>BidBoard | Recruitment Intelligence</title>
-    <meta
-      name="description"
-      content="BidBoard is the recruitment command center for fraternities and sororities. Replace spreadsheets with accountable, real-time decisions."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/css/landing.css" />
-    <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/landing.js" defer></script>
-  </head>
-  <body class="bb-page-home">
-    <div class="bb-cursor-glow" aria-hidden="true"></div>
-    <div class="bb-noise" aria-hidden="true"></div>
-    <div class="bb-atmosphere bb-atmosphere-a" aria-hidden="true"></div>
-    <div class="bb-atmosphere bb-atmosphere-b" aria-hidden="true"></div>
+{% extends "marketing_base.html" %}
+{% set nav_key = 'home' %}
 
-    <main class="bb-shell">
-      <header class="bb-topbar bb-reveal" data-delay="20">
-        <a class="bb-brand" href="/" aria-label="BidBoard home">
-          <span class="bb-brand-dot"></span>
-          <span>BidBoard</span>
-        </a>
-        <nav class="bb-topbar-actions" aria-label="Primary">
-          <a class="bb-link is-active" href="/">Home</a>
-          <a class="bb-link" href="/features">Product</a>
-          <a class="bb-link" href="/demo">Live Demo</a>
-          <a class="bb-link" href="/faq">FAQ</a>
-          <a class="bb-link bb-link-admin" href="/platform">Platform Admin</a>
-        </nav>
-        <div class="bb-topbar-utilities">
-          <button class="bb-theme-toggle" id="bbThemeToggle" type="button" aria-label="Toggle dark and light mode">
-            <span class="bb-theme-toggle-sun" aria-hidden="true">☀</span>
-            <span class="bb-theme-toggle-moon" aria-hidden="true">◐</span>
-          </button>
-          <a class="bb-login-btn" href="/organizations">Organization Login</a>
-        </div>
-      </header>
+{% block title %}BidBoard | Recruitment Intelligence{% endblock %}
+{% block description %}BidBoard is the recruitment command layer for fraternities and sororities that need faster, more accountable decisions.{% endblock %}
+{% block body_class %}bb-page-home{% endblock %}
 
-      <section class="bb-hero bb-reveal" data-delay="40">
-        <div class="bb-hero-copy">
-          <p class="bb-kicker">Built for Fraternities + Sororities</p>
-          <h1 class="bb-hero-title">Recruitment, finally run like a modern command center.</h1>
-          <p class="bb-subtitle">
-            Real-time scoring, transparent collaboration, and meeting-ready intelligence in one connected system.
-            BidBoard keeps your rush team aligned from first touchpoint to final bid decision.
-          </p>
-          <div class="bb-hero-actions">
-            <a class="bb-cta" href="/organizations">Organization Login</a>
-            <a class="bb-cta bb-cta-ghost" href="/demo">Try Interactive Demo</a>
-          </div>
-          <div class="bb-hero-metrics">
-            <article class="bb-inline-metric">
-              <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong>
-              <span>Organizations Live</span>
-            </article>
-            <article class="bb-inline-metric">
-              <strong data-count="45">45</strong>
-              <span>Default Points</span>
-            </article>
-            <article class="bb-inline-metric">
-              <strong data-count="3">3</strong>
-              <span>Role Views</span>
-            </article>
-          </div>
-        </div>
-      </section>
+{% block page_content %}
+<section class="bb-hero bb-hero-home bb-reveal" data-delay="20">
+  <div class="bb-hero-copy">
+    <p class="bb-kicker">Built for fraternities + sororities</p>
+    <h1 class="bb-hero-title">Recruitment, finally run like a modern command layer.</h1>
+    <p class="bb-subtitle">
+      BidBoard keeps scoring, assignments, meetings, and mobile execution in one live system so your rush team can move faster without losing accountability.
+    </p>
+    <div class="bb-hero-actions">
+      <a class="bb-cta bb-cta-strong" href="/demo">Try Interactive Demo</a>
+      <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+      <a class="bb-link-inline" href="/features">Explore Product Depth</a>
+    </div>
+    <div class="bb-proof-grid">
+      <article class="bb-proof-card">
+        <strong>Real-time accountability</strong>
+        <span>Every score, delta, and note stays visible to the right people at the right moment.</span>
+      </article>
+      <article class="bb-proof-card">
+        <strong>Weighted decisions</strong>
+        <span>Rush officer and member input combines into one live ranking system.</span>
+      </article>
+      <article class="bb-proof-card">
+        <strong>Meeting packets</strong>
+        <span>Open discussion-ready profiles with trends, notes, and decision context intact.</span>
+      </article>
+      <article class="bb-proof-card">
+        <strong>Mobile execution</strong>
+        <span>Rate, assign, and coordinate directly from phones during the busiest rush events.</span>
+      </article>
+    </div>
+  </div>
 
-      <section class="bb-marquee-wrap bb-reveal" data-delay="55" aria-label="Greek organizations on BidBoard">
-        <div class="bb-marquee-track" role="presentation">
-          <span>ΑΧΩ</span>
-          <span>ΚΑΘ</span>
-          <span>ΣΝ</span>
-          <span>ΠΚΑ</span>
-          <span>ΔΤΔ</span>
-          <span>ΖΤΑ</span>
-          <span>ΑΔΠ</span>
-          <span>ΚΚΓ</span>
-          <span>ΧΩ</span>
-          <span>ΔΓ</span>
-          <span>ΚΑ</span>
-          <span>ΠΒΦ</span>
-          <span>ΑΧΩ</span>
-          <span>ΚΑΘ</span>
-          <span>ΣΝ</span>
-          <span>ΠΚΑ</span>
-          <span>ΔΤΔ</span>
-          <span>ΖΤΑ</span>
-          <span>ΑΔΠ</span>
-          <span>ΚΚΓ</span>
-          <span>ΧΩ</span>
-          <span>ΔΓ</span>
-          <span>ΚΑ</span>
-          <span>ΠΒΦ</span>
-        </div>
-      </section>
+  <div class="bb-lattice-stage">
+    <div class="bb-lattice-head">
+      <p class="bb-kicker">Signal Lattice</p>
+      <h2>Live matching flow across rushees, interests, and officers</h2>
+      <p>
+        The lattice reacts to cursor movement and routes active interest signals toward the best-fit rush team connection.
+      </p>
+    </div>
+    <div class="bb-network-readout" aria-live="polite">
+      <span class="bb-network-pill" id="bbNetworkInterest">Interest Signal: Leadership</span>
+      <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
+    </div>
+    <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="540" aria-hidden="true"></canvas>
+    <div class="bb-lattice-foot">
+      <span>Pointer-reactive routing</span>
+      <span>Interest-driven ownership</span>
+      <span>Command-center clarity</span>
+    </div>
+  </div>
+</section>
 
-      <section class="bb-section bb-network-section bb-reveal" data-delay="62">
-        <div class="bb-section-head">
-          <p class="bb-kicker">Interactive Match Map</p>
-          <h2>Watch BidBoard connect rushees to the right members and rush officers in real time</h2>
-        </div>
-        <div class="bb-network-layout">
-          <div class="bb-network-copy">
-            <p>
-              Move your cursor through the map to simulate active matching flow. Signals route from each rushee through
-              shared interests into the best-fit member or rush officer.
-            </p>
-            <ul class="bb-network-legend">
-              <li><span class="bb-network-dot bb-network-dot-rushee"></span>Rushee profile nodes</li>
-              <li><span class="bb-network-dot bb-network-dot-interest"></span>Interest signal nodes</li>
-              <li><span class="bb-network-dot bb-network-dot-match"></span>Matched members + rush officers</li>
-            </ul>
-          </div>
-          <div class="bb-network-stage" aria-label="Interactive matching network">
-            <div class="bb-network-head">
-              <p>Live Matching Visualization</p>
-              <h3>Rushee <span>⇄</span> Interest <span>⇄</span> Match</h3>
-              <div class="bb-network-readout" aria-live="polite">
-                <span class="bb-network-pill" id="bbNetworkInterest">Interest Signal: Leadership</span>
-                <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
-              </div>
-            </div>
-            <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="520" aria-hidden="true"></canvas>
-            <div class="bb-network-note">
-              Hover the map to activate an interest-driven pathway and see who gets matched to that rushee.
-            </div>
-          </div>
-        </div>
-      </section>
+<section class="bb-trust-ribbon bb-reveal" data-delay="35" aria-label="Credibility strip">
+  <div class="bb-trust-copy">
+    <p class="bb-kicker">Why teams switch</p>
+    <h2>Built for chapters that need speed, fairness, and meeting clarity in the same week.</h2>
+  </div>
+  <div class="bb-trust-count">
+    <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong>
+    <span>organizations configured on this deployment</span>
+  </div>
+  <div class="bb-marquee-wrap">
+    <div class="bb-marquee-track" role="presentation">
+      <span>ΑΧΩ</span>
+      <span>ΚΑΘ</span>
+      <span>ΣΝ</span>
+      <span>ΠΚΑ</span>
+      <span>ΔΤΔ</span>
+      <span>ΖΤΑ</span>
+      <span>ΑΔΠ</span>
+      <span>ΚΚΓ</span>
+      <span>ΧΩ</span>
+      <span>ΔΓ</span>
+      <span>ΚΑ</span>
+      <span>ΠΒΦ</span>
+      <span>ΑΧΩ</span>
+      <span>ΚΑΘ</span>
+      <span>ΣΝ</span>
+      <span>ΠΚΑ</span>
+      <span>ΔΤΔ</span>
+      <span>ΖΤΑ</span>
+      <span>ΑΔΠ</span>
+      <span>ΚΚΓ</span>
+      <span>ΧΩ</span>
+      <span>ΔΓ</span>
+      <span>ΚΑ</span>
+      <span>ΠΒΦ</span>
+    </div>
+  </div>
+</section>
 
-      <section class="bb-section bb-reveal" data-delay="70">
-        <div class="bb-section-head">
-          <p class="bb-kicker">What Makes It Advanced</p>
-          <h2>Operational depth in a clean command interface</h2>
-        </div>
-        <div class="bb-advanced-grid" aria-label="BidBoard capabilities">
-          <article class="bb-advanced-card bb-advanced-card-primary">
-            <div class="bb-advanced-meta">
-              <span class="bb-advanced-dot" aria-hidden="true"></span>
-              <p class="bb-advanced-label">Visibility Engine</p>
-            </div>
-            <h3>Role-aware decisions with full accountability</h3>
-            <p>
-              Head chairs, officers, and members each see the right view for their role while every action remains fully
-              auditable.
-            </p>
-            <div class="bb-advanced-tags">
-              <span>Role permissions</span>
-              <span>Audit history</span>
-            </div>
-          </article>
-          <article class="bb-advanced-card">
-            <div class="bb-advanced-meta">
-              <span class="bb-advanced-dot" aria-hidden="true"></span>
-              <p class="bb-advanced-label">Scoring Intelligence</p>
-            </div>
-            <h3>Weighted ratings with instant movement</h3>
-            <p>Every submitted update immediately shifts the total score, leaderboard position, and analytics views.</p>
-            <div class="bb-advanced-tags">
-              <span>0.6 / 0.4 weighting</span>
-              <span>Live leaderboard</span>
-            </div>
-          </article>
-          <article class="bb-advanced-card">
-            <div class="bb-advanced-meta">
-              <span class="bb-advanced-dot" aria-hidden="true"></span>
-              <p class="bb-advanced-label">Meeting Readiness</p>
-            </div>
-            <h3>Trend-backed packet mode</h3>
-            <p>Run chapter meetings with historical trends, assignment ownership, and decision-ready profile summaries.</p>
-            <div class="bb-advanced-tags">
-              <span>Trend graph</span>
-              <span>Packet export</span>
-            </div>
-          </article>
-          <article class="bb-advanced-card">
-            <div class="bb-advanced-meta">
-              <span class="bb-advanced-dot" aria-hidden="true"></span>
-              <p class="bb-advanced-label">Coordination Layer</p>
-            </div>
-            <h3>Assignments, lunches, events, and chat in sync</h3>
-            <p>Outreach, ownership, schedules, and rush communication stay connected inside one operating surface.</p>
-            <div class="bb-advanced-tags">
-              <span>Shared calendar</span>
-              <span>Officer chat</span>
-            </div>
-          </article>
-          <article class="bb-advanced-card bb-advanced-card-wide">
-            <div class="bb-advanced-meta">
-              <span class="bb-advanced-dot" aria-hidden="true"></span>
-              <p class="bb-advanced-label">Data Continuity</p>
-            </div>
-            <h3>Production-grade backups and season lifecycle controls</h3>
-            <p>Persistent storage checks, CSV exports, snapshots, and controlled archive/reset flows keep operations safe.</p>
-            <div class="bb-advanced-tags">
-              <span>Persistent storage</span>
-              <span>Backup exports</span>
-            </div>
-          </article>
-          <article class="bb-advanced-card">
-            <div class="bb-advanced-meta">
-              <span class="bb-advanced-dot" aria-hidden="true"></span>
-              <p class="bb-advanced-label">Multi-Organization Platform</p>
-            </div>
-            <h3>Fraternity and sorority branded workspaces</h3>
-            <p>Each organization keeps isolated data with independent admin controls and custom identity.</p>
-            <div class="bb-advanced-tags">
-              <span>Tenant isolation</span>
-              <span>Brand customization</span>
-            </div>
-          </article>
-        </div>
-      </section>
+<section class="bb-section bb-reveal" data-delay="45">
+  <div class="bb-section-head">
+    <p class="bb-kicker">Command Advantages</p>
+    <h2>Operational depth without the spreadsheet drag.</h2>
+  </div>
+  <div class="bb-bento-grid" aria-label="BidBoard advantages">
+    <article class="bb-bento-card is-wide">
+      <p class="bb-bento-label">Visibility Engine</p>
+      <h3>Role-aware views keep rush chairs, officers, and members aligned without exposing the wrong data.</h3>
+      <p>Decisions stay transparent to leadership while each role still gets a focused operating surface.</p>
+      <div class="bb-chip-row"><span>Role permissions</span><span>Audit trail</span><span>Member-safe views</span></div>
+    </article>
+    <article class="bb-bento-card is-tall">
+      <p class="bb-bento-label">Scoring Intelligence</p>
+      <h3>Weighted ratings update instantly across the board.</h3>
+      <p>Every score changes the candidate picture immediately, from rank ordering to meeting packet context.</p>
+      <div class="bb-chip-row"><span>0.6 / 0.4 weighting</span><span>Delta tracking</span></div>
+    </article>
+    <article class="bb-bento-card">
+      <p class="bb-bento-label">Meeting Readiness</p>
+      <h3>Run better discussions.</h3>
+      <p>Trends, notes, and packet views keep chapter conversations focused on current signal instead of memory.</p>
+    </article>
+    <article class="bb-bento-card">
+      <p class="bb-bento-label">Coordination Layer</p>
+      <h3>Assignments, lunches, calendar, and chat stay in sync.</h3>
+      <p>No tool switching when rush week is moving fast.</p>
+    </article>
+    <article class="bb-bento-card is-wide">
+      <p class="bb-bento-label">Data Continuity</p>
+      <h3>Protect the season with durable storage, exports, and controlled archive/reset flow.</h3>
+      <p>BidBoard is built to keep your data intact between pushes, between officers, and between rush cycles.</p>
+      <div class="bb-chip-row"><span>Persistent storage</span><span>CSV exports</span><span>Season archive</span></div>
+    </article>
+  </div>
+</section>
 
-      <section class="bb-section bb-journey bb-reveal" data-delay="80">
-        <div class="bb-section-head">
-          <p class="bb-kicker">Interactive Journey</p>
-          <h2>Click each phase to preview the full recruitment flow</h2>
-        </div>
-        <div class="bb-journey-layout">
-          <div class="bb-journey-steps" id="bbJourneySteps">
-            <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true">
-              <span>01</span>
-              <div>
-                <h3>Capture</h3>
-                <p>Quick-add a rushee at the event and sync their profile details instantly.</p>
-              </div>
-            </button>
-            <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false">
-              <span>02</span>
-              <div>
-                <h3>Score</h3>
-                <p>Officers and members submit weighted ratings that immediately update leaderboard position.</p>
-              </div>
-            </button>
-            <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false">
-              <span>03</span>
-              <div>
-                <h3>Coordinate</h3>
-                <p>Assign ownership, schedule lunch outreach, and align everyone in the shared rush calendar.</p>
-              </div>
-            </button>
-            <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false">
-              <span>04</span>
-              <div>
-                <h3>Decide</h3>
-                <p>Open meeting packet mode with trend data, notes, and ready-to-share recommendations.</p>
-              </div>
-            </button>
-          </div>
-
-          <aside class="bb-phone-shell" aria-live="polite">
-            <div class="bb-phone-notch" aria-hidden="true"></div>
-            <div class="bb-phone-screen" id="bbPhoneScreen" data-state="capture">
-              <div class="bb-phone-header">
-                <strong id="bbPhoneTitle">Event Intake</strong>
-                <span id="bbPhoneBadge">New</span>
-              </div>
-              <ul class="bb-phone-list" id="bbPhoneList">
-                <li>First Name: Mason</li>
-                <li>Last Name: Carter</li>
-                <li>Class Year: Sophomore</li>
-                <li>Instagram: @masoncarter</li>
-              </ul>
-              <div class="bb-phone-footer" id="bbPhoneFooter">Synced to chapter board in 1.2s</div>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <section class="bb-section bb-reveal" data-delay="95">
-        <div class="bb-section-head">
-          <p class="bb-kicker">Interactive Micro-Demo</p>
-          <h2>Live Signal Panel</h2>
-        </div>
-        <div class="bb-signal-panel" aria-label="Weighted scoring simulator">
-          <div class="bb-signal-controls">
-            <label class="bb-signal-field" for="bbOfficerScore">
-              <span>Rush Officer Score</span>
-              <input id="bbOfficerScore" type="range" min="0" max="45" value="34" step="1" />
-            </label>
-            <label class="bb-signal-field" for="bbRusherScore">
-              <span>Rusher Score</span>
-              <input id="bbRusherScore" type="range" min="0" max="45" value="29" step="1" />
-            </label>
-            <p class="bb-signal-weight-note">Weighting: Officer <strong>0.6</strong> + Rusher <strong>0.4</strong></p>
-          </div>
-          <div class="bb-signal-output">
-            <div class="bb-signal-score">
-              <p>Candidate Weighted Score</p>
-              <strong id="bbSignalScore">32.0</strong>
-              <span id="bbSignalDelta" class="bb-signal-delta">+0.0 today</span>
-            </div>
-            <div class="bb-signal-bar" role="img" aria-label="Weighted score progress">
-              <div id="bbSignalBarFill"></div>
-            </div>
-            <div class="bb-signal-meta">
-              <span>Officer: <strong id="bbOfficerScoreValue">34</strong>/45</span>
-              <span>Rusher: <strong id="bbRusherScoreValue">29</strong>/45</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section class="bb-section bb-cta-section bb-reveal" data-delay="110">
+<section class="bb-section bb-journey-section bb-reveal" data-delay="55">
+  <div class="bb-section-head">
+    <p class="bb-kicker">Rush Week, End To End</p>
+    <h2>Click through the operating flow your chapter actually lives in.</h2>
+  </div>
+  <div class="bb-journey-layout">
+    <div class="bb-journey-steps" id="bbJourneySteps">
+      <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true">
+        <span>01</span>
         <div>
-          <p class="bb-kicker">Ready To Run Recruitment Better?</p>
-          <h2>Move your chapter to BidBoard before the next rush cycle.</h2>
-          <p class="bb-page-subtitle">
-            Launch quickly, onboard officers fast, and keep every decision transparent from day one.
-          </p>
+          <h3>Capture</h3>
+          <p>Add the rushee fast, enrich the profile, and get them visible to the whole team immediately.</p>
         </div>
-        <div class="bb-hero-actions">
-          <a class="bb-cta bb-cta-strong" href="/organizations">Open Organization Login</a>
-          <a class="bb-cta bb-cta-ghost" href="/features">Explore Product Depth</a>
+      </button>
+      <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false">
+        <span>02</span>
+        <div>
+          <h3>Score</h3>
+          <p>Collect weighted ratings while interactions are still fresh, then watch the board move in real time.</p>
         </div>
-      </section>
-    </main>
-  </body>
-</html>
+      </button>
+      <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false">
+        <span>03</span>
+        <div>
+          <h3>Coordinate</h3>
+          <p>Assign owners, schedule lunches, and make the next touchpoint obvious to everyone involved.</p>
+        </div>
+      </button>
+      <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false">
+        <span>04</span>
+        <div>
+          <h3>Decide</h3>
+          <p>Open the packet with trend context and walk into meeting discussion already prepared.</p>
+        </div>
+      </button>
+    </div>
+
+    <aside class="bb-command-shell" aria-live="polite">
+      <div class="bb-command-shell-top">
+        <div>
+          <p class="bb-command-shell-label">Preview</p>
+          <strong id="bbPhoneTitle">Event Intake</strong>
+        </div>
+        <span id="bbPhoneBadge">New</span>
+      </div>
+      <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture">
+        <ul class="bb-phone-list" id="bbPhoneList">
+          <li>First Name: Mason</li>
+          <li>Last Name: Carter</li>
+          <li>Class Year: Sophomore</li>
+          <li>Instagram: @masoncarter</li>
+        </ul>
+      </div>
+      <div class="bb-phone-footer" id="bbPhoneFooter">Synced to chapter board in 1.2s</div>
+    </aside>
+  </div>
+</section>
+
+<section class="bb-section bb-live-section bb-reveal" data-delay="65">
+  <div class="bb-section-head">
+    <p class="bb-kicker">Live Interaction</p>
+    <h2>Let prospects feel the product in 20 seconds.</h2>
+  </div>
+  <div class="bb-live-grid">
+    <div class="bb-signal-panel" aria-label="Weighted scoring simulator">
+      <div class="bb-signal-controls">
+        <label class="bb-signal-field" for="bbOfficerScore">
+          <span>Rush Officer Score</span>
+          <input id="bbOfficerScore" type="range" min="0" max="45" value="34" step="1" />
+        </label>
+        <label class="bb-signal-field" for="bbRusherScore">
+          <span>Member Score</span>
+          <input id="bbRusherScore" type="range" min="0" max="45" value="29" step="1" />
+        </label>
+        <p class="bb-signal-weight-note">Weighted model: Officer <strong>0.6</strong> + Member <strong>0.4</strong></p>
+      </div>
+      <div class="bb-signal-output">
+        <div class="bb-signal-score">
+          <p>Weighted Candidate Score</p>
+          <strong id="bbSignalScore">32.0</strong>
+          <span id="bbSignalDelta" class="bb-signal-delta">+0.0 vs baseline</span>
+        </div>
+        <div class="bb-signal-bar" role="img" aria-label="Weighted score progress">
+          <div id="bbSignalBarFill"></div>
+        </div>
+        <div class="bb-signal-meta">
+          <span>Officer: <strong id="bbOfficerScoreValue">34</strong>/45</span>
+          <span>Member: <strong id="bbRusherScoreValue">29</strong>/45</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="bb-live-rail">
+      <article class="bb-rail-card">
+        <p class="bb-rail-label">Immediate payoff</p>
+        <h3>Visitors understand the weighted system without needing a walkthrough.</h3>
+        <p>One interaction demonstrates the scoring model, live movement, and why BidBoard feels materially different from a spreadsheet.</p>
+      </article>
+      <article class="bb-rail-card">
+        <p class="bb-rail-label">What they learn</p>
+        <ul class="bb-feature-list">
+          <li>Scores move live across the system</li>
+          <li>Officer input carries more weight where it matters</li>
+          <li>Decision confidence gets easier to explain in meetings</li>
+        </ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="bb-section bb-reveal" data-delay="75">
+  <div class="bb-section-head">
+    <p class="bb-kicker">Proof Against The Old Way</p>
+    <h2>What chapters stop fighting once BidBoard replaces the sheet.</h2>
+  </div>
+  <div class="bb-objection-grid">
+    <article class="bb-objection-card">
+      <h3>No more spreadsheet drift</h3>
+      <p>Everyone is looking at the same live board instead of stale copies and side messages.</p>
+    </article>
+    <article class="bb-objection-card">
+      <h3>Meeting decisions get sharper</h3>
+      <p>Packet mode, trend history, and role-aware notes keep discussions grounded in actual signal.</p>
+    </article>
+    <article class="bb-objection-card">
+      <h3>Rush week stays mobile</h3>
+      <p>Officers can rate, schedule, and update while moving between events without losing structure.</p>
+    </article>
+    <article class="bb-objection-card">
+      <h3>Data survives real operations</h3>
+      <p>Persistent storage checks, exports, and archive controls reduce the operational risk of code pushes and season turnover.</p>
+    </article>
+  </div>
+</section>
+
+<section class="bb-section bb-final-cta bb-reveal" data-delay="85">
+  <div>
+    <p class="bb-kicker">Ready To Replace The Rush Spreadsheet?</p>
+    <h2>Start with the demo, then move your chapter into a real workspace.</h2>
+    <p class="bb-page-subtitle">
+      Show officers the product, let them feel the command flow, and keep Organization Login ready when you want to move into production.
+    </p>
+  </div>
+  <div class="bb-hero-actions">
+    <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
+    <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+    <a class="bb-link-inline" href="/features">Explore Product</a>
+  </div>
+</section>
+{% endblock %}

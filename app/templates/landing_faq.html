@@ -1,114 +1,82 @@
-<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#090b14" />
-    <title>BidBoard | FAQ</title>
-    <meta
-      name="description"
-      content="Frequently asked questions about BidBoard for fraternity and sorority recruitment teams."
-    />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Space+Grotesk:wght@500;600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <link rel="stylesheet" href="/static/css/landing.css" />
-    <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/landing.js" defer></script>
-  </head>
-  <body class="bb-page-faq">
-    <div class="bb-cursor-glow" aria-hidden="true"></div>
-    <div class="bb-noise" aria-hidden="true"></div>
-    <div class="bb-atmosphere bb-atmosphere-a" aria-hidden="true"></div>
-    <div class="bb-atmosphere bb-atmosphere-b" aria-hidden="true"></div>
+{% extends "marketing_base.html" %}
+{% set nav_key = 'faq' %}
 
-    <main class="bb-shell">
-      <header class="bb-topbar bb-reveal">
-        <a class="bb-brand" href="/" aria-label="BidBoard home">
-          <span class="bb-brand-dot"></span>
-          <span>BidBoard</span>
-        </a>
-        <nav class="bb-topbar-actions" aria-label="Primary">
-          <a class="bb-link" href="/">Home</a>
-          <a class="bb-link" href="/features">Product</a>
-          <a class="bb-link" href="/demo">Live Demo</a>
-          <a class="bb-link is-active" href="/faq">FAQ</a>
-          <a class="bb-link bb-link-admin" href="/platform">Platform Admin</a>
-        </nav>
-        <div class="bb-topbar-utilities">
-          <button class="bb-theme-toggle" id="bbThemeToggle" type="button" aria-label="Toggle dark and light mode">
-            <span class="bb-theme-toggle-sun" aria-hidden="true">☀</span>
-            <span class="bb-theme-toggle-moon" aria-hidden="true">◐</span>
-          </button>
-          <a class="bb-login-btn" href="/organizations">Organization Login</a>
-        </div>
-      </header>
+{% block title %}BidBoard | FAQ{% endblock %}
+{% block description %}Answers for chapters evaluating BidBoard for recruitment operations, data durability, and rollout.{% endblock %}
+{% block body_class %}bb-page-faq{% endblock %}
 
-      <section class="bb-section bb-reveal">
-        <p class="bb-kicker">Frequently Asked Questions</p>
-        <h1 class="bb-page-title"><span class="bb-title-shine">Answers for teams evaluating BidBoard.</span></h1>
-        <p class="bb-page-subtitle">
-          Everything below is built to help chapter leaders move fast without sacrificing fairness, security, or accountability.
-        </p>
-      </section>
+{% block page_content %}
+<section class="bb-page-hero bb-reveal" data-delay="20">
+  <p class="bb-kicker">FAQ</p>
+  <h1 class="bb-page-title">Answers for teams evaluating whether BidBoard can actually hold up during rush week.</h1>
+  <p class="bb-page-subtitle">
+    The questions below focus on fit, rollout, mobile use, access control, and whether the data survives real production conditions.
+  </p>
+</section>
 
-      <section class="bb-faq-wrap bb-reveal" data-delay="40">
-        <details class="bb-faq-item" open>
-          <summary>Who is BidBoard built for?</summary>
-          <p>BidBoard is built for fraternity and sorority recruitment teams that need structured, collaborative decision-making across officers and members.</p>
-        </details>
+<section class="bb-section bb-reveal" data-delay="35">
+  <div class="bb-faq-grid">
+    <article class="bb-faq-group">
+      <p class="bb-bento-label">Fit + Setup</p>
+      <details class="bb-faq-item" open>
+        <summary>Who is BidBoard built for?</summary>
+        <p>BidBoard is built for fraternity and sorority recruitment teams that need structured, collaborative decision-making across officers and members.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Can multiple organizations use one deployment?</summary>
+        <p>Yes. Each organization has a separate tenant path, isolated database, branding controls, and independent account approvals.</p>
+      </details>
+    </article>
 
-        <details class="bb-faq-item">
-          <summary>Can multiple organizations use one deployment?</summary>
-          <p>Yes. Each organization has a separate tenant path, isolated database, branding controls, and independent account approvals.</p>
-        </details>
+    <article class="bb-faq-group">
+      <p class="bb-bento-label">Security + Access</p>
+      <details class="bb-faq-item" open>
+        <summary>How does access control work?</summary>
+        <p>Role-based visibility is enforced at the API layer. Head roles, officers, and members see different data scopes based on configured permissions.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Can we customize branding per organization?</summary>
+        <p>Yes. Logos, colors, and organization-level themes can be set per workspace so each chapter keeps its own identity.</p>
+      </details>
+    </article>
 
-        <details class="bb-faq-item">
-          <summary>How does access control work?</summary>
-          <p>Role-based visibility is enforced at the API layer. Head roles, officers, and members see different data scopes based on configured permissions.</p>
-        </details>
+    <article class="bb-faq-group">
+      <p class="bb-bento-label">Mobile + Workflow</p>
+      <details class="bb-faq-item" open>
+        <summary>Does BidBoard work on mobile during events?</summary>
+        <p>Yes. Mobile-specific pages and routing are included so team members can update ratings, notes, assignments, and lunches from iPhone or Android.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Can we import rushees from forms?</summary>
+        <p>Yes. You can collect submissions via Google Forms, export CSV responses, and import directly into BidBoard with validation and duplicate checks.</p>
+      </details>
+    </article>
 
-        <details class="bb-faq-item">
-          <summary>Does BidBoard work on mobile during events?</summary>
-          <p>Yes. Mobile-specific pages and routing are included so team members can update ratings, notes, and lunches from iPhone or Android.</p>
-        </details>
+    <article class="bb-faq-group">
+      <p class="bb-bento-label">Data Durability</p>
+      <details class="bb-faq-item" open>
+        <summary>How are backups handled?</summary>
+        <p>BidBoard supports CSV export bundles, SQLite snapshots, and season archive/reset tooling for cyclical recruitment operations.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Will data disappear when we deploy new code?</summary>
+        <p>Not when persistent storage is configured correctly. BidBoard includes startup checks and admin diagnostics to verify that storage paths are durable.</p>
+      </details>
+    </article>
+  </div>
+</section>
 
-        <details class="bb-faq-item">
-          <summary>Can we import rushees from forms?</summary>
-          <p>Yes. You can collect submissions via Google Forms, export CSV responses, and import directly into BidBoard with validation and duplicate checks.</p>
-        </details>
-
-        <details class="bb-faq-item">
-          <summary>How are backups handled?</summary>
-          <p>BidBoard supports CSV export bundles and SQLite snapshots. It also includes season archive + reset tooling for cyclical recruitment operations.</p>
-        </details>
-
-        <details class="bb-faq-item">
-          <summary>Will data disappear when we deploy new code?</summary>
-          <p>Not when persistent storage is configured correctly. BidBoard includes startup checks and admin diagnostics to verify that storage paths are durable.</p>
-        </details>
-
-        <details class="bb-faq-item">
-          <summary>Can we customize branding per organization?</summary>
-          <p>Yes. You can upload logos and set organization-level themes so each chapter workspace reflects its own identity.</p>
-        </details>
-      </section>
-
-      <section class="bb-section bb-reveal" data-delay="80">
-        <div class="bb-cta-banner">
-          <div>
-            <h3>Want to explore your organization workspace now?</h3>
-            <p>Active organizations currently configured: <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong></p>
-          </div>
-          <div class="bb-hero-actions">
-            <a class="bb-cta" href="/organizations">Go To Login</a>
-            <a class="bb-cta bb-cta-ghost" href="/features">See Product Overview</a>
-          </div>
-        </div>
-      </section>
-    </main>
-  </body>
-</html>
+<section class="bb-section bb-reveal" data-delay="50">
+  <div class="bb-cta-banner">
+    <div>
+      <p class="bb-kicker">Still Evaluating?</p>
+      <h3>Start with the demo, then move into the real workspace when your chapter is ready.</h3>
+      <p>BidBoard is designed to let prospects test the operational flow before any production rollout begins.</p>
+    </div>
+    <div class="bb-hero-actions">
+      <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
+      <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

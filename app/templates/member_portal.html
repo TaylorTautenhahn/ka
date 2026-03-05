@@ -11,12 +11,6 @@
     <title>{{ app_config.tenant_name if app_config else 'Fraternity' }} Member Portal</title>
     <link rel="manifest" href="{{ app_config.base_path if app_config else '' }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/member_portal.js" defer></script>
@@ -35,7 +29,7 @@
 
     <main class="shell member-shell">
       <header class="hero reveal">
-        <div class="hero-shell">
+        <div class="hero-shell hero-shell-single">
           <div class="hero-copy">
             {% if app_config.logo_path %}
             <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
@@ -47,28 +41,6 @@
               <a class="quick-nav-link" href="{{ app_config.base_path if app_config else '/' }}">Open Rush Team Console</a>
             </div>
           </div>
-          <aside class="hero-visuals" aria-label="Brand and media slots">
-            <div class="media-slot-grid">
-              <article class="media-slot">
-                <p class="media-slot-label">Member Branding</p>
-                <h3 class="media-slot-title">Portal Logo Slot</h3>
-                <p class="media-slot-note">Displays your organization logo to members during login.</p>
-                {% if app_config and app_config.logo_path %}
-                <div class="media-slot-preview logo">
-                  <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo preview" />
-                </div>
-                {% else %}
-                <div class="media-slot-empty">Upload your chapter logo to brand this member portal.</div>
-                {% endif %}
-              </article>
-              <article class="media-slot">
-                <p class="media-slot-label">Recruitment Creative</p>
-                <h3 class="media-slot-title">Member Hero Slot</h3>
-                <p class="media-slot-note">Optional: add your own onboarding graphic in your organization settings.</p>
-                <div class="media-slot-empty">No default artwork.</div>
-              </article>
-            </div>
-          </aside>
         </div>
       </header>
 

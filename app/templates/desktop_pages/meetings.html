@@ -1,0 +1,51 @@
+          <div class="desktop-page{% if app_config and app_config.desktop_page == 'meetings' %} is-active{% endif %}" data-page="meetings">
+        <section class="panel reveal delay-2">
+          <div class="section-head">
+            <div>
+              <h2>Meetings Workspace</h2>
+              <p class="muted">Shortlist, compare, and launch packet review from one operating surface.</p>
+            </div>
+            <div class="action-row">
+              <button id="meetingsWatchToggleBtn" type="button" class="secondary">Toggle Watchlist</button>
+              <a class="quick-nav-link" href="{{ app_config.meeting_base if app_config else '/meeting' }}">Open Packet Detail</a>
+            </div>
+          </div>
+          <div id="meetingsWatchlist" class="list-box muted">No pinned PNMs yet.</div>
+        </section>
+
+        <div class="grid-two reveal delay-3 meetings-grid-top">
+          <section class="panel">
+            <div class="section-head">
+              <h2>Shortlist Queue</h2>
+              <span class="muted">High meeting-readiness first</span>
+            </div>
+            <div id="meetingsShortlist" class="list-box muted">Loading shortlist...</div>
+          </section>
+
+          <section class="panel">
+            <div class="section-head">
+              <h2>Needs Meeting Prep</h2>
+              <span class="muted">Thin context and at-risk candidates</span>
+            </div>
+            <div id="meetingsAttentionList" class="list-box muted">Loading attention items...</div>
+          </section>
+        </div>
+
+        <section class="panel reveal delay-4">
+          <div class="section-head">
+            <h2>Compare Candidates</h2>
+            <p class="muted">Select two candidates to compare meeting readiness and launch either packet.</p>
+          </div>
+          <div class="inline-grid two-cols">
+            <label>
+              Candidate A
+              <select id="meetingsCompareSelectA"></select>
+            </label>
+            <label>
+              Candidate B
+              <select id="meetingsCompareSelectB"></select>
+            </label>
+          </div>
+          <div id="meetingsCompareSummary" class="grid-two compare-summary-grid"></div>
+        </section>
+      </div>

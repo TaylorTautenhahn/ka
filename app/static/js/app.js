@@ -25,6 +25,7 @@ const APP_CONFIG = readAppConfig();
 const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const MEETING_BASE = (APP_CONFIG.meeting_base || `${BASE_PATH}/meeting`).replace(/\/$/, "");
+const TENANT_KEY = String(APP_CONFIG.tenant_slug || "default").trim() || "default";
 
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -91,6 +92,8 @@ function applyTenantTheme(config) {
 
 applyTenantTheme(APP_CONFIG);
 
+const authShell = document.getElementById("authShell");
+const authHero = document.getElementById("authHero");
 const authSection = document.getElementById("authSection");
 const appSection = document.getElementById("appSection");
 
@@ -105,8 +108,22 @@ const loginRememberMe = document.getElementById("loginRememberMe");
 
 const regEmoji = document.getElementById("regEmoji");
 
+const workspaceEyebrow = document.getElementById("workspaceEyebrow");
+const workspaceTitle = document.getElementById("workspaceTitle");
+const workspaceSubtitle = document.getElementById("workspaceSubtitle");
 const sessionTitle = document.getElementById("sessionTitle");
 const sessionSubtitle = document.getElementById("sessionSubtitle");
+const globalCommandBtn = document.getElementById("globalCommandBtn");
+const globalSearchInput = document.getElementById("globalSearchInput");
+const globalCommandPalette = document.getElementById("globalCommandPalette");
+const commandPaletteInput = document.getElementById("commandPaletteInput");
+const commandPaletteResults = document.getElementById("commandPaletteResults");
+const commandPaletteCloseBtn = document.getElementById("commandPaletteCloseBtn");
+const appNotificationsBtn = document.getElementById("appNotificationsBtn");
+const appNotificationsBadge = document.getElementById("appNotificationsBadge");
+const appNotificationsTray = document.getElementById("appNotificationsTray");
+const appNotificationsList = document.getElementById("appNotificationsList");
+const appNotificationsCloseBtn = document.getElementById("appNotificationsCloseBtn");
 const toastEl = document.getElementById("toast");
 const heroStats = document.getElementById("heroStats");
 const heroPnmCount = document.getElementById("heroPnmCount");
@@ -142,13 +159,19 @@ const selectedPnmPhoto = document.getElementById("selectedPnmPhoto");
 const selectedPnmPhotoPlaceholder = document.getElementById("selectedPnmPhotoPlaceholder");
 
 const pnmTable = document.getElementById("pnmTable");
+const pnmBoard = document.getElementById("pnmBoard");
+const pnmViewToggleTable = document.getElementById("pnmViewToggleTable");
+const pnmViewToggleBoard = document.getElementById("pnmViewToggleBoard");
 const memberTable = document.getElementById("memberTable");
+const teamPulseCards = document.getElementById("teamPulseCards");
+const teamOfficerLoads = document.getElementById("teamOfficerLoads");
 const sameStatePnmsHeader = document.getElementById("sameStatePnmsHeader");
 const sameStatePnmsList = document.getElementById("sameStatePnmsList");
 const ratingList = document.getElementById("ratingList");
 const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
 const openMeetingPageBtn = document.getElementById("openMeetingPageBtn");
+const rusheeWatchToggleBtn = document.getElementById("rusheeWatchToggleBtn");
 const ratingPnm = document.getElementById("ratingPnm");
 const lunchPnm = document.getElementById("lunchPnm");
 const lunchStartTime = document.getElementById("lunchStartTime");
@@ -188,6 +211,8 @@ const seasonArchiveLabel = document.getElementById("seasonArchiveLabel");
 const seasonHeadChairConfirm = document.getElementById("seasonHeadChairConfirm");
 const seasonResetBtn = document.getElementById("seasonResetBtn");
 const seasonArchiveDownloadBtn = document.getElementById("seasonArchiveDownloadBtn");
+const adminTabBar = document.getElementById("adminTabBar");
+const adminStorageDiagnostics = document.getElementById("adminStorageDiagnostics");
 
 const analyticsCards = document.getElementById("analyticsCards");
 const matchingPnms = document.getElementById("matchingPnms");
@@ -198,14 +223,22 @@ const commandWindowLabel = document.getElementById("commandWindowLabel");
 const commandQueueCount = document.getElementById("commandQueueCount");
 const commandStaleCount = document.getElementById("commandStaleCount");
 const commandRecentCount = document.getElementById("commandRecentCount");
+const commandPendingCount = document.getElementById("commandPendingCount");
+const commandNeedsHelpCount = document.getElementById("commandNeedsHelpCount");
+const commandUnassignedCount = document.getElementById("commandUnassignedCount");
 const commandCenterQueue = document.getElementById("commandCenterQueue");
 const commandStaleList = document.getElementById("commandStaleList");
 const commandRecentChanges = document.getElementById("commandRecentChanges");
+const commandAttentionList = document.getElementById("commandAttentionList");
+const commandTodayList = document.getElementById("commandTodayList");
+const commandPulseCards = document.getElementById("commandPulseCards");
+const commandWatchlist = document.getElementById("commandWatchlist");
 const commandSelectedPhoto = document.getElementById("commandSelectedPhoto");
 const commandSelectedPhotoPlaceholder = document.getElementById("commandSelectedPhotoPlaceholder");
 const commandSelectedName = document.getElementById("commandSelectedName");
 const commandSelectedMeta = document.getElementById("commandSelectedMeta");
 const commandOpenMeetingBtn = document.getElementById("commandOpenMeetingBtn");
+const commandWatchToggleBtn = document.getElementById("commandWatchToggleBtn");
 const commandRatingForm = document.getElementById("commandRatingForm");
 const commandSaveNextBtn = document.getElementById("commandSaveNextBtn");
 const commandLunchForm = document.getElementById("commandLunchForm");
@@ -234,6 +267,8 @@ const rushEventOfficial = document.getElementById("rushEventOfficial");
 const rushEventPermissionNotice = document.getElementById("rushEventPermissionNotice");
 const rushCalendarStats = document.getElementById("rushCalendarStats");
 const rushCalendarTable = document.getElementById("rushCalendarTable");
+const operationsSummaryCards = document.getElementById("operationsSummaryCards");
+const operationsTabBar = document.getElementById("operationsTabBar");
 const copyRushCalendarFeedBtn = document.getElementById("copyRushCalendarFeedBtn");
 const openRushGoogleSubscribeBtn = document.getElementById("openRushGoogleSubscribeBtn");
 const rushCalendarFeedPreview = document.getElementById("rushCalendarFeedPreview");
@@ -294,6 +329,13 @@ const headAddAssigneeSelect = document.getElementById("headAddAssigneeSelect");
 const headAddAssigneeBtn = document.getElementById("headAddAssigneeBtn");
 const headAssigneeList = document.getElementById("headAssigneeList");
 const headAssignmentTable = document.getElementById("headAssignmentTable");
+const meetingsShortlist = document.getElementById("meetingsShortlist");
+const meetingsAttentionList = document.getElementById("meetingsAttentionList");
+const meetingsWatchlist = document.getElementById("meetingsWatchlist");
+const meetingsCompareSelectA = document.getElementById("meetingsCompareSelectA");
+const meetingsCompareSelectB = document.getElementById("meetingsCompareSelectB");
+const meetingsCompareSummary = document.getElementById("meetingsCompareSummary");
+const meetingsWatchToggleBtn = document.getElementById("meetingsWatchToggleBtn");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
 const ROLE_HEAD = "Head Rush Officer";
@@ -451,6 +493,30 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
 );
 const STATE_OPTIONS = parseStateOptions(APP_CONFIG.state_options);
 
+function storageKey(suffix) {
+  return `bidboard:${TENANT_KEY}:${suffix}`;
+}
+
+function readStoredJson(suffix, fallback) {
+  try {
+    const raw = window.localStorage.getItem(storageKey(suffix));
+    if (!raw) {
+      return fallback;
+    }
+    return JSON.parse(raw);
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredJson(suffix, value) {
+  try {
+    window.localStorage.setItem(storageKey(suffix), JSON.stringify(value));
+  } catch {
+    // ignore storage failures
+  }
+}
+
 const state = {
   user: null,
   pnms: [],
@@ -514,6 +580,48 @@ const state = {
   headAssignmentPnmId: null,
   packagePartnerId: null,
   seasonArchive: null,
+  watchlist: readStoredJson("watchlist", []),
+  viewPrefs: {
+    pnmView: readStoredJson("pnm-view", "table"),
+    operationsTab: readStoredJson("operations-tab", "timeline"),
+    adminTab: readStoredJson("admin-tab", "leadership"),
+  },
+  commandWorkspace: {
+    attention: [],
+    today: [],
+    teamPulse: null,
+    watchCandidates: [],
+    notifications: null,
+  },
+  teamWorkspace: {
+    assignmentOverview: null,
+    leadership: null,
+  },
+  operationsWorkspace: {
+    notificationsDigest: null,
+  },
+  meetingsWorkspace: {
+    shortlist: [],
+    attention: [],
+    candidates: [],
+    compareDefaults: [],
+    compareA: null,
+    compareB: null,
+    compareSummaryA: null,
+    compareSummaryB: null,
+  },
+  adminOverview: {
+    storage: null,
+    assignments: null,
+    leadership: null,
+    pending: null,
+  },
+  searchResults: {
+    query: "",
+    pnms: [],
+    members: [],
+    commands: [],
+  },
   tutorial: {
     active: false,
     mode: TUTORIAL_MODE_GUIDED,
@@ -1064,7 +1172,11 @@ function safeFileToken(value) {
 }
 
 function setAuthView(isAuthenticated) {
-  authSection.classList.toggle("hidden", isAuthenticated);
+  if (authShell) {
+    authShell.classList.toggle("hidden", isAuthenticated);
+  } else {
+    authSection.classList.toggle("hidden", isAuthenticated);
+  }
   appSection.classList.toggle("hidden", !isAuthenticated);
   if (heroStats) {
     heroStats.classList.toggle("hidden", !isAuthenticated);
@@ -1095,6 +1207,9 @@ function mapDesktopRouteToPage(value) {
   if (token === "rushees") {
     return "rushees";
   }
+  if (token === "meetings") {
+    return "meetings";
+  }
   if (token === "admin") {
     return "admin";
   }
@@ -1114,6 +1229,9 @@ function desktopRoutePathForPage(page) {
   }
   if (page === "rushees") {
     return routeMap.rushees || `${BASE_PATH}/rushees`;
+  }
+  if (page === "meetings") {
+    return routeMap.meetings || `${BASE_PATH}/meetings`;
   }
   if (page === "admin") {
     return routeMap.admin || `${BASE_PATH}/admin`;
@@ -1156,6 +1274,7 @@ function setActiveDesktopPage(page, updateUrl = true) {
   desktopPageLinks.forEach((link) => {
     link.classList.toggle("is-active", link.dataset.page === target);
   });
+  updateWorkspaceHeader();
 
   if (!updateUrl) {
     return;
@@ -1190,62 +1309,56 @@ function updateTopbarActions() {
   }
 }
 
+function workspaceMetaForPage(page) {
+  if (page === "rushees") {
+    return { eyebrow: "Workspace", title: "Rushees", subtitle: "Roster, inspector, ownership, and packet readiness." };
+  }
+  if (page === "meetings") {
+    return { eyebrow: "Workspace", title: "Meetings", subtitle: "Shortlist, compare, and packet launch from one queue." };
+  }
+  if (page === "members") {
+    return { eyebrow: "Workspace", title: "Team", subtitle: "Approvals, workload, assignment coverage, and member alignment." };
+  }
+  if (page === "operations") {
+    return { eyebrow: "Workspace", title: "Operations", subtitle: "Timeline, goals, notifications, and officer chat." };
+  }
+  if (page === "admin") {
+    return { eyebrow: "Workspace", title: "Admin", subtitle: "Leadership, season reset, imports, roster tools, and storage." };
+  }
+  return { eyebrow: "Workspace", title: "Command", subtitle: "Personal queue, exceptions, recent decisions, and team pulse." };
+}
+
+function updateWorkspaceHeader() {
+  const meta = workspaceMetaForPage(state.activeDesktopPage || DEFAULT_DESKTOP_PAGE);
+  if (workspaceEyebrow) {
+    workspaceEyebrow.textContent = meta.eyebrow;
+  }
+  if (workspaceTitle) {
+    workspaceTitle.textContent = meta.title;
+  }
+  if (workspaceSubtitle) {
+    workspaceSubtitle.textContent = meta.subtitle;
+  }
+}
+
 function refreshLoadersForActivePage() {
   const page = state.activeDesktopPage || DEFAULT_DESKTOP_PAGE;
   if (page === "operations") {
-    return [
-      () => loadPnms({ includeDetail: false }),
-      () => loadMembers({ includeSameState: false }),
-      loadCalendarShare,
-      loadScheduledLunches,
-      loadRushCalendar,
-      loadWeeklyGoals,
-      loadNotifications,
-      loadOfficerChat,
-      loadOfficerChatStats,
-    ];
+    return [loadOperationsWorkspace];
   }
   if (page === "rushees") {
-    return [
-      () => loadPnms({ includeDetail: true }),
-      () => loadMembers({ includeSameState: false }),
-      loadAnalytics,
-      loadCalendarShare,
-      loadScheduledLunches,
-      loadAssignedRushData,
-      loadNotifications,
-    ];
+    return [loadRusheesWorkspace];
+  }
+  if (page === "meetings") {
+    return [loadMeetingsWorkspace];
   }
   if (page === "members") {
-    return [
-      () => loadPnms({ includeDetail: false }),
-      () => loadMembers({ includeSameState: true }),
-      loadApprovals,
-      loadAssignedRushData,
-      loadNotifications,
-    ];
+    return [loadTeamWorkspace];
   }
   if (page === "admin") {
-    return [
-      () => loadPnms({ includeDetail: false }),
-      () => loadMembers({ includeSameState: false }),
-      loadApprovals,
-      loadHeadAdminData,
-      loadSeasonArchiveStatus,
-      loadAssignedRushData,
-      loadNotifications,
-    ];
+    return [loadAdminWorkspace];
   }
-  return [
-    () => loadPnms({ includeDetail: false }),
-    () => loadMembers({ includeSameState: false }),
-    loadCommandCenter,
-    loadMatching,
-    loadAnalytics,
-    loadLeaderboard,
-    loadAssignedRushData,
-    loadNotifications,
-  ];
+  return [loadCommandWorkspace];
 }
 
 async function refreshByActivePage() {
@@ -1846,6 +1959,9 @@ function maybeLaunchFirstRunTutorial() {
   if (!state.user || !tutorialLayer) {
     return;
   }
+  if (APP_CONFIG && APP_CONFIG.is_demo_tenant) {
+    return;
+  }
   const onboarding = userOnboardingState();
   if (!onboarding.required) {
     return;
@@ -2226,6 +2342,8 @@ function renderWeeklyGoals() {
 function renderNotifications() {
   if (!notificationsList || !notificationsReadAllBtn) {
     renderOperationsUnreadBadge();
+    updateNotificationBell();
+    renderGlobalNotificationsTray();
     return;
   }
   const unread = Number(state.unreadNotifications || 0);
@@ -2264,6 +2382,8 @@ function renderNotifications() {
     .join("");
 
   renderOperationsUnreadBadge();
+  updateNotificationBell();
+  renderGlobalNotificationsTray();
 }
 
 function renderOperationsUnreadBadge() {
@@ -2778,6 +2898,7 @@ function renderPnmTable() {
       <tbody>${rows}</tbody>
     </table>
   `;
+  renderPnmBoard();
 }
 
 function renderMemberTable() {
@@ -3154,6 +3275,7 @@ function applyCommandRatingFormForSelected() {
   if (commentInput) {
     commentInput.value = own && own.comment ? own.comment : "";
   }
+  syncWatchButtons();
   syncCommandMeetingLink();
 }
 
@@ -3267,6 +3389,571 @@ function renderCommandCenter() {
   }
 
   applyCommandRatingFormForSelected();
+}
+
+function setViewPreference(key, value) {
+  state.viewPrefs[key] = value;
+  writeStoredJson(key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`), value);
+}
+
+function currentWatchlistIds() {
+  return Array.isArray(state.watchlist) ? state.watchlist.map((value) => Number(value)).filter((value) => value > 0) : [];
+}
+
+function isWatchedPnm(pnmId) {
+  return currentWatchlistIds().includes(Number(pnmId));
+}
+
+function toggleWatchlistPnm(pnmId) {
+  const target = Number(pnmId || 0);
+  if (!target) {
+    return false;
+  }
+  const next = new Set(currentWatchlistIds());
+  if (next.has(target)) {
+    next.delete(target);
+  } else {
+    next.add(target);
+  }
+  state.watchlist = Array.from(next);
+  writeStoredJson("watchlist", state.watchlist);
+  renderCommandWorkspaceExtras();
+  renderMeetingsWorkspace();
+  syncWatchButtons();
+  return next.has(target);
+}
+
+function syncWatchButtons() {
+  const selectedCommand = state.commandCenter.selectedQueuePnmId;
+  if (commandWatchToggleBtn) {
+    commandWatchToggleBtn.textContent = isWatchedPnm(selectedCommand) ? "Watching" : "Watchlist";
+  }
+  if (rusheeWatchToggleBtn) {
+    rusheeWatchToggleBtn.textContent = isWatchedPnm(state.selectedPnmId) ? "Watching" : "Watchlist";
+  }
+}
+
+function updateNotificationBell() {
+  if (!appNotificationsBadge) {
+    return;
+  }
+  const unread = Number(state.unreadNotifications || 0);
+  appNotificationsBadge.textContent = String(unread);
+  appNotificationsBadge.classList.toggle("hidden", unread <= 0);
+}
+
+function renderGlobalNotificationsTray() {
+  if (!appNotificationsList) {
+    return;
+  }
+  if (!state.notifications.length) {
+    appNotificationsList.innerHTML = '<p class="muted">No notifications right now.</p>';
+    return;
+  }
+  appNotificationsList.innerHTML = state.notifications
+    .slice(0, 20)
+    .map(
+      (item) => `
+        <div class="entry">
+          <div class="entry-title">
+            <strong>${escapeHtml(item.title || "Notification")}</strong>
+            <span>${escapeHtml(formatTrendTimestamp(item.created_at))}</span>
+          </div>
+          <div class="muted">${escapeHtml(item.body || "")}</div>
+        </div>
+      `
+    )
+    .join("");
+}
+
+function toggleNotificationsTray(forceOpen) {
+  if (!appNotificationsTray) {
+    return;
+  }
+  const next = forceOpen !== undefined ? Boolean(forceOpen) : appNotificationsTray.classList.contains("hidden");
+  appNotificationsTray.classList.toggle("hidden", !next);
+  appNotificationsTray.setAttribute("aria-hidden", next ? "false" : "true");
+}
+
+function renderCommandWorkspaceExtras() {
+  if (commandPendingCount) {
+    commandPendingCount.textContent = String(Number((state.commandWorkspace.teamPulse && state.commandWorkspace.teamPulse.pending_approvals) || 0));
+  }
+  if (commandNeedsHelpCount) {
+    commandNeedsHelpCount.textContent = String(Number((state.commandWorkspace.teamPulse && state.commandWorkspace.teamPulse.needs_help) || 0));
+  }
+  if (commandUnassignedCount) {
+    commandUnassignedCount.textContent = String(Number((state.commandWorkspace.teamPulse && state.commandWorkspace.teamPulse.unassigned_pnms) || 0));
+  }
+  if (commandAttentionList) {
+    const rows = state.commandWorkspace.attention || [];
+    commandAttentionList.innerHTML = rows.length
+      ? rows
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title">
+                  <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
+                  <span>${escapeHtml(item.label)}</span>
+                </div>
+                <div class="muted">${escapeHtml(item.detail || "")}</div>
+                <div class="action-row">
+                  <button type="button" class="secondary" data-open-pnm-id="${Number(item.pnm_id)}">Open Rushee</button>
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                </div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No high-priority exceptions right now.</p>';
+  }
+  if (commandTodayList) {
+    const rows = state.commandWorkspace.today || [];
+    commandTodayList.innerHTML = rows.length
+      ? rows
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title">
+                  <strong>${escapeHtml(item.title || "")}</strong>
+                  <span>${escapeHtml(item.start_time || item.event_date || "")}</span>
+                </div>
+                <div class="muted">${escapeHtml(item.location || "No location")} | ${escapeHtml(item.meta || "")}</div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No same-day actions queued.</p>';
+  }
+  if (commandPulseCards) {
+    const pulse = state.commandWorkspace.teamPulse || {};
+    const cards = [
+      { label: "Pending Approvals", value: Number(pulse.pending_approvals || 0) },
+      { label: "Unassigned PNMs", value: Number(pulse.unassigned_pnms || 0) },
+      { label: "Needs Help", value: Number(pulse.needs_help || 0) },
+      { label: "Over Capacity", value: Number(pulse.over_capacity_officers || 0) },
+    ];
+    commandPulseCards.innerHTML = cards
+      .map((item) => `<article class="card"><p>${escapeHtml(item.label)}</p><strong>${item.value}</strong></article>`)
+      .join("");
+  }
+  if (commandWatchlist) {
+    const watchRows = currentWatchlistIds()
+      .map((pnmId) => state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId) || (state.commandWorkspace.watchCandidates || []).find((row) => Number(row.pnm_id) === pnmId))
+      .filter(Boolean);
+    commandWatchlist.innerHTML = watchRows.length
+      ? watchRows
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title">
+                  <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name || `${item.first_name} ${item.last_name}`)}</strong>
+                  <span>${Number(item.weighted_total || 0).toFixed(2)}</span>
+                </div>
+                <div class="action-row">
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove</button>
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                </div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No watched PNMs yet.</p>';
+  }
+  syncWatchButtons();
+}
+
+function renderPnmBoard() {
+  if (!pnmBoard) {
+    return;
+  }
+  const rows = state.pnms || [];
+  pnmBoard.innerHTML = rows.length
+    ? rows
+        .map(
+          (pnm) => `
+            <article class="rushee-board-card">
+              <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
+              <div class="rushee-board-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Lunches ${Number(pnm.total_lunches || 0)}</div>
+              <div class="rushee-board-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
+              <div class="action-row">
+                <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
+                <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Watching" : "Watch"}</button>
+                <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Packet</a>
+              </div>
+            </article>
+          `
+        )
+        .join("")
+    : '<p class="muted">No PNMs match current filters.</p>';
+  const useBoard = state.viewPrefs.pnmView === "board";
+  pnmBoard.classList.toggle("hidden", !useBoard);
+  if (pnmTable) {
+    pnmTable.classList.toggle("hidden", useBoard);
+  }
+  if (pnmViewToggleBoard) {
+    pnmViewToggleBoard.classList.toggle("is-active", useBoard);
+  }
+  if (pnmViewToggleTable) {
+    pnmViewToggleTable.classList.toggle("is-active", !useBoard);
+  }
+}
+
+function renderTeamWorkspaceExtras(pendingRows = []) {
+  if (teamPulseCards) {
+    const overview = state.teamWorkspace.assignmentOverview || {};
+    const cards = [
+      { label: "Members", value: state.members.length },
+      { label: "Pending Approvals", value: pendingRows.length },
+      { label: "Assignments", value: Number((overview.assignments || []).length || 0) },
+      { label: "Escalations", value: Number((overview.escalations || []).length || 0) },
+    ];
+    teamPulseCards.innerHTML = cards
+      .map((item) => `<article class="card"><p>${escapeHtml(item.label)}</p><strong>${item.value}</strong></article>`)
+      .join("");
+  }
+  if (teamOfficerLoads) {
+    const loads = (state.teamWorkspace.assignmentOverview && state.teamWorkspace.assignmentOverview.officer_loads) || [];
+    teamOfficerLoads.innerHTML = loads.length
+      ? loads
+          .map(
+            (row) => `
+              <div class="team-load-card">
+                <h3>${escapeHtml(row.username)}</h3>
+                <div class="team-load-meta">Active ${Number(row.active_assignments || 0)} / Target ${Number(row.capacity_target || 0)}</div>
+                <div class="team-load-meta">Remaining capacity ${Number(row.remaining_capacity || 0)} | Ratio ${Number(row.capacity_ratio || 0).toFixed(2)}</div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No officer load data available.</p>';
+  }
+}
+
+function setOperationsTab(tab, persist = true) {
+  const next = ["timeline", "goals", "comms"].includes(tab) ? tab : "timeline";
+  if (persist) {
+    setViewPreference("operationsTab", next);
+  }
+  document.querySelectorAll("[data-operations-tab]").forEach((node) => {
+    node.classList.toggle("is-active", node.dataset.operationsTab === next);
+  });
+  document.querySelectorAll(".operation-tab-btn[data-operations-tab]").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.operationsTab === next);
+  });
+}
+
+function renderOperationsSummary() {
+  if (!operationsSummaryCards) {
+    return;
+  }
+  const stats = state.rushCalendarStats || {};
+  const notifications = state.operationsWorkspace.notificationsDigest || {};
+  const goals = state.weeklyGoalSummary || {};
+  const cards = [
+    { label: "Timeline Items", value: Number(stats.total_count || 0) },
+    { label: "This Week", value: Number(stats.this_week_count || 0) },
+    { label: "Active Goals", value: Number(goals.active || 0) },
+    { label: "Unread Alerts", value: Number(notifications.unread_count || 0) },
+  ];
+  operationsSummaryCards.innerHTML = cards
+    .map((item) => `<article class="card"><p>${escapeHtml(item.label)}</p><strong>${item.value}</strong></article>`)
+    .join("");
+}
+
+function setAdminTab(tab, persist = true) {
+  const next = ["leadership", "season", "imports", "roster", "storage"].includes(tab) ? tab : "leadership";
+  if (persist) {
+    setViewPreference("adminTab", next);
+  }
+  document.querySelectorAll("[data-admin-tab]").forEach((node) => {
+    node.classList.toggle("is-active", node.dataset.adminTab === next);
+  });
+  document.querySelectorAll(".admin-tab-btn[data-admin-tab]").forEach((btn) => {
+    btn.classList.toggle("is-active", btn.dataset.adminTab === next);
+  });
+}
+
+function renderAdminWorkspaceExtras() {
+  if (!adminStorageDiagnostics) {
+    return;
+  }
+  const payload = state.adminOverview.storage;
+  if (!payload) {
+    adminStorageDiagnostics.innerHTML = '<p class="muted">Storage diagnostics unavailable.</p>';
+    return;
+  }
+  const tableCounts = payload.table_counts || {};
+  adminStorageDiagnostics.innerHTML = `
+    <div class="entry">
+      <div class="entry-title"><strong>Persistent Paths OK</strong><span>${payload.persistent_paths_ok ? "Yes" : "No"}</span></div>
+      <div class="muted">Users ${Number(tableCounts.users || 0)} | PNMs ${Number(tableCounts.pnms || 0)} | Ratings ${Number(tableCounts.ratings || 0)} | Lunches ${Number(tableCounts.lunches || 0)}</div>
+    </div>
+    <div class="entry">
+      <div class="entry-title"><strong>Active Tenant DB</strong><span>${escapeHtml((payload.paths && payload.paths.ACTIVE_TENANT_DB_PATH) || "-")}</span></div>
+      <div class="muted">${escapeHtml((payload.warnings || []).join(" | ") || "No warnings.")}</div>
+    </div>
+  `;
+}
+
+function renderMeetingCompareCard(payload, fallbackLabel) {
+  if (!payload || !payload.pnm) {
+    return `<article class="compare-candidate-card"><h3>${escapeHtml(fallbackLabel)}</h3><p class="muted">Select a candidate to compare.</p></article>`;
+  }
+  const pnm = payload.pnm;
+  const metrics = payload.metrics || {};
+  return `
+    <article class="compare-candidate-card">
+      <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
+      <div class="compare-candidate-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Lunches ${Number(pnm.total_lunches || 0)}</div>
+      <div class="compare-candidate-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
+      <div class="compare-candidate-meta">Rank ${metrics.weighted_rank || "-"} of ${metrics.cohort_size || "-"}</div>
+      <div class="action-row">
+        <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Packet</a>
+        <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Watching" : "Watch"}</button>
+      </div>
+    </article>
+  `;
+}
+
+async function loadMeetingCompareSummary(slot) {
+  const key = slot === "B" ? "compareB" : "compareA";
+  const targetId = Number(state.meetingsWorkspace[key] || 0);
+  if (!targetId) {
+    state.meetingsWorkspace[`compareSummary${slot}`] = null;
+    renderMeetingsWorkspace();
+    return;
+  }
+  try {
+    const payload = await api(`/api/pnms/${targetId}/meeting`);
+    state.meetingsWorkspace[`compareSummary${slot}`] = payload;
+  } catch {
+    state.meetingsWorkspace[`compareSummary${slot}`] = null;
+  }
+  renderMeetingsWorkspace();
+}
+
+function renderMeetingsWorkspace() {
+  if (meetingsShortlist) {
+    const rows = state.meetingsWorkspace.shortlist || [];
+    meetingsShortlist.innerHTML = rows.length
+      ? rows
+          .map(
+            (item) => `
+              <div class="meetings-queue-card">
+                <h3>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</h3>
+                <div class="compare-candidate-meta">Ready ${Number(item.meeting_ready_score || 0)} | Weighted ${Number(item.weighted_total || 0).toFixed(2)} | Ratings ${Number(item.rating_count || 0)}</div>
+                <div class="compare-candidate-meta">${escapeHtml(item.flags.join(" • ") || "Meeting-ready context in place")}</div>
+                <div class="action-row">
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Watching" : "Watch"}</button>
+                </div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No meeting shortlist yet.</p>';
+  }
+  if (meetingsAttentionList) {
+    const rows = state.meetingsWorkspace.attention || [];
+    meetingsAttentionList.innerHTML = rows.length
+      ? rows
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong><span>${escapeHtml(item.label)}</span></div>
+                <div class="muted">${escapeHtml(item.detail || "")}</div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No meeting prep exceptions right now.</p>';
+  }
+  if (meetingsWatchlist) {
+    const rows = currentWatchlistIds()
+      .map((pnmId) => (state.meetingsWorkspace.candidates || []).find((item) => Number(item.pnm_id) === pnmId))
+      .filter(Boolean);
+    meetingsWatchlist.innerHTML = rows.length
+      ? rows
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong><span>${Number(item.weighted_total || 0).toFixed(2)}</span></div>
+                <div class="action-row">
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove</button>
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                </div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No watched PNMs yet.</p>';
+  }
+  if (meetingsCompareSelectA) {
+    const options = '<option value=\"\">Select</option>' + (state.meetingsWorkspace.candidates || [])
+      .map((item) => `<option value=\"${Number(item.pnm_id)}\">${escapeHtml(`${item.pnm_code} | ${item.name}`)}</option>`)
+      .join("");
+    meetingsCompareSelectA.innerHTML = options;
+    meetingsCompareSelectA.value = state.meetingsWorkspace.compareA ? String(state.meetingsWorkspace.compareA) : "";
+  }
+  if (meetingsCompareSelectB) {
+    const options = '<option value=\"\">Select</option>' + (state.meetingsWorkspace.candidates || [])
+      .map((item) => `<option value=\"${Number(item.pnm_id)}\">${escapeHtml(`${item.pnm_code} | ${item.name}`)}</option>`)
+      .join("");
+    meetingsCompareSelectB.innerHTML = options;
+    meetingsCompareSelectB.value = state.meetingsWorkspace.compareB ? String(state.meetingsWorkspace.compareB) : "";
+  }
+  if (meetingsCompareSummary) {
+    meetingsCompareSummary.innerHTML = [
+      renderMeetingCompareCard(state.meetingsWorkspace.compareSummaryA, "Candidate A"),
+      renderMeetingCompareCard(state.meetingsWorkspace.compareSummaryB, "Candidate B"),
+    ].join("");
+  }
+  if (meetingsWatchToggleBtn) {
+    meetingsWatchToggleBtn.textContent = "Manage Watchlist";
+  }
+  syncWatchButtons();
+}
+
+function performCommandAction(action, context = null) {
+  if (action === "create_lunch") {
+    setActiveDesktopPage("rushees");
+    if (lunchPnm && context && context.pnm_id) {
+      lunchPnm.value = String(context.pnm_id);
+    }
+    if (lunchForm) {
+      lunchForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    return;
+  }
+  if (action === "create_event") {
+    setActiveDesktopPage("operations");
+    setOperationsTab("timeline");
+    if (rushEventTitle) {
+      rushEventTitle.focus();
+    }
+    return;
+  }
+  if (action === "backup_csv") {
+    if (backupCsvBtn && !backupCsvBtn.classList.contains("hidden")) {
+      backupCsvBtn.click();
+    }
+    return;
+  }
+  if (action === "backup_db") {
+    if (backupDbBtn && !backupDbBtn.classList.contains("hidden")) {
+      backupDbBtn.click();
+    }
+    return;
+  }
+  if (action === "open_meetings") {
+    setActiveDesktopPage("meetings");
+  }
+}
+
+function renderCommandPaletteResults() {
+  if (!commandPaletteResults) {
+    return;
+  }
+  const query = String(state.searchResults.query || "").trim();
+  if (!query) {
+    commandPaletteResults.innerHTML = '<p class="muted">Start typing to search PNMs, members, or common actions.</p>';
+    return;
+  }
+  const pnmMarkup = (state.searchResults.pnms || [])
+    .map(
+      (item) => `
+        <button type="button" class="command-palette-result" data-command-open-pnm="${Number(item.pnm_id)}">
+          <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
+          <div class="muted">Weighted ${Number(item.weighted_total || 0).toFixed(2)}</div>
+        </button>
+      `
+    )
+    .join("");
+  const memberMarkup = (state.searchResults.members || [])
+    .map(
+      (item) => `
+        <button type="button" class="command-palette-result" data-command-open-member="${Number(item.user_id)}">
+          <strong>${escapeHtml(item.username)}</strong>
+          <div class="muted">${escapeHtml(item.role || "")}</div>
+        </button>
+      `
+    )
+    .join("");
+  const commandMarkup = (state.searchResults.commands || [])
+    .map(
+      (item) => `
+        <button type="button" class="command-palette-result" data-command-run="${escapeHtml(item.action)}">
+          <strong>${escapeHtml(item.label)}</strong>
+          <div class="muted">${escapeHtml(item.command_id || "")}</div>
+        </button>
+      `
+    )
+    .join("");
+  commandPaletteResults.innerHTML = `
+    <div class="command-palette-result-group">
+      <h3>PNMs</h3>
+      ${pnmMarkup || '<p class="muted">No PNM matches.</p>'}
+    </div>
+    <div class="command-palette-result-group">
+      <h3>Members</h3>
+      ${memberMarkup || '<p class="muted">No member matches.</p>'}
+    </div>
+    <div class="command-palette-result-group">
+      <h3>Commands</h3>
+      ${commandMarkup}
+    </div>
+  `;
+}
+
+async function loadGlobalSearch(query) {
+  const token = String(query || "").trim();
+  state.searchResults.query = token;
+  if (!token) {
+    state.searchResults.pnms = [];
+    state.searchResults.members = [];
+    state.searchResults.commands = [];
+    renderCommandPaletteResults();
+    return;
+  }
+  try {
+    const payload = await api(`/api/search/global${toQuery({ q: token })}`);
+    state.searchResults = {
+      query: token,
+      pnms: payload.pnms || [],
+      members: payload.members || [],
+      commands: payload.commands || [],
+    };
+  } catch {
+    state.searchResults = {
+      query: token,
+      pnms: [],
+      members: [],
+      commands: [],
+    };
+  }
+  renderCommandPaletteResults();
+}
+
+function openCommandPalette(seed = "") {
+  if (!globalCommandPalette) {
+    return;
+  }
+  globalCommandPalette.classList.remove("hidden");
+  globalCommandPalette.setAttribute("aria-hidden", "false");
+  if (commandPaletteInput) {
+    commandPaletteInput.value = seed;
+    commandPaletteInput.focus();
+  }
+  loadGlobalSearch(seed);
+}
+
+function closeCommandPalette() {
+  if (!globalCommandPalette) {
+    return;
+  }
+  globalCommandPalette.classList.add("hidden");
+  globalCommandPalette.setAttribute("aria-hidden", "true");
 }
 
 function renderPendingApprovals(data) {
@@ -3888,6 +4575,7 @@ function renderAdminPanel() {
   renderOfficerMetrics();
   renderAdminPnmEditorOptions();
   renderAdminPnmTable();
+  renderAdminWorkspaceExtras();
 }
 
 function applyRatingFormForSelected() {
@@ -3936,6 +4624,7 @@ function applyRatingFormForSelected() {
   photoForm.classList.toggle("hidden", !roleCanManagePhotos());
   renderAssignmentControls();
   renderPackageDealPanel();
+  syncWatchButtons();
   syncOpenMeetingLink();
 }
 
@@ -4060,6 +4749,7 @@ async function loadPnms(options = {}) {
   }
 
   renderPnmTable();
+  renderPnmBoard();
   renderAdminPanel();
   renderAssignedRushSection();
   applyRatingFormForSelected();
@@ -4090,6 +4780,7 @@ async function loadMembers(options = {}) {
   renderAssignmentControls();
   renderAdminPanel();
   renderAssignedRushSection();
+  renderTeamWorkspaceExtras();
 }
 
 async function loadCommandCenter(options = {}) {
@@ -4348,32 +5039,155 @@ async function loadSeasonArchiveStatus() {
   renderSeasonArchiveStatusPanel();
 }
 
-async function refreshAll() {
+async function loadCommandWorkspace() {
+  const query = toQuery({
+    window_hours: state.commandCenter.windowHours || 72,
+    limit: state.commandCenter.limit || 30,
+  });
+  const payload = await api(`/api/workspace/command${query}`);
+  const commandPayload = payload.command_center || {};
+  state.commandCenter.queue = Array.isArray(commandPayload.queue) ? commandPayload.queue : [];
+  state.commandCenter.staleAlerts = Array.isArray(commandPayload.stale_alerts) ? commandPayload.stale_alerts : [];
+  state.commandCenter.recentChanges = Array.isArray(commandPayload.recent_rating_changes) ? commandPayload.recent_rating_changes : [];
+  state.commandCenter.summary = commandPayload.summary || null;
+  state.commandCenter.error = "";
+  if (!state.commandCenter.selectedQueuePnmId) {
+    state.commandCenter.selectedQueuePnmId = state.commandCenter.queue.length
+      ? Number(state.commandCenter.queue[0].pnm_id)
+      : null;
+  }
+  state.commandWorkspace.attention = payload.attention || [];
+  state.commandWorkspace.today = payload.today || [];
+  state.commandWorkspace.teamPulse = payload.team_pulse || null;
+  state.commandWorkspace.watchCandidates = payload.watch_candidates || [];
+  state.notifications = (payload.notifications && payload.notifications.notifications) || [];
+  state.unreadNotifications = Number(payload.notifications && payload.notifications.unread_count ? payload.notifications.unread_count : 0);
+  state.assignedRushRows = payload.assignments || [];
+  renderCommandCenter();
+  renderAssignedRushSection();
+  renderGlobalNotificationsTray();
+  updateNotificationBell();
+  renderCommandWorkspaceExtras();
+}
+
+async function loadRusheesWorkspace() {
+  const payload = await api(`/api/workspace/rushees${toQuery(state.rusheeFilters)}`);
+  state.pnms = payload.pnms || [];
+  state.calendarShare = payload.calendar_share || null;
+  state.scheduledLunches = payload.scheduled_lunches || [];
+  if (payload.analytics) {
+    renderAnalytics(payload.analytics);
+  }
+  updateHeroStats();
+  renderPnmSelectOptions();
+  if (state.selectedPnmId && !state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId)) {
+    state.selectedPnmId = null;
+  }
+  if (!state.selectedPnmId && state.pnms.length) {
+    state.selectedPnmId = state.pnms[0].pnm_id;
+  }
+  renderPnmTable();
+  renderPnmBoard();
+  renderAssignmentControls();
+  renderPackageDealPanel();
+  renderScheduledLunches();
+  renderCalendarShareLinks(state.calendarShare);
+  await loadPnmDetail(state.selectedPnmId);
+}
+
+async function loadTeamWorkspace() {
+  const payload = await api(`/api/workspace/team${toQuery(state.memberFilters)}`);
+  state.members = payload.users || [];
+  state.assignedRushRows = (payload.assignments && payload.assignments.assignments) || [];
+  state.teamWorkspace.assignmentOverview = payload.assignment_overview || null;
+  state.teamWorkspace.leadership = payload.leadership || null;
+  if (!state.members.some((member) => Number(member.user_id) === Number(state.selectedMemberId))) {
+    state.selectedMemberId = state.members.length ? Number(state.members[0].user_id) : null;
+  }
+  renderMemberTable();
+  await loadSameStatePnms();
+  renderAssignedRushSection();
+  renderTeamWorkspaceExtras(payload.pending || []);
+  renderPendingApprovals({ pending: payload.pending || [] });
+}
+
+async function loadOperationsWorkspace() {
+  const payload = await api("/api/workspace/operations");
+  const calendar = payload.calendar || {};
+  state.rushCalendarItems = calendar.items || [];
+  state.rushCalendarStats = calendar.stats || null;
+  state.scheduledLunches = payload.scheduled_lunches || [];
+  state.calendarShare = payload.calendar_share || null;
+  const goals = payload.goals || {};
+  state.weeklyGoals = goals.goals || [];
+  state.weeklyGoalSummary = goals.summary || null;
+  state.weeklyGoalMetricOptions = goals.metric_options || [];
+  const notifications = payload.notifications || {};
+  state.notifications = notifications.notifications || [];
+  state.unreadNotifications = Number(notifications.unread_count || 0);
+  state.operationsWorkspace.notificationsDigest = notifications;
+  state.officerChatMessages = (payload.chat && payload.chat.messages) || [];
+  state.officerChatStats = payload.chat_stats || null;
+  renderCalendarShareLinks(state.calendarShare);
+  renderScheduledLunches();
+  renderRushCalendar();
+  renderWeeklyGoalMetricOptions();
+  renderWeeklyGoals();
+  renderNotifications();
+  renderOfficerChat();
+  renderOfficerChatStats();
+  renderOperationsSummary();
+  renderGlobalNotificationsTray();
+  updateNotificationBell();
+}
+
+async function loadMeetingsWorkspace() {
+  const payload = await api("/api/workspace/meetings");
+  state.meetingsWorkspace.shortlist = payload.shortlist || [];
+  state.meetingsWorkspace.attention = payload.attention || [];
+  state.meetingsWorkspace.candidates = payload.candidates || [];
+  state.meetingsWorkspace.compareDefaults = payload.compare_defaults || [];
+  if (!state.meetingsWorkspace.compareA && state.meetingsWorkspace.compareDefaults[0]) {
+    state.meetingsWorkspace.compareA = Number(state.meetingsWorkspace.compareDefaults[0]);
+  }
+  if (!state.meetingsWorkspace.compareB && state.meetingsWorkspace.compareDefaults[1]) {
+    state.meetingsWorkspace.compareB = Number(state.meetingsWorkspace.compareDefaults[1]);
+  }
+  renderMeetingsWorkspace();
+  await Promise.all([loadMeetingCompareSummary("A"), loadMeetingCompareSummary("B")]);
+}
+
+async function loadAdminWorkspace() {
   await Promise.all([
-    loadInterestHints(),
-    loadPnms({ includeDetail: state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin" }),
-    loadMembers({ includeSameState: state.activeDesktopPage === "members" }),
-    loadCommandCenter(),
-    loadMatching(),
-    loadAnalytics(),
-    loadLeaderboard(),
-    loadCalendarShare(),
-    loadScheduledLunches(),
-    loadRushCalendar(),
-    loadWeeklyGoals(),
-    loadNotifications(),
-    loadOfficerChat(),
-    loadOfficerChatStats(),
-    loadApprovals(),
+    loadPnms({ includeDetail: false }),
+    loadMembers({ includeSameState: false }),
     loadHeadAdminData(),
-    loadAssignedRushData(),
     loadSeasonArchiveStatus(),
   ]);
+  const payload = await api("/api/admin/overview");
+  state.adminOverview = payload;
+  state.teamWorkspace.assignmentOverview = payload.assignments || state.teamWorkspace.assignmentOverview;
+  state.adminOverview.storage = payload.storage || null;
+  state.adminOverview.pending = payload.pending || null;
+  renderAdminWorkspaceExtras();
+}
+
+async function refreshAll() {
+  await loadInterestHints();
+  await refreshByActivePage();
 }
 
 async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
+    if (!payload || !payload.authenticated || !payload.user) {
+      state.user = null;
+      closeTutorialOverlay();
+      setAuthView(false);
+      updateTopbarActions();
+      stopLiveRefresh();
+      return;
+    }
     state.user = payload.user;
     const onboarding = state.user && state.user.onboarding ? state.user.onboarding : null;
     if (shouldRedirectToMemberPortal(state.user)) {
@@ -4659,7 +5473,11 @@ function syncFilterInputsFromState() {
 async function handleApplyRusheeFilters() {
   state.rusheeFilters = getRusheeFilters();
   try {
-    await loadPnms();
+    if (state.activeDesktopPage === "rushees") {
+      await loadRusheesWorkspace();
+    } else {
+      await loadPnms();
+    }
     showToast("Rushee filters applied.");
   } catch (error) {
     showToast(error.message || "Unable to apply rushee filters.");
@@ -4679,7 +5497,11 @@ async function handleApplyMatchingFilters() {
 async function handleApplyMemberFilters() {
   state.memberFilters = getMemberFilters();
   try {
-    await loadMembers();
+    if (state.activeDesktopPage === "members") {
+      await loadTeamWorkspace();
+    } else {
+      await loadMembers();
+    }
     showToast("Member filters applied.");
   } catch (error) {
     showToast(error.message || "Unable to apply member filters.");
@@ -5416,6 +6238,112 @@ async function handlePnmTableClick(event) {
   renderPnmTable();
   applyRatingFormForSelected();
   await loadPnmDetail(pnmId);
+}
+
+function handleWatchToggleClick(event) {
+  const button = event.target.closest("[data-watch-pnm-id]");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.watchPnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  const watching = toggleWatchlistPnm(pnmId);
+  showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+}
+
+async function handleGlobalOpenPnmClick(event) {
+  const button = event.target.closest("[data-open-pnm-id]");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.openPnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  setActiveDesktopPage("rushees");
+  state.selectedPnmId = pnmId;
+  await loadRusheesWorkspace();
+  state.selectedPnmId = pnmId;
+  renderPnmTable();
+  renderPnmBoard();
+  applyRatingFormForSelected();
+  await loadPnmDetail(pnmId);
+}
+
+function handleOperationsTabClick(event) {
+  const button = event.target.closest(".operation-tab-btn[data-operations-tab]");
+  if (!button) {
+    return;
+  }
+  setOperationsTab(button.dataset.operationsTab || "timeline");
+}
+
+function handleAdminTabClick(event) {
+  const button = event.target.closest(".admin-tab-btn[data-admin-tab]");
+  if (!button) {
+    return;
+  }
+  setAdminTab(button.dataset.adminTab || "leadership");
+}
+
+function handleCommandToolbarAction(event) {
+  const button = event.target.closest("[data-command-action]");
+  if (!button) {
+    return;
+  }
+  performCommandAction(button.dataset.commandAction || "");
+}
+
+function handleCommandPaletteResultsClick(event) {
+  const openPnm = event.target.closest("[data-command-open-pnm]");
+  if (openPnm) {
+    const pnmId = Number(openPnm.dataset.commandOpenPnm || 0);
+    if (pnmId) {
+      closeCommandPalette();
+      setActiveDesktopPage("rushees");
+      state.selectedPnmId = pnmId;
+      loadRusheesWorkspace()
+        .then(() => {
+          state.selectedPnmId = pnmId;
+          renderPnmTable();
+          renderPnmBoard();
+          applyRatingFormForSelected();
+          return loadPnmDetail(pnmId);
+        })
+        .catch(() => {});
+    }
+    return;
+  }
+  const openMember = event.target.closest("[data-command-open-member]");
+  if (openMember) {
+    const userId = Number(openMember.dataset.commandOpenMember || 0);
+    if (userId) {
+      closeCommandPalette();
+      setActiveDesktopPage("members");
+      state.selectedMemberId = userId;
+      loadTeamWorkspace().catch(() => {});
+    }
+    return;
+  }
+  const runCommand = event.target.closest("[data-command-run]");
+  if (!runCommand) {
+    return;
+  }
+  closeCommandPalette();
+  performCommandAction(runCommand.dataset.commandRun || "");
+}
+
+function handleMeetingsCompareChange(slot, value) {
+  const nextId = Number(value || 0) || null;
+  if (slot === "B") {
+    state.meetingsWorkspace.compareB = nextId;
+    loadMeetingCompareSummary("B").catch(() => {});
+    return;
+  }
+  state.meetingsWorkspace.compareA = nextId;
+  loadMeetingCompareSummary("A").catch(() => {});
 }
 
 async function handlePendingClick(event) {
@@ -6389,6 +7317,90 @@ function attachEvents() {
   if (commandCenterQueue) {
     commandCenterQueue.addEventListener("click", handleQueueSelect);
   }
+  if (commandWatchToggleBtn) {
+    commandWatchToggleBtn.addEventListener("click", () => {
+      const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
+      if (!selectedId) {
+        showToast("Select a queue item first.");
+        return;
+      }
+      const watching = toggleWatchlistPnm(selectedId);
+      showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+    });
+  }
+  if (rusheeWatchToggleBtn) {
+    rusheeWatchToggleBtn.addEventListener("click", () => {
+      const selectedId = Number(state.selectedPnmId || 0);
+      if (!selectedId) {
+        showToast("Select a rushee first.");
+        return;
+      }
+      const watching = toggleWatchlistPnm(selectedId);
+      showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+    });
+  }
+  if (pnmViewToggleTable) {
+    pnmViewToggleTable.addEventListener("click", () => {
+      setViewPreference("pnmView", "table");
+      renderPnmBoard();
+    });
+  }
+  if (pnmViewToggleBoard) {
+    pnmViewToggleBoard.addEventListener("click", () => {
+      setViewPreference("pnmView", "board");
+      renderPnmBoard();
+    });
+  }
+  if (operationsTabBar) {
+    operationsTabBar.addEventListener("click", handleOperationsTabClick);
+  }
+  if (adminTabBar) {
+    adminTabBar.addEventListener("click", handleAdminTabClick);
+  }
+  if (globalCommandBtn) {
+    globalCommandBtn.addEventListener("click", () => openCommandPalette(globalSearchInput ? globalSearchInput.value : ""));
+  }
+  if (globalSearchInput) {
+    globalSearchInput.addEventListener("focus", () => openCommandPalette(globalSearchInput.value || ""));
+    globalSearchInput.addEventListener("input", () => {
+      if (commandPaletteInput) {
+        commandPaletteInput.value = globalSearchInput.value || "";
+      }
+      loadGlobalSearch(globalSearchInput.value || "");
+      if (globalCommandPalette && globalCommandPalette.classList.contains("hidden")) {
+        openCommandPalette(globalSearchInput.value || "");
+      }
+    });
+  }
+  if (commandPaletteInput) {
+    commandPaletteInput.addEventListener("input", () => loadGlobalSearch(commandPaletteInput.value || ""));
+  }
+  if (commandPaletteCloseBtn) {
+    commandPaletteCloseBtn.addEventListener("click", closeCommandPalette);
+  }
+  if (commandPaletteResults) {
+    commandPaletteResults.addEventListener("click", handleCommandPaletteResultsClick);
+  }
+  if (globalCommandPalette) {
+    globalCommandPalette.addEventListener("click", (event) => {
+      if (event.target === globalCommandPalette || event.target.classList.contains("command-palette-scrim")) {
+        closeCommandPalette();
+      }
+    });
+  }
+  if (appNotificationsBtn) {
+    appNotificationsBtn.addEventListener("click", () => toggleNotificationsTray());
+  }
+  if (appNotificationsCloseBtn) {
+    appNotificationsCloseBtn.addEventListener("click", () => toggleNotificationsTray(false));
+  }
+  if (appNotificationsTray) {
+    appNotificationsTray.addEventListener("click", (event) => {
+      if (event.target === appNotificationsTray || event.target.classList.contains("notifications-tray-scrim")) {
+        toggleNotificationsTray(false);
+      }
+    });
+  }
 
   pnmForm.addEventListener("submit", handlePnmCreate);
   ratingForm.addEventListener("submit", handleRatingSave);
@@ -6426,6 +7438,10 @@ function attachEvents() {
   }
 
   pnmTable.addEventListener("click", handlePnmTableClick);
+  if (pnmBoard) {
+    pnmBoard.addEventListener("click", handlePnmTableClick);
+    pnmBoard.addEventListener("click", handleWatchToggleClick);
+  }
   pendingList.addEventListener("click", handlePendingClick);
   memberTable.addEventListener("click", handleMemberTableClick);
   adminPnmTable.addEventListener("click", handleAdminPanelClick);
@@ -6481,6 +7497,28 @@ function attachEvents() {
   }
   if (sameStatePnmsList) {
     sameStatePnmsList.addEventListener("click", handleSameStatePnmsClick);
+  }
+  document.addEventListener("click", handleWatchToggleClick);
+  document.addEventListener("click", (event) => {
+    handleGlobalOpenPnmClick(event).catch(() => {});
+  });
+  document.addEventListener("click", handleCommandToolbarAction);
+  if (meetingsCompareSelectA) {
+    meetingsCompareSelectA.addEventListener("change", (event) => handleMeetingsCompareChange("A", event.target.value));
+  }
+  if (meetingsCompareSelectB) {
+    meetingsCompareSelectB.addEventListener("change", (event) => handleMeetingsCompareChange("B", event.target.value));
+  }
+  if (meetingsWatchToggleBtn) {
+    meetingsWatchToggleBtn.addEventListener("click", () => {
+      const selectedId = Number(state.meetingsWorkspace.compareA || state.meetingsWorkspace.compareDefaults[0] || 0);
+      if (!selectedId) {
+        showToast("Select a meeting candidate first.");
+        return;
+      }
+      const watching = toggleWatchlistPnm(selectedId);
+      showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+    });
   }
 
   ratingPnm.addEventListener("change", async (event) => {
@@ -6553,6 +7591,16 @@ function attachEvents() {
     tutorialCloseBtn.addEventListener("click", () => closeTutorialOverlay());
   }
   document.addEventListener("keydown", handleTutorialKeydown);
+  document.addEventListener("keydown", (event) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      openCommandPalette(globalSearchInput ? globalSearchInput.value : "");
+    }
+    if (event.key === "Escape") {
+      closeCommandPalette();
+      toggleNotificationsTray(false);
+    }
+  });
 }
 
 async function init() {
@@ -6573,6 +7621,11 @@ async function init() {
   renderOfficerChat();
   renderOfficerChatStats();
   renderRushCalendar();
+  setOperationsTab(state.viewPrefs.operationsTab || "timeline", false);
+  setAdminTab(state.viewPrefs.adminTab || "leadership", false);
+  renderPnmBoard();
+  updateWorkspaceHeader();
+  updateNotificationBell();
   setupPwaInstall();
   await ensureSession();
   showRouteNoticeFromQuery();

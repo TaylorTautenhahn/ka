@@ -1,17 +1,55 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}" data-page="admin">
-        <section id="adminPanel" class="panel hidden reveal delay-6">
+        <section id="adminPanel" class="panel hidden reveal delay-2">
           <div class="section-head">
-            <h2>Head Rush Officer Console</h2>
-            <p class="muted">Leadership controls, officer metrics, and rushee profile management.</p>
+            <div>
+              <h2>Head Rush Officer Console</h2>
+              <p class="muted">Leadership controls, officer metrics, imports, roster tools, and storage diagnostics.</p>
+            </div>
+            <div class="operation-tab-bar" id="adminTabBar">
+              <button type="button" class="secondary admin-tab-btn is-active" data-admin-tab="leadership">Leadership</button>
+              <button type="button" class="secondary admin-tab-btn" data-admin-tab="season">Season</button>
+              <button type="button" class="secondary admin-tab-btn" data-admin-tab="imports">Imports</button>
+              <button type="button" class="secondary admin-tab-btn" data-admin-tab="roster">Roster Tools</button>
+              <button type="button" class="secondary admin-tab-btn" data-admin-tab="storage">Data &amp; Storage</button>
+            </div>
           </div>
 
           <div id="headAdminSummary" class="cards"></div>
+        </section>
 
-          <div class="divider"></div>
+        <section class="desktop-subpage is-active reveal delay-3" data-admin-tab="leadership">
           <div class="grid-two">
-            <article class="list-column">
+            <section class="panel">
+              <h3>Leadership Management</h3>
+              <p class="muted">Promote an approved Rush Officer to Head Rush Officer and review the current head team.</p>
+              <label>
+                Rush Officer
+                <select id="promoteOfficerSelect"></select>
+              </label>
+              <label class="checkbox-line">
+                <input id="demoteExistingHeads" type="checkbox" />
+                Transfer leadership (demote current heads to Rush Officer)
+              </label>
+              <div class="action-row">
+                <button id="promoteOfficerBtn" type="button">Promote To Head</button>
+              </div>
+              <div class="divider"></div>
+              <h3>Current Head Team</h3>
+              <div id="currentHeadsList" class="list-box"></div>
+            </section>
+
+            <section class="panel">
+              <h3>Rush Officer Metrics</h3>
+              <div id="officerMetricsTable" class="table-wrap"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="desktop-subpage reveal delay-3" data-admin-tab="season">
+          <div class="grid-two">
+            <section class="panel">
               <h3>Season Archive + Reset</h3>
-              <p class="muted">Archives the current rush season and resets for next season. Only one season archive is retained.</p>
+              <p class="muted">Archive the current season and reset for the next rush cycle. Only one archive is retained.</p>
               <div id="seasonArchiveSummary" class="list-box muted">Loading season archive status...</div>
               <label>
                 Confirmation phrase
@@ -29,8 +67,8 @@
                 <button id="seasonResetBtn" type="button">Archive + Reset Season</button>
                 <button id="seasonArchiveDownloadBtn" type="button" class="secondary hidden">Download Archived Season</button>
               </div>
-            </article>
-            <article class="list-column">
+            </section>
+            <section class="panel">
               <h3>What Gets Reset</h3>
               <div class="list-box">
                 <div class="entry">
@@ -46,14 +84,15 @@
                   <p class="muted">Members and permissions remain so the rush team can continue immediately.</p>
                 </div>
               </div>
-            </article>
+            </section>
           </div>
+        </section>
 
-          <div class="divider"></div>
+        <section class="desktop-subpage reveal delay-3" data-admin-tab="imports">
           <div class="grid-two">
-            <article class="list-column">
+            <section class="panel">
               <h3>Google Form Import</h3>
-              <p class="muted">Have rushees submit this info in a Google Form, then download responses as CSV and import here.</p>
+              <p class="muted">Collect rushee submissions in Google Forms, download the responses CSV, and import it here.</p>
               <div class="action-row">
                 <button id="downloadGoogleImportTemplateBtn" type="button" class="secondary">Download Google Form Template CSV</button>
               </div>
@@ -66,51 +105,34 @@
                 <button id="googleImportBtn" type="submit">Import Google Form CSV</button>
               </form>
               <div id="googleImportResult" class="list-box muted">No imports yet.</div>
-            </article>
-            <article class="list-column">
-              <h3>Google Form Setup (1-Min)</h3>
+            </section>
+            <section class="panel">
+              <h3>Google Form Setup</h3>
               <div class="list-box">
                 <div class="entry">
                   <div class="entry-title"><strong>Step 1</strong><span>Create Form</span></div>
-                  <p class="muted">Create a Google Form with the 6 required questions shown above.</p>
+                  <p class="muted">Create the form with the six supported fields.</p>
                 </div>
                 <div class="entry">
                   <div class="entry-title"><strong>Step 2</strong><span>Collect Responses</span></div>
-                  <p class="muted">Open the Responses sheet and keep one row per rushee.</p>
+                  <p class="muted">Keep one row per rushee in the connected sheet.</p>
                 </div>
                 <div class="entry">
                   <div class="entry-title"><strong>Step 3</strong><span>Download CSV</span></div>
-                  <p class="muted">In Google Sheets: File > Download > Comma Separated Values (.csv).</p>
+                  <p class="muted">Use Google Sheets to export a CSV, then upload it above.</p>
                 </div>
                 <div class="entry">
                   <div class="entry-title"><strong>Step 4</strong><span>Import</span></div>
-                  <p class="muted">Upload that CSV above. Duplicates by Instagram handle are skipped automatically.</p>
+                  <p class="muted">Duplicates by Instagram handle are skipped automatically.</p>
                 </div>
               </div>
-            </article>
+            </section>
           </div>
+        </section>
 
-          <div class="divider"></div>
+        <section class="desktop-subpage reveal delay-3" data-admin-tab="roster">
           <div class="grid-two">
-            <article class="list-column">
-              <h3>Leadership Management</h3>
-              <p class="muted">Promote an approved Rush Officer to Head Rush Officer.</p>
-              <label>
-                Rush Officer
-                <select id="promoteOfficerSelect"></select>
-              </label>
-              <label class="checkbox-line">
-                <input id="demoteExistingHeads" type="checkbox" />
-                Transfer leadership (demote current heads to Rush Officer)
-              </label>
-              <div class="action-row">
-                <button id="promoteOfficerBtn" type="button">Promote To Head</button>
-              </div>
-              <h3>Current Head Team</h3>
-              <div id="currentHeadsList" class="list-box"></div>
-            </article>
-
-            <article class="list-column">
+            <section class="panel">
               <h3>Edit Rushee Profile</h3>
               <form id="adminPnmEditorForm" class="stack">
                 <label>
@@ -183,14 +205,10 @@
                   <button id="saveAdminPnmBtn" type="submit">Save Rushee Changes</button>
                 </div>
               </form>
-            </article>
-          </div>
-
-          <div class="divider"></div>
-          <div class="grid-two">
-            <article class="list-column">
+            </section>
+            <section class="panel">
               <h3>Assignment Manager</h3>
-              <p class="muted">Assign rushees to Rush Officers directly from Head Console.</p>
+              <p class="muted">Assign rushees directly and build shared assignment teams.</p>
               <form id="headAssignmentForm" class="stack">
                 <label>
                   Rushee
@@ -206,7 +224,6 @@
                 </div>
                 <div class="divider"></div>
                 <h4>Assignment Team</h4>
-                <p class="muted">Attach additional Rush Officers to the same rushee for shared ownership.</p>
                 <label>
                   Additional Rush Officer
                   <select id="headAddAssigneeSelect"></select>
@@ -216,20 +233,35 @@
                 </div>
                 <div id="headAssigneeList" class="list-box"></div>
               </form>
-            </article>
-            <article class="list-column">
-              <h3>Assignment Board</h3>
-              <p class="muted">Live assignment view across all rushees.</p>
-              <div id="headAssignmentTable" class="table-wrap"></div>
-            </article>
+            </section>
           </div>
-
-          <div class="divider"></div>
-          <h3>Rush Officer Metrics</h3>
-          <div id="officerMetricsTable" class="table-wrap"></div>
-
-          <div class="divider"></div>
-          <h3>Rushee Roster Controls</h3>
-          <div id="adminPnmTable" class="table-wrap"></div>
+          <section class="panel">
+            <h3>Rushee Roster Controls</h3>
+            <div id="adminPnmTable" class="table-wrap"></div>
+          </section>
+          <section class="panel">
+            <h3>Assignment Board</h3>
+            <div id="headAssignmentTable" class="table-wrap"></div>
+          </section>
         </section>
+
+        <section class="desktop-subpage reveal delay-3" data-admin-tab="storage">
+          <div class="grid-two">
+            <section class="panel">
+              <h3>Storage Diagnostics</h3>
+              <div id="adminStorageDiagnostics" class="list-box muted">Loading storage diagnostics...</div>
+            </section>
+            <section class="panel">
+              <h3>Backup Actions</h3>
+              <p class="muted">Use backups before major roster changes or season reset actions.</p>
+              <div class="action-row">
+                <button type="button" class="secondary" data-command-action="backup_csv">Backup CSV</button>
+                <button type="button" class="secondary" data-command-action="backup_db">Backup DB</button>
+              </div>
+              <div class="divider"></div>
+              <h3>Admin Overview</h3>
+              <p class="muted">Leadership, assignments, and storage health are surfaced here so you do not need to leave the console.</p>
+            </section>
           </div>
+        </section>
+      </div>

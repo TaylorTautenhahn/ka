@@ -641,7 +641,11 @@ async function loadPnms() {
 async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
-    currentUser = payload && payload.user ? payload.user : null;
+    currentUser = payload && payload.authenticated && payload.user ? payload.user : null;
+    if (!currentUser) {
+      window.location.href = BASE_PATH || "/";
+      return false;
+    }
     if (currentUser && currentUser.role === "Rusher" && APP_CONFIG.member_base) {
       window.location.replace(APP_CONFIG.member_base);
       return false;

@@ -8,16 +8,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name if app_config else 'BidBoard' }}" />
-    {% set desktop_title_map = {'dashboard': 'Dashboard', 'rushees': 'Rushees', 'team': 'Team', 'calendar': 'Calendar', 'admin': 'Admin'} %}
-    <title>{{ app_config.tenant_name if app_config else 'KAO' }} · {{ desktop_title_map.get(app_config.desktop_route if app_config else 'dashboard', 'Dashboard') }}</title>
+    {% set desktop_title_map = {'dashboard': 'Command', 'rushees': 'Rushees', 'meetings': 'Meetings', 'team': 'Team', 'calendar': 'Operations', 'admin': 'Admin'} %}
+    <title>{{ app_config.tenant_name if app_config else 'BidBoard' }} · {{ desktop_title_map.get(app_config.desktop_route if app_config else 'dashboard', 'Command') }}</title>
     <link rel="manifest" href="{{ app_config.base_path if app_config else '' }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Karla:wght@400;500;700&family=Space+Grotesk:wght@500;700&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/static/css/styles.css" />
     <link rel="stylesheet" href="/static/css/tokens.css" />
     <link rel="stylesheet" href="/static/css/layout.css" />
@@ -38,172 +32,212 @@
       </div>
     </div>
 
-    <main class="shell">
-      <header class="hero reveal">
-        <div class="hero-shell hero-shell-single">
-          <div class="hero-copy">
-            {% if app_config.logo_path %}
-            <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-            {% endif %}
-            <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
-            <h1>Connected Rush Evaluation</h1>
-            <p>
-              {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.' }}
-            </p>
-            <div id="heroStats" class="hero-stats hidden">
-              <article class="stat-card">
-                <p>PNMs Tracked</p>
-                <strong id="heroPnmCount">0</strong>
-              </article>
-              <article class="stat-card">
-                <p>Member Ratings</p>
-                <strong id="heroRatingCount">0</strong>
-              </article>
-              <article class="stat-card">
-                <p>Lunch Logs</p>
-                <strong id="heroLunchCount">0</strong>
-              </article>
+    <main class="shell shell-app-shell">
+      <section id="authShell" class="auth-shell">
+        <header id="authHero" class="hero reveal">
+          <div class="hero-shell hero-shell-single">
+            <div class="hero-copy">
+              {% if app_config.logo_path %}
+              <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+              {% endif %}
+              <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
+              <h1>Connected Rush Evaluation</h1>
+              <p>
+                {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.' }}
+              </p>
+              <div id="heroStats" class="hero-stats hidden">
+                <article class="stat-card">
+                  <p>PNMs Tracked</p>
+                  <strong id="heroPnmCount">0</strong>
+                </article>
+                <article class="stat-card">
+                  <p>Member Ratings</p>
+                  <strong id="heroRatingCount">0</strong>
+                </article>
+                <article class="stat-card">
+                  <p>Lunch Logs</p>
+                  <strong id="heroLunchCount">0</strong>
+                </article>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <section id="authSection" class="panel auth-grid reveal delay-1">
-        <article>
-          <h2>Login</h2>
-          <form id="loginForm" class="stack">
-            <label>
-              Username
-              <input id="loginUsername" type="text" required placeholder="Your approved username" />
-            </label>
-            <label>
-              Password
-              <input id="loginAccessCode" type="password" required placeholder="Enter password" />
-            </label>
-            <label class="checkbox-line">
-              <input id="loginRememberMe" type="checkbox" />
-              Keep me signed in on this device
-            </label>
-            <button type="submit">Sign In</button>
-          </form>
-          <p class="muted">
-            Sign in with your approved username and password.
-          </p>
-          <p class="muted">
-            Fraternity member and not on rush team?
-            <a href="{{ app_config.member_base if app_config else '/member' }}">Use the Member Portal</a>.
-          </p>
-        </article>
-
-        <article>
-          <h2>Register New Rush Officer</h2>
-          <p class="muted">Register with username and password. Emoji is optional. Create/manage PNMs after login.</p>
-          <form id="registerForm" class="stack">
-            <label>
-              Username
-              <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
-            </label>
-            <label>
-              Emoji (optional)
-              <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
-            </label>
-            <label>
-              Password
-              <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" />
-            </label>
-            <div class="inline-grid two-cols">
+        <section id="authSection" class="panel auth-grid reveal delay-1">
+          <article>
+            <h2>Login</h2>
+            <form id="loginForm" class="stack">
               <label>
-                City (optional)
-                <input id="regCity" type="text" maxlength="80" placeholder="Austin" />
+                Username
+                <input id="loginUsername" type="text" required placeholder="Your approved username" />
               </label>
+              <label>
+                Password
+                <input id="loginAccessCode" type="password" required placeholder="Enter password" />
+              </label>
+              <label class="checkbox-line">
+                <input id="loginRememberMe" type="checkbox" />
+                Keep me signed in on this device
+              </label>
+              <button type="submit">Sign In</button>
+            </form>
+            <p class="muted">Sign in with your approved username and password.</p>
+            <p class="muted">
+              Fraternity member and not on rush team?
+              <a href="{{ app_config.member_base if app_config else '/member' }}">Use the Member Portal</a>.
+            </p>
+          </article>
+
+          <article>
+            <h2>Register New Rush Officer</h2>
+            <p class="muted">Register with username and password. Emoji is optional. Create and manage PNMs after login.</p>
+            <form id="registerForm" class="stack">
+              <label>
+                Username
+                <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
+              </label>
+              <label>
+                Emoji (optional)
+                <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
+              </label>
+              <label>
+                Password
+                <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" />
+              </label>
+              <div class="inline-grid two-cols">
                 <label>
-                State (optional)
-                <input id="regState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
-              </label>
+                  City (optional)
+                  <input id="regCity" type="text" maxlength="80" placeholder="Austin" />
+                </label>
+                <label>
+                  State (optional)
+                  <input id="regState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
+                </label>
+              </div>
+              <button type="submit" class="secondary">Submit for Approval</button>
+            </form>
+            <div class="divider"></div>
+            <h3>Member Signup QR</h3>
+            <p class="muted">Share this with members so they can open the simplified member login and registration page.</p>
+            <div class="action-row">
+              <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
             </div>
-            <button type="submit" class="secondary">Submit for Approval</button>
-          </form>
-          <div class="divider"></div>
-          <h3>Member Signup QR</h3>
-          <p class="muted">Share this with members so they can open the simplified member login/registration page.</p>
-          <div class="action-row">
-            <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
-          </div>
-          <img
-            id="memberSignupQrImage"
-            class="signup-qr"
-            src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
-            alt="Member signup QR code"
-            loading="lazy"
-          />
-        </article>
+            <img
+              id="memberSignupQrImage"
+              class="signup-qr"
+              src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
+              alt="Member signup QR code"
+              loading="lazy"
+            />
+          </article>
+        </section>
       </section>
 
-      <section id="appSection" class="hidden">
-        <div class="panel topbar reveal delay-1">
-          <div>
-            <p class="eyebrow">Session</p>
-            <h2 id="sessionTitle">Welcome</h2>
-            <p id="sessionSubtitle" class="muted"></p>
-          </div>
-          <div class="action-row">
-            <button id="backupCsvBtn" type="button" class="secondary hidden">Backup CSV</button>
-            <button id="backupDbBtn" type="button" class="secondary hidden">Backup DB</button>
-            <button id="openTutorialBtn" type="button" class="secondary hidden">Tutorial</button>
-            <button id="installBtn" type="button" class="secondary hidden">Install App</button>
-            <button id="logoutBtn" type="button" class="secondary">Logout</button>
-          </div>
-        </div>
+      <section id="appSection" class="hidden app-shell">
+        <div class="app-frame">
+          <aside class="panel app-sidebar">
+            <div class="app-sidebar-brand">
+              {% if app_config.logo_path %}
+              <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+              {% endif %}
+              <div>
+                <p class="eyebrow">{{ app_config.chapter_name if app_config else 'BidBoard' }}</p>
+                <h2>Recruitment OS</h2>
+                <p class="muted">Daily operations for rush week.</p>
+              </div>
+            </div>
 
-        <nav id="desktopPageNav" class="panel quick-nav reveal delay-1" aria-label="Desktop pages">
-          <a
-            href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}"
-            class="quick-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'overview' %} is-active{% endif %}"
-            data-page="overview"
-          >
-            Dashboard
-          </a>
-          <a
-            href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}"
-            class="quick-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'rushees' %} is-active{% endif %}"
-            data-page="rushees"
-          >
-            Rushees
-          </a>
-          <a
-            href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}"
-            class="quick-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'members' %} is-active{% endif %}"
-            data-page="members"
-          >
-            Team
-          </a>
-          <a
-            href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}"
-            class="quick-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'operations' %} is-active{% endif %}"
-            data-page="operations"
-          >
-            Calendar <span id="operationsUnreadBadge" class="nav-badge hidden">0</span>
-          </a>
-          <a
-            id="adminNavLink"
-            href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}"
-            class="quick-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}"
-            data-page="admin"
-          >
-            Admin
-          </a>
-          <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
-        </nav>
+            <nav id="desktopPageNav" class="app-nav" aria-label="Desktop pages">
+              <a href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'overview' %} is-active{% endif %}" data-page="overview">Command</a>
+              <a href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'rushees' %} is-active{% endif %}" data-page="rushees">Rushees</a>
+              <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'meetings' %} is-active{% endif %}" data-page="meetings">Meetings</a>
+              <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'operations' %} is-active{% endif %}" data-page="operations">Operations <span id="operationsUnreadBadge" class="nav-badge hidden">0</span></a>
+              <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'members' %} is-active{% endif %}" data-page="members">Team</a>
+              <a id="adminNavLink" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}" data-page="admin">Admin</a>
+              <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="app-nav-link">Packet Detail</a>
+            </nav>
 
-        <div class="desktop-pages">
-          {% include "desktop_pages/dashboard.html" %}
-          {% include "desktop_pages/calendar.html" %}
-          {% include "desktop_pages/rushees.html" %}
-          {% include "desktop_pages/team.html" %}
-          {% include "desktop_pages/admin.html" %}
+            <div class="app-sidebar-foot">
+              <button id="backupCsvBtn" type="button" class="secondary hidden">Backup CSV</button>
+              <button id="backupDbBtn" type="button" class="secondary hidden">Backup DB</button>
+              <button id="openTutorialBtn" type="button" class="secondary hidden">Tutorial</button>
+              <button id="installBtn" type="button" class="secondary hidden">Install App</button>
+            </div>
+          </aside>
+
+          <div class="app-main">
+            <header class="panel app-topbar reveal delay-1">
+              <div class="app-topbar-copy">
+                <p id="workspaceEyebrow" class="eyebrow">Workspace</p>
+                <h2 id="workspaceTitle">Command</h2>
+                <p id="workspaceSubtitle" class="muted">Priority actions and live team signal.</p>
+              </div>
+              <div class="app-topbar-actions">
+                <div class="app-session-card">
+                  <strong id="sessionTitle">Welcome</strong>
+                  <span id="sessionSubtitle" class="muted"></span>
+                </div>
+                <button id="globalCommandBtn" type="button" class="secondary">Command Palette</button>
+                <button id="appNotificationsBtn" type="button" class="secondary app-notification-btn">
+                  Notifications
+                  <span id="appNotificationsBadge" class="nav-badge hidden">0</span>
+                </button>
+                <button id="logoutBtn" type="button" class="secondary">Logout</button>
+              </div>
+            </header>
+
+            <section class="panel app-toolbar reveal delay-1">
+              <div class="app-search-field">
+                <label>
+                  Search
+                  <input id="globalSearchInput" type="search" placeholder="Search PNMs, members, commands" autocomplete="off" />
+                </label>
+              </div>
+              <div class="action-row app-toolbar-actions">
+                <button type="button" class="secondary" data-command-action="create_lunch">New Lunch</button>
+                <button type="button" class="secondary" data-command-action="create_event">New Event</button>
+                <button type="button" class="secondary" data-command-action="open_meetings">Open Meetings</button>
+              </div>
+            </section>
+
+            <div class="desktop-pages app-workspace-pages">
+              {% include "desktop_pages/dashboard.html" %}
+              {% include "desktop_pages/rushees.html" %}
+              {% include "desktop_pages/meetings.html" %}
+              {% include "desktop_pages/team.html" %}
+              {% include "desktop_pages/calendar.html" %}
+              {% include "desktop_pages/admin.html" %}
+            </div>
+          </div>
         </div>
       </section>
     </main>
+
+    <div id="appNotificationsTray" class="notifications-tray hidden" aria-hidden="true">
+      <div class="notifications-tray-scrim"></div>
+      <section class="notifications-tray-card panel">
+        <div class="section-head">
+          <h2>Notifications</h2>
+          <button id="appNotificationsCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+        <div id="appNotificationsList" class="list-box muted">No notifications loaded yet.</div>
+      </section>
+    </div>
+
+    <div id="globalCommandPalette" class="command-palette-layer hidden" aria-hidden="true">
+      <div class="command-palette-scrim"></div>
+      <section class="command-palette-card panel">
+        <div class="section-head">
+          <h2>Command Palette</h2>
+          <button id="commandPaletteCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+        <label>
+          Search or run a command
+          <input id="commandPaletteInput" type="search" placeholder="Search PNMs, members, or commands" autocomplete="off" />
+        </label>
+        <div id="commandPaletteResults" class="list-box muted">Start typing to search PNMs, members, or common actions.</div>
+      </section>
+    </div>
 
     <div id="tutorialLayer" class="tutorial-layer hidden" aria-hidden="true">
       <div class="tutorial-scrim"></div>
@@ -211,9 +245,7 @@
       <section id="tutorialModeCard" class="tutorial-card hidden" aria-live="polite">
         <p class="eyebrow">First-Time Setup</p>
         <h2 id="tutorialModeTitle">Welcome to BidBoard</h2>
-        <p id="tutorialModeSubtitle" class="muted">
-          Choose how you want to learn your role workflow.
-        </p>
+        <p id="tutorialModeSubtitle" class="muted">Choose how you want to learn your role workflow.</p>
         <div id="tutorialRoleChecklist" class="tutorial-role-checklist"></div>
         <div class="tutorial-mode-grid">
           <button type="button" class="tutorial-mode-btn" data-tutorial-mode="guided">

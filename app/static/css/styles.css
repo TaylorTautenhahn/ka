@@ -490,6 +490,73 @@ h3 {
   color: var(--ink-soft);
 }
 
+.demo-guide-panel {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.demo-guide-summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  cursor: pointer;
+}
+
+.demo-guide-summary::-webkit-details-marker {
+  display: none;
+}
+
+.demo-guide-summary > div {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.demo-guide-summary strong {
+  display: block;
+  font-family: "Space Grotesk", sans-serif;
+  color: var(--accent);
+}
+
+.demo-guide-summary span {
+  color: var(--ink-soft);
+}
+
+.demo-guide-summary-action {
+  border-radius: 999px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  background: rgba(255, 255, 255, 0.62);
+  padding: 0.24rem 0.62rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.demo-guide-body {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.demo-quickstart-grid {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.demo-quickstart-card {
+  min-width: 0;
+}
+
+.demo-quickstart-card strong {
+  display: block;
+  font-family: "Space Grotesk", sans-serif;
+}
+
+.demo-quickstart-card p {
+  margin: 0.28rem 0 0;
+  color: var(--ink-soft);
+}
+
 .table-wrap tr.is-active {
   background: rgba(var(--accent-rgb), 0.15);
 }
@@ -2101,7 +2168,8 @@ td strong {
   #createSection.grid-two,
   #detailSection .grid-two,
   .desktop-page[data-page="overview"] .matching-grid,
-  .command-center-grid {
+  .command-center-grid,
+  .demo-quickstart-grid {
     grid-template-columns: 1fr;
   }
 }
@@ -2433,29 +2501,6 @@ body::after {
   margin: 0.36rem 0 0;
   font-size: 0.79rem;
   color: var(--ink-soft);
-}
-
-.media-slot-preview {
-  margin-top: 0.62rem;
-  width: 100%;
-  border-radius: 12px;
-  border: 1px solid rgba(var(--accent-rgb), 0.18);
-  background: rgba(255, 255, 255, 0.78);
-  overflow: hidden;
-}
-
-.media-slot-preview img {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 10;
-  object-fit: cover;
-}
-
-.media-slot-preview.logo img {
-  aspect-ratio: 1 / 1;
-  max-width: 120px;
-  margin: 0.42rem auto;
-  border-radius: 14px;
 }
 
 .media-slot-empty {

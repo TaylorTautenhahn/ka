@@ -595,7 +595,12 @@ async function refreshPortal() {
 async function ensureSession() {
   try {
     const payload = await api("/api/auth/me");
-    state.user = payload.user;
+    state.user = payload && payload.authenticated && payload.user ? payload.user : null;
+    if (!state.user) {
+      setAuthView(false);
+      memberApprovalsPanel.classList.add("hidden");
+      return;
+    }
     setAuthView(true);
     setSessionHeading();
     await refreshPortal();

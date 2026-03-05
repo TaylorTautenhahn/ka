@@ -343,6 +343,10 @@ async function loadTenants() {
 async function ensureSession() {
   try {
     const payload = await api("/platform/api/auth/me");
+    if (!payload || !payload.authenticated || !payload.admin) {
+      setAuthView(false);
+      return;
+    }
     setAuthView(true);
     sessionTitle.textContent = payload.admin.username;
     await loadTenants();

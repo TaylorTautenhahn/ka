@@ -1062,6 +1062,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
     desktop_routes = {
         "dashboard": f"{base_path}/dashboard",
         "rushees": f"{base_path}/rushees",
+        "meetings": f"{base_path}/meetings",
         "team": f"{base_path}/team",
         "calendar": f"{base_path}/calendar",
         "admin": f"{base_path}/admin",
@@ -1069,6 +1070,7 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
     mobile_routes = {
         "dashboard": mobile_base,
         "rushees": f"{mobile_base}/pnms",
+        "meetings": f"{mobile_base}/meetings",
         "team": f"{mobile_base}/members",
         "calendar": f"{mobile_base}/calendar",
         "admin": f"{mobile_base}/admin",
@@ -1107,12 +1109,14 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         "calendar_timezone": CALENDAR_TIMEZONE,
         "calendar_feed_path": f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}",
         "calendar_lunch_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
+        "is_demo_tenant": is_demo_tenant_slug(tenant.slug),
     }
 
 
 DESKTOP_ROUTE_TO_PAGE_KEY: dict[str, str] = {
     "dashboard": "overview",
     "rushees": "rushees",
+    "meetings": "meetings",
     "team": "members",
     "calendar": "operations",
     "admin": "admin",
@@ -1121,6 +1125,7 @@ DEFAULT_DESKTOP_ROUTE = "dashboard"
 LEGACY_VIEW_TO_ROUTE: dict[str, str] = {
     "overview": "dashboard",
     "rushees": "rushees",
+    "meetings": "meetings",
     "members": "team",
     "admin": "admin",
 }
@@ -1192,7 +1197,8 @@ def render_desktop_page(
     if session_role == ROLE_RUSHER:
         return RedirectResponse(url=f"/{tenant.slug}/member", status_code=307)
     if request_prefers_mobile(request) and bool(session_role):
-        return RedirectResponse(url=f"/{tenant.slug}/mobile", status_code=307)
+        mobile_target = "/mobile/meetings" if normalize_desktop_route(desktop_route) == "meetings" else "/mobile"
+        return RedirectResponse(url=f"/{tenant.slug}{mobile_target}", status_code=307)
 
     resolved_route = normalize_desktop_route(desktop_route)
     if resolved_route == "admin" and session_role and session_role != ROLE_HEAD:
@@ -1811,6 +1817,38 @@ def current_platform_admin(request: Request) -> sqlite3.Row:
         return row
 
 
+def current_platform_admin_optional(request: Request) -> sqlite3.Row | None:
+    token = request.cookies.get(PLATFORM_SESSION_COOKIE)
+    if not token:
+        return None
+
+    with platform_db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT pa.*, ps.last_seen_at, ps.max_idle_seconds
+            FROM platform_sessions ps
+            JOIN platform_admins pa ON pa.id = ps.admin_id
+            WHERE ps.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            return None
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+            return None
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], PLATFORM_SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
+            return None
+
+        conn.execute("UPDATE platform_sessions SET last_seen_at = ? WHERE token = ?", (now_iso(), token))
+        return row
+
+
 @app.middleware("http")
 async def security_headers(request: Request, call_next):  # type: ignore[no-untyped-def]
     response = await call_next(request)
@@ -2397,6 +2435,10 @@ def instagram_avatar_fallback_url(instagram_handle: str | None) -> str | None:
     return f"https://unavatar.io/instagram/{quote(username, safe='')}"
 
 
+def demo_pnm_placeholder_url() -> str:
+    return "/static/images/demo-pnm-placeholder.svg"
+
+
 def photo_fs_path(photo_path: str | None) -> Path | None:
     tenant = CURRENT_TENANT.get()
     if not photo_path:
@@ -2425,6 +2467,9 @@ def resolve_pnm_photo_url(photo_path: str | None, instagram_handle: str | None) 
     local_url = public_photo_url(photo_path)
     if local_url and has_local_photo_file(local_url):
         return local_url
+    tenant = CURRENT_TENANT.get()
+    if tenant and is_demo_tenant_slug(tenant.slug):
+        return demo_pnm_placeholder_url()
     return instagram_avatar_fallback_url(instagram_handle)
 
 
@@ -6936,6 +6981,38 @@ def current_user(request: Request) -> sqlite3.Row:
         return row
 
 
+def current_user_optional(request: Request) -> sqlite3.Row | None:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        return None
+
+    with db_session() as conn:
+        row = conn.execute(
+            """
+            SELECT u.*, s.last_seen_at, s.created_at AS session_created_at, s.max_idle_seconds
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row:
+            return None
+
+        try:
+            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
+        except (TypeError, ValueError):
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return None
+        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
+        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            return None
+
+        conn.execute("UPDATE sessions SET last_seen_at = ? WHERE token = ?", (now_iso(), token))
+        return row
+
+
 def request_has_active_session(request: Request) -> bool:
     token = request.cookies.get(SESSION_COOKIE)
     if not token:
@@ -7951,6 +8028,11 @@ async def desktop_rushees_page(request: Request) -> HTMLResponse:
     return render_desktop_page(request, desktop_route="rushees")
 
 
+@app.get("/meetings", response_class=HTMLResponse)
+async def desktop_meetings_page(request: Request) -> HTMLResponse:
+    return render_desktop_page(request, desktop_route="meetings")
+
+
 @app.get("/team", response_class=HTMLResponse)
 async def desktop_team_page(request: Request) -> HTMLResponse:
     return render_desktop_page(request, desktop_route="team")
@@ -8041,6 +8123,22 @@ async def mobile_members_page(request: Request) -> HTMLResponse:
             "tenant": tenant,
             "app_config": app_config_for_tenant(tenant),
             "mobile_page": "members",
+        },
+    )
+
+
+@app.get("/mobile/meetings", response_class=HTMLResponse)
+async def mobile_meetings_page(request: Request) -> HTMLResponse:
+    tenant = getattr(request.state, "tenant", None)
+    if not tenant:
+        raise HTTPException(status_code=404, detail="Organization context required.")
+    return templates.TemplateResponse(
+        "mobile_meeting.html",
+        {
+            "request": request,
+            "tenant": tenant,
+            "app_config": app_config_for_tenant(tenant),
+            "mobile_page": "meetings",
         },
     )
 
@@ -8233,10 +8331,16 @@ def platform_logout(request: Request, response: Response) -> dict[str, str]:
 
 
 @app.get("/platform/api/auth/me")
-def platform_auth_me(request: Request, response: Response, admin: sqlite3.Row = Depends(current_platform_admin)) -> dict[str, Any]:
+def platform_auth_me(
+    request: Request,
+    response: Response,
+    admin: sqlite3.Row | None = Depends(current_platform_admin_optional),
+) -> dict[str, Any]:
     if not request.cookies.get(CSRF_COOKIE):
         set_csrf_cookie(response, request)
     mark_response_private(response)
+    if not admin:
+        return {"authenticated": False, "admin": None}
     return {"authenticated": True, "admin": platform_user_payload(admin)}
 
 
@@ -9409,10 +9513,16 @@ def logout(request: Request, response: Response) -> dict[str, str]:
 
 
 @app.get("/api/auth/me")
-def auth_me(request: Request, response: Response, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def auth_me(
+    request: Request,
+    response: Response,
+    user: sqlite3.Row | None = Depends(current_user_optional),
+) -> dict[str, Any]:
     if not request.cookies.get(CSRF_COOKIE):
         set_csrf_cookie(response, request)
     mark_response_private(response)
+    if not user:
+        return {"authenticated": False, "user": None}
     return {
         "authenticated": True,
         "user": user_payload(user, user["role"], user["id"]),
@@ -15542,6 +15652,371 @@ def dashboard_command_center(
             "recent_change_count": len(recent_rating_changes),
             "generated_at": now_dt.isoformat(),
         },
+    }
+
+
+def build_today_workspace_items(
+    calendar_items: list[dict[str, Any]],
+    scheduled_lunch_rows: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    today_s = date.today().isoformat()
+    items: list[dict[str, Any]] = []
+    for row in calendar_items:
+        if row.get("event_date") != today_s:
+            continue
+        items.append(
+            {
+                "item_type": row.get("item_type") or "event",
+                "title": row.get("title") or "Untitled",
+                "event_date": row.get("event_date") or today_s,
+                "start_time": row.get("start_time") or "",
+                "location": row.get("location") or "",
+                "meta": row.get("pnm_name") or row.get("created_by_username") or "",
+                "google_calendar_url": row.get("google_calendar_url"),
+            }
+        )
+    if items:
+        return items[:12]
+    return [
+        {
+            "item_type": "lunch",
+            "title": f"Lunch with {row.get('pnm_name', 'PNM')}",
+            "event_date": row.get("lunch_date") or "",
+            "start_time": row.get("start_time") or "",
+            "location": row.get("location") or "",
+            "meta": row.get("assigned_officer_username") or row.get("scheduled_by_username") or "",
+            "google_calendar_url": row.get("google_calendar_url"),
+        }
+        for row in scheduled_lunch_rows[:12]
+    ]
+
+
+def build_command_attention_items(
+    pnms: list[dict[str, Any]],
+    command_payload: dict[str, Any],
+    assignment_payload: dict[str, Any],
+) -> list[dict[str, Any]]:
+    items: list[dict[str, Any]] = []
+    seen: set[tuple[int, str]] = set()
+
+    for row in command_payload.get("stale_alerts", []):
+        pnm_id = int(row.get("pnm_id") or 0)
+        key = (pnm_id, "stale")
+        if pnm_id <= 0 or key in seen:
+            continue
+        seen.add(key)
+        stale_reason = str(row.get("stale_reason") or "").strip().lower()
+        if stale_reason == "never_rated":
+            stale_label = "Never Rated"
+        elif stale_reason == "rating_older_than_recent_touchpoint":
+            stale_label = "Behind Touchpoint"
+        elif stale_reason == "no_recent_rating":
+            stale_label = "No Recent Rating"
+        else:
+            stale_label = "Needs Update"
+        items.append(
+            {
+                "pnm_id": pnm_id,
+                "pnm_code": row.get("pnm_code") or "",
+                "name": row.get("name") or "",
+                "label": stale_label,
+                "detail": f"Last touchpoint: {row.get('last_touchpoint_at') or 'None'}",
+                "priority": 4,
+            }
+        )
+
+    for row in assignment_payload.get("escalations", []):
+        pnm_id = int(row.get("pnm_id") or 0)
+        key = (pnm_id, "assignment")
+        if pnm_id <= 0 or key in seen:
+            continue
+        seen.add(key)
+        due_state = str(row.get("assignment_due_state") or "").strip().replace("_", " ").title()
+        status_label = str(row.get("assignment_status") or "").strip().replace("_", " ").title()
+        items.append(
+            {
+                "pnm_id": pnm_id,
+                "pnm_code": row.get("pnm_code") or "",
+                "name": row.get("name") or "",
+                "label": status_label or "Assignment Alert",
+                "detail": due_state or "Needs follow-up",
+                "priority": 3,
+            }
+        )
+
+    for pnm in pnms:
+        pnm_id = int(pnm.get("pnm_id") or 0)
+        if pnm_id <= 0:
+            continue
+        if not pnm.get("assigned_officers") and not pnm.get("assigned_officer_id"):
+            key = (pnm_id, "owner")
+            if key not in seen:
+                seen.add(key)
+                items.append(
+                    {
+                        "pnm_id": pnm_id,
+                        "pnm_code": pnm.get("pnm_code") or "",
+                        "name": f"{pnm.get('first_name', '')} {pnm.get('last_name', '')}".strip(),
+                        "label": "No Owner",
+                        "detail": "Assignment needed",
+                        "priority": 2,
+                    }
+                )
+        if not pnm.get("photo_url"):
+            key = (pnm_id, "photo")
+            if key not in seen:
+                seen.add(key)
+                items.append(
+                    {
+                        "pnm_id": pnm_id,
+                        "pnm_code": pnm.get("pnm_code") or "",
+                        "name": f"{pnm.get('first_name', '')} {pnm.get('last_name', '')}".strip(),
+                        "label": "Missing Photo",
+                        "detail": "Add photo or fetch from Instagram",
+                        "priority": 1,
+                    }
+                )
+        if not str(pnm.get("notes") or "").strip() or int(pnm.get("rating_count") or 0) <= 0:
+            key = (pnm_id, "meeting")
+            if key not in seen:
+                seen.add(key)
+                items.append(
+                    {
+                        "pnm_id": pnm_id,
+                        "pnm_code": pnm.get("pnm_code") or "",
+                        "name": f"{pnm.get('first_name', '')} {pnm.get('last_name', '')}".strip(),
+                        "label": "Meeting Context Thin",
+                        "detail": "Notes or rating depth still missing",
+                        "priority": 1,
+                    }
+                )
+
+    items.sort(key=lambda item: (-int(item["priority"]), item["name"].lower(), int(item["pnm_id"])))
+    return items[:24]
+
+
+@app.get("/api/workspace/command")
+def workspace_command(
+    request: Request,
+    window_hours: int = Query(default=72, ge=24, le=168),
+    limit: int = Query(default=30, ge=1, le=100),
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    command_payload = dashboard_command_center(window_hours=window_hours, limit=limit, user=user)
+    leaderboard_payload = pnm_leaderboard(limit=8, _=user)
+    analytics_payload = analytics_overview(user=user)
+    assignments_payload = assignments_overview(include_completed=False, user=user)
+    mine_payload = assignments_mine(include_completed=False, user=user)
+    notifications_payload = notification_digest(period="daily", include_read=False, max_items=30, user=user)
+    scheduled_payload = scheduled_lunches(request=request, limit=40, _=user)
+    calendar_payload = rush_calendar(request=request, include_past=False, limit=80, _=user)
+    pnms_payload = list_pnms(user=user)
+    pending_payload = pending_users(_=user)
+
+    team_pulse = {
+        "pending_approvals": len(pending_payload.get("pending", [])),
+        "unassigned_pnms": sum(1 for row in assignments_payload.get("assignments", []) if row.get("assignment_status") == "unassigned"),
+        "needs_help": sum(1 for row in assignments_payload.get("assignments", []) if row.get("assignment_status") == "needs_help"),
+        "over_capacity_officers": sum(1 for row in assignments_payload.get("officer_loads", []) if row.get("is_over_capacity")),
+    }
+
+    return {
+        "command_center": command_payload,
+        "leaderboard": leaderboard_payload.get("leaderboard", []),
+        "analytics": analytics_payload,
+        "assignments": mine_payload.get("assignments", []),
+        "today": build_today_workspace_items(calendar_payload.get("items", []), scheduled_payload.get("lunches", [])),
+        "attention": build_command_attention_items(pnms_payload.get("pnms", []), command_payload, assignments_payload),
+        "team_pulse": team_pulse,
+        "watch_candidates": leaderboard_payload.get("leaderboard", [])[:6],
+        "notifications": notifications_payload,
+    }
+
+
+@app.get("/api/workspace/rushees")
+def workspace_rushees(
+    request: Request,
+    interest: str | None = None,
+    stereotype: str | None = None,
+    state: str | None = None,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    return {
+        "pnms": list_pnms(interest=interest, stereotype=stereotype, state=state, user=user).get("pnms", []),
+        "analytics": analytics_overview(user=user),
+        "scheduled_lunches": scheduled_lunches(request=request, limit=60, _=user).get("lunches", []),
+        "calendar_share": calendar_share_payload(request, current_tenant()),
+        "assignments": assignments_overview(include_completed=False, user=user),
+        "interest_hints": list_interests(_=user),
+    }
+
+
+@app.get("/api/workspace/team")
+def workspace_team(
+    role: str | None = "all",
+    state: str | None = None,
+    city: str | None = None,
+    sort: str | None = "location",
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "users": list_users(role=role, state=state, city=city, sort=sort, user=user).get("users", []),
+        "pending": pending_users(_=user).get("pending", []),
+        "assignments": assignments_mine(include_completed=False, user=user),
+        "assignment_overview": assignments_overview(include_completed=False, user=user),
+    }
+    if user["role"] == ROLE_HEAD:
+        payload["leadership"] = head_admin_officer_metrics(_=user)
+    return payload
+
+
+@app.get("/api/workspace/operations")
+def workspace_operations(
+    request: Request,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    return {
+        "calendar": rush_calendar(request=request, include_past=False, limit=300, _=user),
+        "scheduled_lunches": scheduled_lunches(request=request, limit=80, _=user),
+        "goals": list_weekly_goals(include_archived=False, _=user),
+        "notifications": notification_digest(period="daily", include_read=True, max_items=60, user=user),
+        "chat": list_officer_chat_messages(limit=180, user=user),
+        "chat_stats": officer_chat_stats(_=user),
+        "calendar_share": calendar_share_payload(request, current_tenant()),
+    }
+
+
+@app.get("/api/workspace/meetings")
+def workspace_meetings(
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    pnms = list_pnms(user=user).get("pnms", [])
+    assignments_payload = assignments_overview(include_completed=False, user=user)
+    leaderboard_rows = pnm_leaderboard(limit=18, _=user).get("leaderboard", [])
+
+    candidates: list[dict[str, Any]] = []
+    for pnm in pnms:
+        flags: list[str] = []
+        if int(pnm.get("rating_count") or 0) <= 0:
+            flags.append("No Ratings")
+        if not str(pnm.get("notes") or "").strip():
+            flags.append("No Notes")
+        if not pnm.get("photo_url"):
+            flags.append("No Photo")
+        if not pnm.get("assigned_officers") and not pnm.get("assigned_officer_id"):
+            flags.append("No Owner")
+        if int(pnm.get("total_lunches") or 0) <= 0:
+            flags.append("No Lunch Context")
+        meeting_ready_score = max(0, 100 - len(flags) * 18 + min(int(pnm.get("rating_count") or 0), 5) * 4)
+        candidates.append(
+            {
+                "pnm_id": int(pnm.get("pnm_id") or 0),
+                "pnm_code": pnm.get("pnm_code") or "",
+                "name": f"{pnm.get('first_name', '')} {pnm.get('last_name', '')}".strip(),
+                "weighted_total": round(float(pnm.get("weighted_total") or 0.0), 2),
+                "rating_count": int(pnm.get("rating_count") or 0),
+                "total_lunches": int(pnm.get("total_lunches") or 0),
+                "assigned_officer_username": pnm.get("assigned_officer", {}).get("username") if isinstance(pnm.get("assigned_officer"), dict) else "",
+                "package_group_label": pnm.get("package_group_label") or "",
+                "linked_count": len(list(pnm.get("linked_pnms") or [])),
+                "flags": flags,
+                "meeting_ready_score": meeting_ready_score,
+            }
+        )
+
+    candidates.sort(key=lambda item: (-item["meeting_ready_score"], -item["weighted_total"], item["name"].lower()))
+    compare_defaults = [item["pnm_id"] for item in candidates[:2] if int(item["pnm_id"]) > 0]
+
+    return {
+        "candidates": candidates,
+        "shortlist": candidates[:12],
+        "attention": build_command_attention_items(pnms, {"stale_alerts": []}, assignments_payload),
+        "watch_candidates": leaderboard_rows[:8],
+        "compare_defaults": compare_defaults,
+    }
+
+
+@app.get("/api/admin/overview")
+def workspace_admin_overview(
+    user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    return {
+        "leadership": head_admin_officer_metrics(_=user),
+        "assignments": assignments_overview(include_completed=True, user=user),
+        "storage": storage_diagnostics(_=user),
+        "pending": pending_users(_=user),
+        "goals": list_weekly_goals(include_archived=False, _=user),
+    }
+
+
+@app.get("/api/search/global")
+def global_search(
+    q: str = Query(default="", min_length=1, max_length=120),
+    _: sqlite3.Row = Depends(current_user),
+) -> dict[str, Any]:
+    token = q.strip()
+    if not token:
+        return {"query": "", "pnms": [], "members": [], "commands": []}
+    like_token = f"%{token.lower()}%"
+    tenant = current_tenant()
+    with db_session() as conn:
+        pnm_rows = conn.execute(
+            """
+            SELECT
+                p.id,
+                p.pnm_code,
+                p.first_name,
+                p.last_name,
+                p.weighted_total
+            FROM pnms p
+            WHERE
+                lower(p.pnm_code) LIKE ?
+                OR lower(p.first_name) LIKE ?
+                OR lower(p.last_name) LIKE ?
+                OR lower(COALESCE(p.instagram_handle, '')) LIKE ?
+            ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+            LIMIT 8
+            """,
+            (like_token, like_token, like_token, like_token),
+        ).fetchall()
+        user_rows = conn.execute(
+            """
+            SELECT id, username, role, emoji
+            FROM users
+            WHERE is_approved = 1
+              AND (lower(username) LIKE ? OR lower(role) LIKE ?)
+            ORDER BY username ASC
+            LIMIT 8
+            """,
+            (like_token, like_token),
+        ).fetchall()
+    return {
+        "query": token,
+        "pnms": [
+            {
+                "pnm_id": int(row["id"]),
+                "pnm_code": row["pnm_code"],
+                "name": f"{row['first_name']} {row['last_name']}",
+                "weighted_total": round(float(row["weighted_total"]), 2),
+                "meeting_path": f"/{tenant.slug}/meeting?pnm_id={int(row['id'])}",
+            }
+            for row in pnm_rows
+        ],
+        "members": [
+            {
+                "user_id": int(row["id"]),
+                "username": row["username"],
+                "role": row["role"],
+                "emoji": row["emoji"],
+            }
+            for row in user_rows
+        ],
+        "commands": [
+            {"command_id": "create_lunch", "label": "Create Lunch", "action": "create_lunch"},
+            {"command_id": "create_event", "label": "Create Event", "action": "create_event"},
+            {"command_id": "backup_csv", "label": "Backup CSV", "action": "backup_csv"},
+            {"command_id": "open_meetings", "label": "Open Meetings Workspace", "action": "open_meetings"},
+        ],
     }
 
 

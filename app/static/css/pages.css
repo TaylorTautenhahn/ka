@@ -172,18 +172,28 @@
 
 .command-workspace-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.9fr);
-  gap: 1rem;
+  grid-template-columns: minmax(0, 1.52fr) minmax(300px, 0.82fr);
+  gap: 1.15rem;
   align-items: start;
 }
 
 .command-queue-workspace .command-center-grid {
-  grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.2fr) minmax(260px, 0.85fr);
+  grid-template-columns: minmax(360px, 1.08fr) minmax(420px, 1.12fr) minmax(240px, 0.7fr);
+  gap: 1rem;
 }
 
 .command-support-grid {
   display: grid;
   gap: 1rem;
+}
+
+.command-queue-column {
+  min-width: 360px;
+}
+
+.command-list .entry,
+.command-list .entry button {
+  width: 100%;
 }
 
 .command-pulse-cards {
@@ -206,13 +216,29 @@
 }
 
 .rushee-workspace-grid {
-  grid-template-columns: minmax(0, 1.3fr) minmax(360px, 0.92fr);
+  grid-template-columns: minmax(0, 1.16fr) minmax(430px, 1fr);
   align-items: start;
 }
 
 .rushee-inspector-panel {
   position: sticky;
   top: 5.4rem;
+}
+
+.rushee-inspector-grid {
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: start;
+}
+
+.rushee-inspector-panel .meeting-photo-wrap,
+.rushee-inspector-panel .list-box {
+  width: 100%;
+}
+
+.rushee-inspector-panel .list-box {
+  max-height: 280px;
+  overflow: auto;
 }
 
 .rushee-inline-drawer summary,

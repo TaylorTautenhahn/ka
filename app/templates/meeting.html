@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
-    <title>{{ app_config.tenant_name }} Meeting Packets</title>
+    <title>{{ app_config.tenant_name }} Packet Detail</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
@@ -24,95 +24,72 @@
       <div class="pwa-splash-card">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h2>BidBoard</h2>
-        <p>Loading meeting packets...</p>
+        <p>Loading packet detail...</p>
       </div>
     </div>
-    <main class="shell">
-      <header class="hero reveal">
-        <div class="hero-shell hero-shell-single">
-          <div class="hero-copy">
-            {% if app_config.logo_path %}
-            <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-            {% endif %}
-            <p class="eyebrow">{{ app_config.chapter_name }}</p>
-            <h1>Meeting Packet</h1>
-            <p>Dedicated meeting context for one rushee at a time, optimized for review and print-to-PDF exports.</p>
+
+    <main class="shell shell-app-shell">
+      <section class="app-shell">
+        <div class="app-frame">
+          <aside class="panel app-sidebar">
+            <div class="app-sidebar-brand">
+              {% if app_config.logo_path %}
+              <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+              {% endif %}
+              <div>
+                <p class="eyebrow">{{ app_config.chapter_name }}</p>
+                <h2>Packet Detail</h2>
+                <p class="muted">Deep meeting context for one rushee at a time.</p>
+              </div>
+            </div>
+
+            <nav class="app-nav" aria-label="Packet navigation">
+              <a href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}" class="app-nav-link">Command</a>
+              <a href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}" class="app-nav-link">Rushees</a>
+              <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="app-nav-link">Meetings</a>
+              <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link">Operations</a>
+              <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link">Team</a>
+              <a id="meetingAdminNavLink" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}" class="app-nav-link">Admin</a>
+              <a href="{{ app_config.meeting_base }}" class="app-nav-link is-active">Packet Detail</a>
+            </nav>
+          </aside>
+
+          <div class="app-main">
+            <header class="panel app-topbar">
+              <div class="app-topbar-copy">
+                <p class="eyebrow">Workspace</p>
+                <h2>Packet Detail</h2>
+                <p class="muted">Open one rushee at a time with trend-backed review and PDF export.</p>
+              </div>
+              <div class="app-topbar-actions">
+                <div class="app-session-card">
+                  <strong id="meetingSessionTitle">Meeting Packets</strong>
+                  <span id="meetingSessionSubtitle" class="muted"></span>
+                </div>
+                <button id="meetingRefreshBtn" type="button" class="secondary">Refresh</button>
+                <button id="meetingPdfBtn" type="button" class="secondary">Download PDF</button>
+                <button id="meetingLogoutBtn" type="button" class="secondary">Logout</button>
+              </div>
+            </header>
+
+            <section class="panel app-toolbar">
+              <div class="app-search-field">
+                <label>
+                  Rushee
+                  <select id="meetingPnmSelect"></select>
+                </label>
+              </div>
+              <div class="action-row app-toolbar-actions">
+                <button id="meetingLoadBtn" type="button">Load Packet</button>
+                <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="quick-nav-link">Back To Meetings</a>
+              </div>
+            </section>
+
+            <section id="meetingPacket" class="panel meeting-view packet-detail-shell">
+              <p class="muted">Select a rushee and click Load Packet.</p>
+            </section>
           </div>
         </div>
-      </header>
-
-      <section class="panel topbar reveal delay-1">
-        <div>
-          <p class="eyebrow">Session</p>
-          <h2 id="meetingSessionTitle">Meeting Packets</h2>
-          <p id="meetingSessionSubtitle" class="muted"></p>
-        </div>
-        <div class="action-row">
-          <a
-            id="meetingOpenDashboardBtn"
-            class="quick-nav-link"
-            href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}"
-          >
-            Open Dashboard
-          </a>
-          <button id="meetingLogoutBtn" type="button" class="secondary">Logout</button>
-        </div>
-      </section>
-
-      <nav class="panel quick-nav" aria-label="Tabs">
-        <a
-          href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}"
-          class="quick-nav-link"
-        >
-          Dashboard
-        </a>
-        <a
-          href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}"
-          class="quick-nav-link"
-        >
-          Rushees
-        </a>
-        <a
-          href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}"
-          class="quick-nav-link"
-        >
-          Team
-        </a>
-        <a
-          href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}"
-          class="quick-nav-link"
-        >
-          Calendar
-        </a>
-        <a
-          id="meetingAdminNavLink"
-          href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}"
-          class="quick-nav-link"
-        >
-          Admin
-        </a>
-        <a href="{{ app_config.meeting_base }}" class="quick-nav-link desktop-page-link is-active">Meeting Packets</a>
-      </nav>
-
-      <section class="panel">
-        <div class="inline-grid">
-          <label>
-            Rushee
-            <select id="meetingPnmSelect"></select>
-          </label>
-          <label class="btn-wrap">
-            <span>&nbsp;</span>
-            <button id="meetingLoadBtn" type="button">Load Packet</button>
-          </label>
-        </div>
-        <div class="action-row meeting-actions">
-          <button id="meetingPdfBtn" type="button" class="secondary">Download PDF</button>
-          <button id="meetingRefreshBtn" type="button" class="secondary">Refresh</button>
-        </div>
-      </section>
-
-      <section id="meetingPacket" class="panel meeting-view">
-        <p class="muted">Select a rushee and click Load Packet.</p>
       </section>
     </main>
     <div id="meetingToast" class="toast hidden"></div>

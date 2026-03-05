@@ -1959,15 +1959,8 @@ function maybeLaunchFirstRunTutorial() {
   if (!state.user || !tutorialLayer) {
     return;
   }
-  if (APP_CONFIG && APP_CONFIG.is_demo_tenant) {
-    return;
-  }
-  const onboarding = userOnboardingState();
-  if (!onboarding.required) {
-    return;
-  }
-  state.tutorial.mode = onboarding.mode || TUTORIAL_MODE_GUIDED;
-  openTutorialModeChooser();
+  // Keep onboarding available without blocking the first usable view.
+  closeTutorialOverlay();
 }
 
 function handleTutorialShortcut() {

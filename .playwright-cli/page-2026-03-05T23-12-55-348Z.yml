@@ -1,0 +1,53 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - paragraph [ref=e4]: KAO
+      - heading "Rushees" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Tap a rushee to jump directly into meeting packet review.
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - text: State filter
+          - combobox "State filter" [ref=e10]
+        - button [ref=e12] [cursor=pointer]: Apply Filters
+      - generic [ref=e13]:
+        - button "Refresh" [ref=e14] [cursor=pointer]
+        - link "Add Rushee" [ref=e15] [cursor=pointer]:
+          - /url: /kappaalphaorder/mobile/create
+        - link "Meeting Packets" [ref=e16] [cursor=pointer]:
+          - /url: /kappaalphaorder/mobile/meeting
+    - generic [ref=e17]:
+      - heading "Package Deals" [level=2] [ref=e18]
+      - paragraph [ref=e19]: Link rushees as a package so they stay grouped across assignments and meeting prep.
+      - generic [ref=e20]:
+        - generic [ref=e21]:
+          - text: Primary rushee
+          - combobox "Primary rushee" [ref=e22]
+        - generic [ref=e23]:
+          - text: Package partner
+          - combobox "Package partner" [ref=e24]
+      - generic [ref=e25]:
+        - button "Link Package Deal" [ref=e26] [cursor=pointer]
+        - button "Unlink Primary" [ref=e27] [cursor=pointer]
+      - paragraph [ref=e28]: No package deal selected.
+    - generic [ref=e29]:
+      - heading "iPhone Contacts Panel" [level=2] [ref=e30]
+      - paragraph [ref=e31]: Download one rushee at a time or export all. Checkmarks are saved per account.
+      - generic [ref=e32]:
+        - generic [ref=e33]:
+          - text: Select rushee
+          - combobox "Select rushee" [ref=e34]
+        - button [ref=e36] [cursor=pointer]: Download Selected Contact
+      - button "Download All Contacts (.vcf)" [ref=e38] [cursor=pointer]
+      - paragraph [ref=e39]: Loading download status...
+  - navigation "Mobile Navigation" [ref=e42]:
+    - link "Command" [ref=e43] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile
+    - link "Rushees" [ref=e44] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/pnms
+    - link "Team" [ref=e45] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/members
+    - link "Operations" [ref=e46] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/calendar
+    - link "Admin" [ref=e47] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/admin

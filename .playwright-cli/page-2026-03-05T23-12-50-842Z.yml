@@ -1,0 +1,85 @@
+- main [ref=e2]:
+  - generic [ref=e4]:
+    - complementary [ref=e5]:
+      - generic [ref=e7]:
+        - paragraph [ref=e8]: KAO
+        - heading "Recruitment OS" [level=2] [ref=e9]
+        - paragraph [ref=e10]: Daily operations for rush week.
+      - navigation "Desktop pages" [ref=e11]:
+        - link "Command" [ref=e12] [cursor=pointer]:
+          - /url: /kappaalphaorder/dashboard
+        - link "Rushees" [ref=e13] [cursor=pointer]:
+          - /url: /kappaalphaorder/rushees
+        - link "Meetings" [ref=e14] [cursor=pointer]:
+          - /url: /kappaalphaorder/meetings
+        - link "Operations" [ref=e15] [cursor=pointer]:
+          - /url: /kappaalphaorder/calendar
+        - link "Team" [ref=e16] [cursor=pointer]:
+          - /url: /kappaalphaorder/team
+        - link "Admin" [ref=e17] [cursor=pointer]:
+          - /url: /kappaalphaorder/admin
+        - link "Packet Detail" [ref=e18] [cursor=pointer]:
+          - /url: /kappaalphaorder/meeting
+      - generic [ref=e19]:
+        - button "Backup CSV" [ref=e20] [cursor=pointer]
+        - button "Backup DB" [ref=e21] [cursor=pointer]
+        - button "Tutorial" [ref=e22] [cursor=pointer]
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e25]:
+          - paragraph [ref=e26]: Workspace
+          - heading "Operations" [level=2] [ref=e27]
+          - paragraph [ref=e28]: Timeline, goals, notifications, and officer chat.
+        - generic [ref=e29]:
+          - generic [ref=e30]:
+            - strong [ref=e31]: headseed
+            - generic [ref=e32]: "Head Rush Officer | Stereotype: Strategist"
+          - button "Command Palette" [ref=e33] [cursor=pointer]
+          - button "Notifications" [ref=e34] [cursor=pointer]
+          - button "Logout" [ref=e35] [cursor=pointer]
+      - generic [ref=e36]:
+        - generic [ref=e38]:
+          - text: Search
+          - searchbox "Search" [ref=e39]
+        - generic [ref=e40]:
+          - button "New Lunch" [ref=e41] [cursor=pointer]
+          - button "New Event" [ref=e42] [cursor=pointer]
+          - button "Open Meetings" [ref=e43] [cursor=pointer]
+      - generic [ref=e45]:
+        - generic [ref=e47]:
+          - generic [ref=e48]:
+            - heading "Operations Workspace" [level=2] [ref=e49]
+            - paragraph [ref=e50]: Timeline, goals, notifications, and officer chat in one coordinated command surface.
+          - generic [ref=e51]:
+            - button "Timeline" [ref=e52] [cursor=pointer]
+            - button "Goals" [ref=e53] [cursor=pointer]
+            - button "Comms" [ref=e54] [cursor=pointer]
+        - generic [ref=e56]:
+          - generic [ref=e57]:
+            - heading "Timeline + Calendar" [level=2] [ref=e58]
+            - paragraph [ref=e59]: One shared calendar for rush events and scheduled lunches.
+          - generic [ref=e60]:
+            - article [ref=e61]:
+              - heading "Head Rush Event Controls" [level=3] [ref=e62]
+              - paragraph [ref=e63]: Only Head Rush Officers can add or remove non-lunch events. Use the Schedule Lunch section to add lunch items.
+            - article [ref=e64]:
+              - heading "Shared Calendar Links" [level=3] [ref=e65]
+              - paragraph [ref=e66]: Subscribe once to the chapter rush calendar (events + lunches).
+              - button "Copy Rush Feed URL" [ref=e68] [cursor=pointer]
+              - paragraph [ref=e69]: Loading rush calendar link...
+              - heading "Calendar Snapshot" [level=3] [ref=e71]
+              - generic [ref=e72]:
+                - generic [ref=e73]:
+                  - strong [ref=e74]: "0"
+                  - paragraph [ref=e75]: Total Timeline Items
+                - generic [ref=e76]:
+                  - strong [ref=e77]: "0"
+                  - paragraph [ref=e78]: Official Rush Events
+                - generic [ref=e79]:
+                  - strong [ref=e80]: "0"
+                  - paragraph [ref=e81]: Scheduled Lunches
+                - generic [ref=e82]:
+                  - strong [ref=e83]: "0"
+                  - paragraph [ref=e84]: This Week
+          - heading "Upcoming Calendar Timeline" [level=3] [ref=e86]
+          - paragraph [ref=e88]: No rush calendar items yet.

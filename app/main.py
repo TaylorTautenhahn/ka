@@ -563,6 +563,28 @@ def enforce_host_configuration_if_required() -> None:
         )
 
 
+def production_bootstrap_mode() -> bool:
+    return bool(os.getenv("RENDER")) or REQUIRE_PERSISTENT_DATA
+
+
+def require_bootstrap_secret_configured(
+    secret_value: str | None,
+    *,
+    env_name: str,
+    principal_label: str,
+    production_mode: bool | None = None,
+) -> None:
+    if (secret_value or "").strip():
+        return
+    should_enforce = production_bootstrap_mode() if production_mode is None else production_mode
+    if not should_enforce:
+        return
+    raise RuntimeError(
+        f"{principal_label} bootstrap secret is required for fresh production startup. "
+        f"Set {env_name} before deploying a new datastore."
+    )
+
+
 def normalize_samesite(value: str) -> str:
     if value in {"lax", "strict", "none"}:
         return value
@@ -5079,6 +5101,11 @@ def ensure_seed_data(
             )
         return
 
+    require_bootstrap_secret_configured(
+        access_code,
+        env_name="HEAD_SEED_ACCESS_CODE",
+        principal_label="Head rush officer",
+    )
     seed_access_code = access_code if access_code else resolve_seed_access_code()
     conn.execute(
         """
@@ -5255,16 +5282,22 @@ def ensure_platform_schema_upgrades(conn: sqlite3.Connection) -> None:
 
 def ensure_platform_admin_seed(conn: sqlite3.Connection) -> None:
     created_at = now_iso()
-    seed_access_code = resolve_platform_admin_access_code()
     existing = conn.execute("SELECT id FROM platform_admins WHERE username = ?", (PLATFORM_ADMIN_USERNAME,)).fetchone()
     if existing:
         if PLATFORM_ADMIN_ACCESS_CODE:
+            seed_access_code = resolve_platform_admin_access_code()
             conn.execute(
                 "UPDATE platform_admins SET access_code_hash = ?, updated_at = ? WHERE id = ?",
                 (hash_access_code(seed_access_code), created_at, existing["id"]),
             )
         return
 
+    require_bootstrap_secret_configured(
+        PLATFORM_ADMIN_ACCESS_CODE,
+        env_name="PLATFORM_ADMIN_ACCESS_CODE",
+        principal_label="Platform admin",
+    )
+    seed_access_code = resolve_platform_admin_access_code()
     conn.execute(
         """
         INSERT INTO platform_admins (username, access_code_hash, created_at, updated_at)
@@ -11885,6 +11918,7 @@ async def upload_pnm_photo(
         raise HTTPException(status_code=500, detail=f"Unable to save photo: {exc}") from exc
 
     old_photo_path: str | None = None
+    payload_pnm: dict[str, Any] | None = None
 
     try:
         with db_session() as conn:
@@ -11914,11 +11948,12 @@ async def upload_pnm_photo(
                 FROM pnms p
                 LEFT JOIN users ao ON ao.id = p.assigned_officer_id
                 WHERE p.id = ?
-            """,
-            (pnm_id,),
-        ).fetchone()
-        own = fetch_own_rating(conn, pnm_id, user["id"])
-        links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+                """,
+                (pnm_id,),
+            ).fetchone()
+            own = fetch_own_rating(conn, pnm_id, user["id"])
+            links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+            payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm)
     except Exception:
         target_path.unlink(missing_ok=True)
         raise
@@ -11928,7 +11963,7 @@ async def upload_pnm_photo(
 
     return {
         "message": "PNM photo uploaded.",
-        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
+        "pnm": payload_pnm,
     }
 
 
@@ -11938,6 +11973,8 @@ def refresh_pnm_photo_from_instagram(
     user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     old_photo_path: str | None = None
+    refreshed_photo_path: str | None = None
+    payload_pnm: dict[str, Any] | None = None
 
     with db_session() as conn:
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
@@ -11987,16 +12024,18 @@ def refresh_pnm_photo_from_instagram(
             ).fetchone()
             own = fetch_own_rating(conn, pnm_id, user["id"])
             links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
+            refreshed_photo_path = refreshed["photo_path"]
+            payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm)
         except Exception:
             target_path.unlink(missing_ok=True)
             raise
 
-    if old_photo_path and old_photo_path != refreshed["photo_path"]:
+    if old_photo_path and old_photo_path != refreshed_photo_path:
         remove_photo_if_present(old_photo_path)
 
     return {
         "message": "Instagram photo refreshed.",
-        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
+        "pnm": payload_pnm,
     }
 
 

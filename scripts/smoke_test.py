@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import base64
 import os
 import sys
 import tempfile
@@ -65,6 +66,26 @@ def main() -> None:
         if parsed_city != "Unknown Place" or parsed_state != "":
             raise AssertionError("Hometown parser should preserve unknown format city with empty state.")
         checks.append("State normalization + hometown parsing helpers work")
+
+        try:
+            main_module.require_bootstrap_secret_configured(
+                "",
+                env_name="HEAD_SEED_ACCESS_CODE",
+                principal_label="Head rush officer",
+                production_mode=True,
+            )
+        except RuntimeError as exc:
+            if "HEAD_SEED_ACCESS_CODE" not in str(exc):
+                raise
+        else:
+            raise AssertionError("Fresh production bootstrap should require an explicit head seed secret.")
+        main_module.require_bootstrap_secret_configured(
+            "configured",
+            env_name="HEAD_SEED_ACCESS_CODE",
+            principal_label="Head rush officer",
+            production_mode=True,
+        )
+        checks.append("Production bootstrap secret guard works")
 
         with TestClient(app) as client:
             client.headers.update({"Origin": "http://testserver"})
@@ -340,6 +361,19 @@ def main() -> None:
             pnm = response.json().get("pnm", {})
             pnm_id = int(pnm.get("pnm_id"))
             checks.append("PNM create works")
+
+            tiny_png = base64.b64decode(
+                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO5nXioAAAAASUVORK5CYII="
+            )
+            response = client.post(
+                f"/kappaalphaorder/api/pnms/{pnm_id}/photo",
+                files={"photo": ("tiny.png", tiny_png, "image/png")},
+            )
+            expect_status(response, 200, "Upload PNM photo")
+            photo_payload = response.json().get("pnm", {})
+            if not str(photo_payload.get("photo_url") or "").startswith("/uploads/"):
+                raise AssertionError("Uploaded PNM photo should return a local uploads URL.")
+            checks.append("PNM photo upload works")
 
             response = client.post(
                 "/kappaalphaorder/api/pnms",

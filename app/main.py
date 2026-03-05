@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hmac
 import hashlib
 import html
@@ -562,9 +564,8 @@ def enforce_host_configuration_if_required() -> None:
 
 
 def normalize_samesite(value: str) -> str:
-    val = value.lower()
-    if val in {"strict", "lax", "none"}:
-        return val
+    if value in {"lax", "strict", "none"}:
+        return value
     return "strict"
 
 
@@ -674,7 +675,7 @@ def mark_response_private(response: Response) -> None:
 
 def normalized_idle_ttl_seconds(raw_value: Any, fallback_seconds: int) -> int:
     try:
-        parsed = int(float(raw_value))
+        parsed = int(raw_value)
     except (TypeError, ValueError):
         parsed = fallback_seconds
     return max(900, parsed)
@@ -15082,16 +15083,15 @@ def create_officer_chat_message(
                 """,
                 (json.dumps(mention_usernames),),
             ).fetchall()
-            if mentioned_rows:
-                conn.executemany(
+            for mentioned in mentioned_rows:
+                conn.execute(
                     "INSERT OR IGNORE INTO officer_chat_mentions (message_id, user_id, created_at) VALUES (?, ?, ?)",
-                    [(message_id, int(m["id"]), created_at) for m in mentioned_rows],
+                    (message_id, int(mentioned["id"]), created_at),
                 )
-                other_user_ids = [int(m["id"]) for m in mentioned_rows if int(m["id"]) != int(user["id"])]
-                if other_user_ids:
-                    create_notifications_for_users(
+                if int(mentioned["id"]) != int(user["id"]):
+                    create_notification(
                         conn,
-                        other_user_ids,
+                        user_id=int(mentioned["id"]),
                         notif_type="chat_mention",
                         title=f"Mentioned by {user['username']}",
                         body=message[:220],

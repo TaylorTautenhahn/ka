@@ -16,92 +16,65 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/static/css/landing.css" />
-    <link rel="stylesheet" href="/static/css/apple-landing.css" />
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/landing.js" defer></script>
-    <script src="/static/js/apple-landing.js" defer></script>
   </head>
-  <body class="bb-page-home apple-theme">
+  <body class="bb-page-home">
     <div class="bb-cursor-glow" aria-hidden="true"></div>
     <div class="bb-noise" aria-hidden="true"></div>
     <div class="bb-atmosphere bb-atmosphere-a" aria-hidden="true"></div>
     <div class="bb-atmosphere bb-atmosphere-b" aria-hidden="true"></div>
 
     <main class="bb-shell">
-      <nav class="apple-nav">
-      <a class="apple-nav-brand" href="/">BidBoard</a>
-      <div class="apple-nav-links">
-        <a class="apple-nav-link" href="/">Home</a>
-        <a class="apple-nav-link" href="/features">Features</a>
-        <a class="apple-nav-link" href="/demo">Demo</a>
-        <a class="apple-nav-link" href="/faq">FAQ</a>
-        <a class="apple-nav-link" href="/platform">Admin</a>
-      </div>
-    </nav>
+      <header class="bb-topbar bb-reveal" data-delay="20">
+        <a class="bb-brand" href="/" aria-label="BidBoard home">
+          <span class="bb-brand-dot"></span>
+          <span>BidBoard</span>
+        </a>
+        <nav class="bb-topbar-actions" aria-label="Primary">
+          <a class="bb-link is-active" href="/">Home</a>
+          <a class="bb-link" href="/features">Product</a>
+          <a class="bb-link" href="/demo">Live Demo</a>
+          <a class="bb-link" href="/faq">FAQ</a>
+          <a class="bb-link bb-link-admin" href="/platform">Platform Admin</a>
+        </nav>
+        <div class="bb-topbar-utilities">
+          <button class="bb-theme-toggle" id="bbThemeToggle" type="button" aria-label="Toggle dark and light mode">
+            <span class="bb-theme-toggle-sun" aria-hidden="true">☀</span>
+            <span class="bb-theme-toggle-moon" aria-hidden="true">◐</span>
+          </button>
+          <a class="bb-login-btn" href="/organizations">Organization Login</a>
+        </div>
+      </header>
 
-      <section class="apple-hero">
-      <h1>The recruitment OS<br>for top chapters.</h1>
-      <p>Replace spreadsheets with a true command center. Real-time scoring, transparent collaboration, and meeting-ready intelligence.</p>
-      <div style="display: flex; gap: 15px; justify-content: center; margin-bottom: 60px;">
-        <a class="apple-btn" href="/organizations">Organization Login</a>
-        <a class="apple-btn apple-btn-secondary" href="/demo">Try Interactive Demo</a>
-      </div>
-
-      <div class="apple-showcase">
-        <div class="apple-showcase-inner">
-          <!-- We can keep the existing visual or use a mockup here -->
-          <div style="background: var(--apple-glass-bg); padding: 40px; text-align: left; border-radius: 20px;">
-             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3>Live Scoring</h3>
-                <span style="background: var(--apple-accent); color: white; padding: 4px 12px; border-radius: 12px; font-size: 0.8rem;">Real-time</span>
-             </div>
-
-             <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--apple-glass-border); padding: 15px 20px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                   <div style="width: 40px; height: 40px; border-radius: 50%; background: #0071e3; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">MC</div>
-                   <div>
-                     <div style="font-weight: 600;">Mason Carter</div>
-                     <div style="font-size: 0.85rem; color: var(--apple-text-muted);">Atlanta, GA • Sophomore</div>
-                   </div>
-                </div>
-                <div style="text-align: right;">
-                   <div style="font-weight: 700; font-size: 1.2rem;">34.5</div>
-                   <div style="font-size: 0.85rem; color: #34c759;">↑ 1.2</div>
-                </div>
-             </div>
-
-             <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--apple-glass-border); padding: 15px 20px; border-radius: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                   <div style="width: 40px; height: 40px; border-radius: 50%; background: #ff3b30; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">LH</div>
-                   <div>
-                     <div style="font-weight: 600;">Liam Hayes</div>
-                     <div style="font-size: 0.85rem; color: var(--apple-text-muted);">Dallas, TX • Freshman</div>
-                   </div>
-                </div>
-                <div style="text-align: right;">
-                   <div style="font-weight: 700; font-size: 1.2rem;">32.8</div>
-                   <div style="font-size: 0.85rem; color: #34c759;">↑ 0.5</div>
-                </div>
-             </div>
-
-             <div style="background: rgba(255,255,255,0.05); border: 1px solid var(--apple-glass-border); padding: 15px 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; opacity: 0.7;">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                   <div style="width: 40px; height: 40px; border-radius: 50%; background: #ffcc00; color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">EJ</div>
-                   <div>
-                     <div style="font-weight: 600;">Ethan Jenkins</div>
-                     <div style="font-size: 0.85rem; color: var(--apple-text-muted);">Chicago, IL • Freshman</div>
-                   </div>
-                </div>
-                <div style="text-align: right;">
-                   <div style="font-weight: 700; font-size: 1.2rem;">29.4</div>
-                   <div style="font-size: 0.85rem; color: var(--apple-text-muted);">- 0.0</div>
-                </div>
-             </div>
-
+      <section class="bb-hero bb-reveal" data-delay="40">
+        <div class="bb-hero-copy">
+          <p class="bb-kicker">Built for Fraternities + Sororities</p>
+          <h1 class="bb-hero-title">Recruitment, finally run like a modern command center.</h1>
+          <p class="bb-subtitle">
+            Real-time scoring, transparent collaboration, and meeting-ready intelligence in one connected system.
+            BidBoard keeps your rush team aligned from first touchpoint to final bid decision.
+          </p>
+          <div class="bb-hero-actions">
+            <a class="bb-cta" href="/organizations">Organization Login</a>
+            <a class="bb-cta bb-cta-ghost" href="/demo">Try Interactive Demo</a>
+          </div>
+          <div class="bb-hero-metrics">
+            <article class="bb-inline-metric">
+              <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong>
+              <span>Organizations Live</span>
+            </article>
+            <article class="bb-inline-metric">
+              <strong data-count="45">45</strong>
+              <span>Default Points</span>
+            </article>
+            <article class="bb-inline-metric">
+              <strong data-count="3">3</strong>
+              <span>Role Views</span>
+            </article>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
       <section class="bb-marquee-wrap bb-reveal" data-delay="55" aria-label="Greek organizations on BidBoard">
         <div class="bb-marquee-track" role="presentation">
@@ -166,50 +139,89 @@
         </div>
       </section>
 
-      <section class="apple-features">
-      <div style="text-align: center; margin-bottom: 40px;">
-        <h2 style="font-size: 2.5rem; font-weight: 700; letter-spacing: -0.02em;">Advanced. Yet effortless.</h2>
-        <p style="color: var(--apple-text-muted); font-size: 1.2rem;">Operational depth in a clean command interface.</p>
-      </div>
-
-      <div class="apple-features-grid">
-        <div class="apple-glass-card apple-feature-card">
-          <div class="apple-feature-icon">👁️</div>
-          <h3>Visibility Engine</h3>
-          <p>Head chairs, officers, and members each see the exact right view for their role while every action remains fully auditable. Stop guessing who changed a score.</p>
+      <section class="bb-section bb-reveal" data-delay="70">
+        <div class="bb-section-head">
+          <p class="bb-kicker">What Makes It Advanced</p>
+          <h2>Operational depth in a clean command interface</h2>
         </div>
-
-        <div class="apple-glass-card apple-feature-card">
-          <div class="apple-feature-icon">⚖️</div>
-          <h3>Scoring Intelligence</h3>
-          <p>Every submitted update immediately shifts the total score, leaderboard position, and analytics views. Officer vs Member weighting ensures fairness.</p>
+        <div class="bb-advanced-grid" aria-label="BidBoard capabilities">
+          <article class="bb-advanced-card bb-advanced-card-primary">
+            <div class="bb-advanced-meta">
+              <span class="bb-advanced-dot" aria-hidden="true"></span>
+              <p class="bb-advanced-label">Visibility Engine</p>
+            </div>
+            <h3>Role-aware decisions with full accountability</h3>
+            <p>
+              Head chairs, officers, and members each see the right view for their role while every action remains fully
+              auditable.
+            </p>
+            <div class="bb-advanced-tags">
+              <span>Role permissions</span>
+              <span>Audit history</span>
+            </div>
+          </article>
+          <article class="bb-advanced-card">
+            <div class="bb-advanced-meta">
+              <span class="bb-advanced-dot" aria-hidden="true"></span>
+              <p class="bb-advanced-label">Scoring Intelligence</p>
+            </div>
+            <h3>Weighted ratings with instant movement</h3>
+            <p>Every submitted update immediately shifts the total score, leaderboard position, and analytics views.</p>
+            <div class="bb-advanced-tags">
+              <span>0.6 / 0.4 weighting</span>
+              <span>Live leaderboard</span>
+            </div>
+          </article>
+          <article class="bb-advanced-card">
+            <div class="bb-advanced-meta">
+              <span class="bb-advanced-dot" aria-hidden="true"></span>
+              <p class="bb-advanced-label">Meeting Readiness</p>
+            </div>
+            <h3>Trend-backed packet mode</h3>
+            <p>Run chapter meetings with historical trends, assignment ownership, and decision-ready profile summaries.</p>
+            <div class="bb-advanced-tags">
+              <span>Trend graph</span>
+              <span>Packet export</span>
+            </div>
+          </article>
+          <article class="bb-advanced-card">
+            <div class="bb-advanced-meta">
+              <span class="bb-advanced-dot" aria-hidden="true"></span>
+              <p class="bb-advanced-label">Coordination Layer</p>
+            </div>
+            <h3>Assignments, lunches, events, and chat in sync</h3>
+            <p>Outreach, ownership, schedules, and rush communication stay connected inside one operating surface.</p>
+            <div class="bb-advanced-tags">
+              <span>Shared calendar</span>
+              <span>Officer chat</span>
+            </div>
+          </article>
+          <article class="bb-advanced-card bb-advanced-card-wide">
+            <div class="bb-advanced-meta">
+              <span class="bb-advanced-dot" aria-hidden="true"></span>
+              <p class="bb-advanced-label">Data Continuity</p>
+            </div>
+            <h3>Production-grade backups and season lifecycle controls</h3>
+            <p>Persistent storage checks, CSV exports, snapshots, and controlled archive/reset flows keep operations safe.</p>
+            <div class="bb-advanced-tags">
+              <span>Persistent storage</span>
+              <span>Backup exports</span>
+            </div>
+          </article>
+          <article class="bb-advanced-card">
+            <div class="bb-advanced-meta">
+              <span class="bb-advanced-dot" aria-hidden="true"></span>
+              <p class="bb-advanced-label">Multi-Organization Platform</p>
+            </div>
+            <h3>Fraternity and sorority branded workspaces</h3>
+            <p>Each organization keeps isolated data with independent admin controls and custom identity.</p>
+            <div class="bb-advanced-tags">
+              <span>Tenant isolation</span>
+              <span>Brand customization</span>
+            </div>
+          </article>
         </div>
-
-        <div class="apple-glass-card apple-feature-card">
-          <div class="apple-feature-icon">📊</div>
-          <h3>Meeting Readiness</h3>
-          <p>Run meetings with historical trends, ownership, and summaries. Everything is synced directly to the meeting packet.</p>
-        </div>
-
-        <div class="apple-glass-card apple-feature-card">
-          <div class="apple-feature-icon">🔄</div>
-          <h3>Coordination Layer</h3>
-          <p>Outreach, schedules, and chat stay connected inside one surface. Sync everyone instantly.</p>
-        </div>
-
-        <div class="apple-glass-card apple-feature-card">
-          <div class="apple-feature-icon">🛡️</div>
-          <h3>Data Continuity</h3>
-          <p>Production-grade backups & controls. Persistent storage, CSV exports, snapshots, and controlled archive flows.</p>
-        </div>
-
-        <div class="apple-glass-card apple-feature-card">
-          <div class="apple-feature-icon">🏢</div>
-          <h3>Multi-Org Workspaces</h3>
-          <p>Isolated data with independent admin controls. Branded specifically for your chapter.</p>
-        </div>
-      </div>
-    </section>
+      </section>
 
       <section class="bb-section bb-journey bb-reveal" data-delay="80">
         <div class="bb-section-head">

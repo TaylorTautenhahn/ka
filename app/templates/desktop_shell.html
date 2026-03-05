@@ -24,17 +24,9 @@
     <link rel="stylesheet" href="/static/css/components.css" />
     <link rel="stylesheet" href="/static/css/pages.css" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <link rel="stylesheet" href="/static/css/apple-landing.css" />
-    <style>
-      /* Extra overrides for desktop_shell to preserve existing variables */
-      body.apple-theme { --apple-bg: var(--bg); }
-      .apple-auth-grid { margin: 40px auto; padding: 0; }
-      .apple-glass-card { background: var(--panel); }
-      .apple-hero { padding: 80px 20px 40px; }
-    </style>
     <script src="/static/js/app.js" defer></script>
   </head>
-  <body class=" apple-theme"{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
+  <body{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
     <div class="noise"></div>
@@ -47,107 +39,103 @@
     </div>
 
     <main class="shell">
-      <header class="apple-hero reveal">
-        <div style="max-width: 800px; margin: 0 auto; text-align: center;">
-          {% if app_config.logo_path %}
-          <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" style="width: 80px; height: 80px; border-radius: 20px; box-shadow: var(--apple-shadow); margin-bottom: 20px;" />
-          {% endif %}
-          <p class="eyebrow" style="color: var(--apple-accent); font-weight: 600; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px;">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
-          <h1>Connected Rush Evaluation</h1>
-          <p>
-            {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.' }}
-          </p>
-          <div id="heroStats" class="hero-stats hidden" style="display: flex; gap: 20px; justify-content: center; margin-top: 40px;">
-            <article class="stat-card apple-glass-card" style="padding: 20px; min-width: 150px;">
-              <p style="margin:0; font-size: 0.9rem; color: var(--apple-text-muted);">PNMs Tracked</p>
-              <strong id="heroPnmCount" style="font-size: 2rem; color: var(--apple-text);">0</strong>
-            </article>
-            <article class="stat-card apple-glass-card" style="padding: 20px; min-width: 150px;">
-              <p style="margin:0; font-size: 0.9rem; color: var(--apple-text-muted);">Member Ratings</p>
-              <strong id="heroRatingCount" style="font-size: 2rem; color: var(--apple-text);">0</strong>
-            </article>
-            <article class="stat-card apple-glass-card" style="padding: 20px; min-width: 150px;">
-              <p style="margin:0; font-size: 0.9rem; color: var(--apple-text-muted);">Lunch Logs</p>
-              <strong id="heroLunchCount" style="font-size: 2rem; color: var(--apple-text);">0</strong>
-            </article>
+      <header class="hero reveal">
+        <div class="hero-shell hero-shell-single">
+          <div class="hero-copy">
+            {% if app_config.logo_path %}
+            <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+            {% endif %}
+            <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
+            <h1>Connected Rush Evaluation</h1>
+            <p>
+              {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.' }}
+            </p>
+            <div id="heroStats" class="hero-stats hidden">
+              <article class="stat-card">
+                <p>PNMs Tracked</p>
+                <strong id="heroPnmCount">0</strong>
+              </article>
+              <article class="stat-card">
+                <p>Member Ratings</p>
+                <strong id="heroRatingCount">0</strong>
+              </article>
+              <article class="stat-card">
+                <p>Lunch Logs</p>
+                <strong id="heroLunchCount">0</strong>
+              </article>
+            </div>
           </div>
         </div>
       </header>
 
-      <section id="authSection" class="apple-auth-grid reveal delay-1">
-        <article class="apple-glass-card">
-          <h2 style="font-size: 2rem; margin-bottom: 24px;">Login</h2>
+      <section id="authSection" class="panel auth-grid reveal delay-1">
+        <article>
+          <h2>Login</h2>
           <form id="loginForm" class="stack">
-            <div class="apple-input-group">
-              <label>Username</label>
-              <input id="loginUsername" class="apple-input" type="text" required placeholder="Your approved username" />
-            </div>
-            <div class="apple-input-group">
-              <label>Password</label>
-              <input id="loginAccessCode" class="apple-input" type="password" required placeholder="Enter password" />
-            </div>
-            <label class="checkbox-line" style="margin-bottom: 24px; display: flex; align-items: center; gap: 10px; cursor: pointer;">
-              <input id="loginRememberMe" type="checkbox" style="width: 18px; height: 18px;" />
-              <span style="font-size: 0.95rem; color: var(--apple-text-muted);">Keep me signed in on this device</span>
+            <label>
+              Username
+              <input id="loginUsername" type="text" required placeholder="Your approved username" />
             </label>
-            <button type="submit" class="apple-btn" style="width: 100%;">Sign In</button>
+            <label>
+              Password
+              <input id="loginAccessCode" type="password" required placeholder="Enter password" />
+            </label>
+            <label class="checkbox-line">
+              <input id="loginRememberMe" type="checkbox" />
+              Keep me signed in on this device
+            </label>
+            <button type="submit">Sign In</button>
           </form>
-          <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--apple-glass-border);">
-            <p style="font-size: 0.9rem; color: var(--apple-text-muted); margin-bottom: 8px;">
-              Sign in with your approved username and password.
-            </p>
-            <p style="font-size: 0.9rem; color: var(--apple-text-muted);">
-              Fraternity member and not on rush team?<br>
-              <a href="{{ app_config.member_base if app_config else '/member' }}" style="color: var(--apple-accent); text-decoration: none; font-weight: 500;">Use the Member Portal &rarr;</a>
-            </p>
-          </div>
+          <p class="muted">
+            Sign in with your approved username and password.
+          </p>
+          <p class="muted">
+            Fraternity member and not on rush team?
+            <a href="{{ app_config.member_base if app_config else '/member' }}">Use the Member Portal</a>.
+          </p>
         </article>
 
-        <article class="apple-glass-card">
-          <h2 style="font-size: 2rem; margin-bottom: 8px;">Register New Rush Officer</h2>
-          <p style="font-size: 0.95rem; color: var(--apple-text-muted); margin-bottom: 24px;">Register with username and password. Emoji is optional.</p>
+        <article>
+          <h2>Register New Rush Officer</h2>
+          <p class="muted">Register with username and password. Emoji is optional. Create/manage PNMs after login.</p>
           <form id="registerForm" class="stack">
-            <div class="apple-input-group">
-              <label>Username</label>
-              <input id="regUsername" class="apple-input" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
+            <label>
+              Username
+              <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
+            </label>
+            <label>
+              Emoji (optional)
+              <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
+            </label>
+            <label>
+              Password
+              <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" />
+            </label>
+            <div class="inline-grid two-cols">
+              <label>
+                City (optional)
+                <input id="regCity" type="text" maxlength="80" placeholder="Austin" />
+              </label>
+                <label>
+                State (optional)
+                <input id="regState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
+              </label>
             </div>
-            <div class="apple-input-group">
-              <label>Emoji (optional)</label>
-              <input id="regEmoji" class="apple-input" type="text" maxlength="8" placeholder="🔥" />
-            </div>
-            <div class="apple-input-group">
-              <label>Password</label>
-              <input id="regAccessCode" class="apple-input" type="password" required placeholder="At least 8 characters with letters and numbers" />
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-              <div class="apple-input-group">
-                <label>City (optional)</label>
-                <input id="regCity" class="apple-input" type="text" maxlength="80" placeholder="Austin" />
-              </div>
-              <div class="apple-input-group">
-                <label>State (optional)</label>
-                <input id="regState" list="stateFilterHints" class="apple-input" type="text" maxlength="32" placeholder="TX or Texas" />
-              </div>
-            </div>
-            <button type="submit" class="apple-btn apple-btn-secondary" style="width: 100%;">Submit for Approval</button>
+            <button type="submit" class="secondary">Submit for Approval</button>
           </form>
-
-          <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--apple-glass-border);">
-            <h3 style="font-size: 1.2rem; margin-bottom: 8px;">Member Signup QR</h3>
-            <p style="font-size: 0.9rem; color: var(--apple-text-muted); margin-bottom: 16px;">Share this with members so they can open the simplified member login/registration page.</p>
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-              <a id="memberSignupLink" class="apple-btn apple-btn-secondary" style="padding: 10px 20px; font-size: 0.9rem;" href="{{ app_config.member_base if app_config else '/member' }}">Open Signup Link</a>
-              <div style="background: white; padding: 10px; border-radius: 12px; box-shadow: var(--apple-shadow);">
-                <img
-                  id="memberSignupQrImage"
-                  style="width: 100px; height: 100px; display: block;"
-                  src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
-                  alt="Member signup QR code"
-                  loading="lazy"
-                />
-              </div>
-            </div>
+          <div class="divider"></div>
+          <h3>Member Signup QR</h3>
+          <p class="muted">Share this with members so they can open the simplified member login/registration page.</p>
+          <div class="action-row">
+            <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
           </div>
+          <img
+            id="memberSignupQrImage"
+            class="signup-qr"
+            src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
+            alt="Member signup QR code"
+            loading="lazy"
+          />
         </article>
       </section>
 

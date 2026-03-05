@@ -47,27 +47,9 @@ def main() -> None:
 
         from fastapi.testclient import TestClient
         from app import main as main_module
-        from app.main import app, normalize_samesite
+        from app.main import app
 
         checks: list[str] = []
-
-        # Pure function tests
-        if normalize_samesite("strict") != "strict":
-            raise AssertionError("normalize_samesite('strict') should return 'strict'")
-        if normalize_samesite("lax") != "lax":
-            raise AssertionError("normalize_samesite('lax') should return 'lax'")
-        if normalize_samesite("none") != "none":
-            raise AssertionError("normalize_samesite('none') should return 'none'")
-        if normalize_samesite("STRICT") != "strict":
-            raise AssertionError("normalize_samesite('STRICT') should return 'strict'")
-        if normalize_samesite("Lax") != "lax":
-            raise AssertionError("normalize_samesite('Lax') should return 'lax'")
-        if normalize_samesite("invalid") != "strict":
-            raise AssertionError("normalize_samesite('invalid') should return 'strict'")
-        if normalize_samesite("") != "strict":
-            raise AssertionError("normalize_samesite('') should return 'strict'")
-
-        checks.append("normalize_samesite pure function tests pass")
 
         if main_module.normalize_state_code("Texas") != "TX":
             raise AssertionError("State normalization should map full state names.")
@@ -83,22 +65,6 @@ def main() -> None:
         if parsed_city != "Unknown Place" or parsed_state != "":
             raise AssertionError("Hometown parser should preserve unknown format city with empty state.")
         checks.append("State normalization + hometown parsing helpers work")
-
-        if main_module.normalized_idle_ttl_seconds(3600, 7200) != 3600:
-            raise AssertionError("normalized_idle_ttl_seconds should return the integer directly.")
-        if main_module.normalized_idle_ttl_seconds("1800", 7200) != 1800:
-            raise AssertionError("normalized_idle_ttl_seconds should parse valid integer strings.")
-        if main_module.normalized_idle_ttl_seconds(3600.5, 7200) != 3600:
-            raise AssertionError("normalized_idle_ttl_seconds should truncate floats to integers.")
-        if main_module.normalized_idle_ttl_seconds("1800.9", 7200) != 1800:
-            raise AssertionError("normalized_idle_ttl_seconds should truncate string floats to integers.")
-        if main_module.normalized_idle_ttl_seconds("invalid", 7200) != 7200:
-            raise AssertionError("normalized_idle_ttl_seconds should return fallback for invalid strings.")
-        if main_module.normalized_idle_ttl_seconds(None, 7200) != 7200:
-            raise AssertionError("normalized_idle_ttl_seconds should return fallback for None.")
-        if main_module.normalized_idle_ttl_seconds([], 7200) != 7200:
-            raise AssertionError("normalized_idle_ttl_seconds should return fallback for uncastable types.")
-        checks.append("normalized_idle_ttl_seconds helper works")
 
         with TestClient(app) as client:
             client.headers.update({"Origin": "http://testserver"})

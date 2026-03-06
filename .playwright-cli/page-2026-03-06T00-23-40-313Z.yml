@@ -1,0 +1,58 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e6]:
+      - paragraph [ref=e7]: KAO
+      - heading "Connected Rush Evaluation" [level=1] [ref=e8]
+      - paragraph [ref=e9]: Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.
+    - generic [ref=e10]:
+      - article [ref=e11]:
+        - heading "Login" [level=2] [ref=e12]
+        - generic [ref=e13]:
+          - generic [ref=e14]:
+            - text: Username
+            - textbox "Username" [ref=e15]:
+              - /placeholder: Your approved username
+          - generic [ref=e16]:
+            - text: Password
+            - textbox "Password" [ref=e17]:
+              - /placeholder: Enter password
+          - generic [ref=e18]:
+            - checkbox "Keep me signed in on this device" [ref=e19]
+            - text: Keep me signed in on this device
+          - button "Sign In" [ref=e20] [cursor=pointer]
+        - paragraph [ref=e21]: Sign in with your approved username and password.
+        - paragraph [ref=e22]:
+          - text: Fraternity member and not on rush team?
+          - link "Use the Member Portal" [ref=e23] [cursor=pointer]:
+            - /url: /kappaalphaorder/member
+          - text: .
+      - article [ref=e24]:
+        - heading "Register New Rush Officer" [level=2] [ref=e25]
+        - paragraph [ref=e26]: Register with username and password. Emoji is optional. Create and manage PNMs after login.
+        - generic [ref=e27]:
+          - generic [ref=e28]:
+            - text: Username
+            - textbox "Username" [ref=e29]:
+              - /placeholder: letters, numbers, dot, underscore, hyphen
+          - generic [ref=e30]:
+            - text: Emoji (optional)
+            - textbox "Emoji (optional)" [ref=e31]:
+              - /placeholder: 🔥
+          - generic [ref=e32]:
+            - text: Password
+            - textbox "Password" [ref=e33]:
+              - /placeholder: At least 8 characters with letters and numbers
+          - generic [ref=e34]:
+            - generic [ref=e35]:
+              - text: City (optional)
+              - textbox "City (optional)" [ref=e36]:
+                - /placeholder: Austin
+            - generic [ref=e37]:
+              - text: State (optional)
+              - combobox "State (optional)" [ref=e38]
+          - button "Submit for Approval" [ref=e39] [cursor=pointer]
+        - heading "Member Signup QR" [level=3] [ref=e41]
+        - paragraph [ref=e42]: Share this with members so they can open the simplified member login and registration page.
+        - link "Open Member Signup" [ref=e44] [cursor=pointer]:
+          - /url: /kappaalphaorder/member
+        - img "Member signup QR code" [ref=e45]

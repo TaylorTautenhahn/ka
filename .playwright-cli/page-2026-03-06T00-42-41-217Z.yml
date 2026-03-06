@@ -1,0 +1,100 @@
+- generic [active] [ref=e1]:
+  - main [ref=e2]:
+    - generic [ref=e3]:
+      - paragraph [ref=e4]: KAO
+      - heading "Command" [level=1] [ref=e5]
+      - paragraph [ref=e6]: Search rushees fast, update ratings immediately, and revisit lunch follow-up without switching screens.
+    - generic [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]:
+          - generic [ref=e10]:
+            - heading "Search Rushees" [level=2] [ref=e11]
+            - paragraph [ref=e12]: Find any rushee by name, code, hometown, or Instagram.
+          - link "Add Rushee" [ref=e13] [cursor=pointer]:
+            - /url: /kappaalphaorder/mobile/create
+        - generic [ref=e14]:
+          - text: Search
+          - searchbox "Search" [ref=e15]
+        - generic [ref=e16]:
+          - button "Clear" [ref=e17] [cursor=pointer]
+          - link "Meeting Packets" [ref=e18] [cursor=pointer]:
+            - /url: /kappaalphaorder/mobile/meeting
+        - paragraph [ref=e19]: Showing 0 quick results
+        - paragraph [ref=e21]: No rushees match that search yet.
+      - generic [ref=e22]:
+        - generic [ref=e23]:
+          - generic [ref=e24]:
+            - heading "Lunch Follow-Up" [level=2] [ref=e25]
+            - paragraph [ref=e26]: Rushees you have already been on lunch with for quick post-event updates.
+          - generic [ref=e27]: "0"
+        - paragraph [ref=e29]: No lunch follow-up yet. Once you log lunches, they appear here for fast post-event rating updates.
+      - generic [ref=e30]:
+        - generic [ref=e31]:
+          - generic [ref=e32]:
+            - heading "Quick Rating" [level=2] [ref=e33]
+            - paragraph [ref=e34]: Select a queue item to start rating.
+          - link "Open Meeting" [ref=e35] [cursor=pointer]:
+            - /url: /kappaalphaorder/mobile/meeting
+        - generic [ref=e36]:
+          - generic [ref=e37]:
+            - generic [ref=e38]:
+              - generic [ref=e39]: Girls (0-10)
+              - spinbutton "Girls (0-10)" [ref=e40]
+            - generic [ref=e41]:
+              - generic [ref=e42]: Process (0-10)
+              - spinbutton "Process (0-10)" [ref=e43]
+            - generic [ref=e44]:
+              - generic [ref=e45]: Personable (0-10)
+              - spinbutton "Personable (0-10)" [ref=e46]
+            - generic [ref=e47]:
+              - generic [ref=e48]: Alcohol (0-10)
+              - spinbutton "Alcohol (0-10)" [ref=e49]
+            - generic [ref=e50]:
+              - generic [ref=e51]: IG (0-5)
+              - spinbutton "IG (0-5)" [ref=e52]
+          - generic [ref=e53]:
+            - text: Comment
+            - textbox "Comment" [ref=e54]:
+              - /placeholder: Add context after the event or lunch
+      - group [ref=e55]:
+        - generic "Needs Rating Queue" [ref=e56] [cursor=pointer]
+    - generic [ref=e57]:
+      - heading "Live Snapshot" [level=2] [ref=e58]
+      - generic [ref=e59]:
+        - article [ref=e60]:
+          - strong [ref=e61]: "0"
+          - paragraph [ref=e62]: PNMs
+        - article [ref=e63]:
+          - strong [ref=e64]: "0"
+          - paragraph [ref=e65]: Ratings
+        - article [ref=e66]:
+          - strong [ref=e67]: "0"
+          - paragraph [ref=e68]: Lunches
+      - generic [ref=e69]:
+        - link "Open Rushees" [ref=e70] [cursor=pointer]:
+          - /url: /kappaalphaorder/mobile/pnms
+        - link "Open Team" [ref=e71] [cursor=pointer]:
+          - /url: /kappaalphaorder/mobile/members
+        - link "Open Operations" [ref=e72] [cursor=pointer]:
+          - /url: /kappaalphaorder/mobile/calendar
+        - link "Add Rushee" [ref=e73] [cursor=pointer]:
+          - /url: /kappaalphaorder/mobile/create
+    - group [ref=e74]:
+      - generic "Shared Calendar" [ref=e75] [cursor=pointer]
+    - generic [ref=e76]:
+      - button "Save Rating" [ref=e77] [cursor=pointer]
+      - link "Add Rushee" [ref=e78] [cursor=pointer]:
+        - /url: /kappaalphaorder/mobile/create
+      - link "Open Meeting" [ref=e79] [cursor=pointer]:
+        - /url: /kappaalphaorder/mobile/meeting
+  - navigation "Mobile Navigation" [ref=e80]:
+    - link "Command" [ref=e81] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile
+    - link "Rushees" [ref=e82] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/pnms
+    - link "Team" [ref=e83] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/members
+    - link "Operations" [ref=e84] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/calendar
+    - link "Admin" [ref=e85] [cursor=pointer]:
+      - /url: /kappaalphaorder/mobile/admin

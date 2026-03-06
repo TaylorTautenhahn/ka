@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="shieldStroke" x1="96" y1="84" x2="416" y2="440" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1896ff"/>
+      <stop offset="1" stop-color="#66f0be"/>
+    </linearGradient>
+    <linearGradient id="networkStroke" x1="170" y1="152" x2="352" y2="360" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2d8cf4"/>
+      <stop offset="1" stop-color="#61e7c4"/>
+    </linearGradient>
+    <linearGradient id="arrowFill" x1="194" y1="328" x2="316" y2="184" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2a66d4"/>
+      <stop offset="1" stop-color="#5ee0c6"/>
+    </linearGradient>
+  </defs>
+  <path d="M256 54c38 30 86 50 144 58 18 3 32 18 33 36 2 40 1 159-24 224-22 59-63 106-139 140a34 34 0 0 1-28 0C166 478 125 431 103 372 78 307 77 188 79 148c1-18 15-33 33-36 58-8 106-28 144-58Z" fill="rgba(255,255,255,0.92)"/>
+  <path d="M256 54c38 30 86 50 144 58 18 3 32 18 33 36 2 40 1 159-24 224-22 59-63 106-139 140a34 34 0 0 1-28 0C166 478 125 431 103 372 78 307 77 188 79 148c1-18 15-33 33-36 58-8 106-28 144-58Z" stroke="url(#shieldStroke)" stroke-width="24" stroke-linejoin="round"/>
+  <g stroke="url(#networkStroke)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M184 162h92l78 60v118l-94 40-76-74V162Z"/>
+    <path d="M184 162l76 74m0-74-76 144m0 0 76 74m0-144 94 104m-94 40 18-96m76-62-94-60"/>
+    <path d="M228 342l116-2"/>
+  </g>
+  <g fill="url(#networkStroke)">
+    <circle cx="184" cy="162" r="18"/>
+    <circle cx="260" cy="162" r="16"/>
+    <circle cx="338" cy="222" r="16"/>
+    <circle cx="338" cy="304" r="16"/>
+    <circle cx="290" cy="360" r="16"/>
+    <circle cx="204" cy="380" r="16"/>
+    <circle cx="184" cy="306" r="16"/>
+    <circle cx="228" cy="250" r="18"/>
+  </g>
+  <path d="M190 336 295 230h-42l82-70-26 82h42L246 348c-14 14-36 4-36-12Z" fill="url(#arrowFill)"/>
+</svg>

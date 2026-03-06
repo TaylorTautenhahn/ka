@@ -33,7 +33,7 @@
     </div>
 
     <main class="shell shell-app-shell">
-      <section id="authShell" class="auth-shell">
+      <section id="authShell" class="auth-shell{% if initial_authenticated %} hidden{% endif %}">
         <header id="authHero" class="hero reveal">
           <div class="hero-shell hero-shell-single">
             <div class="hero-copy">
@@ -133,7 +133,7 @@
         </section>
       </section>
 
-      <section id="appSection" class="hidden app-shell">
+      <section id="appSection" class="{% if not initial_authenticated %}hidden {% endif %}app-shell">
         <div class="app-frame">
           <aside class="panel app-sidebar">
             <div class="app-sidebar-brand">

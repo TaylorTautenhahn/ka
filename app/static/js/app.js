@@ -3032,6 +3032,9 @@ function renderSameStatePnmsPanel() {
 }
 
 function renderAnalytics(overview) {
+  if (!analyticsCards || !overview) {
+    return;
+  }
   const pnmCards = overview.top_pnms
     .slice(0, 5)
     .map(

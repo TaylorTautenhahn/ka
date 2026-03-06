@@ -1164,6 +1164,7 @@ def desktop_context(
     desktop_route: str,
     *,
     is_demo_mode: bool = False,
+    initial_authenticated: bool = False,
 ) -> dict[str, Any]:
     resolved_route = normalize_desktop_route(desktop_route)
     app_config = app_config_for_tenant(tenant)
@@ -1176,6 +1177,7 @@ def desktop_context(
         "app_config": app_config,
         "desktop_route": resolved_route,
         "is_demo_mode": is_demo_mode,
+        "initial_authenticated": initial_authenticated,
     }
 
 
@@ -1206,7 +1208,13 @@ def render_desktop_page(
 
     return templates.TemplateResponse(
         "desktop_shell.html",
-        desktop_context(request, tenant, resolved_route, is_demo_mode=is_demo_mode),
+        desktop_context(
+            request,
+            tenant,
+            resolved_route,
+            is_demo_mode=is_demo_mode,
+            initial_authenticated=bool(session_role),
+        ),
     )
 
 

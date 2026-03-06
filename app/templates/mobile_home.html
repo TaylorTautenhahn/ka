@@ -20,7 +20,7 @@
       <div class="pwa-splash-card">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h2>BidBoard</h2>
-        <p>Opening mobile dashboard...</p>
+        <p>Opening mobile command...</p>
       </div>
     </div>
     <main class="shell mobile-shell">
@@ -30,7 +30,7 @@
         {% endif %}
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Command</h1>
-        <p>{{ app_config.setup_tagline if app_config.setup_tagline else app_config.tenant_name ~ ' command center optimized for iPhone use during rush events.' }}</p>
+        <p>Search rushees fast, update ratings immediately, and revisit lunch follow-up without switching screens.</p>
       </header>
 
       {% if app_config.is_demo_tenant %}
@@ -43,11 +43,11 @@
           <span class="demo-guide-summary-action">Collapse</span>
         </summary>
         <div class="demo-guide-body">
-          <p class="muted">This sandbox uses seeded sample data. Rate a PNM, schedule a lunch, then open Meeting to experience the full workflow.</p>
+          <p class="muted">Search for a demo rushee, tap a recent lunch follow-up card, then update the rating and comments in one flow.</p>
           <div class="mobile-action-grid">
-            <a href="#mobileOfficerCommandCenter" class="quick-nav-link">Jump to Queue</a>
-            <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
-            <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="quick-nav-link">Open Calendar</a>
+            <a href="#mobileHomeSearchPanel" class="quick-nav-link">Search</a>
+            <a href="#mobileHomeRecentLunchesPanel" class="quick-nav-link">Lunch Follow-Up</a>
+            <a href="#mobileHomeQuickRatePanel" class="quick-nav-link">Quick Rate</a>
             <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting</a>
           </div>
         </div>
@@ -55,22 +55,45 @@
       {% endif %}
 
       <section id="mobileOfficerCommandCenter" class="hidden">
-        <section class="panel mobile-panel">
+        <section id="mobileHomeSearchPanel" class="panel mobile-panel">
           <div class="section-head">
-            <h2>Rate Queue</h2>
-            <span id="mobileCommandWindowLabel" class="muted">Last 72h</span>
+            <div>
+              <h2>Search Rushees</h2>
+              <p class="muted">Find any rushee by name, code, hometown, or Instagram.</p>
+            </div>
+            <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="quick-nav-link">Add Rushee</a>
           </div>
-          <div class="mobile-kpi-grid">
-            <article class="card"><strong id="mobileCommandQueueCount">0</strong><p>Queue</p></article>
-            <article class="card"><strong id="mobileCommandStaleCount">0</strong><p>Stale</p></article>
-            <article class="card"><strong id="mobileCommandRecentCount">0</strong><p>Changes</p></article>
+          <label>
+            Search
+            <input id="mobileHomeSearchInput" type="search" placeholder="Search Jimmy, JJO02112026, Austin, @jimmy" autocomplete="off" />
+          </label>
+          <div class="mobile-action-grid">
+            <button id="mobileHomeClearSearchBtn" type="button" class="secondary">Clear</button>
+            <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
           </div>
-          <div id="mobileCommandQueueList" class="mobile-list"></div>
+          <p id="mobileHomeSearchMeta" class="muted">Loading rushees...</p>
+          <div id="mobileHomeSearchResults" class="mobile-list"></div>
         </section>
 
-        <section class="panel mobile-panel">
-          <h2>Quick Rating</h2>
-          <p id="mobileCommandSelectedMeta" class="muted">Select a queue item to start rating.</p>
+        <section id="mobileHomeRecentLunchesPanel" class="panel mobile-panel">
+          <div class="section-head">
+            <div>
+              <h2>Lunch Follow-Up</h2>
+              <p class="muted">Rushees you have already been on lunch with for quick post-event updates.</p>
+            </div>
+            <span id="mobileHomeRecentLunchCount" class="muted">0</span>
+          </div>
+          <div id="mobileHomeRecentLunches" class="mobile-list"></div>
+        </section>
+
+        <section id="mobileHomeQuickRatePanel" class="panel mobile-panel">
+          <div class="section-head">
+            <div>
+              <h2>Quick Rating</h2>
+              <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or lunch follow-up to start rating.</p>
+            </div>
+            <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
+          </div>
           <form id="mobileCommandRatingForm" class="stack">
             <div class="inline-grid two-cols compact-inputs">
               <label><span id="mobileCommandRateGirlsLabel">Girls (0-10)</span><input id="mobileCommandRateGirls" type="number" min="0" max="10" required /></label>
@@ -80,49 +103,29 @@
               <label><span id="mobileCommandRateIgLabel">IG (0-5)</span><input id="mobileCommandRateIg" type="number" min="0" max="5" required /></label>
             </div>
             <label>
-              Comment (required on updates; must exceed 5 words)
-              <textarea id="mobileCommandRateComment" rows="3" placeholder="What changed after the latest touchpoint?"></textarea>
+              Comment
+              <textarea id="mobileCommandRateComment" rows="3" placeholder="Add context after the event or lunch"></textarea>
             </label>
           </form>
         </section>
 
-        <section class="panel mobile-panel">
-          <h2>Quick Lunch</h2>
-          <form id="mobileCommandLunchForm" class="stack">
-            <label>
-              Date
-              <input id="mobileCommandLunchDate" type="date" required />
-            </label>
-            <div class="inline-grid two-cols">
-              <label>
-                Start (optional)
-                <input id="mobileCommandLunchStartTime" type="time" />
-              </label>
-              <label>
-                End (optional)
-                <input id="mobileCommandLunchEndTime" type="time" />
-              </label>
-            </div>
-            <label>
-              Location (optional)
-              <input id="mobileCommandLunchLocation" type="text" placeholder="Main Street Cafe" />
-            </label>
-            <label>
-              Notes
-              <textarea id="mobileCommandLunchNotes" rows="2" placeholder="Optional touchpoint context"></textarea>
-            </label>
-          </form>
-        </section>
-
-        <section class="panel mobile-panel">
-          <h2>Recent Rating Changes</h2>
+        <details class="panel mobile-panel mobile-collapsible">
+          <summary>Needs Rating Queue</summary>
+          <div class="mobile-kpi-grid">
+            <article class="card"><strong id="mobileCommandQueueCount">0</strong><p>Queue</p></article>
+            <article class="card"><strong id="mobileCommandStaleCount">0</strong><p>Stale</p></article>
+            <article class="card"><strong id="mobileCommandRecentCount">0</strong><p>Changes</p></article>
+          </div>
+          <div id="mobileCommandQueueList" class="mobile-list"></div>
+          <div class="divider"></div>
+          <h3>Recent Rating Changes</h3>
           <div id="mobileCommandRecentChanges" class="mobile-list"></div>
-        </section>
+        </details>
       </section>
 
       <section id="mobileNonOfficerNotice" class="panel mobile-panel hidden">
         <h2>Summary Dashboard</h2>
-        <p class="muted">Command Center actions are available to Head Rush Officers and Rush Officers. You still have access to core views below.</p>
+        <p class="muted">Quick mobile rating tools are available to Head Rush Officers and Rush Officers. You still have access to the core team views below.</p>
       </section>
 
       <section id="mobileHomeSecondarySection" class="panel mobile-panel">
@@ -135,15 +138,10 @@
         <div class="mobile-action-grid">
           <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
           <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="quick-nav-link">Open Team</a>
-          <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="quick-nav-link">Open Calendar</a>
-          <a href="{{ app_config.mobile_base }}/create" class="quick-nav-link">Add Rushee</a>
+          <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="quick-nav-link">Open Operations</a>
+          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="quick-nav-link">Add Rushee</a>
         </div>
       </section>
-
-      <details class="panel mobile-panel mobile-collapsible">
-        <summary>Leaderboard</summary>
-        <div id="mobileLeaderboard" class="mobile-list"></div>
-      </details>
 
       <details class="panel mobile-panel mobile-collapsible">
         <summary>Shared Calendar</summary>
@@ -156,8 +154,8 @@
 
       <div id="mobileCommandStickyActions" class="mobile-command-sticky hidden">
         <button id="mobileCommandStickySaveBtn" type="button">Save Rating</button>
-        <button id="mobileCommandStickyLunchBtn" type="button" class="secondary">Schedule Lunch</button>
-        <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
+        <a id="mobileCommandStickyAddLink" class="quick-nav-link" href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}">Add Rushee</a>
+        <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
       </div>
     </main>
 

@@ -251,6 +251,9 @@ const mobileCommandCenter = {
   limit: 30,
   error: "",
 };
+let mobileHomePnmRows = [];
+let mobileHomeRecentLunchRows = [];
+let mobileHomeSelectedPnmId = null;
 const mobileFilters = {
   pnms: {
     state: "",
@@ -1100,6 +1103,148 @@ function renderHomeStats(stats) {
   lunchCountEl.textContent = String(Number(stats.lunch_count || 0));
 }
 
+function mobileHomeSelectedPnm() {
+  const selectedId = Number(mobileHomeSelectedPnmId || mobileCommandCenter.selectedPnmId || 0);
+  if (!selectedId) {
+    return null;
+  }
+  return (
+    mobileHomePnmRows.find((item) => Number(item.pnm_id) === selectedId) ||
+    mobileCommandCenter.queue.find((item) => Number(item.pnm_id) === selectedId) ||
+    null
+  );
+}
+
+function mobileHomeAssignedLabel(pnm) {
+  if (!pnm) {
+    return "Unassigned";
+  }
+  if (pnm.assigned_officer && pnm.assigned_officer.username) {
+    return pnm.assigned_officer.username;
+  }
+  if (pnm.assigned_officer_username) {
+    return pnm.assigned_officer_username;
+  }
+  const assignedTeam = Array.isArray(pnm.assigned_officers) ? pnm.assigned_officers : [];
+  if (!assignedTeam.length) {
+    return "Unassigned";
+  }
+  return assignedTeam
+    .map((officer) => officer && officer.username ? officer.username : "Unknown")
+    .join(", ");
+}
+
+function mobileHomeSearchRows() {
+  const input = document.getElementById("mobileHomeSearchInput");
+  const query = String(input && input.value ? input.value : "").trim().toLowerCase();
+  if (!query) {
+    return mobileHomePnmRows.slice(0, 8);
+  }
+  return mobileHomePnmRows.filter((pnm) => {
+    const haystack = [
+      pnm.pnm_code,
+      pnm.first_name,
+      pnm.last_name,
+      pnm.hometown,
+      pnm.hometown_state_code,
+      pnm.instagram_handle,
+      pnm.phone_number,
+      Array.isArray(pnm.interests) ? pnm.interests.join(" ") : "",
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+    return haystack.includes(query);
+  });
+}
+
+function renderMobileHomeSearchResults() {
+  const listEl = document.getElementById("mobileHomeSearchResults");
+  const metaEl = document.getElementById("mobileHomeSearchMeta");
+  if (!listEl || !metaEl) {
+    return;
+  }
+  const input = document.getElementById("mobileHomeSearchInput");
+  const query = String(input && input.value ? input.value : "").trim();
+  const rows = mobileHomeSearchRows();
+  metaEl.textContent = query
+    ? `${rows.length} match${rows.length === 1 ? "" : "es"} for "${query}"`
+    : `Showing ${rows.length} quick results`;
+  if (!rows.length) {
+    listEl.innerHTML = '<p class="muted">No rushees match that search yet.</p>';
+    return;
+  }
+  listEl.innerHTML = rows
+    .map((pnm) => {
+      const selectedClass = Number(mobileHomeSelectedPnmId) === Number(pnm.pnm_id) ? " is-selected" : "";
+      const ownRating = pnm.own_rating && Number.isFinite(Number(pnm.own_rating.total_score))
+        ? `${Number(pnm.own_rating.total_score).toFixed(0)}/${RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0)}`
+        : "Not rated";
+      return `
+        <article class="entry mobile-card${selectedClass}">
+          <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(pnm.pnm_id)}">
+            <div class="entry-title">
+              <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+              <span>${Number(pnm.weighted_total || 0).toFixed(2)}</span>
+            </div>
+            <div class="muted">Assigned: ${escapeHtml(mobileHomeAssignedLabel(pnm))}</div>
+            <div class="muted">My Rating: ${escapeHtml(ownRating)} | Lunches: ${Number(pnm.total_lunches || 0)}</div>
+          </button>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderMobileHomeRecentLunches() {
+  const listEl = document.getElementById("mobileHomeRecentLunches");
+  const countEl = document.getElementById("mobileHomeRecentLunchCount");
+  if (!listEl || !countEl) {
+    return;
+  }
+  countEl.textContent = String(mobileHomeRecentLunchRows.length);
+  if (!mobileHomeRecentLunchRows.length) {
+    listEl.innerHTML = '<p class="muted">No lunch follow-up yet. Once you log lunches, they appear here for fast post-event rating updates.</p>';
+    return;
+  }
+  listEl.innerHTML = mobileHomeRecentLunchRows
+    .map((row) => {
+      const selectedClass = Number(mobileHomeSelectedPnmId) === Number(row.pnm_id) ? " is-selected" : "";
+      const timing = [row.last_lunch_date, row.start_time || "", row.location || ""].filter(Boolean).join(" | ");
+      return `
+        <article class="entry mobile-card${selectedClass}">
+          <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(row.pnm_id)}">
+            <div class="entry-title">
+              <strong>${escapeHtml(row.pnm_code)} | ${escapeHtml(row.name)}</strong>
+              <span>${Number(row.weighted_total || 0).toFixed(2)}</span>
+            </div>
+            <div class="muted">${escapeHtml(timing || "Recent lunch")}</div>
+            <div class="muted">${escapeHtml(row.notes || "Tap to add a post-lunch rating update.")}</div>
+          </button>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function selectMobileHomePnm(pnmId, options = {}) {
+  const targetId = Number(pnmId || 0);
+  if (!targetId) {
+    return;
+  }
+  mobileHomeSelectedPnmId = targetId;
+  mobileCommandCenter.selectedPnmId = targetId;
+  renderMobileHomeSearchResults();
+  renderMobileHomeRecentLunches();
+  renderMobileCommandSelection();
+  if (options.scrollToForm) {
+    const panel = document.getElementById("mobileHomeQuickRatePanel");
+    if (panel) {
+      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }
+}
+
 function renderHomeLeaderboard(rows) {
   const listEl = document.getElementById("mobileLeaderboard");
   if (!listEl) {
@@ -1141,11 +1286,7 @@ function mobileCommandStaleLabel(value) {
 }
 
 function mobileCommandSelectedItem() {
-  const selectedId = Number(mobileCommandCenter.selectedPnmId || 0);
-  if (!selectedId) {
-    return null;
-  }
-  return mobileCommandCenter.queue.find((item) => Number(item.pnm_id) === selectedId) || null;
+  return mobileHomeSelectedPnm();
 }
 
 function applyMobileCommandRatingCriteriaUi() {
@@ -1189,13 +1330,17 @@ function renderMobileCommandCenterVisibility() {
 function renderMobileCommandSelection() {
   const metaEl = document.getElementById("mobileCommandSelectedMeta");
   const stickyMeetingLink = document.getElementById("mobileCommandStickyMeetingLink");
+  const stickyMeetingShortcut = document.getElementById("mobileCommandStickyMeetingShortcut");
   const selected = mobileCommandSelectedItem();
   if (!selected) {
     if (metaEl) {
-      metaEl.textContent = "Select a queue item to start rating.";
+      metaEl.textContent = "Select a rushee from search results or lunch follow-up to start rating.";
     }
     if (stickyMeetingLink) {
       stickyMeetingLink.href = MOBILE_ROUTES.meeting;
+    }
+    if (stickyMeetingShortcut) {
+      stickyMeetingShortcut.href = MOBILE_ROUTES.meeting;
     }
     const ratingForm = document.getElementById("mobileCommandRatingForm");
     if (ratingForm) {
@@ -1204,16 +1349,29 @@ function renderMobileCommandSelection() {
     return;
   }
 
-  const assigned = selected.assigned_officer_username || "Unassigned";
-  const touchpoint = selected.last_touchpoint_at ? formatDownloadStamp(selected.last_touchpoint_at) : "None";
-  const mine = selected.last_rating_by_me_at ? formatDownloadStamp(selected.last_rating_by_me_at) : "Never";
+  const assigned = mobileHomeAssignedLabel(selected);
+  const touchpoint = selected.last_lunch_with_me_at
+    ? formatDownloadStamp(selected.last_lunch_with_me_at)
+    : selected.last_touchpoint_at
+      ? formatDownloadStamp(selected.last_touchpoint_at)
+      : "None";
+  const mine = selected.own_rating && selected.own_rating.updated_at ? formatDownloadStamp(selected.own_rating.updated_at) : selected.last_rating_by_me_at ? formatDownloadStamp(selected.last_rating_by_me_at) : "Never";
   const stale = selected.needs_rating_update ? mobileCommandStaleLabel(selected.stale_reason) : "Fresh";
+  const lunchContext = [
+    selected.last_lunch_with_me_date || "",
+    selected.last_lunch_with_me_location || "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
   if (metaEl) {
     metaEl.textContent =
-      `${selected.pnm_code} | ${selected.name} | Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assigned} | Touchpoint: ${touchpoint} | My Rating: ${mine} | ${stale}`;
+      `${selected.pnm_code} | ${selected.name || `${selected.first_name} ${selected.last_name}`} | Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assigned} | Last lunch: ${touchpoint}${lunchContext ? ` (${lunchContext})` : ""} | My Rating: ${mine} | ${stale}`;
   }
   if (stickyMeetingLink) {
     stickyMeetingLink.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
+  }
+  if (stickyMeetingShortcut) {
+    stickyMeetingShortcut.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
   }
 
   const own = selected.own_rating || null;
@@ -1244,7 +1402,7 @@ function renderMobileCommandSelection() {
     igInput.value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
   }
   if (commentInput) {
-    commentInput.value = own && own.comment ? own.comment : "";
+    commentInput.value = selected.last_lunch_with_me_notes ? selected.last_lunch_with_me_notes : own && own.comment ? own.comment : "";
   }
 }
 
@@ -1391,6 +1549,39 @@ async function loadHomeSnapshot() {
   const payload = await api("/api/mobile/home");
   renderHomeStats(payload.stats || {});
   renderHomeLeaderboard(payload.leaderboard || []);
+  mobileHomePnmRows = Array.isArray(payload.pnms) ? payload.pnms : [];
+  mobileHomeRecentLunchRows = Array.isArray(payload.recent_lunches) ? payload.recent_lunches : [];
+  const lunchByPnm = new Map();
+  mobileHomeRecentLunchRows.forEach((row) => {
+    const pnmId = Number(row && row.pnm_id ? row.pnm_id : 0);
+    if (!pnmId || lunchByPnm.has(pnmId)) {
+      return;
+    }
+    lunchByPnm.set(pnmId, row);
+  });
+  mobileHomePnmRows = mobileHomePnmRows.map((pnm) => {
+    const lunch = lunchByPnm.get(Number(pnm.pnm_id));
+    if (!lunch) {
+      return pnm;
+    }
+    return {
+      ...pnm,
+      last_lunch_with_me_at: lunch.created_at || lunch.last_lunch_date || "",
+      last_lunch_with_me_date: lunch.last_lunch_date || "",
+      last_lunch_with_me_location: lunch.location || "",
+      last_lunch_with_me_notes: lunch.notes || "",
+    };
+  });
+  if (!mobileHomeSelectedPnmId) {
+    mobileHomeSelectedPnmId = mobileHomeRecentLunchRows.length
+      ? Number(mobileHomeRecentLunchRows[0].pnm_id)
+      : mobileHomePnmRows.length
+        ? Number(mobileHomePnmRows[0].pnm_id)
+        : null;
+  }
+  renderMobileHomeSearchResults();
+  renderMobileHomeRecentLunches();
+  renderMobileCommandSelection();
   if (payload.calendar_share) {
     renderMobileCalendarShare(payload.calendar_share);
   }
@@ -1557,7 +1748,7 @@ function handleMobileCommandQueueSelect(event) {
   if (!pnmId) {
     return;
   }
-  mobileCommandCenter.selectedPnmId = pnmId;
+  selectMobileHomePnm(pnmId, { scrollToForm: true });
   renderMobileCommandCenter();
 }
 
@@ -1679,6 +1870,18 @@ async function loadPnmsPage() {
   const [pnmPayload] = await Promise.all([api(`/api/pnms${query}`), loadContactDownloadStatuses()]);
   mobilePnmRows = Array.isArray(pnmPayload.pnms) ? pnmPayload.pnms : [];
   updateContactsUi();
+}
+
+function handleMobileHomeSearchClick(event) {
+  const trigger = event.target.closest("[data-mobile-home-pnm-id]");
+  if (!trigger) {
+    return;
+  }
+  const pnmId = Number(trigger.dataset.mobileHomePnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  selectMobileHomePnm(pnmId, { scrollToForm: true });
 }
 
 async function loadMembersPage() {
@@ -2067,13 +2270,34 @@ async function handleCreateSubmit(event) {
 function attachPageEvents() {
   if (MOBILE_PAGE === "home") {
     const copyBtn = document.getElementById("mobileCopyCalendarBtn");
+    const searchInput = document.getElementById("mobileHomeSearchInput");
+    const clearSearchBtn = document.getElementById("mobileHomeClearSearchBtn");
+    const searchResults = document.getElementById("mobileHomeSearchResults");
+    const recentLunches = document.getElementById("mobileHomeRecentLunches");
     const queueList = document.getElementById("mobileCommandQueueList");
     const ratingForm = document.getElementById("mobileCommandRatingForm");
-    const lunchForm = document.getElementById("mobileCommandLunchForm");
     const stickySaveBtn = document.getElementById("mobileCommandStickySaveBtn");
-    const stickyLunchBtn = document.getElementById("mobileCommandStickyLunchBtn");
     if (copyBtn) {
       copyBtn.addEventListener("click", handleMobileCopyCalendar);
+    }
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        renderMobileHomeSearchResults();
+      });
+    }
+    if (clearSearchBtn) {
+      clearSearchBtn.addEventListener("click", () => {
+        if (searchInput) {
+          searchInput.value = "";
+        }
+        renderMobileHomeSearchResults();
+      });
+    }
+    if (searchResults) {
+      searchResults.addEventListener("click", handleMobileHomeSearchClick);
+    }
+    if (recentLunches) {
+      recentLunches.addEventListener("click", handleMobileHomeSearchClick);
     }
     if (queueList) {
       queueList.addEventListener("click", handleMobileCommandQueueSelect);
@@ -2084,20 +2308,9 @@ function attachPageEvents() {
         await handleMobileCommandSaveRating();
       });
     }
-    if (lunchForm) {
-      lunchForm.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        await handleMobileCommandScheduleLunch();
-      });
-    }
     if (stickySaveBtn) {
       stickySaveBtn.addEventListener("click", () => {
         handleMobileCommandSaveRating();
-      });
-    }
-    if (stickyLunchBtn) {
-      stickyLunchBtn.addEventListener("click", () => {
-        handleMobileCommandScheduleLunch();
       });
     }
   }

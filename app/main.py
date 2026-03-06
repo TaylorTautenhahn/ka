@@ -13223,7 +13223,7 @@ def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str,
 
 
 @app.get("/api/mobile/home")
-def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def mobile_home_payload(request: Request, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     tenant = current_tenant()
     with db_session() as conn:
         totals = conn.execute(
@@ -13235,7 +13235,7 @@ def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)
             FROM pnms
             """
         ).fetchone()
-        rows = conn.execute(
+        leaderboard_rows = conn.execute(
             """
             SELECT
                 p.id,
@@ -13253,9 +13253,47 @@ def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)
             LIMIT 10
             """
         ).fetchall()
+        pnm_rows = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+            LIMIT 300
+            """
+        ).fetchall()
+        own_rows = conn.execute("SELECT * FROM ratings WHERE user_id = ?", (user["id"],)).fetchall()
+        own_rating_by_pnm = {int(row["pnm_id"]): rating_payload(row) for row in own_rows}
+        links_by_pnm = fetch_assignment_links_for_pnms(
+            conn,
+            pnm_ids=[int(row["id"]) for row in pnm_rows],
+        )
+        lunch_rows = conn.execute(
+            """
+            SELECT
+                l.id,
+                l.pnm_id,
+                l.lunch_date,
+                l.start_time,
+                l.end_time,
+                l.location,
+                l.notes,
+                l.created_at
+            FROM lunches l
+            WHERE l.user_id = ?
+            ORDER BY l.lunch_date DESC, COALESCE(l.start_time, '23:59') DESC, l.created_at DESC, l.id DESC
+            LIMIT 80
+            """,
+            (user["id"],),
+        ).fetchall()
 
     leaderboard: list[dict[str, Any]] = []
-    for index, row in enumerate(rows, start=1):
+    for index, row in enumerate(leaderboard_rows, start=1):
         leaderboard.append(
             {
                 "rank": index,
@@ -13270,6 +13308,49 @@ def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)
             }
         )
 
+    pnms = [
+        pnm_payload(
+            row,
+            own_rating_by_pnm.get(int(row["id"])),
+            assigned_officer=assigned_officer_payload_from_row(row),
+            assigned_officers=links_by_pnm.get(int(row["id"]), []),
+        )
+        for row in pnm_rows
+    ]
+    pnm_by_id = {int(item["pnm_id"]): item for item in pnms}
+    recent_lunches: list[dict[str, Any]] = []
+    seen_recent_pnms: set[int] = set()
+    for row in lunch_rows:
+        pnm_id = int(row["pnm_id"])
+        if pnm_id in seen_recent_pnms:
+            continue
+        pnm = pnm_by_id.get(pnm_id)
+        if not pnm:
+            continue
+        seen_recent_pnms.add(pnm_id)
+        recent_lunches.append(
+            {
+                "pnm_id": pnm_id,
+                "pnm_code": pnm["pnm_code"],
+                "name": f"{pnm['first_name']} {pnm['last_name']}",
+                "weighted_total": round(float(pnm["weighted_total"]), 2),
+                "photo_url": pnm["photo_url"],
+                "assigned_officer_username": (
+                    (pnm.get("assigned_officer") or {}).get("username", "")
+                    if isinstance(pnm.get("assigned_officer"), dict)
+                    else ""
+                ),
+                "last_lunch_date": row["lunch_date"],
+                "start_time": row["start_time"],
+                "end_time": row["end_time"],
+                "location": row["location"] or "",
+                "notes": row["notes"] or "",
+                "created_at": row["created_at"],
+            }
+        )
+        if len(recent_lunches) >= 12:
+            break
+
     return {
         "stats": {
             "pnm_count": int(totals["pnm_count"]),
@@ -13277,6 +13358,8 @@ def mobile_home_payload(request: Request, _: sqlite3.Row = Depends(current_user)
             "lunch_count": int(totals["lunch_count"]),
         },
         "leaderboard": leaderboard,
+        "pnms": pnms,
+        "recent_lunches": recent_lunches,
         "calendar_share": calendar_share_payload(request, tenant),
     }
 

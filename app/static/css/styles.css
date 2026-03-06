@@ -244,6 +244,12 @@ body {
   gap: 0.55rem;
 }
 
+#mobileHomeSearchResults,
+#mobileHomeRecentLunches {
+  max-height: 34vh;
+  overflow: auto;
+}
+
 .mobile-card {
   margin-bottom: 0;
 }
@@ -252,6 +258,25 @@ body {
   display: flex;
   gap: 0.55rem;
   align-items: center;
+}
+
+.mobile-home-pnm-btn {
+  width: 100%;
+  border: 1px solid rgba(var(--accent-rgb), 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.72rem 0.76rem;
+  text-align: left;
+  color: inherit;
+  font: inherit;
+  box-shadow: none;
+}
+
+.mobile-home-pnm-btn:hover,
+.mobile-home-pnm-btn:focus-visible {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  transform: none;
+  box-shadow: 0 10px 18px rgba(var(--accent-shadow-rgb), 0.1);
 }
 
 .mobile-tabs {

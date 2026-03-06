@@ -192,12 +192,12 @@
 }
 
 .command-queue-workspace .command-center-grid {
-  grid-template-columns: minmax(520px, 1.34fr) minmax(520px, 1.22fr) minmax(260px, 0.74fr);
-  gap: 1.18rem;
+  grid-template-columns: minmax(440px, 1.08fr) minmax(520px, 1.02fr);
+  gap: 1.1rem;
 }
 
 .command-queue-column {
-  min-width: 520px;
+  min-width: 440px;
 }
 
 .command-list .entry,
@@ -209,6 +209,10 @@
 .command-composer-column,
 .command-rail-column {
   min-width: 0;
+}
+
+.command-rail-column {
+  grid-column: 1 / -1;
 }
 
 .command-pulse-cards {

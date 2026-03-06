@@ -1524,12 +1524,12 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "overview",
-      target: "#matchingSection",
-      title: "Run Interest + Stereotype Matching",
-      body: "Use matching filters to pair rushees with the best-fit officers and members intentionally.",
-      hint: "Filter by one interest first, then add stereotype only when you need tighter matching.",
+      target: "#globalSearchInput",
+      title: "Use Command Search To Move Fast",
+      body: "Use the top search to jump to PNMs, members, and common actions without leaving your current workspace.",
+      hint: "Start typing a first name, code, hometown, or command to open results instantly.",
       advanced:
-        "Advanced workflow: run matching before each event block and create officer assignments based on strongest overlap.",
+        "Advanced workflow: use command search as the fastest way to jump between active PNMs during events and meetings.",
     },
     {
       page: "rushees",
@@ -1578,6 +1578,7 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "operations",
+      operationsTab: "timeline",
       target: "#rushCalendarTable",
       title: "Track One Shared Rush Timeline",
       body: "The calendar combines official rush events and lunches into a single operational timeline.",
@@ -1587,6 +1588,7 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "operations",
+      operationsTab: "goals",
       target: "#weeklyGoalsList",
       title: "Use Weekly Goals For Accountability",
       body: "Goals auto-track progress from real activity like ratings, lunches, and chat participation.",
@@ -1596,6 +1598,7 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "operations",
+      operationsTab: "comms",
       target: "#officerChatForm",
       title: "Coordinate In Live Officer Chat",
       body: "Use tags and mentions to run real-time coordination like a focused rush command channel.",
@@ -1636,6 +1639,7 @@ function tutorialBaseStepsForRole(role) {
     return commonOfficerSteps.concat([
       {
         page: "admin",
+        adminTab: "leadership",
         target: "#headAdminSummary",
         title: "Use Admin As Head Mission Control",
         body: "Head-only metrics summarize officer output, approvals, and chapter-level recruiting health.",
@@ -1645,6 +1649,7 @@ function tutorialBaseStepsForRole(role) {
       },
       {
         page: "admin",
+        adminTab: "roster",
         target: "#headAssignmentForm",
         title: "Assign Rushees Directly From Head Console",
         body: "Set or clear assignment ownership centrally so every rushee has accountable follow-through.",
@@ -1654,6 +1659,7 @@ function tutorialBaseStepsForRole(role) {
       },
       {
         page: "admin",
+        adminTab: "season",
         target: "#seasonArchiveSummary",
         title: "Archive And Reset Safely",
         body: "Archive one full season snapshot before reset so leadership transitions keep historical context.",
@@ -1850,6 +1856,12 @@ function renderTutorialStep() {
   const step = steps[safeIndex];
   if (step.page) {
     setActiveDesktopPage(step.page);
+  }
+  if (step.operationsTab) {
+    setOperationsTab(step.operationsTab);
+  }
+  if (step.adminTab) {
+    setAdminTab(step.adminTab);
   }
   window.setTimeout(() => {
     const highlighted = setTutorialHighlight(step.target);
@@ -3860,8 +3872,18 @@ function renderCommandPaletteResults() {
     .map(
       (item) => `
         <button type="button" class="command-palette-result" data-command-open-pnm="${Number(item.pnm_id)}">
-          <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
-          <div class="muted">Weighted ${Number(item.weighted_total || 0).toFixed(2)}</div>
+          <div class="command-palette-result-main">
+            ${
+              item.photo_url
+                ? `<img src="${escapeHtml(item.photo_url)}" alt="${escapeHtml(item.name || item.pnm_code || "PNM")}" class="command-palette-avatar" loading="lazy" />`
+                : '<div class="command-palette-avatar command-palette-avatar-empty">PNM</div>'
+            }
+            <div class="command-palette-result-copy">
+              <strong>${escapeHtml(item.name || "Unknown PNM")}</strong>
+              <div class="muted">${escapeHtml(item.pnm_code || "")}${item.hometown ? ` | ${escapeHtml(item.hometown)}` : ""}</div>
+              <div class="muted">Weighted ${Number(item.weighted_total || 0).toFixed(2)}</div>
+            </div>
+          </div>
         </button>
       `
     )

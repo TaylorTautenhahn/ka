@@ -23,9 +23,16 @@
     <p class="bb-kicker">Available Workspaces</p>
     <h2>Open the right dashboard without crossing organization data.</h2>
   </div>
+  <div class="bb-org-search-row">
+    <label class="bb-org-search-field">
+      <span>Search organizations</span>
+      <input id="bbOrgSearchInput" type="search" placeholder="Search by chapter name, display name, or slug" autocomplete="off" />
+    </label>
+    <p id="bbOrgSearchCount" class="bb-page-subtitle">Showing {{ tenants|length }} organization{{ '' if tenants|length == 1 else 's' }}.</p>
+  </div>
   <div class="bb-org-grid">
     {% for tenant in tenants %}
-    <article class="bb-org-card">
+    <article class="bb-org-card" data-org-search="{{ (tenant.display_name ~ ' ' ~ tenant.chapter_name ~ ' ' ~ tenant.slug ~ ' ' ~ tenant.org_type)|lower }}">
       <a class="bb-org-card-main" href="/{{ tenant.slug }}" aria-label="Open {{ tenant.display_name }} dashboard">
         <div class="bb-org-card-top">
           {% if tenant.logo_path %}

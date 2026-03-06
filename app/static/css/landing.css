@@ -1008,6 +1008,33 @@ html[data-theme="light"] .bb-theme-toggle {
   gap: 0.8rem;
 }
 
+.bb-org-search-row {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+
+.bb-org-search-field {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.bb-org-search-field span {
+  color: var(--bb-muted-strong);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.bb-org-search-field input {
+  width: 100%;
+  border-radius: 16px;
+  border: 1px solid var(--bb-line);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--bb-text);
+  padding: 0.9rem 1rem;
+}
+
 .bb-org-card-top {
   display: flex;
   gap: 0.85rem;
@@ -1367,6 +1394,10 @@ html[data-theme="light"] .bb-theme-toggle {
 
   .bb-footer-links {
     justify-content: start;
+  }
+
+  .bb-org-search-row {
+    margin-bottom: 0.85rem;
   }
 }
 

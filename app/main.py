@@ -16058,17 +16058,21 @@ def global_search(
                 p.pnm_code,
                 p.first_name,
                 p.last_name,
-                p.weighted_total
+                p.weighted_total,
+                p.hometown,
+                p.photo_path,
+                p.instagram_handle
             FROM pnms p
             WHERE
                 lower(p.pnm_code) LIKE ?
                 OR lower(p.first_name) LIKE ?
                 OR lower(p.last_name) LIKE ?
                 OR lower(COALESCE(p.instagram_handle, '')) LIKE ?
+                OR lower(COALESCE(p.hometown, '')) LIKE ?
             ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
             LIMIT 8
             """,
-            (like_token, like_token, like_token, like_token),
+            (like_token, like_token, like_token, like_token, like_token),
         ).fetchall()
         user_rows = conn.execute(
             """
@@ -16089,6 +16093,8 @@ def global_search(
                 "pnm_code": row["pnm_code"],
                 "name": f"{row['first_name']} {row['last_name']}",
                 "weighted_total": round(float(row["weighted_total"]), 2),
+                "photo_url": resolve_pnm_photo_url(row["photo_path"], row["instagram_handle"]),
+                "hometown": row["hometown"] or "",
                 "meeting_path": f"/{tenant.slug}/meeting?pnm_id={int(row['id'])}",
             }
             for row in pnm_rows

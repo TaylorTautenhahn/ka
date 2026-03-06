@@ -821,7 +821,34 @@
     applyState("capture");
   }
 
+  function initOrganizationSearch() {
+    const input = document.getElementById("bbOrgSearchInput");
+    const count = document.getElementById("bbOrgSearchCount");
+    const cards = Array.from(document.querySelectorAll(".bb-org-card[data-org-search]"));
+    if (!input || !count || !cards.length) {
+      return;
+    }
+
+    const update = () => {
+      const query = String(input.value || "").trim().toLowerCase();
+      let visible = 0;
+      cards.forEach((card) => {
+        const haystack = String(card.getAttribute("data-org-search") || "");
+        const matches = !query || haystack.includes(query);
+        card.classList.toggle("hidden", !matches);
+        if (matches) {
+          visible += 1;
+        }
+      });
+      count.textContent = `Showing ${visible} organization${visible === 1 ? "" : "s"}.`;
+    };
+
+    input.addEventListener("input", update);
+    update();
+  }
+
   initNetworkGraph();
   initSignalPanel();
   initJourney();
+  initOrganizationSearch();
 })();

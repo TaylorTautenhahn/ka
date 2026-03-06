@@ -332,7 +332,8 @@ h1,
 h2,
 h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
 }
 
 h1 {
@@ -400,7 +401,8 @@ h3 {
   display: block;
   margin-top: 0.22rem;
   font-size: 1.35rem;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
 }
 
 .panel {
@@ -532,7 +534,7 @@ h3 {
 }
 
 .demo-banner strong {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
   color: var(--accent);
 }
 
@@ -565,7 +567,8 @@ h3 {
 
 .demo-guide-summary strong {
   display: block;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
   color: var(--accent);
 }
 
@@ -599,7 +602,8 @@ h3 {
 
 .demo-quickstart-card strong {
   display: block;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
 }
 
 .demo-quickstart-card p {

@@ -138,7 +138,8 @@
 }
 
 .app-session-card strong {
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
   color: var(--heading);
 }
 
@@ -174,28 +175,29 @@
 
 .command-summary-shell .command-summary-row {
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 0.7rem;
-}
-
-.command-workspace-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.72fr) minmax(280px, 0.72fr);
-  gap: 1.25rem;
-  align-items: start;
-}
-
-.command-queue-workspace .command-center-grid {
-  grid-template-columns: minmax(430px, 1.18fr) minmax(470px, 1.14fr) minmax(250px, 0.68fr);
-  gap: 1.1rem;
+  gap: 0.78rem;
 }
 
 .command-support-grid {
   display: grid;
-  gap: 1.1rem;
+  gap: 1rem;
+}
+
+.command-support-grid-top {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.command-support-grid-bottom {
+  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+}
+
+.command-queue-workspace .command-center-grid {
+  grid-template-columns: minmax(520px, 1.34fr) minmax(520px, 1.22fr) minmax(260px, 0.74fr);
+  gap: 1.18rem;
 }
 
 .command-queue-column {
-  min-width: 430px;
+  min-width: 520px;
 }
 
 .command-list .entry,
@@ -263,7 +265,8 @@
 .demo-guide-summary {
   list-style: none;
   cursor: pointer;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 700;
   font-size: 1rem;
   color: var(--heading);
 }
@@ -292,7 +295,8 @@
 .meetings-queue-card h3,
 .compare-candidate-card h3 {
   margin: 0;
-  font-family: "Space Grotesk", sans-serif;
+  font-family: "Manrope", sans-serif;
+  font-weight: 800;
   color: var(--heading);
 }
 
@@ -428,7 +432,6 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .command-workspace-grid,
   .rushee-workspace-grid,
   .app-frame,
   .meetings-grid-top,
@@ -449,6 +452,8 @@
 
 @media (max-width: 1080px) {
   .command-queue-workspace .command-center-grid,
+  .command-support-grid-top,
+  .command-support-grid-bottom,
   .rushee-quick-actions-grid,
   .rushee-board,
   .team-workspace-grid {

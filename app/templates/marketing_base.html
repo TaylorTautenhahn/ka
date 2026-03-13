@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#06101f" />
+    <meta name="theme-color" content="#07111d" />
     <title>{% block title %}BidBoard{% endblock %}</title>
     <meta name="description" content="{% block description %}BidBoard is the recruitment command layer for fraternities and sororities.{% endblock %}" />
     <link rel="stylesheet" href="/static/css/landing.css" />
@@ -21,14 +21,10 @@
     <main class="bb-shell">
       <header class="bb-topbar bb-reveal" data-delay="10">
         <a class="bb-brand" href="/" aria-label="BidBoard home">
-          <img
-            src="/static/icons/bidboard-shield.svg"
-            alt="BidBoard"
-            class="bb-brand-mark-image"
-          />
+          <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="bb-brand-mark-image" />
           <span class="bb-brand-lockup">
             <strong>BidBoard</strong>
-            <small>Fraternity &amp; Sorority Recruitment Intelligence</small>
+            <small>Recruitment Command Intelligence</small>
           </span>
         </a>
 
@@ -38,13 +34,13 @@
         </button>
 
         <nav id="bbPrimaryNav" class="bb-topbar-actions" aria-label="Primary">
-          <a class="bb-link{% if nav_key == 'home' %} is-active{% endif %}" href="/">Home</a>
           <a class="bb-link{% if nav_key == 'features' %} is-active{% endif %}" href="/features">Product</a>
           <a class="bb-link{% if nav_key == 'demo' %} is-active{% endif %}" href="/demo">Demo</a>
           <a class="bb-link{% if nav_key == 'faq' %} is-active{% endif %}" href="/faq">FAQ</a>
         </nav>
 
         <div class="bb-topbar-utilities">
+          <span class="bb-topbar-pill">Live workspace ready</span>
           <button class="bb-theme-toggle" id="bbThemeToggle" type="button" aria-label="Toggle dark and light mode">
             <span class="bb-theme-toggle-sun" aria-hidden="true">☀</span>
             <span class="bb-theme-toggle-moon" aria-hidden="true">◐</span>
@@ -58,18 +54,14 @@
       <footer class="bb-footer bb-reveal" data-delay="40">
         <div class="bb-footer-branding">
           <div class="bb-footer-brand-lockup">
-            <img
-              src="/static/icons/bidboard-shield.svg"
-              alt="BidBoard"
-              class="bb-footer-mark"
-            />
+            <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="bb-footer-mark" />
             <div>
               <p class="bb-kicker">BidBoard</p>
               <h2>The modern command surface for recruitment week.</h2>
             </div>
           </div>
           <p>
-            Replace spreadsheet drift with live scoring, accountable collaboration, and meeting-ready decisions built for fraternities and sororities.
+            Built for fraternities and sororities that need faster scoring, cleaner coordination, and meeting-ready decisions without spreadsheet drift.
           </p>
           <div class="bb-footer-stats">
             <article>
@@ -78,7 +70,7 @@
             </article>
             <article>
               <strong data-count="4">4</strong>
-              <span>Outcome Modules</span>
+              <span>Operational Pillars</span>
             </article>
             <article>
               <strong data-count="1">1</strong>
@@ -92,8 +84,8 @@
             <p>Explore</p>
             <a href="/">Home</a>
             <a href="/features">Product</a>
-            <a href="/faq">FAQ</a>
             <a href="/demo">Demo</a>
+            <a href="/faq">FAQ</a>
           </div>
           <div>
             <p>Access</p>

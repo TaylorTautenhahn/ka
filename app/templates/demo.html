@@ -11,7 +11,7 @@
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/demo.js" defer></script>
   </head>
-  <body>
+  <body class="demo-premium">
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
     <div class="noise"></div>
@@ -24,12 +24,30 @@
     </div>
 
     <main class="shell">
+      <header class="panel demo-sitebar reveal">
+        <a href="/" class="demo-brand">
+          <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="demo-brand-mark" />
+          <span>
+            <strong>BidBoard</strong>
+            <small>Interactive Sandbox</small>
+          </span>
+        </a>
+        <nav class="demo-sitebar-nav" aria-label="Demo navigation">
+          <a href="/">Home</a>
+          <a href="/features">Product</a>
+          <a href="/faq">FAQ</a>
+        </nav>
+        <div class="action-row">
+          <a href="/organizations" class="quick-nav-link">Organization Login</a>
+        </div>
+      </header>
+
       <header class="hero reveal">
         <div class="hero-shell">
           <div class="hero-copy">
-            <p class="eyebrow">BidBoard Sales Demo</p>
-            <h1>Interactive Demo Workspace</h1>
-            <p>Try core workflows without login. This demo never writes to your real organization data.</p>
+            <p class="eyebrow">BidBoard Demo</p>
+            <h1>See the recruitment command layer in motion.</h1>
+            <p>Run through the scoring model, PNM workflow, and activity feed without touching real organization data.</p>
             <div class="action-row">
               <a href="/organizations" class="quick-nav-link">Open Organization Login</a>
               <a href="/features" class="quick-nav-link">View Product Tour</a>

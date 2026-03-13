@@ -8,9 +8,9 @@
 {% block page_content %}
 <section class="bb-page-hero bb-reveal" data-delay="20">
   <p class="bb-kicker">FAQ</p>
-  <h1 class="bb-page-title">Answers for teams evaluating whether BidBoard can actually hold up during rush week.</h1>
+  <h1 class="bb-page-title">Answers for teams deciding whether BidBoard can actually hold up during rush week.</h1>
   <p class="bb-page-subtitle">
-    The questions below focus on fit, rollout, mobile use, access control, and whether the data survives real production conditions.
+    These are the questions chapter leadership usually asks before moving off spreadsheets: fit, access control, mobile execution, rollout, and whether the data stays durable in production.
   </p>
 </section>
 
@@ -20,11 +20,15 @@
       <p class="bb-bento-label">Fit + Setup</p>
       <details class="bb-faq-item" open>
         <summary>Who is BidBoard built for?</summary>
-        <p>BidBoard is built for fraternity and sorority recruitment teams that need structured, collaborative decision-making across officers and members.</p>
+        <p>BidBoard is built for fraternity and sorority recruitment teams that need structured, collaborative decision-making across heads, officers, and members.</p>
       </details>
       <details class="bb-faq-item">
         <summary>Can multiple organizations use one deployment?</summary>
-        <p>Yes. Each organization has a separate tenant path, isolated database, branding controls, and independent account approvals.</p>
+        <p>Yes. Each organization has a separate tenant path, isolated database, custom branding, and independent approvals.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>How hard is rollout?</summary>
+        <p>Most teams start with the interactive demo, configure one organization workspace, then move rush officers into live use once branding and storage are set.</p>
       </details>
     </article>
 
@@ -32,11 +36,15 @@
       <p class="bb-bento-label">Security + Access</p>
       <details class="bb-faq-item" open>
         <summary>How does access control work?</summary>
-        <p>Role-based visibility is enforced at the API layer. Head roles, officers, and members see different data scopes based on configured permissions.</p>
+        <p>Role-based visibility is enforced at the API layer. Head roles, officers, and members see different scopes, and users cannot edit or delete other users’ ratings.</p>
       </details>
       <details class="bb-faq-item">
-        <summary>Can we customize branding per organization?</summary>
-        <p>Yes. Logos, colors, and organization-level themes can be set per workspace so each chapter keeps its own identity.</p>
+        <summary>Can organizations customize branding?</summary>
+        <p>Yes. Logos, colors, organization titles, and workspace identity can be customized independently per tenant.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Is accountability preserved?</summary>
+        <p>Yes. Leadership can see rating changes, deltas, and comments where allowed, while member-facing views remain intentionally limited.</p>
       </details>
     </article>
 
@@ -44,11 +52,15 @@
       <p class="bb-bento-label">Mobile + Workflow</p>
       <details class="bb-faq-item" open>
         <summary>Does BidBoard work on mobile during events?</summary>
-        <p>Yes. Mobile-specific pages and routing are included so team members can update ratings, notes, assignments, and lunches from iPhone or Android.</p>
+        <p>Yes. Mobile-specific pages are optimized for small screens so officers can search, rate, assign, and follow up from iPhone or Android.</p>
       </details>
       <details class="bb-faq-item">
         <summary>Can we import rushees from forms?</summary>
-        <p>Yes. You can collect submissions via Google Forms, export CSV responses, and import directly into BidBoard with validation and duplicate checks.</p>
+        <p>Yes. You can collect submissions through Google Forms, export CSV responses, and import them into BidBoard with validation and duplicate handling.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Can the team coordinate in one place?</summary>
+        <p>Yes. Calendar events, lunches, goals, notifications, assignments, and officer chat are part of the product workflow rather than side systems.</p>
       </details>
     </article>
 
@@ -56,11 +68,15 @@
       <p class="bb-bento-label">Data Durability</p>
       <details class="bb-faq-item" open>
         <summary>How are backups handled?</summary>
-        <p>BidBoard supports CSV export bundles, SQLite snapshots, and season archive/reset tooling for cyclical recruitment operations.</p>
+        <p>BidBoard supports CSV export bundles, SQLite snapshots, and season archive/reset tools for cyclical recruitment operations.</p>
       </details>
       <details class="bb-faq-item">
         <summary>Will data disappear when we deploy new code?</summary>
-        <p>Not when persistent storage is configured correctly. BidBoard includes startup checks and admin diagnostics to verify that storage paths are durable.</p>
+        <p>Not when persistent storage is configured correctly. BidBoard includes startup checks and admin diagnostics to verify that the configured paths are durable.</p>
+      </details>
+      <details class="bb-faq-item">
+        <summary>Can we keep historical context between seasons?</summary>
+        <p>Yes. Archived season data can be preserved while the live board resets for the next rush cycle.</p>
       </details>
     </article>
   </div>
@@ -70,8 +86,8 @@
   <div class="bb-cta-banner">
     <div>
       <p class="bb-kicker">Still Evaluating?</p>
-      <h3>Start with the demo, then move into the real workspace when your chapter is ready.</h3>
-      <p>BidBoard is designed to let prospects test the operational flow before any production rollout begins.</p>
+      <h3>Start with the demo, then move into a real workspace when your chapter is ready.</h3>
+      <p>BidBoard is designed so leadership can feel the operating flow before any production rollout begins.</p>
     </div>
     <div class="bb-hero-actions">
       <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>

@@ -8,53 +8,64 @@
 {% block page_content %}
 <section class="bb-hero bb-hero-home bb-reveal" data-delay="20">
   <div class="bb-hero-copy">
-    <p class="bb-kicker">Built for fraternities + sororities</p>
-    <h1 class="bb-hero-title">Recruitment, finally run like a modern command layer.</h1>
+    <div class="bb-hero-badge-row">
+      <span class="bb-signal-tag">Recruitment Intelligence Platform</span>
+      <span class="bb-signal-tag bb-signal-tag-muted">Built for fraternities + sororities</span>
+    </div>
+    <p class="bb-kicker">The recruitment command layer</p>
+    <h1 class="bb-hero-title">Recruitment, finally run like a modern command center.</h1>
     <p class="bb-subtitle">
-      BidBoard keeps scoring, assignments, meetings, and mobile execution in one live system so your rush team can move faster without losing accountability.
+      BidBoard gives your rush team one live system for scoring, assignments, meetings, and mobile execution so chapter leadership can move faster with visible accountability.
     </p>
     <div class="bb-hero-actions">
       <a class="bb-cta bb-cta-strong" href="/demo">Try Interactive Demo</a>
       <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
-      <a class="bb-link-inline" href="/features">Explore Product Depth</a>
+      <a class="bb-link-inline" href="/features">Explore Product</a>
     </div>
-    <div class="bb-proof-grid">
-      <article class="bb-proof-card">
-        <strong>Real-time accountability</strong>
-        <span>Every score, delta, and note stays visible to the right people at the right moment.</span>
+    <div class="bb-hero-inline-proof">
+      <article>
+        <strong>Role-aware visibility</strong>
+        <span>Heads, officers, and members see the right layer of the system without blurring accountability.</span>
       </article>
-      <article class="bb-proof-card">
-        <strong>Weighted decisions</strong>
-        <span>Rush officer and member input combines into one live ranking system.</span>
+      <article>
+        <strong>Meeting-ready intelligence</strong>
+        <span>Packet context, linked activity, and rating movement stay ready for chapter discussion.</span>
       </article>
-      <article class="bb-proof-card">
-        <strong>Meeting packets</strong>
-        <span>Open discussion-ready profiles with trends, notes, and decision context intact.</span>
-      </article>
-      <article class="bb-proof-card">
-        <strong>Mobile execution</strong>
-        <span>Rate, assign, and coordinate directly from phones during the busiest rush events.</span>
+      <article>
+        <strong>Mobile-first execution</strong>
+        <span>Rush officers can update signal live from events, lunches, and follow-up conversations.</span>
       </article>
     </div>
   </div>
 
-  <div class="bb-lattice-stage">
-    <div class="bb-lattice-head">
-      <p class="bb-kicker">Signal Lattice</p>
-      <h2>Live matching flow across rushees, interests, and officers</h2>
-      <p>
-        The lattice reacts to cursor movement and routes active interest signals toward the best-fit rush team connection.
-      </p>
-    </div>
-    <div class="bb-network-readout" aria-live="polite">
-      <span class="bb-network-pill" id="bbNetworkInterest">Interest Signal: Leadership</span>
-      <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
-    </div>
-    <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="540" aria-hidden="true"></canvas>
-    <div class="bb-lattice-foot">
-      <span>Pointer-reactive routing</span>
-      <span>Interest-driven ownership</span>
-      <span>Command-center clarity</span>
+  <div class="bb-hero-visual">
+    <div class="bb-lattice-stage">
+      <div class="bb-lattice-head">
+        <p class="bb-kicker">Signal Lattice</p>
+        <h2>Watch BidBoard connect the right rushee to the right officer through live interest signal.</h2>
+        <p>
+          Hover through the network to see interests route from rushee profiles into the rush team member best equipped to own the relationship.
+        </p>
+      </div>
+      <div class="bb-network-readout" aria-live="polite">
+        <span class="bb-network-pill" id="bbNetworkInterest">Interest Signal: Leadership</span>
+        <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
+      </div>
+      <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="540" aria-hidden="true"></canvas>
+      <div class="bb-lattice-metrics">
+        <article>
+          <strong>1 live board</strong>
+          <span>Scoring, assignments, and packets stay synced.</span>
+        </article>
+        <article>
+          <strong>Interest-led routing</strong>
+          <span>Relationships move to the best-fit owner faster.</span>
+        </article>
+        <article>
+          <strong>Meeting clarity</strong>
+          <span>Officers arrive with current signal instead of side notes.</span>
+        </article>
+      </div>
     </div>
   </div>
 </section>
@@ -62,75 +73,60 @@
 <section class="bb-trust-ribbon bb-reveal" data-delay="35" aria-label="Credibility strip">
   <div class="bb-trust-copy">
     <p class="bb-kicker">Why teams switch</p>
-    <h2>Built for chapters that need speed, fairness, and meeting clarity in the same week.</h2>
+    <h2>Built for chapters that need faster decisions, cleaner coordination, and confidence in the meeting room.</h2>
   </div>
   <div class="bb-trust-count">
     <strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong>
     <span>organizations configured on this deployment</span>
   </div>
-  <div class="bb-marquee-wrap">
-    <div class="bb-marquee-track" role="presentation">
-      <span>ΑΧΩ</span>
-      <span>ΚΑΘ</span>
-      <span>ΣΝ</span>
-      <span>ΠΚΑ</span>
-      <span>ΔΤΔ</span>
-      <span>ΖΤΑ</span>
-      <span>ΑΔΠ</span>
-      <span>ΚΚΓ</span>
-      <span>ΧΩ</span>
-      <span>ΔΓ</span>
-      <span>ΚΑ</span>
-      <span>ΠΒΦ</span>
-      <span>ΑΧΩ</span>
-      <span>ΚΑΘ</span>
-      <span>ΣΝ</span>
-      <span>ΠΚΑ</span>
-      <span>ΔΤΔ</span>
-      <span>ΖΤΑ</span>
-      <span>ΑΔΠ</span>
-      <span>ΚΚΓ</span>
-      <span>ΧΩ</span>
-      <span>ΔΓ</span>
-      <span>ΚΑ</span>
-      <span>ΠΒΦ</span>
-    </div>
+  <div class="bb-trust-card-row">
+    <article class="bb-proof-card">
+      <strong>Weighted decisions</strong>
+      <span>Officer and member input combine into one live ranking model.</span>
+    </article>
+    <article class="bb-proof-card">
+      <strong>Rush-week coordination</strong>
+      <span>Assignments, lunches, calendar, and chat sit in one operating surface.</span>
+    </article>
+    <article class="bb-proof-card">
+      <strong>Durable data</strong>
+      <span>Persistent storage checks and exports reduce deployment and turnover risk.</span>
+    </article>
   </div>
 </section>
 
 <section class="bb-section bb-reveal" data-delay="45">
   <div class="bb-section-head">
-    <p class="bb-kicker">Command Advantages</p>
-    <h2>Operational depth without the spreadsheet drag.</h2>
+    <p class="bb-kicker">What Makes It Different</p>
+    <h2>Operational depth packaged like premium software instead of a chapter spreadsheet.</h2>
   </div>
   <div class="bb-bento-grid" aria-label="BidBoard advantages">
-    <article class="bb-bento-card is-wide">
+    <article class="bb-bento-card is-wide is-emphasis">
       <p class="bb-bento-label">Visibility Engine</p>
-      <h3>Role-aware views keep rush chairs, officers, and members aligned without exposing the wrong data.</h3>
-      <p>Decisions stay transparent to leadership while each role still gets a focused operating surface.</p>
-      <div class="bb-chip-row"><span>Role permissions</span><span>Audit trail</span><span>Member-safe views</span></div>
+      <h3>Every decision stays accountable without flooding every role with too much information.</h3>
+      <p>Leadership keeps the audit trail, officers keep the operating surface, and members still participate without exposing the wrong data.</p>
+      <div class="bb-chip-row"><span>Role permissions</span><span>Delta history</span><span>Audit-aware updates</span></div>
     </article>
     <article class="bb-bento-card is-tall">
       <p class="bb-bento-label">Scoring Intelligence</p>
-      <h3>Weighted ratings update instantly across the board.</h3>
-      <p>Every score changes the candidate picture immediately, from rank ordering to meeting packet context.</p>
-      <div class="bb-chip-row"><span>0.6 / 0.4 weighting</span><span>Delta tracking</span></div>
+      <h3>Weighted rankings move immediately across the board.</h3>
+      <p>One new rating updates the candidate picture everywhere it matters: queue priority, leadership ranking, and packet context.</p>
     </article>
     <article class="bb-bento-card">
       <p class="bb-bento-label">Meeting Readiness</p>
-      <h3>Run better discussions.</h3>
-      <p>Trends, notes, and packet views keep chapter conversations focused on current signal instead of memory.</p>
+      <h3>Packet mode brings context into the room.</h3>
+      <p>Trend movement, linked notes, lunches, and relationship ownership stay attached to the candidate conversation.</p>
     </article>
     <article class="bb-bento-card">
       <p class="bb-bento-label">Coordination Layer</p>
-      <h3>Assignments, lunches, calendar, and chat stay in sync.</h3>
-      <p>No tool switching when rush week is moving fast.</p>
+      <h3>Own the next touchpoint clearly.</h3>
+      <p>Assignments, event flow, lunch scheduling, and officer communication stop living in separate tools.</p>
     </article>
     <article class="bb-bento-card is-wide">
-      <p class="bb-bento-label">Data Continuity</p>
-      <h3>Protect the season with durable storage, exports, and controlled archive/reset flow.</h3>
-      <p>BidBoard is built to keep your data intact between pushes, between officers, and between rush cycles.</p>
-      <div class="bb-chip-row"><span>Persistent storage</span><span>CSV exports</span><span>Season archive</span></div>
+      <p class="bb-bento-label">Season Continuity</p>
+      <h3>Protect the season before, during, and after deployment.</h3>
+      <p>Persistent storage diagnostics, exports, archive tooling, and organization separation make the platform usable in real chapter operations.</p>
+      <div class="bb-chip-row"><span>Persistent storage</span><span>CSV + DB backups</span><span>Season archive</span></div>
     </article>
   </div>
 </section>
@@ -138,7 +134,7 @@
 <section class="bb-section bb-journey-section bb-reveal" data-delay="55">
   <div class="bb-section-head">
     <p class="bb-kicker">Rush Week, End To End</p>
-    <h2>Click through the operating flow your chapter actually lives in.</h2>
+    <h2>Click through the flow your chapter actually runs.</h2>
   </div>
   <div class="bb-journey-layout">
     <div class="bb-journey-steps" id="bbJourneySteps">
@@ -146,28 +142,28 @@
         <span>01</span>
         <div>
           <h3>Capture</h3>
-          <p>Add the rushee fast, enrich the profile, and get them visible to the whole team immediately.</p>
+          <p>Enter a rushee on the spot, get them into the system immediately, and start giving the team clean shared context.</p>
         </div>
       </button>
       <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false">
         <span>02</span>
         <div>
           <h3>Score</h3>
-          <p>Collect weighted ratings while interactions are still fresh, then watch the board move in real time.</p>
+          <p>Collect live ratings while interactions are fresh and let the weighted model move the board in real time.</p>
         </div>
       </button>
       <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false">
         <span>03</span>
         <div>
           <h3>Coordinate</h3>
-          <p>Assign owners, schedule lunches, and make the next touchpoint obvious to everyone involved.</p>
+          <p>Assign ownership, schedule the next lunch, and make follow-up obvious for the right officer.</p>
         </div>
       </button>
       <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false">
         <span>04</span>
         <div>
           <h3>Decide</h3>
-          <p>Open the packet with trend context and walk into meeting discussion already prepared.</p>
+          <p>Open packet detail with trend context, linked activity, and supporting notes already in place.</p>
         </div>
       </button>
     </div>
@@ -178,7 +174,7 @@
           <p class="bb-command-shell-label">Preview</p>
           <strong id="bbPhoneTitle">Event Intake</strong>
         </div>
-        <span id="bbPhoneBadge">New</span>
+        <span id="bbPhoneBadge">Live</span>
       </div>
       <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture">
         <ul class="bb-phone-list" id="bbPhoneList">
@@ -195,8 +191,8 @@
 
 <section class="bb-section bb-live-section bb-reveal" data-delay="65">
   <div class="bb-section-head">
-    <p class="bb-kicker">Live Interaction</p>
-    <h2>Let prospects feel the product in 20 seconds.</h2>
+    <p class="bb-kicker">Live Product Signal</p>
+    <h2>Show visitors how the weighted model behaves before they ever log in.</h2>
   </div>
   <div class="bb-live-grid">
     <div class="bb-signal-panel" aria-label="Weighted scoring simulator">
@@ -230,15 +226,15 @@
     <div class="bb-live-rail">
       <article class="bb-rail-card">
         <p class="bb-rail-label">Immediate payoff</p>
-        <h3>Visitors understand the weighted system without needing a walkthrough.</h3>
-        <p>One interaction demonstrates the scoring model, live movement, and why BidBoard feels materially different from a spreadsheet.</p>
+        <h3>Prospects understand the model in one interaction.</h3>
+        <p>The simulator demonstrates live movement, weighting, and why leadership gets more clarity than a spreadsheet can provide.</p>
       </article>
       <article class="bb-rail-card">
         <p class="bb-rail-label">What they learn</p>
         <ul class="bb-feature-list">
-          <li>Scores move live across the system</li>
+          <li>Scores move instantly across the system</li>
           <li>Officer input carries more weight where it matters</li>
-          <li>Decision confidence gets easier to explain in meetings</li>
+          <li>Meeting confidence becomes easier to explain</li>
         </ul>
       </article>
     </div>
@@ -247,25 +243,25 @@
 
 <section class="bb-section bb-reveal" data-delay="75">
   <div class="bb-section-head">
-    <p class="bb-kicker">Proof Against The Old Way</p>
+    <p class="bb-kicker">Trust, Not Hype</p>
     <h2>What chapters stop fighting once BidBoard replaces the sheet.</h2>
   </div>
   <div class="bb-objection-grid">
     <article class="bb-objection-card">
       <h3>No more spreadsheet drift</h3>
-      <p>Everyone is looking at the same live board instead of stale copies and side messages.</p>
+      <p>Everyone is looking at one live board instead of stale copies, side notes, and message fragments.</p>
     </article>
     <article class="bb-objection-card">
-      <h3>Meeting decisions get sharper</h3>
-      <p>Packet mode, trend history, and role-aware notes keep discussions grounded in actual signal.</p>
+      <h3>Sharper meeting decisions</h3>
+      <p>Packet detail, trend history, and linked activity keep chapter discussion grounded in actual signal.</p>
     </article>
     <article class="bb-objection-card">
       <h3>Rush week stays mobile</h3>
-      <p>Officers can rate, schedule, and update while moving between events without losing structure.</p>
+      <p>Officers can rate, schedule, assign, and follow up from phones while moving between real events.</p>
     </article>
     <article class="bb-objection-card">
-      <h3>Data survives real operations</h3>
-      <p>Persistent storage checks, exports, and archive controls reduce the operational risk of code pushes and season turnover.</p>
+      <h3>Data survives operations</h3>
+      <p>Persistent storage checks, exports, and archive flow reduce production risk when leadership changes or code ships.</p>
     </article>
   </div>
 </section>
@@ -273,9 +269,9 @@
 <section class="bb-section bb-final-cta bb-reveal" data-delay="85">
   <div>
     <p class="bb-kicker">Ready To Replace The Rush Spreadsheet?</p>
-    <h2>Start with the demo, then move your chapter into a real workspace.</h2>
+    <h2>Let officers feel the command flow first, then move the chapter into a real workspace.</h2>
     <p class="bb-page-subtitle">
-      Show officers the product, let them feel the command flow, and keep Organization Login ready when you want to move into production.
+      Start with the interactive demo, show leadership how scoring and packet prep actually work, then keep Organization Login ready for production rollout.
     </p>
   </div>
   <div class="bb-hero-actions">

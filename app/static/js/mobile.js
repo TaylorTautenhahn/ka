@@ -1320,7 +1320,7 @@ function renderMobileCommandCenterVisibility() {
     officerSection.classList.toggle("hidden", !canUse);
   }
   if (stickyActions) {
-    stickyActions.classList.toggle("hidden", !canUse);
+    stickyActions.classList.toggle("hidden", !canUse || !mobileCommandSelectedItem());
   }
   if (noticeSection) {
     noticeSection.classList.toggle("hidden", canUse);
@@ -1331,7 +1331,11 @@ function renderMobileCommandSelection() {
   const metaEl = document.getElementById("mobileCommandSelectedMeta");
   const stickyMeetingLink = document.getElementById("mobileCommandStickyMeetingLink");
   const stickyMeetingShortcut = document.getElementById("mobileCommandStickyMeetingShortcut");
+  const stickyActions = document.getElementById("mobileCommandStickyActions");
   const selected = mobileCommandSelectedItem();
+  if (stickyActions) {
+    stickyActions.classList.toggle("hidden", !mobileCanUseCommandCenter() || !selected);
+  }
   if (!selected) {
     if (metaEl) {
       metaEl.textContent = "Select a rushee from search results or lunch follow-up to start rating.";

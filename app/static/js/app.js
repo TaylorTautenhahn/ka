@@ -1172,6 +1172,7 @@ function safeFileToken(value) {
 }
 
 function setAuthView(isAuthenticated) {
+  document.body.classList.toggle("desktop-product-auth", Boolean(isAuthenticated));
   if (authShell) {
     authShell.classList.toggle("hidden", isAuthenticated);
   } else {

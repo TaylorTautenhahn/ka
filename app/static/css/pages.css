@@ -524,3 +524,584 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* Premium dark authenticated desktop shell */
+body.desktop-product-auth {
+  --ink: #eef6ff;
+  --ink-soft: #9fb1c9;
+  --heading: #f4f8fc;
+  --panel: rgba(11, 22, 36, 0.8);
+  --panel-strong: rgba(9, 18, 31, 0.9);
+  --stroke: rgba(115, 168, 222, 0.16);
+  --glass-highlight: rgba(255, 255, 255, 0.08);
+  --shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  background:
+    radial-gradient(circle at 8% 6%, rgba(var(--accent-rgb), 0.16), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(var(--gold-rgb), 0.08), transparent 28%),
+    radial-gradient(circle at 86% 88%, rgba(83, 184, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, #07111d 0%, #0d1828 42%, #132338 100%);
+  color: var(--ink);
+}
+
+body.desktop-product-auth .aura {
+  filter: blur(110px);
+  opacity: 0.7;
+}
+
+body.desktop-product-auth .aura-one {
+  background: rgba(var(--accent-rgb), 0.2);
+}
+
+body.desktop-product-auth .aura-two {
+  background: rgba(var(--gold-rgb), 0.14);
+}
+
+body.desktop-product-auth .noise {
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.2) 0.45px, transparent 0.45px);
+}
+
+body.desktop-product-auth .shell-app-shell {
+  width: min(calc(100% - 1.4rem), 1660px);
+}
+
+body.desktop-product-auth .app-frame {
+  grid-template-columns: 286px minmax(0, 1fr);
+  gap: 1.25rem;
+  align-items: start;
+}
+
+body.desktop-product-auth #appSection .panel,
+body.desktop-product-auth .notifications-tray-card,
+body.desktop-product-auth .command-palette-card,
+body.desktop-product-auth .tutorial-card {
+  border: 1px solid rgba(115, 168, 222, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%),
+    rgba(11, 22, 36, 0.82);
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+body.desktop-product-auth .app-sidebar {
+  padding: 1.15rem;
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), rgba(255, 255, 255, 0) 28%),
+    rgba(7, 17, 29, 0.9);
+}
+
+body.desktop-product-auth .app-sidebar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 22%);
+  pointer-events: none;
+}
+
+body.desktop-product-auth .app-sidebar-brand {
+  gap: 0.8rem;
+}
+
+body.desktop-product-auth .app-sidebar-brand-top,
+body.desktop-product-auth .app-sidebar-tenant-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.8rem;
+  align-items: center;
+}
+
+body.desktop-product-auth .app-shell-mark {
+  width: 42px;
+  height: 42px;
+  object-fit: contain;
+  border-radius: 14px;
+  filter: drop-shadow(0 14px 24px rgba(var(--accent-rgb), 0.16));
+}
+
+body.desktop-product-auth .app-sidebar-brand-top strong {
+  display: block;
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
+  letter-spacing: -0.03em;
+}
+
+body.desktop-product-auth .app-sidebar-tenant-card {
+  padding: 0.92rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.desktop-product-auth .app-sidebar-tenant-card .brand-logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  object-fit: contain;
+}
+
+body.desktop-product-auth .app-sidebar-tenant-card h2 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1.38rem;
+  letter-spacing: -0.04em;
+}
+
+body.desktop-product-auth .app-sidebar-meta,
+body.desktop-product-auth .app-topbar-pills,
+body.desktop-product-auth .app-toolbar-status {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+body.desktop-product-auth .app-sidebar-meta span,
+body.desktop-product-auth .app-topbar-pills span,
+body.desktop-product-auth .app-toolbar-status span {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.34rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid rgba(115, 168, 222, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: #c7d8eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+body.desktop-product-auth .app-nav {
+  gap: 0.5rem;
+}
+
+body.desktop-product-auth .app-nav-link {
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  color: #a8bdd4;
+  border-radius: 16px;
+  padding: 0.86rem 0.95rem;
+}
+
+body.desktop-product-auth .app-nav-link:hover,
+body.desktop-product-auth .app-nav-link.is-active {
+  color: var(--ink);
+  border-color: rgba(var(--accent-rgb), 0.34);
+  background:
+    linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), rgba(255, 255, 255, 0.04));
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.22);
+}
+
+body.desktop-product-auth .app-sidebar-foot {
+  gap: 0.72rem;
+}
+
+body.desktop-product-auth .app-sidebar-foot .secondary {
+  justify-content: center;
+}
+
+body.desktop-product-auth .app-topbar,
+body.desktop-product-auth .app-toolbar {
+  padding: 1.05rem 1.15rem;
+}
+
+body.desktop-product-auth .app-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1.22fr) minmax(390px, 0.78fr);
+  align-items: start;
+  gap: 1rem 1.2rem;
+}
+
+body.desktop-product-auth .app-topbar-copy {
+  display: grid;
+  gap: 0.58rem;
+  align-content: start;
+}
+
+body.desktop-product-auth .app-topbar-copy h2 {
+  margin: 0;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(2.15rem, 3vw, 2.9rem);
+  letter-spacing: -0.05em;
+  line-height: 0.96;
+}
+
+body.desktop-product-auth .app-topbar-copy .muted {
+  max-width: 35rem;
+  font-size: 1.02rem;
+  line-height: 1.48;
+}
+
+body.desktop-product-auth .app-topbar-actions {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  align-items: stretch;
+  gap: 0.7rem;
+  justify-items: end;
+  justify-content: end;
+}
+
+body.desktop-product-auth .app-session-card {
+  grid-column: 1 / -1;
+  min-width: 0;
+  max-width: none;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid rgba(115, 168, 222, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  text-align: left;
+}
+
+body.desktop-product-auth .app-session-card strong {
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 1rem;
+}
+
+body.desktop-product-auth .app-topbar-actions > button.secondary {
+  min-width: 0;
+  padding-inline: 0.96rem;
+}
+
+body.desktop-product-auth .app-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 1rem 1.1rem;
+}
+
+body.desktop-product-auth .app-search-field label {
+  color: #d7e6f7;
+}
+
+body.desktop-product-auth .app-search-field input {
+  min-width: min(620px, 100%);
+}
+
+body.desktop-product-auth .app-toolbar-right {
+  display: grid;
+  justify-items: end;
+  gap: 0.72rem;
+}
+
+body.desktop-product-auth .app-toolbar-actions {
+  justify-content: flex-end;
+}
+
+body.desktop-product-auth .app-toolbar-actions > button.secondary {
+  min-width: 0;
+  padding-inline: 0.95rem;
+}
+
+body.desktop-product-auth .desktop-page .section-head h2,
+body.desktop-product-auth .desktop-page h3,
+body.desktop-product-auth .notifications-tray-card h2,
+body.desktop-product-auth .command-palette-card h2,
+body.desktop-product-auth .tutorial-card h2 {
+  color: var(--ink);
+  font-family: "Space Grotesk", sans-serif;
+  letter-spacing: -0.03em;
+}
+
+body.desktop-product-auth .eyebrow,
+body.desktop-product-auth label,
+body.desktop-product-auth .muted,
+body.desktop-product-auth .entry span,
+body.desktop-product-auth .table-wrap td,
+body.desktop-product-auth .table-wrap th,
+body.desktop-product-auth .officer-chat-hint,
+body.desktop-product-auth .demo-guide-summary span {
+  color: var(--ink-soft);
+}
+
+body.desktop-product-auth .quick-nav-link,
+body.desktop-product-auth .operation-tab-btn,
+body.desktop-product-auth .admin-tab-btn,
+body.desktop-product-auth .theme-chip {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(115, 168, 222, 0.14);
+}
+
+body.desktop-product-auth .quick-nav-link:hover,
+body.desktop-product-auth .operation-tab-btn:hover,
+body.desktop-product-auth .admin-tab-btn:hover,
+body.desktop-product-auth .operation-tab-btn.is-active,
+body.desktop-product-auth .admin-tab-btn.is-active {
+  color: var(--ink);
+  border-color: rgba(var(--accent-rgb), 0.32);
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+body.desktop-product-auth input,
+body.desktop-product-auth select,
+body.desktop-product-auth textarea {
+  border: 1px solid rgba(115, 168, 222, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.desktop-product-auth input::placeholder,
+body.desktop-product-auth textarea::placeholder {
+  color: rgba(195, 212, 232, 0.54);
+}
+
+body.desktop-product-auth input:focus,
+body.desktop-product-auth select:focus,
+body.desktop-product-auth textarea:focus {
+  border-color: rgba(var(--accent-rgb), 0.42);
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.14);
+}
+
+body.desktop-product-auth button:not(.secondary),
+body.desktop-product-auth .tutorial-mode-btn,
+body.desktop-product-auth .tutorial-card-actions button:not(.secondary) {
+  border: 1px solid rgba(var(--accent-rgb), 0.22);
+  background: linear-gradient(135deg, rgba(var(--accent-rgb), 0.96), rgba(var(--accent-soft-rgb), 0.96));
+  color: #fff;
+  box-shadow: 0 18px 30px rgba(var(--accent-rgb), 0.2);
+}
+
+body.desktop-product-auth button.secondary,
+body.desktop-product-auth .tutorial-card-actions .secondary {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(115, 168, 222, 0.14);
+}
+
+body.desktop-product-auth .card,
+body.desktop-product-auth .list-box,
+body.desktop-product-auth .list-column,
+body.desktop-product-auth .entry,
+body.desktop-product-auth .table-wrap,
+body.desktop-product-auth .calendar-share,
+body.desktop-product-auth .criteria-builder,
+body.desktop-product-auth .tag-picker .tag-pill,
+body.desktop-product-auth .tenant-card,
+body.desktop-product-auth .officer-chat-composer,
+body.desktop-product-auth .chat-bubble,
+body.desktop-product-auth .rushee-board-card,
+body.desktop-product-auth .meetings-queue-card,
+body.desktop-product-auth .compare-candidate-card,
+body.desktop-product-auth .team-load-card,
+body.desktop-product-auth .command-palette-result,
+body.desktop-product-auth .demo-guide-panel {
+  border-color: rgba(115, 168, 222, 0.14);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%),
+    rgba(255, 255, 255, 0.035);
+}
+
+body.desktop-product-auth .card strong,
+body.desktop-product-auth .command-summary-shell .card strong,
+body.desktop-product-auth .rank-chip,
+body.desktop-product-auth .entry strong,
+body.desktop-product-auth .table-wrap td strong {
+  color: var(--ink);
+}
+
+body.desktop-product-auth .table-wrap,
+body.desktop-product-auth .list-box,
+body.desktop-product-auth .criteria-builder,
+body.desktop-product-auth .calendar-share,
+body.desktop-product-auth .list-column,
+body.desktop-product-auth .officer-chat-room,
+body.desktop-product-auth .officer-chat-rail {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body.desktop-product-auth .table-wrap {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.desktop-product-auth .table-wrap th {
+  background: rgba(5, 14, 24, 0.88);
+  color: #b6cae1;
+  border-bottom-color: rgba(115, 168, 222, 0.14);
+}
+
+body.desktop-product-auth .table-wrap td,
+body.desktop-product-auth .table-wrap th {
+  border-bottom-color: rgba(115, 168, 222, 0.12);
+}
+
+body.desktop-product-auth tbody tr:hover {
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+body.desktop-product-auth tbody tr.selected-row,
+body.desktop-product-auth .table-wrap tr.is-active {
+  background: rgba(var(--accent-rgb), 0.12);
+}
+
+body.desktop-product-auth .list-box,
+body.desktop-product-auth #officerChatList.officer-chat-feed {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%),
+    rgba(6, 15, 26, 0.54);
+}
+
+body.desktop-product-auth .entry:hover,
+body.desktop-product-auth .rushee-board-card:hover,
+body.desktop-product-auth .meetings-queue-card:hover,
+body.desktop-product-auth .compare-candidate-card:hover,
+body.desktop-product-auth .team-load-card:hover,
+body.desktop-product-auth .command-palette-result:hover {
+  box-shadow: 0 16px 28px rgba(0, 0, 0, 0.22);
+}
+
+body.desktop-product-auth .entry.selected-row,
+body.desktop-product-auth .mobile-card.is-selected,
+body.desktop-product-auth .tag-picker .tag-pill.is-active {
+  border-color: rgba(var(--accent-rgb), 0.4);
+}
+
+body.desktop-product-auth .rank-chip {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(var(--accent-rgb), 0.22);
+}
+
+body.desktop-product-auth .meeting-photo,
+body.desktop-product-auth .photo-placeholder,
+body.desktop-product-auth .command-palette-avatar {
+  border-color: rgba(115, 168, 222, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body.desktop-product-auth .photo-placeholder,
+body.desktop-product-auth .command-palette-avatar-empty {
+  color: #c8daee;
+}
+
+body.desktop-product-auth .divider {
+  background: linear-gradient(90deg, transparent, rgba(115, 168, 222, 0.2), transparent);
+}
+
+body.desktop-product-auth .notifications-tray-scrim,
+body.desktop-product-auth .command-palette-scrim,
+body.desktop-product-auth .tutorial-scrim {
+  background: rgba(3, 10, 20, 0.54);
+  backdrop-filter: blur(8px);
+}
+
+body.desktop-product-auth .command-palette-result-copy .muted,
+body.desktop-product-auth .notifications-tray-card .muted,
+body.desktop-product-auth .tutorial-card .muted {
+  color: var(--ink-soft);
+}
+
+body.desktop-product-auth .command-summary-shell .command-summary-row {
+  gap: 0.9rem;
+}
+
+body.desktop-product-auth .command-summary-shell .card,
+body.desktop-product-auth .command-pulse-cards .card,
+body.desktop-product-auth #operationsSummaryCards .card,
+body.desktop-product-auth #headAdminSummary .card,
+body.desktop-product-auth #rushCalendarStats .card,
+body.desktop-product-auth #weeklyGoalSummary .card {
+  padding: 0.92rem 0.98rem;
+  min-height: 118px;
+}
+
+body.desktop-product-auth .command-summary-shell .card strong,
+body.desktop-product-auth .command-pulse-cards .card strong,
+body.desktop-product-auth #operationsSummaryCards .card strong,
+body.desktop-product-auth #headAdminSummary .card strong {
+  display: block;
+  margin-bottom: 0.18rem;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: clamp(1.6rem, 2vw, 2.1rem);
+  letter-spacing: -0.04em;
+}
+
+body.desktop-product-auth .workspace-sticky-filter-bar {
+  top: 1rem;
+  z-index: 4;
+}
+
+body.desktop-product-auth .officer-chat-layout {
+  gap: 1rem;
+}
+
+body.desktop-product-auth .officer-chat-head,
+body.desktop-product-auth .notifications-tray-head,
+body.desktop-product-auth .command-palette-head {
+  border-bottom: 1px solid rgba(115, 168, 222, 0.12);
+  padding-bottom: 0.8rem;
+  margin-bottom: 0.8rem;
+}
+
+body.desktop-product-auth .officer-chat-hint {
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+body.desktop-product-auth .tutorial-card,
+body.desktop-product-auth .tutorial-mode-btn,
+body.desktop-product-auth .tutorial-step-hint,
+body.desktop-product-auth .tutorial-role-checklist .entry {
+  border-color: rgba(115, 168, 222, 0.14);
+}
+
+body.desktop-product-auth .tutorial-highlight {
+  box-shadow: 0 0 0 2px rgba(var(--accent-rgb), 0.42), 0 0 0 10px rgba(var(--accent-rgb), 0.12);
+}
+
+@media (max-width: 1360px) {
+  body.desktop-product-auth .app-frame {
+    grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .app-sidebar {
+    position: relative;
+    top: auto;
+  }
+}
+
+@media (max-width: 1080px) {
+  body.desktop-product-auth .app-topbar,
+  body.desktop-product-auth .app-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .app-topbar-actions {
+    grid-template-columns: repeat(3, auto);
+    justify-items: start;
+  }
+
+  body.desktop-product-auth .app-toolbar-right,
+  body.desktop-product-auth .app-toolbar-actions {
+    justify-items: start;
+    justify-content: flex-start;
+  }
+
+  body.desktop-product-auth .app-topbar-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  body.desktop-product-auth .app-nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.desktop-product-auth .app-topbar-pills,
+  body.desktop-product-auth .app-sidebar-meta,
+  body.desktop-product-auth .app-toolbar-status {
+    display: none;
+  }
+}
+
+@media (min-width: 1200px) {
+  body.desktop-product-auth .app-frame {
+    grid-template-columns: 286px minmax(0, 1fr);
+  }
+
+  body.desktop-product-auth .app-sidebar {
+    position: sticky;
+    top: 1rem;
+  }
+}

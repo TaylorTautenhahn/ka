@@ -20,7 +20,7 @@
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/app.js" defer></script>
   </head>
-  <body{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
+  <body class="desktop-backend-body{% if initial_authenticated %} desktop-product-auth{% endif %}"{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
     <div class="noise"></div>
@@ -137,13 +137,27 @@
         <div class="app-frame">
           <aside class="panel app-sidebar">
             <div class="app-sidebar-brand">
-              {% if app_config.logo_path %}
-              <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-              {% endif %}
-              <div>
-                <p class="eyebrow">{{ app_config.chapter_name if app_config else 'BidBoard' }}</p>
-                <h2>Recruitment OS</h2>
-                <p class="muted">Daily operations for rush week.</p>
+              <div class="app-sidebar-brand-top">
+                <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="app-shell-mark" />
+                <div>
+                  <p class="eyebrow">BidBoard</p>
+                  <strong>Recruitment Command</strong>
+                </div>
+              </div>
+              <div class="app-sidebar-tenant-card">
+                {% if app_config.logo_path %}
+                <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+                {% endif %}
+                <div>
+                  <p class="eyebrow">{{ app_config.chapter_name if app_config else 'BidBoard' }}</p>
+                  <h2>Recruitment OS</h2>
+                  <p class="muted">Daily operations for rush week.</p>
+                </div>
+              </div>
+              <div class="app-sidebar-meta">
+                <span>Role-aware</span>
+                <span>Live scoring</span>
+                <span>Meeting ready</span>
               </div>
             </div>
 
@@ -171,6 +185,11 @@
                 <p id="workspaceEyebrow" class="eyebrow">Workspace</p>
                 <h2 id="workspaceTitle">Command</h2>
                 <p id="workspaceSubtitle" class="muted">Priority actions and live team signal.</p>
+                <div class="app-topbar-pills">
+                  <span>Connected workspace</span>
+                  <span>Shared operations layer</span>
+                  <span>Packet-ready context</span>
+                </div>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
@@ -193,10 +212,17 @@
                   <input id="globalSearchInput" type="search" placeholder="Search PNMs, members, commands" autocomplete="off" />
                 </label>
               </div>
-              <div class="action-row app-toolbar-actions">
-                <button type="button" class="secondary" data-command-action="create_lunch">New Lunch</button>
-                <button type="button" class="secondary" data-command-action="create_event">New Event</button>
-                <button type="button" class="secondary" data-command-action="open_meetings">Open Meetings</button>
+              <div class="app-toolbar-right">
+                <div class="app-toolbar-status">
+                  <span>Fast add</span>
+                  <span>Officer coordination</span>
+                  <span>Meeting launch</span>
+                </div>
+                <div class="action-row app-toolbar-actions">
+                  <button type="button" class="secondary" data-command-action="create_lunch">New Lunch</button>
+                  <button type="button" class="secondary" data-command-action="create_event">New Event</button>
+                  <button type="button" class="secondary" data-command-action="open_meetings">Open Meetings</button>
+                </div>
               </div>
             </section>
 

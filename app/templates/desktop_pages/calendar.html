@@ -3,12 +3,12 @@
           <div class="section-head">
             <div>
               <h2>Operations Workspace</h2>
-              <p class="muted">Timeline, goals, notifications, and officer chat in one coordinated command surface.</p>
+              <p class="muted">Timeline, goals, and officer chat in one coordinated command surface.</p>
             </div>
             <div class="operation-tab-bar" id="operationsTabBar">
               <button type="button" class="secondary operation-tab-btn is-active" data-operations-tab="timeline">Timeline</button>
               <button type="button" class="secondary operation-tab-btn" data-operations-tab="goals">Goals</button>
-              <button type="button" class="secondary operation-tab-btn" data-operations-tab="comms">Comms</button>
+              <button type="button" class="secondary operation-tab-btn" data-operations-tab="comms">Chat</button>
             </div>
           </div>
           <div id="operationsSummaryCards" class="cards"></div>
@@ -18,12 +18,20 @@
           <section class="panel">
             <div class="section-head">
               <h2>Timeline + Calendar</h2>
-              <p class="muted">One shared calendar for rush events and scheduled lunches.</p>
+              <p class="muted">One shared calendar for rush events and scheduled touchpoints.</p>
             </div>
             <div class="grid-two">
               <article class="list-column">
+                <div class="section-head">
+                  <div>
+                    <h3>Shared Touchpoints</h3>
+                    <p class="muted">Use one shared drawer for lunches and one-on-one follow-up scheduling.</p>
+                  </div>
+                  <button id="operationsScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
+                </div>
+                <div class="divider"></div>
                 <h3>Head Rush Event Controls</h3>
-                <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove non-lunch events. Use the Schedule Lunch section to add lunch items.</p>
+                <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove non-lunch events. Use Schedule Touchpoint for lunches and one-on-one follow-up.</p>
                 <form id="rushEventForm" class="stack">
                   <label>
                     Event title
@@ -153,18 +161,15 @@
         <section class="desktop-subpage reveal delay-3" data-operations-tab="comms">
           <section class="panel">
             <div class="section-head">
-              <h2>Officer Chat + Notifications</h2>
+              <h2>Officer Chat</h2>
               <p class="muted">Live officer communication with mentions, tags, and engagement stats.</p>
             </div>
             <div class="officer-chat-layout">
               <aside class="list-column officer-chat-rail">
                 <div class="section-head">
-                  <h3>Notifications</h3>
-                  <button id="notificationsReadAllBtn" type="button" class="secondary">Mark All Read</button>
+                  <h3>Thread Stats</h3>
+                  <span class="muted">Live engagement and top tags</span>
                 </div>
-                <div id="notificationsList" class="list-box muted officer-notification-list">Loading notifications...</div>
-                <div class="divider"></div>
-                <h3>Thread Stats</h3>
                 <div id="officerChatStats" class="cards officer-chat-stats"></div>
               </aside>
 

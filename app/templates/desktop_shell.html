@@ -154,11 +154,6 @@
                   <p class="muted">Daily operations for rush week.</p>
                 </div>
               </div>
-              <div class="app-sidebar-meta">
-                <span>Role-aware</span>
-                <span>Live scoring</span>
-                <span>Meeting ready</span>
-              </div>
             </div>
 
             <nav id="desktopPageNav" class="app-nav" aria-label="Desktop pages">
@@ -168,15 +163,7 @@
               <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'operations' %} is-active{% endif %}" data-page="operations">Operations <span id="operationsUnreadBadge" class="nav-badge hidden">0</span></a>
               <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'members' %} is-active{% endif %}" data-page="members">Team</a>
               <a id="adminNavLink" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}" data-page="admin">Admin</a>
-              <a href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="app-nav-link">Packet Detail</a>
             </nav>
-
-            <div class="app-sidebar-foot">
-              <button id="backupCsvBtn" type="button" class="secondary hidden">Backup CSV</button>
-              <button id="backupDbBtn" type="button" class="secondary hidden">Backup DB</button>
-              <button id="openTutorialBtn" type="button" class="secondary hidden">Tutorial</button>
-              <button id="installBtn" type="button" class="secondary hidden">Install App</button>
-            </div>
           </aside>
 
           <div class="app-main">
@@ -185,11 +172,6 @@
                 <p id="workspaceEyebrow" class="eyebrow">Workspace</p>
                 <h2 id="workspaceTitle">Command</h2>
                 <p id="workspaceSubtitle" class="muted">Priority actions and live team signal.</p>
-                <div class="app-topbar-pills">
-                  <span>Connected workspace</span>
-                  <span>Shared operations layer</span>
-                  <span>Packet-ready context</span>
-                </div>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
@@ -197,6 +179,21 @@
                   <span id="sessionSubtitle" class="muted"></span>
                 </div>
                 <button id="globalCommandBtn" type="button" class="secondary">Command Palette</button>
+                <details id="globalAddMenu" class="app-menu">
+                  <summary class="secondary">+ Add</summary>
+                  <div class="app-menu-card">
+                    <button type="button" class="app-menu-item" data-command-action="add_rushee">Add Rushee</button>
+                    <button type="button" class="app-menu-item" data-command-action="schedule_touchpoint">Schedule Touchpoint</button>
+                    <button type="button" class="app-menu-item" data-command-action="create_event">Create Event</button>
+                  </div>
+                </details>
+                <details id="appHelpMenu" class="app-menu">
+                  <summary class="secondary">Help</summary>
+                  <div class="app-menu-card">
+                    <button id="openTutorialBtn" type="button" class="app-menu-item hidden">Open Tutorial</button>
+                    <button id="installBtn" type="button" class="app-menu-item hidden">Install App</button>
+                  </div>
+                </details>
                 <button id="appNotificationsBtn" type="button" class="secondary app-notification-btn">
                   Notifications
                   <span id="appNotificationsBadge" class="nav-badge hidden">0</span>
@@ -212,18 +209,7 @@
                   <input id="globalSearchInput" type="search" placeholder="Search PNMs, members, commands" autocomplete="off" />
                 </label>
               </div>
-              <div class="app-toolbar-right">
-                <div class="app-toolbar-status">
-                  <span>Fast add</span>
-                  <span>Officer coordination</span>
-                  <span>Meeting launch</span>
-                </div>
-                <div class="action-row app-toolbar-actions">
-                  <button type="button" class="secondary" data-command-action="create_lunch">New Lunch</button>
-                  <button type="button" class="secondary" data-command-action="create_event">New Event</button>
-                  <button type="button" class="secondary" data-command-action="open_meetings">Open Meetings</button>
-                </div>
-              </div>
+              <p class="muted app-toolbar-hint">Use search to jump to rushees, members, or the commands you need next.</p>
             </section>
 
             <div class="desktop-pages app-workspace-pages">
@@ -244,7 +230,10 @@
       <section class="notifications-tray-card panel">
         <div class="section-head">
           <h2>Notifications</h2>
-          <button id="appNotificationsCloseBtn" type="button" class="secondary">Close</button>
+          <div class="action-row">
+            <button id="appNotificationsReadAllBtn" type="button" class="secondary">Mark All Read</button>
+            <button id="appNotificationsCloseBtn" type="button" class="secondary">Close</button>
+          </div>
         </div>
         <div id="appNotificationsList" class="list-box muted">No notifications loaded yet.</div>
       </section>
@@ -262,6 +251,55 @@
           <input id="commandPaletteInput" type="search" placeholder="Search PNMs, members, or commands" autocomplete="off" />
         </label>
         <div id="commandPaletteResults" class="list-box muted">Start typing to search PNMs, members, or common actions.</div>
+      </section>
+    </div>
+
+    <div id="touchpointDrawer" class="touchpoint-drawer hidden" aria-hidden="true">
+      <div class="touchpoint-drawer-scrim"></div>
+      <section class="touchpoint-drawer-card panel">
+        <div class="section-head">
+          <div>
+            <h2 id="touchpointDrawerTitle">Schedule Touchpoint</h2>
+            <p id="touchpointDrawerSubtitle" class="muted">Create one shared lunch touchpoint from any workspace.</p>
+          </div>
+          <button id="touchpointDrawerCloseBtn" type="button" class="secondary">Close</button>
+        </div>
+        <form id="touchpointDrawerForm" class="stack">
+          <label>
+            PNM
+            <select id="touchpointDrawerPnm" required></select>
+          </label>
+          <label>
+            Date
+            <input id="touchpointDrawerDate" type="date" required />
+          </label>
+          <div class="inline-grid two-cols">
+            <label>
+              Start time (optional)
+              <input id="touchpointDrawerStartTime" type="time" />
+            </label>
+            <label>
+              End time (optional)
+              <input id="touchpointDrawerEndTime" type="time" />
+            </label>
+          </div>
+          <label>
+            Location (optional)
+            <input id="touchpointDrawerLocation" type="text" placeholder="Main Street Cafe" />
+          </label>
+          <label>
+            Notes
+            <textarea id="touchpointDrawerNotes" rows="3" placeholder="Optional touchpoint context"></textarea>
+          </label>
+          <label class="checkbox-line">
+            <input id="touchpointDrawerOpenGoogle" type="checkbox" checked />
+            Open Google event page after scheduling
+          </label>
+          <div class="action-row">
+            <button id="touchpointDrawerSubmitBtn" type="submit">Schedule Touchpoint</button>
+            <a id="touchpointDrawerLastGoogleLink" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Open In Google Calendar</a>
+          </div>
+        </form>
       </section>
     </div>
 

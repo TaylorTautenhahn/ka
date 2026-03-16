@@ -3,15 +3,14 @@
           <div class="section-head">
             <div>
               <h2>Rushee Workspace</h2>
-              <p class="muted">Roster, inspector, quick creation, lunch scheduling, and packet launch in one workspace.</p>
+              <p class="muted">Roster, inspector, quick creation, and packet-ready detail in one workspace.</p>
             </div>
             <div class="action-row">
-              <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Packet</a>
               <button id="pnmViewToggleTable" type="button" class="secondary">Table View</button>
               <button id="pnmViewToggleBoard" type="button" class="secondary">Board View</button>
             </div>
           </div>
-          <div class="grid-two rushee-quick-actions-grid">
+          <div class="rushee-quick-actions-grid">
             <section class="panel rushee-inline-panel">
               <div class="section-head">
                 <h3>Create Rushee</h3>
@@ -86,49 +85,6 @@
                 <button type="submit">Add PNM</button>
               </form>
             </section>
-
-            <section class="panel rushee-inline-panel">
-              <div class="section-head">
-                <h3>Schedule Lunch</h3>
-                <p class="muted">Create the next touchpoint without leaving the workspace.</p>
-              </div>
-              <form id="lunchForm" class="stack">
-                <label>
-                  PNM
-                  <select id="lunchPnm" required></select>
-                </label>
-                <label>
-                  Date
-                  <input id="lunchDate" type="date" required />
-                </label>
-                <div class="inline-grid two-cols">
-                  <label>
-                    Start time (optional)
-                    <input id="lunchStartTime" type="time" />
-                  </label>
-                  <label>
-                    End time (optional)
-                    <input id="lunchEndTime" type="time" />
-                  </label>
-                </div>
-                <label>
-                  Location (optional)
-                  <input id="lunchLocation" type="text" placeholder="Main Street Cafe" />
-                </label>
-                <label>
-                  Notes
-                  <textarea id="lunchNotes" rows="3" placeholder="Optional lunch context"></textarea>
-                </label>
-                <label class="checkbox-line">
-                  <input id="autoOpenGoogleLunchEvent" type="checkbox" checked />
-                  Open Google event page after scheduling
-                </label>
-                <button type="submit">Schedule Lunch</button>
-              </form>
-              <div id="lastLunchCalendarActions" class="action-row hidden">
-                <a id="openLastLunchGoogleLink" class="quick-nav-link" href="#" target="_blank" rel="noopener">Open In Google Calendar</a>
-              </div>
-            </section>
           </div>
         </section>
 
@@ -145,10 +101,6 @@
             <label>
               State
               <input id="rusheeFilterState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
-            </label>
-            <label class="btn-wrap">
-              <span>&nbsp;</span>
-              <button id="applyRusheeFiltersBtn" type="button">Apply Rushee Filters</button>
             </label>
           </div>
         </section>
@@ -173,8 +125,9 @@
                 <p id="selectedPnmLabel" class="muted">Select a PNM to review packet readiness, ratings, and ownership.</p>
               </div>
               <div class="action-row">
-                <button id="rusheeWatchToggleBtn" type="button" class="secondary">Watchlist</button>
-                <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="quick-nav-link">Open Meetings</a>
+                <button id="rusheeWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
+                <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
+                <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Packet</a>
               </div>
             </div>
 

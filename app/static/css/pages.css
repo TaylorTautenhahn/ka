@@ -143,9 +143,49 @@
   color: var(--heading);
 }
 
-.app-toolbar-actions {
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.app-menu {
+  position: relative;
+}
+
+.app-menu summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.app-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.app-menu-card {
+  position: absolute;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  min-width: 220px;
+  padding: 0.45rem;
+  border-radius: 18px;
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  background: rgba(11, 22, 36, 0.94);
+  box-shadow: 0 22px 44px rgba(4, 10, 26, 0.3);
+  display: grid;
+  gap: 0.2rem;
+  z-index: 12;
+}
+
+.app-menu-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 0.78rem 0.85rem;
+  border-radius: 14px;
+  font: inherit;
+}
+
+.app-menu-item:hover,
+.app-menu-item:focus-visible {
+  background: rgba(var(--accent-rgb), 0.12);
+  outline: none;
 }
 
 .app-search-field label {
@@ -155,6 +195,10 @@
 
 .app-search-field input {
   min-width: min(420px, 100%);
+}
+
+.app-toolbar-hint {
+  margin: 0;
 }
 
 .app-workspace-pages {
@@ -188,16 +232,12 @@
 }
 
 .command-support-grid-bottom {
-  grid-template-columns: minmax(0, 1.18fr) minmax(0, 0.82fr);
+  grid-template-columns: 1fr;
 }
 
 .command-queue-workspace .command-center-grid {
-  grid-template-columns: minmax(440px, 1.08fr) minmax(520px, 1.02fr);
+  grid-template-columns: minmax(390px, 0.94fr) minmax(540px, 1.06fr);
   gap: 1.1rem;
-}
-
-.command-queue-column {
-  min-width: 440px;
 }
 
 .command-list .entry,
@@ -205,14 +245,10 @@
   width: 100%;
 }
 
-.command-queue-column .list-box,
+.command-queue-column,
 .command-composer-column,
-.command-rail-column {
+.command-queue-column .list-box {
   min-width: 0;
-}
-
-.command-rail-column {
-  grid-column: 1 / -1;
 }
 
 .command-pulse-cards {
@@ -235,7 +271,7 @@
 }
 
 .rushee-quick-actions-grid {
-  grid-template-columns: minmax(0, 1.02fr) minmax(0, 0.98fr);
+  grid-template-columns: 1fr;
   align-items: start;
 }
 
@@ -344,19 +380,22 @@
 }
 
 .notifications-tray,
-.command-palette-layer {
+.command-palette-layer,
+.touchpoint-drawer {
   position: fixed;
   inset: 0;
   z-index: 60;
 }
 
 .notifications-tray.hidden,
-.command-palette-layer.hidden {
+.command-palette-layer.hidden,
+.touchpoint-drawer.hidden {
   display: none;
 }
 
 .notifications-tray-scrim,
-.command-palette-scrim {
+.command-palette-scrim,
+.touchpoint-drawer-scrim {
   position: absolute;
   inset: 0;
   background: rgba(16, 28, 44, 0.24);
@@ -383,6 +422,18 @@
   display: grid;
   gap: 0.8rem;
   max-height: 80vh;
+  overflow: auto;
+}
+
+.touchpoint-drawer-card {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  width: min(540px, calc(100% - 2rem));
+  display: grid;
+  gap: 0.8rem;
+  max-height: calc(100vh - 2rem);
   overflow: auto;
 }
 
@@ -693,14 +744,6 @@ body.desktop-product-auth .app-nav-link.is-active {
   box-shadow: 0 16px 28px rgba(0, 0, 0, 0.22);
 }
 
-body.desktop-product-auth .app-sidebar-foot {
-  gap: 0.72rem;
-}
-
-body.desktop-product-auth .app-sidebar-foot .secondary {
-  justify-content: center;
-}
-
 body.desktop-product-auth .app-topbar,
 body.desktop-product-auth .app-toolbar {
   padding: 1.05rem 1.15rem;
@@ -734,11 +777,10 @@ body.desktop-product-auth .app-topbar-copy .muted {
 }
 
 body.desktop-product-auth .app-topbar-actions {
-  display: grid;
-  grid-template-columns: repeat(3, auto);
-  align-items: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 0.7rem;
-  justify-items: end;
   justify-content: end;
 }
 
@@ -764,6 +806,12 @@ body.desktop-product-auth .app-topbar-actions > button.secondary {
   padding-inline: 0.96rem;
 }
 
+body.desktop-product-auth .app-menu summary.secondary,
+body.desktop-product-auth .app-menu > summary.secondary {
+  min-width: 0;
+  padding-inline: 0.96rem;
+}
+
 body.desktop-product-auth .app-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -779,19 +827,9 @@ body.desktop-product-auth .app-search-field input {
   min-width: min(620px, 100%);
 }
 
-body.desktop-product-auth .app-toolbar-right {
-  display: grid;
-  justify-items: end;
-  gap: 0.72rem;
-}
-
-body.desktop-product-auth .app-toolbar-actions {
-  justify-content: flex-end;
-}
-
-body.desktop-product-auth .app-toolbar-actions > button.secondary {
-  min-width: 0;
-  padding-inline: 0.95rem;
+body.desktop-product-auth .app-toolbar-hint {
+  text-align: right;
+  max-width: 24rem;
 }
 
 body.desktop-product-auth .desktop-page .section-head h2,
@@ -981,6 +1019,7 @@ body.desktop-product-auth .divider {
 
 body.desktop-product-auth .notifications-tray-scrim,
 body.desktop-product-auth .command-palette-scrim,
+body.desktop-product-auth .touchpoint-drawer-scrim,
 body.desktop-product-auth .tutorial-scrim {
   background: rgba(3, 10, 20, 0.54);
   backdrop-filter: blur(8px);
@@ -990,6 +1029,21 @@ body.desktop-product-auth .command-palette-result-copy .muted,
 body.desktop-product-auth .notifications-tray-card .muted,
 body.desktop-product-auth .tutorial-card .muted {
   color: var(--ink-soft);
+}
+
+body.desktop-product-auth .app-menu-card,
+body.desktop-product-auth .touchpoint-drawer-card {
+  border: 1px solid rgba(115, 168, 222, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%),
+    rgba(9, 18, 31, 0.96);
+  box-shadow: 0 24px 58px rgba(0, 0, 0, 0.32);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+body.desktop-product-auth .app-menu-item {
+  color: var(--ink);
 }
 
 body.desktop-product-auth .command-summary-shell .command-summary-row {
@@ -1068,18 +1122,13 @@ body.desktop-product-auth .tutorial-highlight {
   }
 
   body.desktop-product-auth .app-topbar-actions {
-    grid-template-columns: repeat(3, auto);
-    justify-items: start;
-  }
-
-  body.desktop-product-auth .app-toolbar-right,
-  body.desktop-product-auth .app-toolbar-actions {
     justify-items: start;
     justify-content: flex-start;
   }
 
-  body.desktop-product-auth .app-topbar-actions {
-    justify-content: flex-start;
+  body.desktop-product-auth .app-toolbar-hint {
+    text-align: left;
+    max-width: none;
   }
 }
 
@@ -1092,6 +1141,16 @@ body.desktop-product-auth .tutorial-highlight {
   body.desktop-product-auth .app-sidebar-meta,
   body.desktop-product-auth .app-toolbar-status {
     display: none;
+  }
+
+  .touchpoint-drawer-card {
+    top: auto;
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+    transform: none;
+    max-height: calc(100vh - 1.5rem);
   }
 }
 

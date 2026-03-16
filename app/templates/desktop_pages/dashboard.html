@@ -86,9 +86,10 @@
                 <div>
                   <h3 id="commandSelectedName">Select a PNM from queue</h3>
                   <p id="commandSelectedMeta" class="muted">Queue details, assignment ownership, and latest touchpoint appear here.</p>
-                  <div class="action-row">
+              <div class="action-row">
                     <a id="commandOpenMeetingBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Packet</a>
-                    <button id="commandWatchToggleBtn" type="button" class="secondary">Watchlist</button>
+                    <button id="commandWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
+                    <button id="commandScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
                   </div>
                 </div>
               </div>
@@ -111,35 +112,6 @@
                 </div>
               </form>
             </article>
-
-            <article class="list-column command-rail-column">
-              <h3>Quick Actions</h3>
-              <form id="commandLunchForm" class="stack">
-                <label>
-                  Lunch Date
-                  <input id="commandLunchDate" type="date" required />
-                </label>
-                <div class="inline-grid two-cols">
-                  <label>
-                    Start (optional)
-                    <input id="commandLunchStartTime" type="time" />
-                  </label>
-                  <label>
-                    End (optional)
-                    <input id="commandLunchEndTime" type="time" />
-                  </label>
-                </div>
-                <label>
-                  Location (optional)
-                  <input id="commandLunchLocation" type="text" placeholder="Main Street Cafe" />
-                </label>
-                <label>
-                  Notes
-                  <textarea id="commandLunchNotes" rows="2" placeholder="Optional touchpoint context"></textarea>
-                </label>
-                <button id="commandLunchBtn" type="submit">Schedule Lunch</button>
-              </form>
-            </article>
           </div>
         </section>
 
@@ -150,14 +122,6 @@
               <span class="muted">Latest rating movement</span>
             </div>
             <div id="commandRecentChanges" class="list-box command-list compact">Loading recent decisions...</div>
-          </section>
-
-          <section class="panel">
-            <div class="section-head">
-              <h2>Watchlist</h2>
-              <span class="muted">Pinned high-priority PNMs</span>
-            </div>
-            <div id="commandWatchlist" class="list-box command-list compact">No watched PNMs yet.</div>
           </section>
         </section>
       </div>

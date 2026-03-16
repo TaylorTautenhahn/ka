@@ -61,7 +61,6 @@
             <a href="#mobileHomeSearchPanel" class="quick-nav-link">Search</a>
             <a href="#mobileHomeRecentLunchesPanel" class="quick-nav-link">Lunch Follow-Up</a>
             <a href="#mobileHomeQuickRatePanel" class="quick-nav-link">Quick Rate</a>
-            <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting</a>
           </div>
         </div>
       </details>
@@ -82,7 +81,6 @@
           </label>
           <div class="mobile-action-grid">
             <button id="mobileHomeClearSearchBtn" type="button" class="secondary">Clear</button>
-            <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Meeting Packets</a>
           </div>
           <p id="mobileHomeSearchMeta" class="muted">Loading rushees...</p>
           <div id="mobileHomeSearchResults" class="mobile-list"></div>
@@ -152,7 +150,6 @@
           <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
           <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="quick-nav-link">Open Team</a>
           <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="quick-nav-link">Open Operations</a>
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="quick-nav-link">Add Rushee</a>
         </div>
       </section>
 
@@ -167,7 +164,6 @@
 
       <div id="mobileCommandStickyActions" class="mobile-command-sticky hidden">
         <button id="mobileCommandStickySaveBtn" type="button">Save Rating</button>
-        <a id="mobileCommandStickyAddLink" class="quick-nav-link" href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}">Add Rushee</a>
         <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
       </div>
     </main>

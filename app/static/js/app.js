@@ -101,10 +101,10 @@ const loginForm = document.getElementById("loginForm");
 const registerForm = document.getElementById("registerForm");
 const logoutBtn = document.getElementById("logoutBtn");
 const installBtn = document.getElementById("installBtn");
-const backupCsvBtn = document.getElementById("backupCsvBtn");
-const backupDbBtn = document.getElementById("backupDbBtn");
 const openTutorialBtn = document.getElementById("openTutorialBtn");
 const loginRememberMe = document.getElementById("loginRememberMe");
+const globalAddMenu = document.getElementById("globalAddMenu");
+const appHelpMenu = document.getElementById("appHelpMenu");
 
 const regEmoji = document.getElementById("regEmoji");
 
@@ -133,7 +133,6 @@ const heroLunchCount = document.getElementById("heroLunchCount");
 const rusheeFilterInterest = document.getElementById("rusheeFilterInterest");
 const rusheeFilterStereotype = document.getElementById("rusheeFilterStereotype");
 const rusheeFilterState = document.getElementById("rusheeFilterState");
-const applyRusheeFiltersBtn = document.getElementById("applyRusheeFiltersBtn");
 const matchingFilterInterest = document.getElementById("matchingFilterInterest");
 const matchingFilterStereotype = document.getElementById("matchingFilterStereotype");
 const matchingFilterState = document.getElementById("matchingFilterState");
@@ -142,14 +141,12 @@ const memberFilterRole = document.getElementById("memberFilterRole");
 const memberFilterState = document.getElementById("memberFilterState");
 const memberFilterCity = document.getElementById("memberFilterCity");
 const memberSortSelectDesktop = document.getElementById("memberSortSelectDesktop");
-const applyMemberFiltersBtn = document.getElementById("applyMemberFiltersBtn");
 const interestHints = document.getElementById("interestHints");
 const stereotypeFilterHints = document.getElementById("stereotypeFilterHints");
 const stateFilterHints = document.getElementById("stateFilterHints");
 const adminNavLink = document.getElementById("adminNavLink");
 
 const pnmForm = document.getElementById("pnmForm");
-const lunchForm = document.getElementById("lunchForm");
 const ratingForm = document.getElementById("ratingForm");
 const photoForm = document.getElementById("photoForm");
 const pnmPhotoInput = document.getElementById("pnmPhoto");
@@ -172,12 +169,8 @@ const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
 const openMeetingPageBtn = document.getElementById("openMeetingPageBtn");
 const rusheeWatchToggleBtn = document.getElementById("rusheeWatchToggleBtn");
+const rusheeScheduleTouchpointBtn = document.getElementById("rusheeScheduleTouchpointBtn");
 const ratingPnm = document.getElementById("ratingPnm");
-const lunchPnm = document.getElementById("lunchPnm");
-const lunchStartTime = document.getElementById("lunchStartTime");
-const lunchEndTime = document.getElementById("lunchEndTime");
-const lunchLocation = document.getElementById("lunchLocation");
-const autoOpenGoogleLunchEvent = document.getElementById("autoOpenGoogleLunchEvent");
 const assignPanel = document.getElementById("assignPanel");
 const assignOfficerSelect = document.getElementById("assignOfficerSelect");
 const assignOfficerBtn = document.getElementById("assignOfficerBtn");
@@ -232,21 +225,15 @@ const commandRecentChanges = document.getElementById("commandRecentChanges");
 const commandAttentionList = document.getElementById("commandAttentionList");
 const commandTodayList = document.getElementById("commandTodayList");
 const commandPulseCards = document.getElementById("commandPulseCards");
-const commandWatchlist = document.getElementById("commandWatchlist");
 const commandSelectedPhoto = document.getElementById("commandSelectedPhoto");
 const commandSelectedPhotoPlaceholder = document.getElementById("commandSelectedPhotoPlaceholder");
 const commandSelectedName = document.getElementById("commandSelectedName");
 const commandSelectedMeta = document.getElementById("commandSelectedMeta");
 const commandOpenMeetingBtn = document.getElementById("commandOpenMeetingBtn");
 const commandWatchToggleBtn = document.getElementById("commandWatchToggleBtn");
+const commandScheduleTouchpointBtn = document.getElementById("commandScheduleTouchpointBtn");
 const commandRatingForm = document.getElementById("commandRatingForm");
 const commandSaveNextBtn = document.getElementById("commandSaveNextBtn");
-const commandLunchForm = document.getElementById("commandLunchForm");
-const commandLunchDate = document.getElementById("commandLunchDate");
-const commandLunchStartTime = document.getElementById("commandLunchStartTime");
-const commandLunchEndTime = document.getElementById("commandLunchEndTime");
-const commandLunchLocation = document.getElementById("commandLunchLocation");
-const commandLunchNotes = document.getElementById("commandLunchNotes");
 const copyCalendarFeedBtn = document.getElementById("copyCalendarFeedBtn");
 const openGoogleSubscribeBtn = document.getElementById("openGoogleSubscribeBtn");
 const calendarFeedPreview = document.getElementById("calendarFeedPreview");
@@ -254,6 +241,19 @@ const lastLunchCalendarActions = document.getElementById("lastLunchCalendarActio
 const openLastLunchGoogleLink = document.getElementById("openLastLunchGoogleLink");
 const refreshScheduledLunchesBtn = document.getElementById("refreshScheduledLunchesBtn");
 const scheduledLunchesList = document.getElementById("scheduledLunchesList");
+const touchpointDrawer = document.getElementById("touchpointDrawer");
+const touchpointDrawerCloseBtn = document.getElementById("touchpointDrawerCloseBtn");
+const touchpointDrawerForm = document.getElementById("touchpointDrawerForm");
+const touchpointDrawerPnm = document.getElementById("touchpointDrawerPnm");
+const touchpointDrawerDate = document.getElementById("touchpointDrawerDate");
+const touchpointDrawerStartTime = document.getElementById("touchpointDrawerStartTime");
+const touchpointDrawerEndTime = document.getElementById("touchpointDrawerEndTime");
+const touchpointDrawerLocation = document.getElementById("touchpointDrawerLocation");
+const touchpointDrawerNotes = document.getElementById("touchpointDrawerNotes");
+const touchpointDrawerOpenGoogle = document.getElementById("touchpointDrawerOpenGoogle");
+const touchpointDrawerLastGoogleLink = document.getElementById("touchpointDrawerLastGoogleLink");
+const touchpointDrawerTitle = document.getElementById("touchpointDrawerTitle");
+const touchpointDrawerSubtitle = document.getElementById("touchpointDrawerSubtitle");
 
 const rushEventForm = document.getElementById("rushEventForm");
 const rushEventTitle = document.getElementById("rushEventTitle");
@@ -269,6 +269,7 @@ const rushCalendarStats = document.getElementById("rushCalendarStats");
 const rushCalendarTable = document.getElementById("rushCalendarTable");
 const operationsSummaryCards = document.getElementById("operationsSummaryCards");
 const operationsTabBar = document.getElementById("operationsTabBar");
+const operationsScheduleTouchpointBtn = document.getElementById("operationsScheduleTouchpointBtn");
 const copyRushCalendarFeedBtn = document.getElementById("copyRushCalendarFeedBtn");
 const openRushGoogleSubscribeBtn = document.getElementById("openRushGoogleSubscribeBtn");
 const rushCalendarFeedPreview = document.getElementById("rushCalendarFeedPreview");
@@ -286,8 +287,7 @@ const weeklyGoalAssignedUser = document.getElementById("weeklyGoalAssignedUser")
 const weeklyGoalSummary = document.getElementById("weeklyGoalSummary");
 const weeklyGoalsList = document.getElementById("weeklyGoalsList");
 
-const notificationsReadAllBtn = document.getElementById("notificationsReadAllBtn");
-const notificationsList = document.getElementById("notificationsList");
+const appNotificationsReadAllBtn = document.getElementById("appNotificationsReadAllBtn");
 const officerChatForm = document.getElementById("officerChatForm");
 const officerChatMessage = document.getElementById("officerChatMessage");
 const officerChatTags = document.getElementById("officerChatTags");
@@ -335,7 +335,6 @@ const meetingsWatchlist = document.getElementById("meetingsWatchlist");
 const meetingsCompareSelectA = document.getElementById("meetingsCompareSelectA");
 const meetingsCompareSelectB = document.getElementById("meetingsCompareSelectB");
 const meetingsCompareSummary = document.getElementById("meetingsCompareSummary");
-const meetingsWatchToggleBtn = document.getElementById("meetingsWatchToggleBtn");
 
 const DEFAULT_DESKTOP_PAGE = "overview";
 const ROLE_HEAD = "Head Rush Officer";
@@ -526,6 +525,15 @@ const state = {
   selectedPnmId: null,
   selectedMemberId: null,
   toastTimer: null,
+  filterTimers: {
+    rushees: null,
+    members: null,
+  },
+  touchpoint: {
+    source: "shell",
+    pnmId: null,
+    lastGoogleUrl: "",
+  },
   rusheeFilters: {
     interest: "",
     stereotype: "",
@@ -1276,6 +1284,7 @@ function setActiveDesktopPage(page, updateUrl = true) {
     link.classList.toggle("is-active", link.dataset.page === target);
   });
   updateWorkspaceHeader();
+  closeAppMenus();
 
   if (!updateUrl) {
     return;
@@ -1297,10 +1306,11 @@ function setActiveDesktopPage(page, updateUrl = true) {
 
 function updateTopbarActions() {
   const isHead = roleCanUseAdminPanel();
-  backupCsvBtn.classList.toggle("hidden", !isHead);
-  backupDbBtn.classList.toggle("hidden", !isHead);
   if (openTutorialBtn) {
     openTutorialBtn.classList.toggle("hidden", !state.user);
+  }
+  if (installBtn) {
+    installBtn.classList.toggle("hidden", !state.user);
   }
   if (adminNavLink) {
     adminNavLink.classList.toggle("hidden", !isHead);
@@ -1321,7 +1331,7 @@ function workspaceMetaForPage(page) {
     return { eyebrow: "Workspace", title: "Team", subtitle: "Approvals, workload, assignment coverage, and member alignment." };
   }
   if (page === "operations") {
-    return { eyebrow: "Workspace", title: "Operations", subtitle: "Timeline, goals, notifications, and officer chat." };
+    return { eyebrow: "Workspace", title: "Operations", subtitle: "Timeline, goals, touchpoints, and officer chat." };
   }
   if (page === "admin") {
     return { eyebrow: "Workspace", title: "Admin", subtitle: "Leadership, season reset, imports, roster tools, and storage." };
@@ -1409,6 +1419,25 @@ function setSessionHeading() {
   sessionSubtitle.textContent = `${emoji}${state.user.role} | Stereotype: ${state.user.stereotype}`;
 }
 
+function closeAppMenus() {
+  [globalAddMenu, appHelpMenu].forEach((menu) => {
+    if (menu && menu.open) {
+      menu.open = false;
+    }
+  });
+}
+
+function setTouchpointDrawerVisible(visible) {
+  if (!touchpointDrawer) {
+    return;
+  }
+  touchpointDrawer.classList.toggle("hidden", !visible);
+  touchpointDrawer.setAttribute("aria-hidden", visible ? "false" : "true");
+  if (!visible) {
+    closeAppMenus();
+  }
+}
+
 function showRouteNoticeFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const notice = String(params.get("notice") || "").trim().toLowerCase();
@@ -1486,7 +1515,7 @@ function tutorialRoleSummary(role) {
   if (role === ROLE_HEAD) {
     return [
       { title: "Leadership Controls", body: "Manage approvals, assignments, promotions, and season lifecycle safely." },
-      { title: "Calendar Command", body: "Run events, goals, chat, and notifications in one timeline workflow." },
+      { title: "Calendar Command", body: "Run events, goals, and live rush chat in one timeline workflow." },
       { title: "Decision Intelligence", body: "Move from live scoring to meeting packets with full audit context." },
     ];
   }
@@ -1510,7 +1539,7 @@ function tutorialBaseStepsForRole(role) {
       target: "#pnmForm",
       title: "Core Workflow: Add, Rate, Run Meeting",
       body: "Use the same three-step sequence every cycle: 1) Add + Select a rushee, 2) Rate + Log activity, 3) Run Meeting packets for final decisions.",
-      hint: "Step 1 starts in Rushees form, Step 2 in the rating and lunch forms, Step 3 from Open Meeting Page.",
+      hint: "Step 1 starts in Rushees form, Step 2 in the rating flow and touchpoint drawer, Step 3 from the packet links.",
       advanced:
         "Advanced workflow: keep this sequence strict after every event block so decisions stay consistent and auditable.",
     },
@@ -1518,8 +1547,8 @@ function tutorialBaseStepsForRole(role) {
       page: "overview",
       target: "#desktopPageNav",
       title: "Use Navigation As The Command Rail",
-      body: "Move between Dashboard, Rushees, Team, Calendar, and Admin from the top route navigation.",
-      hint: "Open each page from this bar so your workflow stays predictable during rush week.",
+      body: "Move between Command, Rushees, Meetings, Operations, Team, and Admin from the left navigation rail.",
+      hint: "Use the left rail as your default route system so rush-week work stays predictable.",
       advanced:
         "Advanced workflow: keep one tab on Calendar and one on Rushees during live events for faster execution.",
     },
@@ -1570,10 +1599,10 @@ function tutorialBaseStepsForRole(role) {
     },
     {
       page: "rushees",
-      target: "#lunchForm",
-      title: "Schedule Lunches Directly In The Workflow",
-      body: "Lunch scheduling updates member and rushee stats immediately and can open in Google Calendar.",
-      hint: "Add location/time to make coordination easier for the full team.",
+      target: "#rusheeScheduleTouchpointBtn",
+      title: "Schedule Touchpoints Directly In The Workflow",
+      body: "Touchpoint scheduling updates member and rushee stats immediately and can open in Google Calendar.",
+      hint: "Use the shared Schedule Touchpoint drawer so Command, Rushees, and Operations stay consistent.",
       advanced:
         "Advanced workflow: schedule lunches by assignment owner so accountability is clear before key decisions.",
     },
@@ -1582,7 +1611,7 @@ function tutorialBaseStepsForRole(role) {
       operationsTab: "timeline",
       target: "#rushCalendarTable",
       title: "Track One Shared Rush Timeline",
-      body: "The calendar combines official rush events and lunches into a single operational timeline.",
+      body: "The calendar combines official rush events and touchpoints into a single operational timeline.",
       hint: "Use this view as the source of truth before each day starts.",
       advanced:
         "Advanced workflow: compare timeline density against rating activity to spot under-covered rushees quickly.",
@@ -1946,7 +1975,7 @@ async function completeTutorialFlow() {
       setSessionHeading();
     }
     closeTutorialOverlay();
-    showToast("Tutorial completed. Reopen it anytime from the Tutorial button.");
+    showToast("Tutorial completed. Reopen it anytime from Help → Open Tutorial.");
   } catch (error) {
     showToast(error.message || "Unable to save tutorial completion.");
   } finally {
@@ -1980,6 +2009,7 @@ function handleTutorialShortcut() {
   if (!state.user) {
     return;
   }
+  closeAppMenus();
   openTutorialModeChooser();
 }
 
@@ -2346,47 +2376,6 @@ function renderWeeklyGoals() {
 }
 
 function renderNotifications() {
-  if (!notificationsList || !notificationsReadAllBtn) {
-    renderOperationsUnreadBadge();
-    updateNotificationBell();
-    renderGlobalNotificationsTray();
-    return;
-  }
-  const unread = Number(state.unreadNotifications || 0);
-  notificationsReadAllBtn.textContent = unread > 0 ? `Mark All Read (${unread})` : "Mark All Read";
-  notificationsReadAllBtn.disabled = unread <= 0;
-
-  const rows = state.notifications || [];
-  if (!rows.length) {
-    notificationsList.innerHTML = '<p class="muted">No notifications yet.</p>';
-    renderOperationsUnreadBadge();
-    return;
-  }
-  notificationsList.innerHTML = rows
-    .map((item) => {
-      const readClass = item.is_read ? "" : " notification-unread";
-      const markBtn = item.is_read
-        ? ""
-        : `<button type="button" class="secondary" data-notification-read="${item.notification_id}">Mark Read</button>`;
-      const linkBtn = item.link_path
-        ? `<a class="quick-nav-link" href="${escapeHtml(resolveTenantPath(item.link_path))}">Open</a>`
-        : "";
-      return `
-        <div class="entry${readClass}">
-          <div class="entry-title">
-            <strong>${escapeHtml(item.title || "Update")}</strong>
-            <span>${escapeHtml(formatLastSeen(item.created_at))}</span>
-          </div>
-          ${item.body ? `<div class="muted">${escapeHtml(item.body)}</div>` : ""}
-          <div class="action-row">
-            ${markBtn}
-            ${linkBtn}
-          </div>
-        </div>
-      `;
-    })
-    .join("");
-
   renderOperationsUnreadBadge();
   updateNotificationBell();
   renderGlobalNotificationsTray();
@@ -2705,10 +2694,12 @@ function toQuery(params) {
 
 function setDefaultDates() {
   const today = new Date().toISOString().slice(0, 10);
-  document.getElementById("pnmEventDate").value = today;
-  document.getElementById("lunchDate").value = today;
-  if (commandLunchDate) {
-    commandLunchDate.value = today;
+  const pnmEventDate = document.getElementById("pnmEventDate");
+  if (pnmEventDate) {
+    pnmEventDate.value = today;
+  }
+  if (touchpointDrawerDate) {
+    touchpointDrawerDate.value = today;
   }
   if (rushEventDate) {
     rushEventDate.value = today;
@@ -2807,20 +2798,43 @@ function initializeFilterHintLists() {
 }
 
 function renderPnmSelectOptions() {
+  const combined = [];
+  const seen = new Set();
+  [...(state.pnms || []), ...(state.commandCenter.queue || []), ...(state.meetingsWorkspace.candidates || [])].forEach((pnm) => {
+    const pnmId = Number(pnm && pnm.pnm_id ? pnm.pnm_id : 0);
+    if (!pnmId || seen.has(pnmId)) {
+      return;
+    }
+    seen.add(pnmId);
+    combined.push(pnm);
+  });
   const options =
     '<option value="">Select PNM</option>' +
-    state.pnms
+    combined
       .map((pnm) => {
-        const label = `${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`;
+        const displayName =
+          pnm.name ||
+          [pnm.first_name, pnm.last_name].filter(Boolean).join(" ").trim() ||
+          pnm.pnm_code ||
+          "Unknown PNM";
+        const label = `${pnm.pnm_code || "PNM"} | ${displayName}`;
         return `<option value="${pnm.pnm_id}">${escapeHtml(label)}</option>`;
       })
       .join("");
-  ratingPnm.innerHTML = options;
-  lunchPnm.innerHTML = options;
+  if (ratingPnm) {
+    ratingPnm.innerHTML = options;
+  }
+  if (touchpointDrawerPnm) {
+    touchpointDrawerPnm.innerHTML = options;
+  }
 
   if (state.selectedPnmId) {
-    ratingPnm.value = String(state.selectedPnmId);
-    lunchPnm.value = String(state.selectedPnmId);
+    if (ratingPnm) {
+      ratingPnm.value = String(state.selectedPnmId);
+    }
+    if (touchpointDrawerPnm) {
+      touchpointDrawerPnm.value = String(state.selectedPnmId);
+    }
   }
 }
 
@@ -3201,6 +3215,64 @@ function syncCommandMeetingLink() {
   commandOpenMeetingBtn.href = selectedId ? `${MEETING_BASE}?pnm_id=${selectedId}` : MEETING_BASE;
 }
 
+function touchpointDrawerSelectedPnmId() {
+  const direct = Number(touchpointDrawerPnm && touchpointDrawerPnm.value ? touchpointDrawerPnm.value : 0);
+  if (direct) {
+    return direct;
+  }
+  return Number(state.touchpoint.pnmId || 0);
+}
+
+function syncTouchpointDrawerSelection() {
+  if (!touchpointDrawerPnm) {
+    return;
+  }
+  const preferredId = Number(state.touchpoint.pnmId || state.selectedPnmId || state.commandCenter.selectedQueuePnmId || 0);
+  touchpointDrawerPnm.value = preferredId ? String(preferredId) : "";
+}
+
+function openTouchpointDrawer(options = {}) {
+  if (!touchpointDrawer || !touchpointDrawerForm) {
+    return;
+  }
+  const source = String(options.source || "shell").trim() || "shell";
+  const fallbackPnmId =
+    Number(options.pnmId || 0) ||
+    Number(state.selectedPnmId || 0) ||
+    Number(state.commandCenter.selectedQueuePnmId || 0) ||
+    null;
+  state.touchpoint.source = source;
+  state.touchpoint.pnmId = fallbackPnmId;
+  state.touchpoint.lastGoogleUrl = "";
+  if (touchpointDrawerLastGoogleLink) {
+    touchpointDrawerLastGoogleLink.classList.add("hidden");
+    touchpointDrawerLastGoogleLink.href = "#";
+  }
+  if (touchpointDrawerTitle) {
+    touchpointDrawerTitle.textContent = source === "operations" ? "Schedule Shared Touchpoint" : "Schedule Touchpoint";
+  }
+  if (touchpointDrawerSubtitle) {
+    touchpointDrawerSubtitle.textContent =
+      source === "operations"
+        ? "Create a shared lunch or follow-up event without leaving operations."
+        : "Create one shared lunch touchpoint from the selected rushee context.";
+  }
+  renderPnmSelectOptions();
+  if (touchpointDrawerDate && !touchpointDrawerDate.value) {
+    touchpointDrawerDate.value = new Date().toISOString().slice(0, 10);
+  }
+  syncTouchpointDrawerSelection();
+  setTouchpointDrawerVisible(true);
+  const focusTarget = touchpointDrawerPnm && !touchpointDrawerPnm.value ? touchpointDrawerPnm : touchpointDrawerDate || touchpointDrawerPnm;
+  if (focusTarget) {
+    window.setTimeout(() => focusTarget.focus(), 30);
+  }
+}
+
+function closeTouchpointDrawer() {
+  setTouchpointDrawerVisible(false);
+}
+
 function renderCommandSelectedPhoto(item) {
   if (!commandSelectedPhoto || !commandSelectedPhotoPlaceholder) {
     return;
@@ -3435,10 +3507,10 @@ function toggleWatchlistPnm(pnmId) {
 function syncWatchButtons() {
   const selectedCommand = state.commandCenter.selectedQueuePnmId;
   if (commandWatchToggleBtn) {
-    commandWatchToggleBtn.textContent = isWatchedPnm(selectedCommand) ? "Watching" : "Watchlist";
+    commandWatchToggleBtn.textContent = isWatchedPnm(selectedCommand) ? "Pinned" : "Pin for Meetings";
   }
   if (rusheeWatchToggleBtn) {
-    rusheeWatchToggleBtn.textContent = isWatchedPnm(state.selectedPnmId) ? "Watching" : "Watchlist";
+    rusheeWatchToggleBtn.textContent = isWatchedPnm(state.selectedPnmId) ? "Pinned" : "Pin for Meetings";
   }
 }
 
@@ -3455,6 +3527,11 @@ function renderGlobalNotificationsTray() {
   if (!appNotificationsList) {
     return;
   }
+  const unread = Number(state.unreadNotifications || 0);
+  if (appNotificationsReadAllBtn) {
+    appNotificationsReadAllBtn.textContent = unread > 0 ? `Mark All Read (${unread})` : "Mark All Read";
+    appNotificationsReadAllBtn.disabled = unread <= 0;
+  }
   if (!state.notifications.length) {
     appNotificationsList.innerHTML = '<p class="muted">No notifications right now.</p>';
     return;
@@ -3463,12 +3540,16 @@ function renderGlobalNotificationsTray() {
     .slice(0, 20)
     .map(
       (item) => `
-        <div class="entry">
+        <div class="entry${item.is_read ? "" : " notification-unread"}">
           <div class="entry-title">
             <strong>${escapeHtml(item.title || "Notification")}</strong>
-            <span>${escapeHtml(formatTrendTimestamp(item.created_at))}</span>
+            <span>${escapeHtml(formatLastSeen(item.created_at))}</span>
           </div>
-          <div class="muted">${escapeHtml(item.body || "")}</div>
+          ${item.body ? `<div class="muted">${escapeHtml(item.body)}</div>` : ""}
+          <div class="action-row">
+            ${item.is_read ? "" : `<button type="button" class="secondary" data-notification-read="${item.notification_id}">Mark Read</button>`}
+            ${item.link_path ? `<a class="quick-nav-link" href="${escapeHtml(resolveTenantPath(item.link_path))}">Open</a>` : ""}
+          </div>
         </div>
       `
     )
@@ -3546,29 +3627,6 @@ function renderCommandWorkspaceExtras() {
       .map((item) => `<article class="card"><p>${escapeHtml(item.label)}</p><strong>${item.value}</strong></article>`)
       .join("");
   }
-  if (commandWatchlist) {
-    const watchRows = currentWatchlistIds()
-      .map((pnmId) => state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId) || (state.commandWorkspace.watchCandidates || []).find((row) => Number(row.pnm_id) === pnmId))
-      .filter(Boolean);
-    commandWatchlist.innerHTML = watchRows.length
-      ? watchRows
-          .map(
-            (item) => `
-              <div class="entry">
-                <div class="entry-title">
-                  <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name || `${item.first_name} ${item.last_name}`)}</strong>
-                  <span>${Number(item.weighted_total || 0).toFixed(2)}</span>
-                </div>
-                <div class="action-row">
-                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove</button>
-                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
-                </div>
-              </div>
-            `
-          )
-          .join("")
-      : '<p class="muted">No watched PNMs yet.</p>';
-  }
   syncWatchButtons();
 }
 
@@ -3587,7 +3645,7 @@ function renderPnmBoard() {
               <div class="rushee-board-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
               <div class="action-row">
                 <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
-                <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Watching" : "Watch"}</button>
+                <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned" : "Pin"}</button>
                 <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Packet</a>
               </div>
             </article>
@@ -3719,7 +3777,7 @@ function renderMeetingCompareCard(payload, fallbackLabel) {
       <div class="compare-candidate-meta">Rank ${metrics.weighted_rank || "-"} of ${metrics.cohort_size || "-"}</div>
       <div class="action-row">
         <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Packet</a>
-        <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Watching" : "Watch"}</button>
+        <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned" : "Pin"}</button>
       </div>
     </article>
   `;
@@ -3755,7 +3813,7 @@ function renderMeetingsWorkspace() {
                 <div class="compare-candidate-meta">${escapeHtml(item.flags.join(" • ") || "Meeting-ready context in place")}</div>
                 <div class="action-row">
                   <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
-                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Watching" : "Watch"}</button>
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Pinned" : "Pin"}</button>
                 </div>
               </div>
             `
@@ -3780,23 +3838,28 @@ function renderMeetingsWorkspace() {
   }
   if (meetingsWatchlist) {
     const rows = currentWatchlistIds()
-      .map((pnmId) => (state.meetingsWorkspace.candidates || []).find((item) => Number(item.pnm_id) === pnmId))
+      .map(
+        (pnmId) =>
+          (state.meetingsWorkspace.candidates || []).find((item) => Number(item.pnm_id) === pnmId) ||
+          (state.pnms || []).find((item) => Number(item.pnm_id) === pnmId) ||
+          (state.commandCenter.queue || []).find((item) => Number(item.pnm_id) === pnmId)
+      )
       .filter(Boolean);
     meetingsWatchlist.innerHTML = rows.length
       ? rows
           .map(
             (item) => `
-              <div class="entry">
-                <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong><span>${Number(item.weighted_total || 0).toFixed(2)}</span></div>
+        <div class="entry">
+                <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name || `${item.first_name || ""} ${item.last_name || ""}`.trim())}</strong><span>${Number(item.weighted_total || 0).toFixed(2)}</span></div>
                 <div class="action-row">
-                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove</button>
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Unpin</button>
                   <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
                 </div>
               </div>
             `
           )
           .join("")
-      : '<p class="muted">No watched PNMs yet.</p>';
+      : '<p class="muted">No pinned PNMs yet.</p>';
   }
   if (meetingsCompareSelectA) {
     const options = '<option value=\"\">Select</option>' + (state.meetingsWorkspace.candidates || [])
@@ -3818,44 +3881,79 @@ function renderMeetingsWorkspace() {
       renderMeetingCompareCard(state.meetingsWorkspace.compareSummaryB, "Candidate B"),
     ].join("");
   }
-  if (meetingsWatchToggleBtn) {
-    meetingsWatchToggleBtn.textContent = "Manage Watchlist";
-  }
   syncWatchButtons();
 }
 
-function performCommandAction(action, context = null) {
-  if (action === "create_lunch") {
-    setActiveDesktopPage("rushees");
-    if (lunchPnm && context && context.pnm_id) {
-      lunchPnm.value = String(context.pnm_id);
-    }
-    if (lunchForm) {
-      lunchForm.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+function focusSoon(target) {
+  if (!target) {
     return;
   }
-  if (action === "create_event") {
+  window.setTimeout(() => target.focus(), 40);
+}
+
+function openAdminStorageView() {
+  setActiveDesktopPage("admin");
+  setAdminTab("storage");
+}
+
+function localCommandResults(query, existing = []) {
+  const token = String(query || "").trim().toLowerCase();
+  const base = [
+    { action: "add_rushee", label: "Add Rushee", command_id: "create new PNM record" },
+    { action: "schedule_touchpoint", label: "Schedule Touchpoint", command_id: "open shared touchpoint drawer" },
+    { action: "create_event", label: "Create Event", command_id: "jump to Operations timeline" },
+    { action: "open_tutorial", label: "Open Tutorial", command_id: "relaunch role walkthrough" },
+  ];
+  const seen = new Set((existing || []).map((item) => String(item && item.action ? item.action : "").trim()).filter(Boolean));
+  return base.filter((item) => item.label.toLowerCase().includes(token) && !seen.has(item.action));
+}
+
+function performCommandAction(action, context = null) {
+  const resolvedAction = action === "create_lunch" ? "schedule_touchpoint" : action;
+  closeAppMenus();
+  if (resolvedAction === "add_rushee") {
+    setActiveDesktopPage("rushees");
+    focusSoon(document.getElementById("pnmFirstName"));
+    return;
+  }
+  if (resolvedAction === "schedule_touchpoint") {
+    const selectedPnmId = Number(
+      (context && context.pnm_id) ||
+        state.selectedPnmId ||
+        state.commandCenter.selectedQueuePnmId ||
+        0
+    );
+    if (state.activeDesktopPage !== "operations" && !selectedPnmId) {
+      setActiveDesktopPage("operations");
+      setOperationsTab("timeline");
+    }
+    openTouchpointDrawer({
+      source: state.activeDesktopPage === "operations" ? "operations" : "context",
+      pnmId: selectedPnmId || null,
+    });
+    return;
+  }
+  if (resolvedAction === "create_event") {
     setActiveDesktopPage("operations");
     setOperationsTab("timeline");
-    if (rushEventTitle) {
-      rushEventTitle.focus();
-    }
+    focusSoon(rushEventTitle);
     return;
   }
-  if (action === "backup_csv") {
-    if (backupCsvBtn && !backupCsvBtn.classList.contains("hidden")) {
-      backupCsvBtn.click();
-    }
+  if (resolvedAction === "backup_csv") {
+    openAdminStorageView();
+    handleCsvBackupDownload(context && context.button ? context.button : null).catch(() => {});
     return;
   }
-  if (action === "backup_db") {
-    if (backupDbBtn && !backupDbBtn.classList.contains("hidden")) {
-      backupDbBtn.click();
-    }
+  if (resolvedAction === "backup_db") {
+    openAdminStorageView();
+    handleDbBackupDownload(context && context.button ? context.button : null).catch(() => {});
     return;
   }
-  if (action === "open_meetings") {
+  if (resolvedAction === "open_tutorial") {
+    handleTutorialShortcut();
+    return;
+  }
+  if (resolvedAction === "open_meetings") {
     setActiveDesktopPage("meetings");
   }
 }
@@ -3920,7 +4018,7 @@ function renderCommandPaletteResults() {
     </div>
     <div class="command-palette-result-group">
       <h3>Commands</h3>
-      ${commandMarkup}
+      ${commandMarkup || '<p class="muted">No command matches.</p>'}
     </div>
   `;
 }
@@ -3941,14 +4039,14 @@ async function loadGlobalSearch(query) {
       query: token,
       pnms: payload.pnms || [],
       members: payload.members || [],
-      commands: payload.commands || [],
+      commands: [...(payload.commands || []), ...localCommandResults(token, payload.commands || [])],
     };
   } catch {
     state.searchResults = {
       query: token,
       pnms: [],
       members: [],
-      commands: [],
+      commands: localCommandResults(token, []),
     };
   }
   renderCommandPaletteResults();
@@ -4625,7 +4723,9 @@ function applyRatingFormForSelected() {
   const phone = selected.phone_number || "No phone";
   selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Primary: ${assigned} | Team: ${assignmentTeamText} | Package: ${packageText}`;
   ratingPnm.value = String(selected.pnm_id);
-  lunchPnm.value = String(selected.pnm_id);
+  if (touchpointDrawerPnm) {
+    touchpointDrawerPnm.value = String(selected.pnm_id);
+  }
 
   const own = selected.own_rating;
   const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
@@ -4949,10 +5049,16 @@ async function loadNotifications() {
   } catch {
     state.notifications = [];
     state.unreadNotifications = 0;
-    if (notificationsList) {
-      notificationsList.innerHTML = '<p class="muted">Unable to load notifications right now.</p>';
+    if (appNotificationsList) {
+      appNotificationsList.innerHTML = '<p class="muted">Unable to load notifications right now.</p>';
+    }
+    if (appNotificationsReadAllBtn) {
+      appNotificationsReadAllBtn.disabled = true;
+      appNotificationsReadAllBtn.textContent = "Mark All Read";
     }
     renderOperationsUnreadBadge();
+    renderGlobalNotificationsTray();
+    updateNotificationBell();
   }
 }
 
@@ -5082,6 +5188,7 @@ async function loadCommandWorkspace() {
   state.notifications = (payload.notifications && payload.notifications.notifications) || [];
   state.unreadNotifications = Number(payload.notifications && payload.notifications.unread_count ? payload.notifications.unread_count : 0);
   state.assignedRushRows = payload.assignments || [];
+  renderPnmSelectOptions();
   renderCommandCenter();
   renderAssignedRushSection();
   renderGlobalNotificationsTray();
@@ -5172,6 +5279,7 @@ async function loadMeetingsWorkspace() {
   if (!state.meetingsWorkspace.compareB && state.meetingsWorkspace.compareDefaults[1]) {
     state.meetingsWorkspace.compareB = Number(state.meetingsWorkspace.compareDefaults[1]);
   }
+  renderPnmSelectOptions();
   renderMeetingsWorkspace();
   await Promise.all([loadMeetingCompareSummary("A"), loadMeetingCompareSummary("B")]);
 }
@@ -5320,6 +5428,8 @@ async function handleLogout() {
   } catch {
     // ignore logout transport errors; local reset still required.
   }
+  closeTouchpointDrawer();
+  closeAppMenus();
   state.user = null;
   closeTutorialOverlay();
   state.selectedPnmId = null;
@@ -5379,8 +5489,12 @@ async function handleLogout() {
   if (weeklyGoalsList) {
     weeklyGoalsList.innerHTML = '<p class="muted">Sign in to view weekly goals.</p>';
   }
-  if (notificationsList) {
-    notificationsList.innerHTML = '<p class="muted">Sign in to view notifications.</p>';
+  if (appNotificationsList) {
+    appNotificationsList.innerHTML = '<p class="muted">Sign in to view notifications.</p>';
+  }
+  if (appNotificationsReadAllBtn) {
+    appNotificationsReadAllBtn.disabled = true;
+    appNotificationsReadAllBtn.textContent = "Mark All Read";
   }
   if (officerChatList) {
     officerChatList.innerHTML = '<div class="chat-welcome"><strong>Sign in to view officer chat.</strong><p class="muted">Rush Officer accounts can access the live thread after login.</p></div>';
@@ -5418,6 +5532,8 @@ async function handleLogout() {
     seasonArchiveDownloadBtn.classList.add("hidden");
   }
   renderOperationsUnreadBadge();
+  renderGlobalNotificationsTray();
+  updateNotificationBell();
   renderSelectedPnmPhoto(null);
   renderAdminPanel();
   renderAssignmentControls();
@@ -5489,7 +5605,8 @@ function syncFilterInputsFromState() {
   }
 }
 
-async function handleApplyRusheeFilters() {
+async function applyRusheeFilters(options = {}) {
+  const silent = Boolean(options.silent);
   state.rusheeFilters = getRusheeFilters();
   try {
     if (state.activeDesktopPage === "rushees") {
@@ -5497,7 +5614,9 @@ async function handleApplyRusheeFilters() {
     } else {
       await loadPnms();
     }
-    showToast("Rushee filters applied.");
+    if (!silent) {
+      showToast("Rushee filters applied.");
+    }
   } catch (error) {
     showToast(error.message || "Unable to apply rushee filters.");
   }
@@ -5513,7 +5632,8 @@ async function handleApplyMatchingFilters() {
   }
 }
 
-async function handleApplyMemberFilters() {
+async function applyMemberFilters(options = {}) {
+  const silent = Boolean(options.silent);
   state.memberFilters = getMemberFilters();
   try {
     if (state.activeDesktopPage === "members") {
@@ -5521,10 +5641,26 @@ async function handleApplyMemberFilters() {
     } else {
       await loadMembers();
     }
-    showToast("Member filters applied.");
+    if (!silent) {
+      showToast("Member filters applied.");
+    }
   } catch (error) {
     showToast(error.message || "Unable to apply member filters.");
   }
+}
+
+function scheduleAutoApplyFilters(kind) {
+  const timerMap = state.filterTimers || {};
+  if (timerMap[kind]) {
+    clearTimeout(timerMap[kind]);
+  }
+  timerMap[kind] = window.setTimeout(() => {
+    if (kind === "members") {
+      applyMemberFilters({ silent: true }).catch(() => {});
+      return;
+    }
+    applyRusheeFilters({ silent: true }).catch(() => {});
+  }, 240);
 }
 
 async function handlePnmCreate(event) {
@@ -5805,63 +5941,113 @@ async function handleQuickRatingSaveNext() {
   await submitCommandRating({ advance: true });
 }
 
-async function handleQuickLunchFromDashboard(event) {
-  event.preventDefault();
-  if (!roleCanUseCommandCenter()) {
-    showToast("Rush Officer access required.");
+async function submitTouchpointDrawer() {
+  if (!touchpointDrawerForm || !touchpointDrawerPnm || !touchpointDrawerDate) {
+    showToast("Touchpoint controls are unavailable.");
     return;
   }
-  const selected = commandQueueSelectedItem();
-  if (!selected) {
-    showToast("Select a queue item first.");
-    return;
-  }
-  if (!commandLunchDate || !commandLunchStartTime || !commandLunchEndTime || !commandLunchLocation || !commandLunchNotes) {
-    showToast("Lunch controls are unavailable.");
-    return;
-  }
-  if (!String(commandLunchDate.value || "").trim()) {
-    showToast("Lunch date is required.");
-    return;
-  }
-
-  const selectedId = Number(selected.pnm_id || 0);
+  const selectedId = Number(touchpointDrawerPnm.value || state.touchpoint.pnmId || 0);
   if (!selectedId) {
-    showToast("Invalid queue selection.");
+    showToast("Select a rushee before scheduling a touchpoint.");
     return;
   }
-
-  const lunchBtn = document.getElementById("commandLunchBtn");
-  if (lunchBtn) {
-    lunchBtn.disabled = true;
-    lunchBtn.textContent = "Scheduling...";
+  if (!String(touchpointDrawerDate.value || "").trim()) {
+    showToast("Touchpoint date is required.");
+    return;
   }
+  const shouldAutoOpenGoogle = Boolean(touchpointDrawerOpenGoogle && touchpointDrawerOpenGoogle.checked);
+  let pendingGoogleWindow = null;
+  if (shouldAutoOpenGoogle) {
+    try {
+      pendingGoogleWindow = window.open("", "_blank");
+    } catch {
+      pendingGoogleWindow = null;
+    }
+  }
+
+  const submitBtn = document.getElementById("touchpointDrawerSubmitBtn");
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.textContent = "Scheduling...";
+  }
+
   try {
-    await api("/api/lunches", {
+    const payload = await api("/api/lunches", {
       method: "POST",
       body: {
         pnm_id: selectedId,
-        lunch_date: commandLunchDate.value,
-        start_time: commandLunchStartTime.value ? commandLunchStartTime.value : null,
-        end_time: commandLunchEndTime.value ? commandLunchEndTime.value : null,
-        location: commandLunchLocation.value.trim(),
-        notes: commandLunchNotes.value.trim(),
+        lunch_date: touchpointDrawerDate.value,
+        start_time: touchpointDrawerStartTime && touchpointDrawerStartTime.value ? touchpointDrawerStartTime.value : null,
+        end_time: touchpointDrawerEndTime && touchpointDrawerEndTime.value ? touchpointDrawerEndTime.value : null,
+        location: touchpointDrawerLocation ? touchpointDrawerLocation.value.trim() : "",
+        notes: touchpointDrawerNotes ? touchpointDrawerNotes.value.trim() : "",
       },
     });
-    commandLunchStartTime.value = "";
-    commandLunchEndTime.value = "";
-    commandLunchLocation.value = "";
-    commandLunchNotes.value = "";
-    await Promise.all([refreshCommandCenterDependencies(), loadCalendarShare(), loadScheduledLunches()]);
-    showToast("Lunch scheduled from Command Center.");
+    state.selectedPnmId = selectedId;
+    state.touchpoint.pnmId = selectedId;
+    state.touchpoint.lastGoogleUrl = payload.lunch && payload.lunch.google_calendar_url ? payload.lunch.google_calendar_url : "";
+    if (touchpointDrawerLastGoogleLink) {
+      const hasGoogleUrl = Boolean(state.touchpoint.lastGoogleUrl);
+      touchpointDrawerLastGoogleLink.classList.toggle("hidden", !hasGoogleUrl);
+      touchpointDrawerLastGoogleLink.href = hasGoogleUrl ? state.touchpoint.lastGoogleUrl : "#";
+    }
+    if (touchpointDrawerStartTime) {
+      touchpointDrawerStartTime.value = "";
+    }
+    if (touchpointDrawerEndTime) {
+      touchpointDrawerEndTime.value = "";
+    }
+    if (touchpointDrawerLocation) {
+      touchpointDrawerLocation.value = "";
+    }
+    if (touchpointDrawerNotes) {
+      touchpointDrawerNotes.value = "";
+    }
+    await Promise.all([
+      refreshCommandCenterDependencies(),
+      loadCalendarShare(),
+      loadRushCalendar(),
+      loadScheduledLunches(),
+      loadWeeklyGoals(),
+    ]);
+    if (state.activeDesktopPage === "operations") {
+      await loadOperationsWorkspace();
+    } else if (state.activeDesktopPage === "meetings") {
+      await loadMeetingsWorkspace();
+    } else if (state.activeDesktopPage === "members") {
+      await loadTeamWorkspace();
+    }
+    if (state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin") {
+      await loadPnmDetail(selectedId);
+    }
+    if (payload.lunch && payload.lunch.google_calendar_url) {
+      if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
+        pendingGoogleWindow.location.href = payload.lunch.google_calendar_url;
+      } else if (shouldAutoOpenGoogle) {
+        window.location.assign(payload.lunch.google_calendar_url);
+        return;
+      }
+    } else if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
+      pendingGoogleWindow.close();
+    }
+    closeTouchpointDrawer();
+    showToast("Touchpoint scheduled. Shared calendar updated.");
   } catch (error) {
-    showToast(error.message || "Unable to schedule lunch.");
+    if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
+      pendingGoogleWindow.close();
+    }
+    showToast(error.message || "Unable to schedule touchpoint.");
   } finally {
-    if (lunchBtn) {
-      lunchBtn.disabled = false;
-      lunchBtn.textContent = "Schedule Lunch";
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Schedule Touchpoint";
     }
   }
+}
+
+async function handleTouchpointDrawerSubmit(event) {
+  event.preventDefault();
+  await submitTouchpointDrawer();
 }
 
 function handleQueueSelect(event) {
@@ -5878,73 +6064,6 @@ function handleQueueSelect(event) {
   renderPnmTable();
   applyRatingFormForSelected();
   renderCommandCenter();
-}
-
-async function handleLunchLog(event) {
-  event.preventDefault();
-  const selectedId = Number(lunchPnm.value || state.selectedPnmId || 0);
-
-  if (!selectedId) {
-    showToast("Select a PNM before logging lunch.");
-    return;
-  }
-
-  const body = {
-    pnm_id: selectedId,
-    lunch_date: document.getElementById("lunchDate").value,
-    start_time: lunchStartTime && lunchStartTime.value ? lunchStartTime.value : null,
-    end_time: lunchEndTime && lunchEndTime.value ? lunchEndTime.value : null,
-    location: lunchLocation ? lunchLocation.value.trim() : "",
-    notes: document.getElementById("lunchNotes").value.trim(),
-  };
-
-  const shouldAutoOpenGoogle = Boolean(autoOpenGoogleLunchEvent && autoOpenGoogleLunchEvent.checked);
-  let pendingGoogleWindow = null;
-  if (shouldAutoOpenGoogle) {
-    try {
-      pendingGoogleWindow = window.open("", "_blank");
-    } catch {
-      pendingGoogleWindow = null;
-    }
-  }
-
-  try {
-    const payload = await api("/api/lunches", {
-      method: "POST",
-      body,
-    });
-    document.getElementById("lunchNotes").value = "";
-    if (lunchStartTime) {
-      lunchStartTime.value = "";
-    }
-    if (lunchEndTime) {
-      lunchEndTime.value = "";
-    }
-    if (lunchLocation) {
-      lunchLocation.value = "";
-    }
-    if (payload.lunch && payload.lunch.google_calendar_url && openLastLunchGoogleLink && lastLunchCalendarActions) {
-      openLastLunchGoogleLink.href = payload.lunch.google_calendar_url;
-      lastLunchCalendarActions.classList.remove("hidden");
-      if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
-        pendingGoogleWindow.location.href = payload.lunch.google_calendar_url;
-      } else if (shouldAutoOpenGoogle) {
-        window.location.assign(payload.lunch.google_calendar_url);
-        return;
-      }
-    } else if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
-      pendingGoogleWindow.close();
-    }
-    showToast("Lunch scheduled. Shared calendar updated; Google subscribed calendars may sync with delay.");
-    state.selectedPnmId = selectedId;
-    await refreshAll();
-    await loadPnmDetail(selectedId);
-  } catch (error) {
-    if (pendingGoogleWindow && !pendingGoogleWindow.closed) {
-      pendingGoogleWindow.close();
-    }
-    showToast(error.message || "Unable to schedule lunch.");
-  }
 }
 
 async function handleHeadAssignmentSubmit(event) {
@@ -6269,7 +6388,7 @@ function handleWatchToggleClick(event) {
     return;
   }
   const watching = toggleWatchlistPnm(pnmId);
-  showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+  showToast(watching ? "Pinned for meetings." : "Removed from pinned meetings.");
 }
 
 async function handleGlobalOpenPnmClick(event) {
@@ -6312,7 +6431,7 @@ function handleCommandToolbarAction(event) {
   if (!button) {
     return;
   }
-  performCommandAction(button.dataset.commandAction || "");
+  performCommandAction(button.dataset.commandAction || "", { button });
 }
 
 function handleCommandPaletteResultsClick(event) {
@@ -6672,39 +6791,51 @@ async function handleClearAssignment() {
   }
 }
 
-async function handleCsvBackupDownload() {
+async function handleCsvBackupDownload(trigger = null) {
   if (!roleCanUseAdminPanel()) {
     showToast("Head Rush Officer access required.");
     return;
   }
-  backupCsvBtn.disabled = true;
-  backupCsvBtn.textContent = "Preparing...";
+  const button = trigger && trigger.nodeType === 1 ? trigger : null;
+  const priorLabel = button ? button.textContent : "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Preparing...";
+  }
   try {
     await downloadFile("/api/export/csv", "kao-rush-backup.zip");
     showToast("CSV backup downloaded.");
   } catch (error) {
     showToast(error.message || "CSV backup download failed.");
   } finally {
-    backupCsvBtn.disabled = false;
-    backupCsvBtn.textContent = "Backup CSV";
+    if (button) {
+      button.disabled = false;
+      button.textContent = priorLabel || "Backup CSV";
+    }
   }
 }
 
-async function handleDbBackupDownload() {
+async function handleDbBackupDownload(trigger = null) {
   if (!roleCanUseAdminPanel()) {
     showToast("Head Rush Officer access required.");
     return;
   }
-  backupDbBtn.disabled = true;
-  backupDbBtn.textContent = "Preparing...";
+  const button = trigger && trigger.nodeType === 1 ? trigger : null;
+  const priorLabel = button ? button.textContent : "";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Preparing...";
+  }
   try {
     await downloadFile("/api/export/sqlite", "kao-rush-backup.sqlite");
     showToast("Database snapshot downloaded.");
   } catch (error) {
     showToast(error.message || "Database backup download failed.");
   } finally {
-    backupDbBtn.disabled = false;
-    backupDbBtn.textContent = "Backup DB";
+    if (button) {
+      button.disabled = false;
+      button.textContent = priorLabel || "Backup DB";
+    }
   }
 }
 
@@ -7107,7 +7238,7 @@ async function handleWeeklyGoalsActionClick(event) {
   }
 }
 
-async function handleNotificationListClick(event) {
+async function handleAppNotificationsClick(event) {
   const btn = event.target.closest("[data-notification-read]");
   if (!btn) {
     return;
@@ -7127,11 +7258,13 @@ async function handleNotificationListClick(event) {
   }
 }
 
-async function handleNotificationsReadAll() {
+async function handleAppNotificationsReadAll() {
   if (!state.unreadNotifications) {
     return;
   }
-  notificationsReadAllBtn.disabled = true;
+  if (appNotificationsReadAllBtn) {
+    appNotificationsReadAllBtn.disabled = true;
+  }
   try {
     await api("/api/notifications/read-all", { method: "POST" });
     await loadNotifications();
@@ -7139,7 +7272,9 @@ async function handleNotificationsReadAll() {
   } catch (error) {
     showToast(error.message || "Unable to mark notifications read.");
   } finally {
-    notificationsReadAllBtn.disabled = false;
+    if (appNotificationsReadAllBtn) {
+      appNotificationsReadAllBtn.disabled = false;
+    }
   }
 }
 
@@ -7276,8 +7411,6 @@ function attachEvents() {
   if (openTutorialBtn) {
     openTutorialBtn.addEventListener("click", handleTutorialShortcut);
   }
-  backupCsvBtn.addEventListener("click", handleCsvBackupDownload);
-  backupDbBtn.addEventListener("click", handleDbBackupDownload);
   if (seasonResetBtn) {
     seasonResetBtn.addEventListener("click", handleSeasonReset);
   }
@@ -7315,23 +7448,14 @@ function attachEvents() {
   if (clearAssignBtn) {
     clearAssignBtn.addEventListener("click", handleClearAssignment);
   }
-  if (applyRusheeFiltersBtn) {
-    applyRusheeFiltersBtn.addEventListener("click", handleApplyRusheeFilters);
-  }
   if (applyMatchingFiltersBtn) {
     applyMatchingFiltersBtn.addEventListener("click", handleApplyMatchingFilters);
-  }
-  if (applyMemberFiltersBtn) {
-    applyMemberFiltersBtn.addEventListener("click", handleApplyMemberFilters);
   }
   if (commandRatingForm) {
     commandRatingForm.addEventListener("submit", handleQuickRatingSave);
   }
   if (commandSaveNextBtn) {
     commandSaveNextBtn.addEventListener("click", handleQuickRatingSaveNext);
-  }
-  if (commandLunchForm) {
-    commandLunchForm.addEventListener("submit", handleQuickLunchFromDashboard);
   }
   if (commandCenterQueue) {
     commandCenterQueue.addEventListener("click", handleQueueSelect);
@@ -7344,7 +7468,17 @@ function attachEvents() {
         return;
       }
       const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+      showToast(watching ? "Pinned for meetings." : "Removed from pinned meetings.");
+    });
+  }
+  if (commandScheduleTouchpointBtn) {
+    commandScheduleTouchpointBtn.addEventListener("click", () => {
+      const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
+      if (!selectedId) {
+        showToast("Select a queue item first.");
+        return;
+      }
+      openTouchpointDrawer({ source: "command", pnmId: selectedId });
     });
   }
   if (rusheeWatchToggleBtn) {
@@ -7355,9 +7489,54 @@ function attachEvents() {
         return;
       }
       const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
+      showToast(watching ? "Pinned for meetings." : "Removed from pinned meetings.");
     });
   }
+  if (rusheeScheduleTouchpointBtn) {
+    rusheeScheduleTouchpointBtn.addEventListener("click", () => {
+      const selectedId = Number(state.selectedPnmId || 0);
+      if (!selectedId) {
+        showToast("Select a rushee first.");
+        return;
+      }
+      openTouchpointDrawer({ source: "rushees", pnmId: selectedId });
+    });
+  }
+  if (operationsScheduleTouchpointBtn) {
+    operationsScheduleTouchpointBtn.addEventListener("click", () => {
+      openTouchpointDrawer({ source: "operations", pnmId: Number(state.selectedPnmId || 0) || null });
+    });
+  }
+  if (touchpointDrawerForm) {
+    touchpointDrawerForm.addEventListener("submit", handleTouchpointDrawerSubmit);
+  }
+  if (touchpointDrawerPnm) {
+    touchpointDrawerPnm.addEventListener("change", (event) => {
+      state.touchpoint.pnmId = Number(event.target.value || 0) || null;
+    });
+  }
+  if (touchpointDrawerCloseBtn) {
+    touchpointDrawerCloseBtn.addEventListener("click", closeTouchpointDrawer);
+  }
+  if (touchpointDrawer) {
+    touchpointDrawer.addEventListener("click", (event) => {
+      if (event.target === touchpointDrawer || event.target.classList.contains("touchpoint-drawer-scrim")) {
+        closeTouchpointDrawer();
+      }
+    });
+  }
+  [rusheeFilterInterest, rusheeFilterStereotype, rusheeFilterState].forEach((input) => {
+    if (input) {
+      input.addEventListener("input", () => scheduleAutoApplyFilters("rushees"));
+      input.addEventListener("change", () => scheduleAutoApplyFilters("rushees"));
+    }
+  });
+  [memberFilterRole, memberFilterState, memberFilterCity, memberSortSelectDesktop].forEach((input) => {
+    if (input) {
+      input.addEventListener("input", () => scheduleAutoApplyFilters("members"));
+      input.addEventListener("change", () => scheduleAutoApplyFilters("members"));
+    }
+  });
   if (pnmViewToggleTable) {
     pnmViewToggleTable.addEventListener("click", () => {
       setViewPreference("pnmView", "table");
@@ -7413,6 +7592,12 @@ function attachEvents() {
   if (appNotificationsCloseBtn) {
     appNotificationsCloseBtn.addEventListener("click", () => toggleNotificationsTray(false));
   }
+  if (appNotificationsReadAllBtn) {
+    appNotificationsReadAllBtn.addEventListener("click", handleAppNotificationsReadAll);
+  }
+  if (appNotificationsList) {
+    appNotificationsList.addEventListener("click", handleAppNotificationsClick);
+  }
   if (appNotificationsTray) {
     appNotificationsTray.addEventListener("click", (event) => {
       if (event.target === appNotificationsTray || event.target.classList.contains("notifications-tray-scrim")) {
@@ -7423,7 +7608,6 @@ function attachEvents() {
 
   pnmForm.addEventListener("submit", handlePnmCreate);
   ratingForm.addEventListener("submit", handleRatingSave);
-  lunchForm.addEventListener("submit", handleLunchLog);
   photoForm.addEventListener("submit", handlePhotoUpload);
   if (rushEventForm) {
     rushEventForm.addEventListener("submit", handleRushEventCreate);
@@ -7436,12 +7620,6 @@ function attachEvents() {
   }
   if (weeklyGoalsList) {
     weeklyGoalsList.addEventListener("click", handleWeeklyGoalsActionClick);
-  }
-  if (notificationsList) {
-    notificationsList.addEventListener("click", handleNotificationListClick);
-  }
-  if (notificationsReadAllBtn) {
-    notificationsReadAllBtn.addEventListener("click", handleNotificationsReadAll);
   }
   if (officerChatForm) {
     officerChatForm.addEventListener("submit", handleOfficerChatSubmit);
@@ -7522,22 +7700,16 @@ function attachEvents() {
     handleGlobalOpenPnmClick(event).catch(() => {});
   });
   document.addEventListener("click", handleCommandToolbarAction);
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest(".app-menu")) {
+      closeAppMenus();
+    }
+  });
   if (meetingsCompareSelectA) {
     meetingsCompareSelectA.addEventListener("change", (event) => handleMeetingsCompareChange("A", event.target.value));
   }
   if (meetingsCompareSelectB) {
     meetingsCompareSelectB.addEventListener("change", (event) => handleMeetingsCompareChange("B", event.target.value));
-  }
-  if (meetingsWatchToggleBtn) {
-    meetingsWatchToggleBtn.addEventListener("click", () => {
-      const selectedId = Number(state.meetingsWorkspace.compareA || state.meetingsWorkspace.compareDefaults[0] || 0);
-      if (!selectedId) {
-        showToast("Select a meeting candidate first.");
-        return;
-      }
-      const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Added to watchlist." : "Removed from watchlist.");
-    });
   }
 
   ratingPnm.addEventListener("change", async (event) => {
@@ -7549,15 +7721,6 @@ function attachEvents() {
     renderPnmTable();
     applyRatingFormForSelected();
     await loadPnmDetail(selectedId);
-  });
-
-  lunchPnm.addEventListener("change", (event) => {
-    const selectedId = Number(event.target.value || 0);
-    if (selectedId) {
-      state.selectedPnmId = selectedId;
-      renderPnmTable();
-      applyRatingFormForSelected();
-    }
   });
 
   if (desktopPageNav) {
@@ -7595,7 +7758,7 @@ function attachEvents() {
   if (tutorialModeSkipBtn) {
     tutorialModeSkipBtn.addEventListener("click", () => {
       closeTutorialOverlay();
-      showToast("Tutorial skipped. Use the Tutorial button any time.");
+      showToast("Tutorial skipped. Use Help → Open Tutorial any time.");
     });
   }
   if (tutorialPrevBtn) {
@@ -7618,6 +7781,8 @@ function attachEvents() {
     if (event.key === "Escape") {
       closeCommandPalette();
       toggleNotificationsTray(false);
+      closeTouchpointDrawer();
+      closeAppMenus();
     }
   });
 }

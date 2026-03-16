@@ -1164,3 +1164,276 @@ body.desktop-product-auth .tutorial-highlight {
     top: 1rem;
   }
 }
+
+/* Design polish pass */
+body.desktop-product-auth .app-frame {
+  gap: 1.45rem;
+}
+
+body.desktop-product-auth .app-main,
+body.desktop-product-auth .desktop-subpage.is-active {
+  gap: 1.25rem;
+}
+
+body.desktop-product-auth .app-sidebar,
+body.desktop-product-auth .app-topbar,
+body.desktop-product-auth .app-toolbar,
+body.desktop-product-auth .command-summary-shell,
+body.desktop-product-auth .command-queue-workspace,
+body.desktop-product-auth .rushee-action-shell,
+body.desktop-product-auth .rushee-roster-panel,
+body.desktop-product-auth .rushee-inspector-panel,
+body.desktop-product-auth .notifications-tray-card,
+body.desktop-product-auth .command-palette-card,
+body.desktop-product-auth .touchpoint-drawer-card {
+  border-radius: 30px;
+}
+
+body.desktop-product-auth .app-sidebar,
+body.desktop-product-auth .app-topbar,
+body.desktop-product-auth .app-toolbar {
+  box-shadow:
+    0 26px 68px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+body.desktop-product-auth .app-sidebar {
+  padding: 1.2rem;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--accent-rgb), 0.12), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 24%),
+    rgba(7, 17, 29, 0.92);
+}
+
+body.desktop-product-auth .app-sidebar-brand-top {
+  padding-bottom: 0.45rem;
+  border-bottom: 1px solid rgba(115, 168, 222, 0.12);
+}
+
+body.desktop-product-auth .app-sidebar-tenant-card {
+  border-radius: 22px;
+  padding: 1rem;
+}
+
+body.desktop-product-auth .app-nav-link {
+  position: relative;
+  padding: 0.95rem 1rem 0.95rem 1.1rem;
+  border-radius: 18px;
+  transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+body.desktop-product-auth .app-nav-link::before {
+  content: "";
+  position: absolute;
+  left: 0.72rem;
+  top: 50%;
+  width: 4px;
+  height: 48%;
+  border-radius: 999px;
+  transform: translateY(-50%);
+  background: linear-gradient(180deg, rgba(var(--accent-rgb), 1), rgba(var(--accent-soft-rgb), 0.88));
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+body.desktop-product-auth .app-nav-link:hover::before,
+body.desktop-product-auth .app-nav-link.is-active::before {
+  opacity: 1;
+}
+
+body.desktop-product-auth .app-topbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 1.2rem 1.25rem;
+}
+
+body.desktop-product-auth .app-topbar-copy {
+  max-width: 46rem;
+}
+
+body.desktop-product-auth .app-topbar-copy h2 {
+  font-size: clamp(2rem, 2.45vw, 2.75rem);
+  line-height: 0.98;
+}
+
+body.desktop-product-auth .app-topbar-actions {
+  align-self: start;
+  gap: 0.6rem;
+  padding: 0.55rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.desktop-product-auth .app-session-card {
+  grid-column: auto;
+  min-width: 220px;
+  max-width: 280px;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.08), transparent 58%),
+    rgba(255, 255, 255, 0.04);
+}
+
+body.desktop-product-auth .app-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 1rem 1.15rem;
+}
+
+body.desktop-product-auth .app-search-field input {
+  min-height: 3.2rem;
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .app-toolbar-hint {
+  max-width: 24rem;
+  padding: 0.78rem 0.9rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body.desktop-product-auth .section-head {
+  gap: 0.9rem;
+  align-items: flex-start;
+}
+
+body.desktop-product-auth .section-head .muted:last-child,
+body.desktop-product-auth .section-head > span.muted {
+  padding-top: 0.3rem;
+}
+
+body.desktop-product-auth .card,
+body.desktop-product-auth .list-box,
+body.desktop-product-auth .list-column,
+body.desktop-product-auth .entry,
+body.desktop-product-auth .table-wrap,
+body.desktop-product-auth .rushee-board-card,
+body.desktop-product-auth .meetings-queue-card,
+body.desktop-product-auth .compare-candidate-card,
+body.desktop-product-auth .team-load-card,
+body.desktop-product-auth .command-palette-result,
+body.desktop-product-auth .demo-guide-panel {
+  border-radius: 22px;
+}
+
+body.desktop-product-auth .command-summary-shell .card,
+body.desktop-product-auth .command-pulse-cards .card,
+body.desktop-product-auth #operationsSummaryCards .card,
+body.desktop-product-auth #headAdminSummary .card,
+body.desktop-product-auth #rushCalendarStats .card,
+body.desktop-product-auth #weeklyGoalSummary .card {
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.09), transparent 72%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%),
+    rgba(255, 255, 255, 0.04);
+}
+
+body.desktop-product-auth .command-queue-workspace .command-center-grid {
+  gap: 1.2rem;
+}
+
+body.desktop-product-auth .command-center-grid .list-box,
+body.desktop-product-auth .rushee-inspector-panel .list-box,
+body.desktop-product-auth .command-composer-column form,
+body.desktop-product-auth .rushee-inline-panel,
+body.desktop-product-auth .meeting-photo-wrap {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 30%),
+    rgba(5, 14, 24, 0.54);
+}
+
+body.desktop-product-auth .command-composer-column form,
+body.desktop-product-auth .rushee-inline-panel {
+  padding: 1rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 24px;
+}
+
+body.desktop-product-auth .command-selected-head {
+  gap: 1rem;
+  grid-template-columns: 138px minmax(0, 1fr);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid rgba(115, 168, 222, 0.12);
+}
+
+body.desktop-product-auth .command-selected-photo-wrap .meeting-photo,
+body.desktop-product-auth .command-selected-photo-wrap .photo-placeholder {
+  width: 138px;
+  max-width: none;
+  min-height: 182px;
+  border-radius: 24px;
+}
+
+body.desktop-product-auth .command-list .entry,
+body.desktop-product-auth .entry,
+body.desktop-product-auth .rushee-board-card,
+body.desktop-product-auth .meetings-queue-card,
+body.desktop-product-auth .compare-candidate-card,
+body.desktop-product-auth .team-load-card {
+  padding: 0.92rem;
+}
+
+body.desktop-product-auth .command-list .entry:hover,
+body.desktop-product-auth .entry:hover,
+body.desktop-product-auth .rushee-board-card:hover,
+body.desktop-product-auth .meetings-queue-card:hover,
+body.desktop-product-auth .compare-candidate-card:hover,
+body.desktop-product-auth .team-load-card:hover,
+body.desktop-product-auth .command-palette-result:hover {
+  transform: translateY(-2px);
+}
+
+body.desktop-product-auth .rushee-quick-actions-grid {
+  gap: 0.95rem;
+}
+
+body.desktop-product-auth .rushee-inline-panel {
+  max-width: 560px;
+}
+
+body.desktop-product-auth .rushee-workspace-grid {
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1.05fr) minmax(440px, 0.95fr);
+}
+
+body.desktop-product-auth .rushee-inspector-panel {
+  top: 5rem;
+}
+
+body.desktop-product-auth .rushee-inspector-grid {
+  gap: 1.15rem;
+}
+
+body.desktop-product-auth .tag-picker {
+  gap: 0.55rem;
+}
+
+body.desktop-product-auth .tag-picker .tag-pill {
+  padding: 0.56rem 0.82rem;
+  border-radius: 999px;
+}
+
+body.desktop-product-auth .notifications-tray-card,
+body.desktop-product-auth .command-palette-card,
+body.desktop-product-auth .touchpoint-drawer-card {
+  box-shadow:
+    0 28px 72px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+@media (max-width: 1080px) {
+  body.desktop-product-auth .app-topbar-actions {
+    justify-content: flex-start;
+    max-width: none;
+  }
+
+  body.desktop-product-auth .app-session-card {
+    min-width: 0;
+    max-width: none;
+  }
+
+  body.desktop-product-auth .app-toolbar-hint {
+    max-width: none;
+  }
+}

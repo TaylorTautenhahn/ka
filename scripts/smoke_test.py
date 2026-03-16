@@ -530,6 +530,15 @@ def main() -> None:
             search_payload = response.json()
             if "pnms" not in search_payload or "members" not in search_payload or "commands" not in search_payload:
                 raise AssertionError("Global search payload should include pnms, members, and commands.")
+            officer_commands = {
+                str(item.get("action"))
+                for item in search_payload.get("commands", [])
+                if isinstance(item, dict) and item.get("action")
+            }
+            if "backup_csv" in officer_commands or "create_event" in officer_commands:
+                raise AssertionError("Officer search should not expose head-only commands.")
+            if "create_lunch" not in officer_commands or "open_meetings" not in officer_commands:
+                raise AssertionError("Officer search should expose officer-safe command actions.")
             checks.append("Global search API works")
 
             response = client.post(
@@ -600,6 +609,13 @@ def main() -> None:
             )
             expect_status(response, 200, "Create lunch")
             checks.append("Lunch scheduling works")
+
+            response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/lunches")
+            expect_status(response, 200, "Officer lunch history view")
+            lunch_payload = response.json()
+            if not isinstance(lunch_payload.get("lunches"), list) or not lunch_payload.get("lunches"):
+                raise AssertionError("Officer lunch history should include at least one lunch entry.")
+            checks.append("Officer lunch history remains available")
 
             response = client.post(
                 "/kappaalphaorder/api/lunches",
@@ -676,6 +692,45 @@ def main() -> None:
             response = client.get("/kappaalphaorder/api/dashboard/command-center")
             expect_status(response, 403, "Rusher blocked from command center API")
             checks.append("Command center endpoint enforces officer-only access")
+
+            response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/meeting")
+            expect_status(response, 403, "Rusher blocked from meeting detail API")
+            checks.append("Meeting detail enforces officer-only access")
+
+            response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/lunches")
+            expect_status(response, 403, "Rusher blocked from lunch history API")
+            checks.append("Lunch history enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/events?include_past=1")
+            expect_status(response, 403, "Rusher blocked from events API")
+            checks.append("Unified events API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/rush-events")
+            expect_status(response, 403, "Rusher blocked from rush events API")
+            checks.append("Rush events API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/rush-calendar?limit=50")
+            expect_status(response, 403, "Rusher blocked from rush calendar API")
+            checks.append("Rush calendar API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/tasks/weekly")
+            expect_status(response, 403, "Rusher blocked from weekly goals API")
+            checks.append("Weekly goals API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/search/global?q=alex")
+            expect_status(response, 200, "Rusher global search API")
+            rusher_search_payload = response.json()
+            rusher_commands = {
+                str(item.get("action"))
+                for item in rusher_search_payload.get("commands", [])
+                if isinstance(item, dict) and item.get("action")
+            }
+            blocked_rusher_commands = {"add_rushee", "create_event", "backup_csv", "open_meetings"}
+            if rusher_commands & blocked_rusher_commands:
+                raise AssertionError("Rusher search should not expose officer or head-only commands.")
+            if "create_lunch" not in rusher_commands or "open_tutorial" not in rusher_commands:
+                raise AssertionError("Rusher search should still expose safe self-service commands.")
+            checks.append("Global search hides restricted commands for rushers")
 
             response = client.patch(
                 f"/kappaalphaorder/api/users/{officer_user_id}/location",

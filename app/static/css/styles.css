@@ -3536,3 +3536,138 @@ body.demo-premium button.secondary {
     justify-content: flex-start;
   }
 }
+
+/* Mobile shell design polish pass */
+body[data-mobile-page] .mobile-shell {
+  gap: 1rem;
+  padding: 0.82rem 0.82rem 8.9rem;
+}
+
+body[data-mobile-page] .mobile-appbar {
+  position: sticky;
+  top: max(0.65rem, env(safe-area-inset-top, 0px));
+  z-index: 20;
+  padding: 0.88rem 0.98rem;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 44%),
+    rgba(9, 20, 33, 0.9);
+  box-shadow:
+    0 22px 48px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body[data-mobile-page] .mobile-appbar-link {
+  min-height: 2.45rem;
+  padding: 0.58rem 0.82rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+body[data-mobile-page] .hero.mobile-hero,
+body[data-mobile-page] .panel.mobile-panel,
+body[data-mobile-page] .panel.meeting-view,
+body[data-mobile-page] .entry.mobile-card,
+body[data-mobile-page] .list-box,
+body[data-mobile-page] .card {
+  box-shadow:
+    0 22px 52px rgba(0, 0, 0, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body[data-mobile-page] .hero.mobile-hero {
+  padding: 1.2rem 1.05rem 1.08rem;
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(53, 200, 255, 0.14), transparent 34%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 38%),
+    rgba(11, 22, 36, 0.84);
+}
+
+body[data-mobile-page] .mobile-hero h1 {
+  margin-bottom: 0.42rem;
+}
+
+body[data-mobile-page] .panel.mobile-panel,
+body[data-mobile-page] .panel.meeting-view {
+  padding: 1.05rem;
+  border-radius: 22px;
+}
+
+body[data-mobile-page] .section-head {
+  gap: 0.7rem;
+  align-items: flex-start;
+}
+
+body[data-mobile-page] .mobile-home-pnm-btn,
+body[data-mobile-page] .mobile-command-queue-btn,
+body[data-mobile-page] .entry.mobile-card {
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 28%),
+    rgba(255, 255, 255, 0.03);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+
+body[data-mobile-page] .mobile-kpi-grid .card,
+body[data-mobile-page] .mobile-panel .card {
+  min-height: 94px;
+  border-radius: 20px;
+  padding: 0.95rem;
+  background:
+    linear-gradient(180deg, rgba(53, 200, 255, 0.08), transparent 70%),
+    rgba(255, 255, 255, 0.04);
+}
+
+body[data-mobile-page] .mobile-action-grid {
+  gap: 0.62rem;
+}
+
+body[data-mobile-page] .mobile-command-sticky {
+  left: 0.72rem;
+  right: 0.72rem;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.7rem);
+  padding: 0.58rem;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), transparent 44%),
+    rgba(8, 18, 31, 0.94);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+body[data-mobile-page] .mobile-command-sticky button,
+body[data-mobile-page] .mobile-command-sticky .quick-nav-link {
+  min-height: 3rem;
+  border-radius: 16px;
+}
+
+body[data-mobile-page] .mobile-tabs {
+  padding: 0.68rem 0.74rem calc(env(safe-area-inset-bottom, 0px) + 0.22rem);
+  gap: 0.42rem;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 42%),
+    rgba(5, 13, 24, 0.94);
+}
+
+body[data-mobile-page] .mobile-tab {
+  border-radius: 16px;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+@media (max-width: 560px) {
+  body[data-mobile-page] .mobile-shell {
+    padding-inline: 0.74rem;
+  }
+
+  body[data-mobile-page] .mobile-appbar {
+    padding: 0.82rem 0.88rem;
+  }
+
+  body[data-mobile-page] .mobile-panel,
+  body[data-mobile-page] .panel.meeting-view {
+    padding: 0.98rem;
+  }
+}

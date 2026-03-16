@@ -1061,13 +1061,19 @@ function resolveTenantPath(path) {
   if (!raw) {
     return raw;
   }
-  if (/^(https?:)?\/\//i.test(raw) || raw.startsWith("mailto:") || raw.startsWith("tel:") || raw.startsWith("#")) {
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("mailto:") || raw.startsWith("tel:") || raw.startsWith("#")) {
     return raw;
+  }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//")) {
+    return BASE_PATH || "/";
   }
   if (raw.startsWith("/") && BASE_PATH && !raw.startsWith(`${BASE_PATH}/`) && raw !== BASE_PATH) {
     return `${BASE_PATH}${raw}`;
   }
-  return raw;
+  if (raw.startsWith("/")) {
+    return raw;
+  }
+  return BASE_PATH || "/";
 }
 
 function readCookie(name) {
@@ -3898,12 +3904,21 @@ function openAdminStorageView() {
 
 function localCommandResults(query, existing = []) {
   const token = String(query || "").trim().toLowerCase();
-  const base = [
-    { action: "add_rushee", label: "Add Rushee", command_id: "create new PNM record" },
-    { action: "schedule_touchpoint", label: "Schedule Touchpoint", command_id: "open shared touchpoint drawer" },
-    { action: "create_event", label: "Create Event", command_id: "jump to Operations timeline" },
-    { action: "open_tutorial", label: "Open Tutorial", command_id: "relaunch role walkthrough" },
-  ];
+  const base = [];
+  if (roleCanApproveUsers()) {
+    base.push({ action: "add_rushee", label: "Add Rushee", command_id: "create new PNM record" });
+  }
+  if (state.user) {
+    base.push({ action: "schedule_touchpoint", label: "Schedule Touchpoint", command_id: "open shared touchpoint drawer" });
+    base.push({ action: "open_tutorial", label: "Open Tutorial", command_id: "relaunch role walkthrough" });
+  }
+  if (roleCanUseAdminPanel()) {
+    base.push({ action: "create_event", label: "Create Event", command_id: "jump to Operations timeline" });
+    base.push({ action: "backup_csv", label: "Backup CSV", command_id: "open admin data tools" });
+  }
+  if (roleCanUseCommandCenter()) {
+    base.push({ action: "open_meetings", label: "Open Meetings Workspace", command_id: "review packet-ready PNMs" });
+  }
   const seen = new Set((existing || []).map((item) => String(item && item.action ? item.action : "").trim()).filter(Boolean));
   return base.filter((item) => item.label.toLowerCase().includes(token) && !seen.has(item.action));
 }
@@ -3912,11 +3927,18 @@ function performCommandAction(action, context = null) {
   const resolvedAction = action === "create_lunch" ? "schedule_touchpoint" : action;
   closeAppMenus();
   if (resolvedAction === "add_rushee") {
+    if (!roleCanApproveUsers()) {
+      showToast("Only rush officers can add rushees.");
+      return;
+    }
     setActiveDesktopPage("rushees");
     focusSoon(document.getElementById("pnmFirstName"));
     return;
   }
   if (resolvedAction === "schedule_touchpoint") {
+    if (!state.user) {
+      return;
+    }
     const selectedPnmId = Number(
       (context && context.pnm_id) ||
         state.selectedPnmId ||
@@ -3934,12 +3956,20 @@ function performCommandAction(action, context = null) {
     return;
   }
   if (resolvedAction === "create_event") {
+    if (!roleCanUseAdminPanel()) {
+      showToast("Only Head Rush Officers can create events from search.");
+      return;
+    }
     setActiveDesktopPage("operations");
     setOperationsTab("timeline");
     focusSoon(rushEventTitle);
     return;
   }
   if (resolvedAction === "backup_csv") {
+    if (!roleCanUseAdminPanel()) {
+      showToast("Backup tools are limited to Head Rush Officers.");
+      return;
+    }
     openAdminStorageView();
     handleCsvBackupDownload(context && context.button ? context.button : null).catch(() => {});
     return;
@@ -3954,6 +3984,10 @@ function performCommandAction(action, context = null) {
     return;
   }
   if (resolvedAction === "open_meetings") {
+    if (!roleCanUseCommandCenter()) {
+      showToast("Meetings workspace is limited to rush officers.");
+      return;
+    }
     setActiveDesktopPage("meetings");
   }
 }

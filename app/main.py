@@ -12158,7 +12158,7 @@ def refresh_pnm_photo_from_instagram(
 
 
 @app.get("/api/pnms/{pnm_id}/meeting")
-def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     tenant = current_tenant()
     criteria_by_field = rating_criteria_by_field(list(tenant.rating_criteria))
 
@@ -13091,7 +13091,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
 
 
 @app.get("/api/pnms/{pnm_id}/lunches")
-def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         target = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not target:
@@ -13791,7 +13791,7 @@ def list_engagement_events(
     include_past: bool = False,
     include_cancelled: bool = False,
     limit: int = 500,
-    _: sqlite3.Row = Depends(current_user),
+    _: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     where_clauses: list[str] = []
     params: list[Any] = []
@@ -14163,7 +14163,7 @@ def rush_event_payload(row: sqlite3.Row) -> dict[str, Any]:
 def list_rush_events(
     include_past: bool = False,
     limit: int = 300,
-    _: sqlite3.Row = Depends(current_user),
+    _: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     max_limit = max(1, min(1000, int(limit)))
     with db_session() as conn:
@@ -14397,7 +14397,7 @@ def rush_calendar(
     request: Request,
     include_past: bool = False,
     limit: int = 500,
-    _: sqlite3.Row = Depends(current_user),
+    _: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     max_limit = max(20, min(1200, int(limit)))
     with db_session() as conn:
@@ -14558,7 +14558,7 @@ def rush_calendar(
 @app.get("/api/tasks/weekly")
 def list_weekly_goals(
     include_archived: bool = False,
-    _: sqlite3.Row = Depends(current_user),
+    _: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     with db_session() as conn:
         if include_archived:
@@ -16040,10 +16040,24 @@ def workspace_admin_overview(
     }
 
 
+def global_search_commands_for_user(user: sqlite3.Row) -> list[dict[str, str]]:
+    commands: list[dict[str, str]] = [
+        {"command_id": "create_lunch", "label": "Schedule Touchpoint", "action": "create_lunch"},
+        {"command_id": "open_tutorial", "label": "Open Tutorial", "action": "open_tutorial"},
+    ]
+    if user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}:
+        commands.append({"command_id": "add_rushee", "label": "Add Rushee", "action": "add_rushee"})
+        commands.append({"command_id": "open_meetings", "label": "Open Meetings Workspace", "action": "open_meetings"})
+    if user["role"] == ROLE_HEAD:
+        commands.append({"command_id": "create_event", "label": "Create Event", "action": "create_event"})
+        commands.append({"command_id": "backup_csv", "label": "Backup CSV", "action": "backup_csv"})
+    return commands
+
+
 @app.get("/api/search/global")
 def global_search(
     q: str = Query(default="", min_length=1, max_length=120),
-    _: sqlite3.Row = Depends(current_user),
+    user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
     token = q.strip()
     if not token:
@@ -16095,7 +16109,11 @@ def global_search(
                 "weighted_total": round(float(row["weighted_total"]), 2),
                 "photo_url": resolve_pnm_photo_url(row["photo_path"], row["instagram_handle"]),
                 "hometown": row["hometown"] or "",
-                "meeting_path": f"/{tenant.slug}/meeting?pnm_id={int(row['id'])}",
+                "meeting_path": (
+                    f"/{tenant.slug}/meeting?pnm_id={int(row['id'])}"
+                    if user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
+                    else None
+                ),
             }
             for row in pnm_rows
         ],
@@ -16108,12 +16126,7 @@ def global_search(
             }
             for row in user_rows
         ],
-        "commands": [
-            {"command_id": "create_lunch", "label": "Create Lunch", "action": "create_lunch"},
-            {"command_id": "create_event", "label": "Create Event", "action": "create_event"},
-            {"command_id": "backup_csv", "label": "Backup CSV", "action": "backup_csv"},
-            {"command_id": "open_meetings", "label": "Open Meetings Workspace", "action": "open_meetings"},
-        ],
+        "commands": global_search_commands_for_user(user),
     }
 
 

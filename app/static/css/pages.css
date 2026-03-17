@@ -1309,6 +1309,7 @@ body.desktop-product-auth {
   --backend-space-md: 1rem;
   --backend-space-lg: 1.15rem;
   --backend-space-xl: 1.35rem;
+  --backend-space-2xl: 1.7rem;
 }
 
 body.desktop-product-auth .app-frame {
@@ -1320,6 +1321,11 @@ body.desktop-product-auth .app-workspace-pages,
 body.desktop-product-auth .desktop-page.is-active,
 body.desktop-product-auth .desktop-subpage.is-active {
   gap: var(--backend-space-md);
+}
+
+body.desktop-product-auth .desktop-page.is-active,
+body.desktop-product-auth .desktop-subpage.is-active {
+  animation: fade-slide-in 180ms ease;
 }
 
 body.desktop-product-auth .app-sidebar,
@@ -1456,6 +1462,12 @@ body.desktop-product-auth .section-head > span.muted {
   padding-top: 0.15rem;
 }
 
+body.desktop-product-auth .section-head-compact {
+  padding-bottom: 0;
+  border-bottom: 0;
+  margin-bottom: 0.72rem;
+}
+
 body.desktop-product-auth .card,
 body.desktop-product-auth .list-box,
 body.desktop-product-auth .list-column,
@@ -1484,8 +1496,28 @@ body.desktop-product-auth #weeklyGoalSummary .card {
     rgba(255, 255, 255, 0.04);
 }
 
+body.desktop-product-auth .command-summary-shell {
+  padding: var(--backend-space-lg);
+}
+
+body.desktop-product-auth .command-summary-shell .command-summary-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.desktop-product-auth .command-summary-shell .card {
+  min-height: 124px;
+}
+
+body.desktop-product-auth .command-summary-shell .card:nth-child(-n + 3) {
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--accent-rgb), 0.16), transparent 36%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), transparent 34%),
+    rgba(255, 255, 255, 0.05);
+}
+
 body.desktop-product-auth .command-queue-workspace .command-center-grid {
   gap: var(--backend-space-md);
+  grid-template-columns: minmax(360px, 0.76fr) minmax(0, 1.24fr);
 }
 
 body.desktop-product-auth .command-center-grid .list-box,
@@ -1505,6 +1537,18 @@ body.desktop-product-auth .rushee-inline-panel {
   border-radius: 24px;
 }
 
+body.desktop-product-auth .command-composer-shell {
+  display: grid;
+  gap: var(--backend-space-md);
+  height: 100%;
+}
+
+body.desktop-product-auth .command-form-head,
+body.desktop-product-auth .command-selected-copy {
+  display: grid;
+  gap: 0.55rem;
+}
+
 body.desktop-product-auth .command-selected-head {
   gap: var(--backend-space-md);
   grid-template-columns: 138px minmax(0, 1fr);
@@ -1519,6 +1563,121 @@ body.desktop-product-auth .command-selected-photo-wrap .photo-placeholder {
   max-width: none;
   min-height: 182px;
   border-radius: 24px;
+}
+
+body.desktop-product-auth .command-selected-signal {
+  padding: 0.72rem 0.82rem;
+  border-radius: 16px;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body.desktop-product-auth .command-selected-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+body.desktop-product-auth .command-stat-card {
+  display: grid;
+  gap: 0.22rem;
+  padding: 0.8rem 0.84rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body.desktop-product-auth .command-stat-card span {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+body.desktop-product-auth .command-stat-card strong {
+  color: var(--ink);
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+body.desktop-product-auth .command-selected-actions {
+  padding-top: 0.1rem;
+}
+
+body.desktop-product-auth .command-form-head {
+  padding: 0.95rem 1rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--accent-rgb), 0.11), transparent 34%),
+    rgba(255, 255, 255, 0.035);
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+body.desktop-product-auth .command-form-head h3,
+body.desktop-product-auth .rushee-inspector-block h3,
+body.desktop-product-auth .meetings-overview-panel h3,
+body.desktop-product-auth .admin-overview-panel h3 {
+  margin: 0;
+}
+
+body.desktop-product-auth .command-score-grid label,
+body.desktop-product-auth .rushee-inspector-block .compact-inputs label {
+  padding: 0.7rem 0.72rem;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+body.desktop-product-auth .command-support-grid-top {
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1.05fr) minmax(300px, 0.9fr);
+}
+
+body.desktop-product-auth #commandCenterQueue {
+  max-height: 760px;
+  overflow: auto;
+  padding: 0.42rem;
+}
+
+body.desktop-product-auth .command-list .entry {
+  border-radius: 18px;
+  padding: 0.4rem;
+  background: transparent;
+}
+
+body.desktop-product-auth .command-queue-btn {
+  display: grid;
+  gap: 0.48rem;
+  padding: 0.95rem 1rem;
+  border-radius: 16px;
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 36%),
+    rgba(255, 255, 255, 0.04);
+  text-align: left;
+  transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+body.desktop-product-auth .command-list .entry.selected-row .command-queue-btn,
+body.desktop-product-auth .command-queue-btn:hover {
+  border-color: rgba(var(--accent-rgb), 0.34);
+  background:
+    radial-gradient(circle at 0% 0%, rgba(var(--accent-rgb), 0.14), transparent 36%),
+    rgba(255, 255, 255, 0.05);
+  box-shadow: 0 16px 30px rgba(0, 0, 0, 0.24);
+}
+
+body.desktop-product-auth .command-chip-row {
+  gap: 0.42rem;
+  flex-wrap: wrap;
+}
+
+body.desktop-product-auth .rushee-action-shell,
+body.desktop-product-auth .rushee-roster-panel,
+body.desktop-product-auth .rushee-inspector-panel {
+  padding: var(--backend-space-lg);
 }
 
 body.desktop-product-auth .command-list .entry,
@@ -1545,12 +1704,12 @@ body.desktop-product-auth .rushee-quick-actions-grid {
 }
 
 body.desktop-product-auth .rushee-inline-panel {
-  max-width: 560px;
+  max-width: 640px;
 }
 
 body.desktop-product-auth .rushee-workspace-grid {
   gap: var(--backend-space-md);
-  grid-template-columns: minmax(0, 1.05fr) minmax(440px, 0.95fr);
+  grid-template-columns: minmax(0, 1.08fr) minmax(460px, 0.92fr);
 }
 
 body.desktop-product-auth .rushee-inspector-panel {
@@ -1558,7 +1717,40 @@ body.desktop-product-auth .rushee-inspector-panel {
 }
 
 body.desktop-product-auth .rushee-inspector-grid {
+  grid-template-columns: minmax(0, 1.03fr) minmax(0, 0.97fr);
   gap: var(--backend-space-md);
+}
+
+body.desktop-product-auth .rushee-inspector-column {
+  display: grid;
+  gap: var(--backend-space-md);
+  min-width: 0;
+}
+
+body.desktop-product-auth .rushee-inspector-block {
+  display: grid;
+  gap: 0.8rem;
+  padding: var(--backend-space-md);
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 30%),
+    rgba(5, 14, 24, 0.5);
+}
+
+body.desktop-product-auth #selectedPnmLabel {
+  max-width: 52rem;
+  line-height: 1.5;
+}
+
+body.desktop-product-auth .rushee-identity-block .meeting-photo-wrap {
+  min-height: 260px;
+}
+
+body.desktop-product-auth .rushee-inspector-panel .action-row,
+body.desktop-product-auth .command-selected-actions,
+body.desktop-product-auth .desktop-page[data-page="admin"] .action-row {
+  flex-wrap: wrap;
 }
 
 body.desktop-product-auth .tag-picker {
@@ -1609,6 +1801,50 @@ body.desktop-product-auth .desktop-page[data-page="admin"] > #adminPanel {
   padding: var(--backend-space-lg);
 }
 
+body.desktop-product-auth .meetings-overview-grid,
+body.desktop-product-auth .admin-overview-grid {
+  display: grid;
+  gap: var(--backend-space-md);
+  align-items: start;
+}
+
+body.desktop-product-auth .meetings-overview-grid {
+  grid-template-columns: minmax(0, 1.08fr) minmax(320px, 0.92fr);
+}
+
+body.desktop-product-auth .meetings-pinned-panel {
+  display: grid;
+  gap: 0.7rem;
+  padding: var(--backend-space-md);
+  border: 1px solid rgba(115, 168, 222, 0.12);
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(var(--accent-rgb), 0.09), transparent 48%),
+    rgba(255, 255, 255, 0.035);
+}
+
+body.desktop-product-auth #meetingsWatchlist,
+body.desktop-product-auth #meetingsShortlist {
+  display: grid;
+  gap: 0.72rem;
+}
+
+body.desktop-product-auth .meetings-compare-panel {
+  padding: var(--backend-space-lg);
+}
+
+body.desktop-product-auth .admin-overview-grid {
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+}
+
+body.desktop-product-auth #headAdminSummary {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+body.desktop-product-auth .admin-workspace-grid {
+  align-items: start;
+}
+
 body.desktop-product-auth .desktop-page[data-page="meetings"] .grid-two > .panel,
 body.desktop-product-auth .desktop-page[data-page="admin"] .grid-two > .panel,
 body.desktop-product-auth .desktop-page[data-page="admin"] > .panel {
@@ -1643,6 +1879,39 @@ body.desktop-product-auth .desktop-page[data-page="admin"] .operation-tab-bar {
   background: rgba(255, 255, 255, 0.03);
 }
 
+body.desktop-product-auth #adminPanel .section-head {
+  margin-bottom: var(--backend-space-md);
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) #authHero {
+  padding: 1.65rem 1.7rem;
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) .hero-copy {
+  display: grid;
+  gap: 0.9rem;
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) .auth-proof-grid {
+  margin-top: 0.35rem;
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) #authSection > article {
+  padding: 1.45rem;
+}
+
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1080px) {
   body.desktop-product-auth .app-topbar-actions {
     justify-content: flex-start;
@@ -1663,8 +1932,16 @@ body.desktop-product-auth .desktop-page[data-page="admin"] .operation-tab-bar {
   }
 
   body.desktop-backend-body:not(.desktop-product-auth) .auth-proof-grid,
+  body.desktop-product-auth .command-selected-stats,
   body.desktop-product-auth .meetings-signal-strip,
   body.desktop-product-auth .admin-signal-strip {
+    grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .command-form-head,
+  body.desktop-product-auth .meetings-overview-grid,
+  body.desktop-product-auth .admin-overview-grid,
+  body.desktop-product-auth .rushee-inspector-grid {
     grid-template-columns: 1fr;
   }
 }

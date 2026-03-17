@@ -8,9 +8,9 @@
 {% block page_content %}
 <section class="bb-page-hero bb-reveal" data-delay="20">
   <p class="bb-kicker">Organization Login</p>
-  <h1 class="bb-page-title">Choose the workspace for your chapter.</h1>
+  <h1 class="bb-page-title">Choose your chapter workspace and continue into Command.</h1>
   <p class="bb-page-subtitle">
-    Every organization gets isolated data, independent approvals, custom branding, and its own recruitment command surface.
+    Every organization gets isolated data, independent approvals, custom branding, and one connected Command workspace for touchpoints, meetings, and decisions.
   </p>
   <div class="bb-hero-actions">
     <a class="bb-cta bb-cta-ghost" href="/">Back Home</a>
@@ -21,7 +21,7 @@
 <section class="bb-section bb-reveal" data-delay="35">
   <div class="bb-section-head">
     <p class="bb-kicker">Available Workspaces</p>
-    <h2>Open the right dashboard without crossing organization data.</h2>
+    <h2>Open the right chapter workspace without crossing organization data.</h2>
   </div>
   <div class="bb-org-search-row">
     <label class="bb-org-search-field">
@@ -51,8 +51,7 @@
         </div>
       </a>
       <div class="bb-org-card-actions">
-        <a class="bb-cta bb-cta-ghost" href="/{{ tenant.slug }}">Open Workspace</a>
-        <a class="bb-link-inline" href="/{{ tenant.slug }}/meeting">Meeting Packets</a>
+        <a class="bb-cta bb-cta-ghost" href="/{{ tenant.slug }}">Open Chapter Login</a>
       </div>
     </article>
     {% endfor %}

@@ -229,6 +229,8 @@ const commandSelectedPhoto = document.getElementById("commandSelectedPhoto");
 const commandSelectedPhotoPlaceholder = document.getElementById("commandSelectedPhotoPlaceholder");
 const commandSelectedName = document.getElementById("commandSelectedName");
 const commandSelectedMeta = document.getElementById("commandSelectedMeta");
+const commandSelectedSignal = document.getElementById("commandSelectedSignal");
+const commandSelectedStats = document.getElementById("commandSelectedStats");
 const commandOpenMeetingBtn = document.getElementById("commandOpenMeetingBtn");
 const commandWatchToggleBtn = document.getElementById("commandWatchToggleBtn");
 const commandScheduleTouchpointBtn = document.getElementById("commandScheduleTouchpointBtn");
@@ -1061,7 +1063,7 @@ function resolveTenantPath(path) {
   if (!raw) {
     return raw;
   }
-  if (/^https?:\/\//i.test(raw) || raw.startsWith("mailto:") || raw.startsWith("tel:") || raw.startsWith("#")) {
+  if (raw.startsWith("#")) {
     return raw;
   }
   if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//")) {
@@ -1597,7 +1599,7 @@ function tutorialBaseStepsForRole(role) {
     {
       page: "rushees",
       target: "#openMeetingPageBtn",
-      title: "Open Meeting Packets From Rushee Detail",
+      title: "Open Meeting Packet From Rushee Detail",
       body: "Jump straight into the dedicated meeting view for deep analytics, trend history, and decision packets.",
       hint: "Use this after selecting a rushee so packet context stays aligned with live updates.",
       advanced:
@@ -3056,7 +3058,7 @@ function renderSameStatePnmsPanel() {
           <div class="muted">${escapeHtml(pnm.hometown || "-")}</div>
           <div class="action-row">
             <button type="button" class="secondary open-same-state-pnm" data-pnm-id="${Number(pnm.pnm_id)}" data-state="${escapeHtml(stateCode)}">Open In Rushees</button>
-            <a class="quick-nav-link" href="${escapeHtml(meetingHref)}">Open Packet</a>
+            <a class="quick-nav-link" href="${escapeHtml(meetingHref)}">Open Meeting Packet</a>
           </div>
         </div>
       `;
@@ -3309,6 +3311,12 @@ function applyCommandRatingFormForSelected() {
     if (commandSelectedMeta) {
       commandSelectedMeta.textContent = "Queue details, assignment ownership, and latest touchpoint appear here.";
     }
+    if (commandSelectedSignal) {
+      commandSelectedSignal.textContent = "Pick a rushee to load assignment, freshness, and packet context.";
+    }
+    if (commandSelectedStats) {
+      commandSelectedStats.innerHTML = "";
+    }
     syncCommandMeetingLink();
     return;
   }
@@ -3337,6 +3345,30 @@ function applyCommandRatingFormForSelected() {
   if (commandSelectedMeta) {
     commandSelectedMeta.textContent =
       `Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assignedLabel} | Touchpoint: ${touchpointLabel} | My Rating: ${mineLabel} | ${staleLabel}`;
+  }
+  if (commandSelectedSignal) {
+    commandSelectedSignal.textContent =
+      `${selected.needs_rating_update ? "Needs follow-up" : "Ready"} · ${assignedTeam.length ? `${assignedTeam.length} officer${assignedTeam.length === 1 ? "" : "s"} on coverage` : "No assignment team"} · Priority ${Number(selected.priority_score || 0).toFixed(0)}`;
+  }
+  if (commandSelectedStats) {
+    commandSelectedStats.innerHTML = `
+      <article class="command-stat-card">
+        <span>Weighted Total</span>
+        <strong>${Number(selected.weighted_total || 0).toFixed(2)}</strong>
+      </article>
+      <article class="command-stat-card">
+        <span>Ratings</span>
+        <strong>${Number(selected.rating_count || 0)}</strong>
+      </article>
+      <article class="command-stat-card">
+        <span>Touchpoints</span>
+        <strong>${Number(selected.total_lunches || 0)}</strong>
+      </article>
+      <article class="command-stat-card">
+        <span>My Last Update</span>
+        <strong>${escapeHtml(mineLabel)}</strong>
+      </article>
+    `;
   }
   const girlsInput = document.getElementById("commandRateGirls");
   const processInput = document.getElementById("commandRateProcess");
@@ -3513,10 +3545,10 @@ function toggleWatchlistPnm(pnmId) {
 function syncWatchButtons() {
   const selectedCommand = state.commandCenter.selectedQueuePnmId;
   if (commandWatchToggleBtn) {
-    commandWatchToggleBtn.textContent = isWatchedPnm(selectedCommand) ? "Pinned" : "Pin for Meetings";
+    commandWatchToggleBtn.textContent = isWatchedPnm(selectedCommand) ? "Pinned for Meetings" : "Pin for Meetings";
   }
   if (rusheeWatchToggleBtn) {
-    rusheeWatchToggleBtn.textContent = isWatchedPnm(state.selectedPnmId) ? "Pinned" : "Pin for Meetings";
+    rusheeWatchToggleBtn.textContent = isWatchedPnm(state.selectedPnmId) ? "Pinned for Meetings" : "Pin for Meetings";
   }
 }
 
@@ -3651,7 +3683,7 @@ function renderPnmBoard() {
               <div class="rushee-board-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
               <div class="action-row">
                 <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
-                <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned" : "Pin"}</button>
+                <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
                 <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Packet</a>
               </div>
             </article>
@@ -3782,8 +3814,8 @@ function renderMeetingCompareCard(payload, fallbackLabel) {
       <div class="compare-candidate-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
       <div class="compare-candidate-meta">Rank ${metrics.weighted_rank || "-"} of ${metrics.cohort_size || "-"}</div>
       <div class="action-row">
-        <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Packet</a>
-        <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned" : "Pin"}</button>
+        <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Meeting Packet</a>
+        <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
       </div>
     </article>
   `;
@@ -3819,7 +3851,7 @@ function renderMeetingsWorkspace() {
                 <div class="compare-candidate-meta">${escapeHtml(item.flags.join(" • ") || "Meeting-ready context in place")}</div>
                 <div class="action-row">
                   <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
-                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Pinned" : "Pin"}</button>
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
                 </div>
               </div>
             `
@@ -3858,7 +3890,7 @@ function renderMeetingsWorkspace() {
         <div class="entry">
                 <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name || `${item.first_name || ""} ${item.last_name || ""}`.trim())}</strong><span>${Number(item.weighted_total || 0).toFixed(2)}</span></div>
                 <div class="action-row">
-                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Unpin</button>
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove from Meetings</button>
                   <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
                 </div>
               </div>
@@ -6422,7 +6454,7 @@ function handleWatchToggleClick(event) {
     return;
   }
   const watching = toggleWatchlistPnm(pnmId);
-  showToast(watching ? "Pinned for meetings." : "Removed from pinned meetings.");
+  showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
 }
 
 async function handleGlobalOpenPnmClick(event) {
@@ -7502,7 +7534,7 @@ function attachEvents() {
         return;
       }
       const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Pinned for meetings." : "Removed from pinned meetings.");
+      showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
     });
   }
   if (commandScheduleTouchpointBtn) {
@@ -7523,7 +7555,7 @@ function attachEvents() {
         return;
       }
       const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Pinned for meetings." : "Removed from pinned meetings.");
+      showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
     });
   }
   if (rusheeScheduleTouchpointBtn) {

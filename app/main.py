@@ -1218,6 +1218,13 @@ def render_desktop_page(
     )
 
 
+def maybe_redirect_rusher_to_member_portal(request: Request, tenant: TenantContext) -> RedirectResponse | None:
+    session_role = request_session_role(request)
+    if session_role == ROLE_RUSHER:
+        return RedirectResponse(url=f"/{tenant.slug}/member", status_code=307)
+    return None
+
+
 def manifest_payload_for_tenant(tenant: TenantContext | None) -> dict[str, Any]:
     if tenant:
         display_name = tenant.display_name.strip() or "BidBoard"
@@ -8014,6 +8021,9 @@ async def meeting_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     if request_prefers_mobile(request) and request_has_active_session(request):
         return RedirectResponse(url=f"/{tenant.slug}/mobile/meeting", status_code=307)
     return templates.TemplateResponse(
@@ -8076,6 +8086,9 @@ async def mobile_home_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_home.html",
         {
@@ -8092,6 +8105,9 @@ async def mobile_pnms_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_pnms.html",
         {
@@ -8108,6 +8124,9 @@ async def mobile_create_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_create.html",
         {
@@ -8124,6 +8143,9 @@ async def mobile_members_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_members.html",
         {
@@ -8140,6 +8162,9 @@ async def mobile_meetings_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_meeting.html",
         {
@@ -8156,6 +8181,9 @@ async def mobile_calendar_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_calendar.html",
         {
@@ -8172,6 +8200,9 @@ async def mobile_admin_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     session_role = request_session_role(request)
     if session_role and session_role != ROLE_HEAD:
         return RedirectResponse(url=f"/{tenant.slug}/mobile?notice=admin-access-denied", status_code=307)
@@ -8191,6 +8222,9 @@ async def mobile_meeting_page(request: Request) -> HTMLResponse:
     tenant = getattr(request.state, "tenant", None)
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
+    rusher_redirect = maybe_redirect_rusher_to_member_portal(request, tenant)
+    if rusher_redirect:
+        return rusher_redirect
     return templates.TemplateResponse(
         "mobile_meeting.html",
         {
@@ -9811,7 +9845,7 @@ def list_users(
     state: str | None = None,
     city: str | None = None,
     sort: str | None = "location",
-    user: sqlite3.Row = Depends(current_user),
+    user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     try:
         interest_filter = parse_interest_filter(interest)
@@ -13223,7 +13257,7 @@ def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str,
 
 
 @app.get("/api/mobile/home")
-def mobile_home_payload(request: Request, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def mobile_home_payload(request: Request, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     tenant = current_tenant()
     with db_session() as conn:
         totals = conn.execute(
@@ -13365,7 +13399,7 @@ def mobile_home_payload(request: Request, user: sqlite3.Row = Depends(current_us
 
 
 @app.get("/api/mobile/pnms")
-def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def mobile_pnms_payload(_: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         ensure_package_link_schema(conn)
         rows = conn.execute(
@@ -13429,7 +13463,7 @@ def mobile_pnms_payload(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any
 
 
 @app.get("/api/mobile/members")
-def mobile_members_payload(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def mobile_members_payload(user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         rows = conn.execute(
             "SELECT * FROM users WHERE is_approved = 1 ORDER BY role ASC, username ASC LIMIT 400"
@@ -13438,7 +13472,7 @@ def mobile_members_payload(user: sqlite3.Row = Depends(current_user)) -> dict[st
 
 
 @app.get("/api/calendar/share")
-def calendar_share_links(request: Request, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def calendar_share_links(request: Request, _: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     tenant = current_tenant()
     return calendar_share_payload(request, tenant)
 
@@ -16088,17 +16122,19 @@ def global_search(
             """,
             (like_token, like_token, like_token, like_token, like_token),
         ).fetchall()
-        user_rows = conn.execute(
-            """
-            SELECT id, username, role, emoji
-            FROM users
-            WHERE is_approved = 1
-              AND (lower(username) LIKE ? OR lower(role) LIKE ?)
-            ORDER BY username ASC
-            LIMIT 8
-            """,
-            (like_token, like_token),
-        ).fetchall()
+        user_rows: list[sqlite3.Row] = []
+        if user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}:
+            user_rows = conn.execute(
+                """
+                SELECT id, username, role, emoji
+                FROM users
+                WHERE is_approved = 1
+                  AND (lower(username) LIKE ? OR lower(role) LIKE ?)
+                ORDER BY username ASC
+                LIMIT 8
+                """,
+                (like_token, like_token),
+            ).fetchall()
     return {
         "query": token,
         "pnms": [
@@ -16135,7 +16171,7 @@ def matching(
     interest: str | None = None,
     stereotype: str | None = None,
     state: str | None = None,
-    user: sqlite3.Row = Depends(current_user),
+    user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     try:
         interest_filter = parse_interest_filter(interest)
@@ -16209,7 +16245,7 @@ def matching(
 
 
 @app.get("/api/analytics/overview")
-def analytics_overview(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def analytics_overview(user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         top_pnms = conn.execute(
             """
@@ -16241,7 +16277,7 @@ def analytics_overview(user: sqlite3.Row = Depends(current_user)) -> dict[str, A
 
 
 @app.get("/api/leaderboard/pnms")
-def pnm_leaderboard(limit: int = 100, _: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def pnm_leaderboard(limit: int = 100, _: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     safe_limit = max(1, min(int(limit), 500))
     with db_session() as conn:
         rows = conn.execute(
@@ -16292,7 +16328,7 @@ def pnm_leaderboard(limit: int = 100, _: sqlite3.Row = Depends(current_user)) ->
 
 
 @app.get("/api/interests")
-def list_interests(_: sqlite3.Row = Depends(current_user)) -> dict[str, list[str]]:
+def list_interests(_: sqlite3.Row = Depends(require_officer)) -> dict[str, list[str]]:
     tenant = CURRENT_TENANT.get()
     values = list(tenant.default_interest_tags) if tenant else list(DEFAULT_INTEREST_TAG_SUGGESTIONS)
     return {"interests": values}

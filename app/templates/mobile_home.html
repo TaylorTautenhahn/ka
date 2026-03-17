@@ -34,7 +34,7 @@
         </a>
         <div class="mobile-appbar-actions">
           <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Packets</a>
+          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
         </div>
       </div>
       <header class="hero mobile-hero">
@@ -103,7 +103,7 @@
               <h2>Quick Rating</h2>
               <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or lunch follow-up to start rating.</p>
             </div>
-            <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Packet</a>
+            <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting Packet</a>
           </div>
           <form id="mobileCommandRatingForm" class="stack">
             <div class="inline-grid two-cols compact-inputs">
@@ -164,7 +164,7 @@
 
       <div id="mobileCommandStickyActions" class="mobile-command-sticky hidden">
         <button id="mobileCommandStickySaveBtn" type="button">Save Rating</button>
-        <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Packet</a>
+        <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting Packet</a>
       </div>
     </main>
 

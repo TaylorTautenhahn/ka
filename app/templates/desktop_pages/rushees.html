@@ -118,7 +118,7 @@
             <div id="pnmTable" class="table-wrap"></div>
           </section>
 
-          <section id="detailSection" class="panel rushee-inspector-panel">
+        <section id="detailSection" class="panel rushee-inspector-panel">
             <div class="section-head">
               <div>
                 <h2>Inspector</h2>
@@ -127,57 +127,87 @@
               <div class="action-row">
                 <button id="rusheeWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
                 <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
-                <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Packet</a>
+                <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
               </div>
             </div>
 
             <div class="grid-two rushee-inspector-grid">
-              <article>
-                <h3>Rate / Update</h3>
-                <form id="ratingForm" class="stack">
-                  <label>
-                    Rushee
-                    <select id="ratingPnm" required></select>
-                  </label>
-                  <div class="inline-grid five-cols compact-inputs">
-                    <label><span id="rateGirlsLabel">Girls (0-10)</span><input id="rateGirls" type="number" min="0" max="10" required /></label>
-                    <label><span id="rateProcessLabel">Process (0-10)</span><input id="rateProcess" type="number" min="0" max="10" required /></label>
-                    <label><span id="ratePersonableLabel">Personable (0-10)</span><input id="ratePersonable" type="number" min="0" max="10" required /></label>
-                    <label><span id="rateAlcoholLabel">Alcohol (0-10)</span><input id="rateAlcohol" type="number" min="0" max="10" required /></label>
-                    <label><span id="rateIgLabel">IG (0-5)</span><input id="rateIg" type="number" min="0" max="5" required /></label>
+              <article class="rushee-inspector-column">
+                <section class="rushee-inspector-block">
+                  <div class="section-head section-head-compact">
+                    <div>
+                      <h3>Quick Rating</h3>
+                      <p class="muted">Update your current read without leaving the roster.</p>
+                    </div>
                   </div>
-                  <label>
-                    Comment (required on updates; must exceed 5 words)
-                    <textarea id="rateComment" rows="3" placeholder="Explain what changed and why"></textarea>
-                  </label>
-                  <button type="submit">Save Rating</button>
-                </form>
+                  <form id="ratingForm" class="stack">
+                    <label>
+                      Rushee
+                      <select id="ratingPnm" required></select>
+                    </label>
+                    <div class="inline-grid five-cols compact-inputs">
+                      <label><span id="rateGirlsLabel">Girls (0-10)</span><input id="rateGirls" type="number" min="0" max="10" required /></label>
+                      <label><span id="rateProcessLabel">Process (0-10)</span><input id="rateProcess" type="number" min="0" max="10" required /></label>
+                      <label><span id="ratePersonableLabel">Personable (0-10)</span><input id="ratePersonable" type="number" min="0" max="10" required /></label>
+                      <label><span id="rateAlcoholLabel">Alcohol (0-10)</span><input id="rateAlcohol" type="number" min="0" max="10" required /></label>
+                      <label><span id="rateIgLabel">IG (0-5)</span><input id="rateIg" type="number" min="0" max="5" required /></label>
+                    </div>
+                    <label>
+                      Comment (required on updates; must exceed 5 words)
+                      <textarea id="rateComment" rows="3" placeholder="Explain what changed and why"></textarea>
+                    </label>
+                    <button type="submit">Save Rating</button>
+                  </form>
+                </section>
 
-                <div class="divider"></div>
-                <h3>Ratings</h3>
-                <div id="ratingList" class="list-box muted">Select a rushee to view rating entries.</div>
-                <h3>Touchpoint History</h3>
-                <div id="lunchHistory" class="list-box muted">Select a rushee to view touchpoint logs.</div>
+                <section class="rushee-inspector-block">
+                  <div class="section-head section-head-compact">
+                    <h3>Ratings</h3>
+                    <span class="muted">Latest submitted reads</span>
+                  </div>
+                  <div id="ratingList" class="list-box muted">Select a rushee to view rating entries.</div>
+                </section>
+
+                <section class="rushee-inspector-block">
+                  <div class="section-head section-head-compact">
+                    <h3>Touchpoint History</h3>
+                    <span class="muted">Touchpoints and follow-up context</span>
+                  </div>
+                  <div id="lunchHistory" class="list-box muted">Select a rushee to view touchpoint logs.</div>
+                </section>
               </article>
 
-              <article>
-                <h3>Ownership + Packet Readiness</h3>
-                <div class="meeting-photo-wrap">
-                  <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected rushee" />
-                  <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
-                </div>
-                <form id="photoForm" class="stack compact-upload">
-                  <label>
-                    Update photo
-                    <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
-                  </label>
-                  <div class="action-row">
-                    <button type="submit" class="secondary">Upload Photo</button>
-                    <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+              <article class="rushee-inspector-column">
+                <section class="rushee-inspector-block rushee-identity-block">
+                  <div class="section-head section-head-compact">
+                    <div>
+                      <h3>Identity + Packet Readiness</h3>
+                      <p class="muted">Photo, assignment ownership, and meeting prep status.</p>
+                    </div>
                   </div>
-                </form>
-                <div id="assignPanel" class="stack hidden">
-                  <h3>Assign Rush Officer (Head Only)</h3>
+                  <div class="meeting-photo-wrap">
+                    <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected rushee" />
+                    <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
+                  </div>
+                  <form id="photoForm" class="stack compact-upload">
+                    <label>
+                      Update photo
+                      <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+                    </label>
+                    <div class="action-row">
+                      <button type="submit" class="secondary">Upload Photo</button>
+                      <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                    </div>
+                  </form>
+                </section>
+
+                <section id="assignPanel" class="stack hidden rushee-inspector-block">
+                  <div class="section-head section-head-compact">
+                    <div>
+                      <h3>Assignment Ownership</h3>
+                      <p class="muted">Head-only control for primary ownership.</p>
+                    </div>
+                  </div>
                   <label>
                     Assigned officer
                     <select id="assignOfficerSelect"></select>
@@ -186,10 +216,15 @@
                     <button id="assignOfficerBtn" type="button">Assign</button>
                     <button id="clearAssignBtn" type="button" class="secondary">Clear</button>
                   </div>
-                </div>
-                <div id="packageDealPanel" class="stack">
-                  <h3>Package Deals</h3>
-                  <p class="muted">Keep linked rushees grouped across assignments and meeting prep.</p>
+                </section>
+
+                <section id="packageDealPanel" class="stack rushee-inspector-block">
+                  <div class="section-head section-head-compact">
+                    <div>
+                      <h3>Package Deals</h3>
+                      <p class="muted">Keep linked rushees grouped across assignments and packet prep.</p>
+                    </div>
+                  </div>
                   <label>
                     Link selected rushee with
                     <select id="packagePartnerSelect"></select>
@@ -199,7 +234,7 @@
                     <button id="packageUnlinkBtn" type="button" class="secondary">Unlink Selected</button>
                   </div>
                   <p id="packageDealSummary" class="muted">No package deal linked for this rushee yet.</p>
-                </div>
+                </section>
               </article>
             </div>
           </section>

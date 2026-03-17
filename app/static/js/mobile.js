@@ -1730,7 +1730,7 @@ function renderSameStatePnms(member, pnms, errorMessage = "") {
           </div>
           <div class="muted">${escapeHtml(pnm.hometown || "")}${pnm.hometown_state_code ? `, ${escapeHtml(pnm.hometown_state_code)}` : ""}</div>
           <div class="action-row">
-            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Packet</a>
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Meeting Packet</a>
           </div>
         </article>
       `;

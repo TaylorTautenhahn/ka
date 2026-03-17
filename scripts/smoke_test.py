@@ -525,6 +525,32 @@ def main() -> None:
                 raise AssertionError("Meetings workspace payload should include shortlist and candidates.")
             checks.append("Meetings workspace API works")
 
+            response = client.get("/kappaalphaorder/api/mobile/home")
+            expect_status(response, 200, "Officer mobile home API")
+            mobile_home_payload = response.json()
+            if "pnms" not in mobile_home_payload or "recent_lunches" not in mobile_home_payload:
+                raise AssertionError("Mobile home payload should include pnms and recent_lunches.")
+            checks.append("Officer mobile home API works")
+
+            response = client.get("/kappaalphaorder/api/mobile/pnms")
+            expect_status(response, 200, "Officer mobile pnms API")
+            if not isinstance(response.json().get("pnms"), list):
+                raise AssertionError("Mobile pnms payload should include a pnm list.")
+            checks.append("Officer mobile pnms API works")
+
+            response = client.get("/kappaalphaorder/api/mobile/members")
+            expect_status(response, 200, "Officer mobile members API")
+            if not isinstance(response.json().get("users"), list):
+                raise AssertionError("Mobile members payload should include a user list.")
+            checks.append("Officer mobile members API works")
+
+            response = client.get("/kappaalphaorder/api/calendar/share")
+            expect_status(response, 200, "Officer calendar share API")
+            calendar_share = response.json()
+            if not calendar_share.get("feed_url") or not calendar_share.get("google_subscribe_url"):
+                raise AssertionError("Calendar share payload should include feed and subscribe URLs.")
+            checks.append("Officer calendar share API works")
+
             response = client.get("/kappaalphaorder/api/search/global?q=alex")
             expect_status(response, 200, "Global search API")
             search_payload = response.json()
@@ -693,6 +719,24 @@ def main() -> None:
             expect_status(response, 403, "Rusher blocked from command center API")
             checks.append("Command center endpoint enforces officer-only access")
 
+            response = client.get("/kappaalphaorder/mobile", follow_redirects=False)
+            expect_status(response, 307, "Rusher mobile home route redirect")
+            if response.headers.get("location") != "/kappaalphaorder/member":
+                raise AssertionError("Rusher mobile home route should redirect to member portal.")
+            checks.append("Rusher mobile home route redirects to member portal")
+
+            response = client.get("/kappaalphaorder/mobile/pnms", follow_redirects=False)
+            expect_status(response, 307, "Rusher mobile rushees route redirect")
+            if response.headers.get("location") != "/kappaalphaorder/member":
+                raise AssertionError("Rusher mobile rushees route should redirect to member portal.")
+            checks.append("Rusher mobile rushees route redirects to member portal")
+
+            response = client.get("/kappaalphaorder/meeting", follow_redirects=False)
+            expect_status(response, 307, "Rusher meeting route redirect")
+            if response.headers.get("location") != "/kappaalphaorder/member":
+                raise AssertionError("Rusher meeting route should redirect to member portal.")
+            checks.append("Rusher meeting route redirects to member portal")
+
             response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/meeting")
             expect_status(response, 403, "Rusher blocked from meeting detail API")
             checks.append("Meeting detail enforces officer-only access")
@@ -717,6 +761,42 @@ def main() -> None:
             expect_status(response, 403, "Rusher blocked from weekly goals API")
             checks.append("Weekly goals API enforces officer-only access")
 
+            response = client.get("/kappaalphaorder/api/users")
+            expect_status(response, 403, "Rusher blocked from users API")
+            checks.append("Users API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/matching")
+            expect_status(response, 403, "Rusher blocked from matching API")
+            checks.append("Matching API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/analytics/overview")
+            expect_status(response, 403, "Rusher blocked from analytics API")
+            checks.append("Analytics API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/leaderboard/pnms?limit=25")
+            expect_status(response, 403, "Rusher blocked from leaderboard API")
+            checks.append("Leaderboard API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/interests")
+            expect_status(response, 403, "Rusher blocked from interests API")
+            checks.append("Interests API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/mobile/home")
+            expect_status(response, 403, "Rusher blocked from mobile home API")
+            checks.append("Mobile home API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/mobile/pnms")
+            expect_status(response, 403, "Rusher blocked from mobile pnms API")
+            checks.append("Mobile pnms API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/mobile/members")
+            expect_status(response, 403, "Rusher blocked from mobile members API")
+            checks.append("Mobile members API enforces officer-only access")
+
+            response = client.get("/kappaalphaorder/api/calendar/share")
+            expect_status(response, 403, "Rusher blocked from calendar share API")
+            checks.append("Calendar share API enforces officer-only access")
+
             response = client.get("/kappaalphaorder/api/search/global?q=alex")
             expect_status(response, 200, "Rusher global search API")
             rusher_search_payload = response.json()
@@ -730,6 +810,8 @@ def main() -> None:
                 raise AssertionError("Rusher search should not expose officer or head-only commands.")
             if "create_lunch" not in rusher_commands or "open_tutorial" not in rusher_commands:
                 raise AssertionError("Rusher search should still expose safe self-service commands.")
+            if rusher_search_payload.get("members"):
+                raise AssertionError("Rusher search should not expose member roster results.")
             checks.append("Global search hides restricted commands for rushers")
 
             response = client.patch(

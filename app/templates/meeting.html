@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
-    <title>{{ app_config.tenant_name }} Meeting Packet</title>
+    <title>{{ app_config.tenant_name }} Meetings · Packet Detail</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
@@ -38,28 +38,27 @@
               {% endif %}
               <div>
                 <p class="eyebrow">{{ app_config.chapter_name }}</p>
-                <h2>Meeting Packet</h2>
-                <p class="muted">Deep meeting context for one rushee at a time.</p>
+                <h2>Meetings</h2>
+                <p class="muted">Packet detail inside the Meetings workflow.</p>
               </div>
             </div>
 
             <nav class="app-nav" aria-label="Packet navigation">
               <a href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}" class="app-nav-link">Command</a>
               <a href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}" class="app-nav-link">Rushees</a>
-              <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="app-nav-link">Meetings</a>
+              <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="app-nav-link is-active">Meetings</a>
               <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link">Operations</a>
               <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link">Team</a>
               <a id="meetingAdminNavLink" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}" class="app-nav-link">Admin</a>
-              <a href="{{ app_config.meeting_base }}" class="app-nav-link is-active">Meeting Packet</a>
             </nav>
           </aside>
 
           <div class="app-main">
             <header class="panel app-topbar">
               <div class="app-topbar-copy">
-                <p class="eyebrow">Workspace</p>
+                <p class="eyebrow">Meetings</p>
                 <h2>Meeting Packet</h2>
-                <p class="muted">Open one rushee at a time with trend-backed review, touchpoint context, and PDF export.</p>
+                <p class="muted">A packet drill-down inside Meetings with trend-backed review, touchpoint context, and PDF export.</p>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
@@ -81,7 +80,7 @@
               </div>
               <div class="action-row app-toolbar-actions">
                 <button id="meetingLoadBtn" type="button">Load Packet</button>
-                <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="quick-nav-link">Back To Meetings</a>
+                <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="quick-nav-link">Back to Meetings Queue</a>
               </div>
             </section>
 

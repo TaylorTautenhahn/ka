@@ -1,5 +1,5 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}" data-page="admin">
-        <section id="adminPanel" class="panel hidden reveal delay-2">
+        <section id="adminPanel" class="panel hidden reveal delay-2 admin-overview-panel">
           <div class="section-head">
             <div>
               <h2>Head Rush Admin</h2>
@@ -14,25 +14,27 @@
             </div>
           </div>
 
-          <div id="headAdminSummary" class="cards"></div>
-          <div class="cards admin-signal-strip">
-            <article class="card">
-              <p>Leadership</p>
-              <strong>Approve, promote, and rebalance officer coverage</strong>
-            </article>
-            <article class="card">
-              <p>Season Control</p>
-              <strong>Archive safely before the next rush cycle</strong>
-            </article>
-            <article class="card">
-              <p>Data Health</p>
-              <strong>Keep imports, storage, and backups in one place</strong>
-            </article>
+          <div class="admin-overview-grid">
+            <div id="headAdminSummary" class="cards"></div>
+            <div class="cards admin-signal-strip">
+              <article class="card">
+                <p>Leadership</p>
+                <strong>Approve, promote, and rebalance officer coverage</strong>
+              </article>
+              <article class="card">
+                <p>Season Control</p>
+                <strong>Archive safely before the next rush cycle</strong>
+              </article>
+              <article class="card">
+                <p>Data Health</p>
+                <strong>Keep imports, storage, and backups in one place</strong>
+              </article>
+            </div>
           </div>
         </section>
 
         <section class="desktop-subpage is-active reveal delay-3" data-admin-tab="leadership">
-          <div class="grid-two">
+          <div class="grid-two admin-workspace-grid">
             <section class="panel">
               <h3>Leadership Management</h3>
               <p class="muted">Promote an approved Rush Officer to Head Rush Officer and review the current head team.</p>
@@ -60,7 +62,7 @@
         </section>
 
         <section class="desktop-subpage reveal delay-3" data-admin-tab="season">
-          <div class="grid-two">
+          <div class="grid-two admin-workspace-grid">
             <section class="panel">
               <h3>Season Archive + Reset</h3>
               <p class="muted">Archive the current season and reset for the next rush cycle. Only one archive is retained.</p>
@@ -103,7 +105,7 @@
         </section>
 
         <section class="desktop-subpage reveal delay-3" data-admin-tab="imports">
-          <div class="grid-two">
+          <div class="grid-two admin-workspace-grid">
             <section class="panel">
               <h3>Google Form Import</h3>
               <p class="muted">Collect rushee submissions in Google Forms, download the responses CSV, and import it here.</p>
@@ -145,7 +147,7 @@
         </section>
 
         <section class="desktop-subpage reveal delay-3" data-admin-tab="roster">
-          <div class="grid-two">
+          <div class="grid-two admin-workspace-grid">
             <section class="panel">
               <h3>Edit Rushee Profile</h3>
               <form id="adminPnmEditorForm" class="stack">
@@ -260,7 +262,7 @@
         </section>
 
         <section class="desktop-subpage reveal delay-3" data-admin-tab="storage">
-          <div class="grid-two">
+          <div class="grid-two admin-workspace-grid">
             <section class="panel">
               <h3>Storage Diagnostics</h3>
               <div id="adminStorageDiagnostics" class="list-box muted">Loading storage diagnostics...</div>

@@ -8,7 +8,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
-    <title>{{ app_config.tenant_name }} Packet Detail</title>
+    <title>{{ app_config.tenant_name }} Meeting Packet</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
@@ -24,7 +24,7 @@
       <div class="pwa-splash-card">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h2>BidBoard</h2>
-        <p>Loading packet detail...</p>
+        <p>Loading meeting packet...</p>
       </div>
     </div>
 
@@ -38,7 +38,7 @@
               {% endif %}
               <div>
                 <p class="eyebrow">{{ app_config.chapter_name }}</p>
-                <h2>Packet Detail</h2>
+                <h2>Meeting Packet</h2>
                 <p class="muted">Deep meeting context for one rushee at a time.</p>
               </div>
             </div>
@@ -50,7 +50,7 @@
               <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link">Operations</a>
               <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link">Team</a>
               <a id="meetingAdminNavLink" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}" class="app-nav-link">Admin</a>
-              <a href="{{ app_config.meeting_base }}" class="app-nav-link is-active">Packet Detail</a>
+              <a href="{{ app_config.meeting_base }}" class="app-nav-link is-active">Meeting Packet</a>
             </nav>
           </aside>
 
@@ -58,12 +58,12 @@
             <header class="panel app-topbar">
               <div class="app-topbar-copy">
                 <p class="eyebrow">Workspace</p>
-                <h2>Packet Detail</h2>
-                <p class="muted">Open one rushee at a time with trend-backed review and PDF export.</p>
+                <h2>Meeting Packet</h2>
+                <p class="muted">Open one rushee at a time with trend-backed review, touchpoint context, and PDF export.</p>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
-                  <strong id="meetingSessionTitle">Meeting Packets</strong>
+                  <strong id="meetingSessionTitle">Meeting Packet</strong>
                   <span id="meetingSessionSubtitle" class="muted"></span>
                 </div>
                 <button id="meetingRefreshBtn" type="button" class="secondary">Refresh</button>

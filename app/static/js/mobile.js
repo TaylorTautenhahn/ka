@@ -1056,7 +1056,7 @@ function renderMobileCalendarShare(data) {
 
   const lunchPreview = document.getElementById("mobileCalendarLunchFeedPreview");
   if (lunchPreview) {
-    lunchPreview.textContent = data.lunch_feed_url || "Lunch feed URL unavailable.";
+    lunchPreview.textContent = data.lunch_feed_url || "Touchpoint feed URL unavailable.";
   }
 }
 
@@ -1188,7 +1188,7 @@ function renderMobileHomeSearchResults() {
               <span>${Number(pnm.weighted_total || 0).toFixed(2)}</span>
             </div>
             <div class="muted">Assigned: ${escapeHtml(mobileHomeAssignedLabel(pnm))}</div>
-            <div class="muted">My Rating: ${escapeHtml(ownRating)} | Lunches: ${Number(pnm.total_lunches || 0)}</div>
+            <div class="muted">My Rating: ${escapeHtml(ownRating)} | Touchpoints: ${Number(pnm.total_lunches || 0)}</div>
           </button>
         </article>
       `;
@@ -1204,7 +1204,7 @@ function renderMobileHomeRecentLunches() {
   }
   countEl.textContent = String(mobileHomeRecentLunchRows.length);
   if (!mobileHomeRecentLunchRows.length) {
-    listEl.innerHTML = '<p class="muted">No lunch follow-up yet. Once you log lunches, they appear here for fast post-event rating updates.</p>';
+    listEl.innerHTML = '<p class="muted">No touchpoint follow-up yet. Once you log touchpoints, they appear here for fast post-event rating updates.</p>';
     return;
   }
   listEl.innerHTML = mobileHomeRecentLunchRows
@@ -1251,7 +1251,7 @@ function renderHomeLeaderboard(rows) {
     return;
   }
   if (!rows.length) {
-    listEl.innerHTML = '<p class="muted">No ranked PNMs yet.</p>';
+    listEl.innerHTML = '<p class="muted">No ranked rushees yet.</p>';
     return;
   }
   listEl.innerHTML = rows
@@ -1264,7 +1264,7 @@ function renderHomeLeaderboard(rows) {
             <strong>#${entry.rank} ${escapeHtml(entry.pnm_code)} | ${escapeHtml(entry.name)}</strong>
             <span>${entry.weighted_total.toFixed(2)}</span>
           </div>
-          <div class="muted">Ratings: ${entry.rating_count} | Lunches: ${entry.total_lunches} | Days: ${entry.days_since_first_event}</div>
+          <div class="muted">Ratings: ${entry.rating_count} | Touchpoints: ${entry.total_lunches} | Days: ${entry.days_since_first_event}</div>
           <div class="muted">Assigned: ${escapeHtml(assigned)}</div>
         </article>
       `;
@@ -1597,7 +1597,7 @@ function renderPnmCards(pnms) {
     return;
   }
   if (!pnms.length) {
-    listEl.innerHTML = '<p class="muted">No PNMs found.</p>';
+    listEl.innerHTML = '<p class="muted">No rushees found.</p>';
     return;
   }
   listEl.innerHTML = pnms
@@ -1676,7 +1676,7 @@ function renderMembers(members) {
           </div>
           <div class="muted">Stereotype: ${escapeHtml(member.stereotype)}</div>
           <div class="muted">Location: ${escapeHtml(location)}</div>
-          <div class="muted">Lunches: ${member.total_lunches} | Week: ${member.lunches_per_week.toFixed(2)}</div>
+          <div class="muted">Touchpoints: ${member.total_lunches} | Week: ${member.lunches_per_week.toFixed(2)}</div>
           <div class="muted">Ratings: ${ratings} | Avg Given: ${avg}</div>
           <div class="action-row">
             <button type="button" class="secondary mobile-member-same-state-btn" data-member-id="${member.user_id}"${stateActionDisabled}>Same-State Rushees</button>
@@ -1730,7 +1730,7 @@ function renderSameStatePnms(member, pnms, errorMessage = "") {
           </div>
           <div class="muted">${escapeHtml(pnm.hometown || "")}${pnm.hometown_state_code ? `, ${escapeHtml(pnm.hometown_state_code)}` : ""}</div>
           <div class="action-row">
-            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Meeting</a>
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Packet</a>
           </div>
         </article>
       `;
@@ -2148,7 +2148,7 @@ function renderMobileAdminOfficers(officerPayload) {
             <strong>${escapeHtml(officer.username)}</strong>
             <span>${escapeHtml(officer.emoji || "")}</span>
           </div>
-          <div class="muted">Ratings: ${Number(officer.rating_count || 0)} | Lunches: ${Number(officer.total_lunches || 0)}</div>
+          <div class="muted">Ratings: ${Number(officer.rating_count || 0)} | Touchpoints: ${Number(officer.total_lunches || 0)}</div>
           <div class="muted">Avg Given: ${Number(officer.avg_rating_given || 0).toFixed(2)} | Participation: ${Number(officer.participation_score || 0).toFixed(2)}</div>
         </article>
       `;
@@ -2170,8 +2170,8 @@ function renderMobileAdminStorage(storagePayload) {
         <span>${storagePayload && storagePayload.persistent_paths_ok ? "OK" : "Check"}</span>
       </div>
       <div class="muted">Tenants: ${Number(storagePayload && storagePayload.active_tenants ? storagePayload.active_tenants : 0)}</div>
-      <div class="muted">PNMs: ${Number(counters.pnms || 0)} | Users: ${Number(counters.users || 0)}</div>
-      <div class="muted">Ratings: ${Number(counters.ratings || 0)} | Lunches: ${Number(counters.lunches || 0)}</div>
+      <div class="muted">Rushees: ${Number(counters.pnms || 0)} | Users: ${Number(counters.users || 0)}</div>
+      <div class="muted">Ratings: ${Number(counters.ratings || 0)} | Touchpoints: ${Number(counters.lunches || 0)}</div>
       ${warnings.length ? `<div class="muted">${escapeHtml(warnings.join(" | "))}</div>` : ""}
     </article>
   `;
@@ -2261,13 +2261,13 @@ async function handleCreateSubmit(event) {
     document.getElementById("mobilePnmEventDate").value = new Date().toISOString().slice(0, 10);
     syncInterestPickerFromInput("mobilePnmInterests", "mobileInterestTags");
     syncStereotypePickerFromInput("mobilePnmStereotype", "mobileStereotypeTags");
-    showToast("PNM created.");
+    showToast("Rushee created.");
     window.location.href = MOBILE_ROUTES.rushees;
   } catch (error) {
-    showToast(error.message || "Unable to create PNM.");
+    showToast(error.message || "Unable to create rushee.");
   } finally {
     submitButton.disabled = false;
-    submitButton.textContent = "Create PNM";
+    submitButton.textContent = "Create Rushee";
   }
 }
 
@@ -2336,7 +2336,7 @@ function attachPageEvents() {
           await loadPnmsPage();
           showToast("Refreshed.");
         } catch (error) {
-          showToast(error.message || "Unable to refresh PNMs.");
+          showToast(error.message || "Unable to refresh rushees.");
         }
       });
     }

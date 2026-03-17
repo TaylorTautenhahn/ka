@@ -1527,7 +1527,7 @@ function tutorialRoleSummary(role) {
   }
   if (role === ROLE_RUSH_OFFICER) {
     return [
-      { title: "Daily Execution", body: "Add rushees, log lunches, and submit weighted rating updates quickly." },
+      { title: "Daily Execution", body: "Add rushees, schedule touchpoints, and submit weighted rating updates quickly." },
       { title: "Team Coordination", body: "Track assignments, state coverage, goals, and chat in one system." },
       { title: "Meeting Readiness", body: "Use leaderboard and packets to keep decisions consistent and accountable." },
     ];
@@ -1562,10 +1562,10 @@ function tutorialBaseStepsForRole(role) {
       page: "overview",
       target: "#globalSearchInput",
       title: "Use Command Search To Move Fast",
-      body: "Use the top search to jump to PNMs, members, and common actions without leaving your current workspace.",
+      body: "Use the top search to jump to rushees, members, and common actions without leaving your current workspace.",
       hint: "Start typing a first name, code, hometown, or command to open results instantly.",
       advanced:
-        "Advanced workflow: use command search as the fastest way to jump between active PNMs during events and meetings.",
+        "Advanced workflow: use command search as the fastest way to jump between active rushees during events and meetings.",
     },
     {
       page: "rushees",
@@ -1655,7 +1655,7 @@ function tutorialBaseStepsForRole(role) {
       page: "members",
       target: "#sameStatePnmsSection",
       title: "Use Same-State Discovery",
-      body: "Select a member to instantly see PNMs from the same state for stronger local connections.",
+      body: "Select a member to instantly see rushees from the same state for stronger local connections.",
       hint: "If no results appear, confirm the member has a state set in their profile.",
       advanced:
         "Advanced workflow: use same-state lists to assign warm introductions before high-stakes events.",
@@ -2167,14 +2167,14 @@ function renderScheduledLunches() {
   }
   const rows = state.scheduledLunches || [];
   if (!rows.length) {
-    scheduledLunchesList.innerHTML = '<p class="muted">No scheduled lunches yet.</p>';
+    scheduledLunchesList.innerHTML = '<p class="muted">No scheduled touchpoints yet.</p>';
     return;
   }
 
   scheduledLunchesList.innerHTML = rows
     .map((row) => {
       const timing = formatLunchWindow(row);
-      const timingText = timing || "All-day lunch";
+      const timingText = timing || "All-day touchpoint";
       const assigned = row.assigned_officer_username ? `Assigned: ${row.assigned_officer_username}` : "Assigned: Unassigned";
       const notes = row.notes || "No notes";
       const calendarAction = row.google_calendar_url
@@ -2223,7 +2223,7 @@ function renderRushCalendar() {
   rushCalendarStats.innerHTML = `
     <div class="card"><strong>${Number(stats.total_count || 0)}</strong><p>Total Timeline Items</p></div>
     <div class="card"><strong>${Number(stats.official_event_count || 0)}</strong><p>Official Rush Events</p></div>
-    <div class="card"><strong>${Number(stats.lunch_count || 0)}</strong><p>Scheduled Lunches</p></div>
+    <div class="card"><strong>${Number(stats.lunch_count || 0)}</strong><p>Scheduled Touchpoints</p></div>
     <div class="card"><strong>${Number(stats.this_week_count || 0)}</strong><p>This Week</p></div>
   `;
 
@@ -2295,7 +2295,7 @@ function renderWeeklyGoalMetricOptions() {
   weeklyGoalMetric.innerHTML = options || `
     <option value="manual">Manual Progress</option>
     <option value="ratings_submitted">Ratings Submitted</option>
-    <option value="lunches_logged">Lunches Logged</option>
+    <option value="lunches_logged">Touchpoints Logged</option>
     <option value="pnms_created">PNMs Added</option>
     <option value="chat_messages">Chat Messages</option>
     <option value="rush_events_created">Rush Events Created</option>
@@ -2639,7 +2639,7 @@ function renderAssignedRushSection() {
           <th>Phone</th>
           ${officerHeader}
           <th>Weighted Total</th>
-          <th>Lunches</th>
+          <th>Touchpoints</th>
           <th>Contacts</th>
         </tr>
       </thead>
@@ -2663,7 +2663,7 @@ function renderCalendarShareLinks(data) {
     openRushGoogleSubscribeBtn.classList.toggle("hidden", !data.google_subscribe_url);
   }
   if (lunchOnlyFeedPreview) {
-    lunchOnlyFeedPreview.textContent = data.lunch_feed_url || "Lunch feed URL unavailable.";
+    lunchOnlyFeedPreview.textContent = data.lunch_feed_url || "Touchpoint feed URL unavailable.";
   }
 }
 
@@ -2815,7 +2815,7 @@ function renderPnmSelectOptions() {
     combined.push(pnm);
   });
   const options =
-    '<option value="">Select PNM</option>' +
+    '<option value="">Select rushee</option>' +
     combined
       .map((pnm) => {
         const displayName =
@@ -2854,7 +2854,7 @@ function syncOpenMeetingLink() {
 
 function renderPnmTable() {
   if (!state.pnms.length) {
-    pnmTable.innerHTML = '<p class="muted">No PNMs match current filters.</p>';
+    pnmTable.innerHTML = '<p class="muted">No rushees match current filters.</p>';
     return;
   }
 
@@ -2915,7 +2915,7 @@ function renderPnmTable() {
           <th>Ratings</th>
           <th>Weighted Total</th>
           ${RATING_CRITERIA.map((criterion) => `<th>${escapeHtml(criterion.short_label)}</th>`).join("")}
-          <th>Lunches</th>
+          <th>Touchpoints</th>
           <th>Assigned Officer</th>
           <th>My Rating</th>
           <th></th>
@@ -2984,8 +2984,8 @@ function renderMemberTable() {
           <th>State</th>
           <th>Stereotype</th>
           <th>Interests</th>
-          <th>Total Lunches</th>
-          <th>Lunches / Week</th>
+          <th>Total Touchpoints</th>
+          <th>Touchpoints / Week</th>
           <th>Ratings Given</th>
           <th>Avg Rating Given</th>
           <th>Actions</th>
@@ -3027,7 +3027,7 @@ function renderSameStatePnmsPanel() {
   }
   const selectedMember = state.members.find((member) => Number(member.user_id) === Number(state.selectedMemberId)) || null;
   if (!selectedMember) {
-    sameStatePnmsHeader.textContent = "Select a member to view PNMs from the same state.";
+    sameStatePnmsHeader.textContent = "Select a member to view rushees from the same state.";
     sameStatePnmsList.innerHTML = '<p class="muted">No member selected.</p>';
     return;
   }
@@ -3039,9 +3039,9 @@ function renderSameStatePnmsPanel() {
   }
 
   const rows = state.sameStatePnms || [];
-  sameStatePnmsHeader.textContent = `${selectedMember.username} | ${stateCode} | ${rows.length} same-state PNMs`;
+  sameStatePnmsHeader.textContent = `${selectedMember.username} | ${stateCode} | ${rows.length} same-state rushees`;
   if (!rows.length) {
-    sameStatePnmsList.innerHTML = '<p class="muted">No PNMs found in this state.</p>';
+    sameStatePnmsList.innerHTML = '<p class="muted">No rushees found in this state.</p>';
     return;
   }
   sameStatePnmsList.innerHTML = rows
@@ -3056,7 +3056,7 @@ function renderSameStatePnmsPanel() {
           <div class="muted">${escapeHtml(pnm.hometown || "-")}</div>
           <div class="action-row">
             <button type="button" class="secondary open-same-state-pnm" data-pnm-id="${Number(pnm.pnm_id)}" data-state="${escapeHtml(stateCode)}">Open In Rushees</button>
-            <a class="quick-nav-link" href="${escapeHtml(meetingHref)}">Open Meeting</a>
+            <a class="quick-nav-link" href="${escapeHtml(meetingHref)}">Open Packet</a>
           </div>
         </div>
       `;
@@ -3074,7 +3074,7 @@ function renderAnalytics(overview) {
       (pnm) => `
       <article class="card">
         <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.name)}</strong>
-        <p>Weighted Total: ${pnm.weighted_total.toFixed(2)} | Ratings: ${pnm.rating_count} | Lunches: ${pnm.total_lunches}</p>
+        <p>Weighted Total: ${pnm.weighted_total.toFixed(2)} | Ratings: ${pnm.rating_count} | Touchpoints: ${pnm.total_lunches}</p>
       </article>
     `
     )
@@ -3086,7 +3086,7 @@ function renderAnalytics(overview) {
       (member) => `
       <article class="card">
         <strong>${escapeHtml(member.username)}</strong>
-        <p>Lunches: ${member.total_lunches} | Lunches/Week: ${member.lunches_per_week.toFixed(2)}</p>
+        <p>Touchpoints: ${member.total_lunches} | Touchpoints/Week: ${member.lunches_per_week.toFixed(2)}</p>
       </article>
     `
     )
@@ -3100,7 +3100,7 @@ function renderLeaderboard(rows) {
     return;
   }
   if (!rows.length) {
-    leaderboardTable.innerHTML = '<p class="muted">No PNM rankings available yet.</p>';
+    leaderboardTable.innerHTML = '<p class="muted">No rushee rankings available yet.</p>';
     return;
   }
 
@@ -3144,7 +3144,7 @@ function renderLeaderboard(rows) {
           <th>Name</th>
           <th>Weighted Total</th>
           <th>Ratings</th>
-          <th>Lunches</th>
+          <th>Touchpoints</th>
           <th>Days</th>
           <th>Assigned Officer</th>
         </tr>
@@ -3261,7 +3261,7 @@ function openTouchpointDrawer(options = {}) {
     touchpointDrawerSubtitle.textContent =
       source === "operations"
         ? "Create a shared lunch or follow-up event without leaving operations."
-        : "Create one shared lunch touchpoint from the selected rushee context.";
+        : "Create one shared touchpoint from the selected rushee context.";
   }
   renderPnmSelectOptions();
   if (touchpointDrawerDate && !touchpointDrawerDate.value) {
@@ -3304,7 +3304,7 @@ function applyCommandRatingFormForSelected() {
   if (!selected) {
     commandRatingForm.reset();
     if (commandSelectedName) {
-      commandSelectedName.textContent = "Select a PNM from queue";
+      commandSelectedName.textContent = "Select a rushee from queue";
     }
     if (commandSelectedMeta) {
       commandSelectedMeta.textContent = "Queue details, assignment ownership, and latest touchpoint appear here.";
@@ -3625,7 +3625,7 @@ function renderCommandWorkspaceExtras() {
     const pulse = state.commandWorkspace.teamPulse || {};
     const cards = [
       { label: "Pending Approvals", value: Number(pulse.pending_approvals || 0) },
-      { label: "Unassigned PNMs", value: Number(pulse.unassigned_pnms || 0) },
+      { label: "Unassigned Rushees", value: Number(pulse.unassigned_pnms || 0) },
       { label: "Needs Help", value: Number(pulse.needs_help || 0) },
       { label: "Over Capacity", value: Number(pulse.over_capacity_officers || 0) },
     ];
@@ -3647,7 +3647,7 @@ function renderPnmBoard() {
           (pnm) => `
             <article class="rushee-board-card">
               <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
-              <div class="rushee-board-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Lunches ${Number(pnm.total_lunches || 0)}</div>
+              <div class="rushee-board-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
               <div class="rushee-board-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
               <div class="action-row">
                 <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
@@ -3658,7 +3658,7 @@ function renderPnmBoard() {
           `
         )
         .join("")
-    : '<p class="muted">No PNMs match current filters.</p>';
+    : '<p class="muted">No rushees match current filters.</p>';
   const useBoard = state.viewPrefs.pnmView === "board";
   pnmBoard.classList.toggle("hidden", !useBoard);
   if (pnmTable) {
@@ -3760,7 +3760,7 @@ function renderAdminWorkspaceExtras() {
   adminStorageDiagnostics.innerHTML = `
     <div class="entry">
       <div class="entry-title"><strong>Persistent Paths OK</strong><span>${payload.persistent_paths_ok ? "Yes" : "No"}</span></div>
-      <div class="muted">Users ${Number(tableCounts.users || 0)} | PNMs ${Number(tableCounts.pnms || 0)} | Ratings ${Number(tableCounts.ratings || 0)} | Lunches ${Number(tableCounts.lunches || 0)}</div>
+      <div class="muted">Users ${Number(tableCounts.users || 0)} | Rushees ${Number(tableCounts.pnms || 0)} | Ratings ${Number(tableCounts.ratings || 0)} | Touchpoints ${Number(tableCounts.lunches || 0)}</div>
     </div>
     <div class="entry">
       <div class="entry-title"><strong>Active Tenant DB</strong><span>${escapeHtml((payload.paths && payload.paths.ACTIVE_TENANT_DB_PATH) || "-")}</span></div>
@@ -3778,7 +3778,7 @@ function renderMeetingCompareCard(payload, fallbackLabel) {
   return `
     <article class="compare-candidate-card">
       <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
-      <div class="compare-candidate-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Lunches ${Number(pnm.total_lunches || 0)}</div>
+      <div class="compare-candidate-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
       <div class="compare-candidate-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
       <div class="compare-candidate-meta">Rank ${metrics.weighted_rank || "-"} of ${metrics.cohort_size || "-"}</div>
       <div class="action-row">
@@ -3865,7 +3865,7 @@ function renderMeetingsWorkspace() {
             `
           )
           .join("")
-      : '<p class="muted">No pinned PNMs yet.</p>';
+      : '<p class="muted">No pinned rushees yet.</p>';
   }
   if (meetingsCompareSelectA) {
     const options = '<option value=\"\">Select</option>' + (state.meetingsWorkspace.candidates || [])
@@ -3917,7 +3917,7 @@ function localCommandResults(query, existing = []) {
     base.push({ action: "backup_csv", label: "Backup CSV", command_id: "open admin data tools" });
   }
   if (roleCanUseCommandCenter()) {
-    base.push({ action: "open_meetings", label: "Open Meetings Workspace", command_id: "review packet-ready PNMs" });
+    base.push({ action: "open_meetings", label: "Open Meetings Workspace", command_id: "review packet-ready rushees" });
   }
   const seen = new Set((existing || []).map((item) => String(item && item.action ? item.action : "").trim()).filter(Boolean));
   return base.filter((item) => item.label.toLowerCase().includes(token) && !seen.has(item.action));
@@ -3998,7 +3998,7 @@ function renderCommandPaletteResults() {
   }
   const query = String(state.searchResults.query || "").trim();
   if (!query) {
-    commandPaletteResults.innerHTML = '<p class="muted">Start typing to search PNMs, members, or common actions.</p>';
+    commandPaletteResults.innerHTML = '<p class="muted">Start typing to search rushees, members, or common actions.</p>';
     return;
   }
   const pnmMarkup = (state.searchResults.pnms || [])
@@ -4043,8 +4043,8 @@ function renderCommandPaletteResults() {
     .join("");
   commandPaletteResults.innerHTML = `
     <div class="command-palette-result-group">
-      <h3>PNMs</h3>
-      ${pnmMarkup || '<p class="muted">No PNM matches.</p>'}
+      <h3>Rushees</h3>
+      ${pnmMarkup || '<p class="muted">No rushee matches.</p>'}
     </div>
     <div class="command-palette-result-group">
       <h3>Members</h3>
@@ -4185,7 +4185,7 @@ function renderHeadAdminSummary() {
     </div>
     <div class="card">
       <strong>${summary.total_officer_lunches}</strong>
-      <p>Total Officer Lunches</p>
+      <p>Total Officer Touchpoints</p>
     </div>
     <div class="card">
       <strong>${Number(summary.avg_officer_score_given || 0).toFixed(2)}</strong>
@@ -4211,7 +4211,7 @@ function renderCurrentHeadsList() {
             <strong>${escapeHtml(head.username)}</strong>
             <span>${head.rating_count} ratings</span>
           </div>
-          <div class="muted">Lunches: ${head.total_lunches} | Per week: ${Number(head.lunches_per_week || 0).toFixed(2)}</div>
+          <div class="muted">Touchpoints: ${head.total_lunches} | Per week: ${Number(head.lunches_per_week || 0).toFixed(2)}</div>
           <div class="muted">Last login: ${escapeHtml(formatLastSeen(head.last_login_at))}</div>
         </div>
       `
@@ -4277,9 +4277,9 @@ function renderOfficerMetrics() {
           <th>Ratings</th>
           <th>Avg Given</th>
           <th>Avg Score</th>
-          <th>Lunches</th>
-          <th>Lunches/Week</th>
-          <th>Assigned PNMs</th>
+          <th>Touchpoints</th>
+          <th>Touchpoints/Week</th>
+          <th>Assigned Rushees</th>
           <th>Participation</th>
           <th>Last Login</th>
         </tr>
@@ -4318,7 +4318,7 @@ function renderSeasonArchiveStatusPanel() {
           <span>${escapeHtml(archive.archive_label || "Season Archive")}</span>
         </div>
         <p class="muted">Created: ${escapeHtml(formatLastSeen(archive.archived_at))} by ${escapeHtml(archive.archived_by_username || "Unknown")}</p>
-        <p class="muted">Archived counts: PNMs ${archive.pnm_count}, Ratings ${archive.rating_count}, Lunches ${archive.lunch_count}</p>
+        <p class="muted">Archived counts: Rushees ${archive.pnm_count}, Ratings ${archive.rating_count}, Touchpoints ${archive.lunch_count}</p>
       </div>
     `
     : '<p class="muted">No archived season yet.</p>';
@@ -4329,7 +4329,7 @@ function renderSeasonArchiveStatusPanel() {
         <strong>Current Live Data</strong>
         <span>Before Reset</span>
       </div>
-      <p class="muted">PNMs: ${current.pnm_count} | Ratings: ${current.rating_count} | Lunches: ${current.lunch_count}</p>
+      <p class="muted">Rushees: ${current.pnm_count} | Ratings: ${current.rating_count} | Touchpoints: ${current.lunch_count}</p>
       <p class="muted">Confirmation phrase: <strong>${escapeHtml(phrase)}</strong></p>
     </div>
     ${archiveMeta}
@@ -4432,7 +4432,7 @@ function renderAdminPnmTable() {
           <th>Instagram</th>
           <th>Weighted Total</th>
           <th>Ratings</th>
-          <th>Lunches</th>
+          <th>Touchpoints</th>
           <th></th>
         </tr>
       </thead>
@@ -4829,7 +4829,7 @@ function renderRatingEntries(data) {
 
 function renderLunchEntries(data) {
   if (!data.lunches.length) {
-    lunchHistory.innerHTML = '<p class="muted">No lunches logged for this PNM.</p>';
+    lunchHistory.innerHTML = '<p class="muted">No touchpoints logged for this rushee.</p>';
     return;
   }
 
@@ -4841,7 +4841,7 @@ function renderLunchEntries(data) {
           <strong>${escapeHtml(row.lunch_date)}</strong>
           <span>${escapeHtml(row.username)}</span>
         </div>
-        <div class="muted">${escapeHtml(formatLunchWindow(row) || "All-day lunch")}</div>
+        <div class="muted">${escapeHtml(formatLunchWindow(row) || "All-day touchpoint")}</div>
         <div class="muted">${escapeHtml(row.notes || "No notes")}</div>
       </div>
     `
@@ -4851,8 +4851,8 @@ function renderLunchEntries(data) {
 
 async function loadPnmDetail(pnmId) {
   if (!pnmId) {
-    ratingList.innerHTML = '<p class="muted">Select a PNM to view rating entries.</p>';
-    lunchHistory.innerHTML = '<p class="muted">Select a PNM to view lunch logs.</p>';
+    ratingList.innerHTML = '<p class="muted">Select a rushee to view rating entries.</p>';
+    lunchHistory.innerHTML = '<p class="muted">Select a rushee to view touchpoint logs.</p>';
     renderSelectedPnmPhoto(null);
     syncOpenMeetingLink();
     renderAssignmentControls();
@@ -5033,7 +5033,7 @@ async function loadScheduledLunches() {
   } catch {
     state.scheduledLunches = [];
     if (scheduledLunchesList) {
-      scheduledLunchesList.innerHTML = '<p class="muted">Unable to load scheduled lunches right now.</p>';
+      scheduledLunchesList.innerHTML = '<p class="muted">Unable to load scheduled touchpoints right now.</p>';
     }
   }
 }
@@ -5515,7 +5515,7 @@ async function handleLogout() {
     lunchOnlyFeedPreview.textContent = "Sign in to load lunch feed link.";
   }
   if (scheduledLunchesList) {
-    scheduledLunchesList.innerHTML = '<p class="muted">Sign in to view scheduled lunches.</p>';
+    scheduledLunchesList.innerHTML = '<p class="muted">Sign in to view scheduled touchpoints.</p>';
   }
   if (rushCalendarTable) {
     rushCalendarTable.innerHTML = '<p class="muted">Sign in to view rush calendar items.</p>';
@@ -5745,13 +5745,13 @@ async function handlePnmCreate(event) {
     setDefaultDates();
     syncInterestPickerFromInput("pnmInterests", "pnmInterestTags");
     syncStereotypePickerFromInput("pnmStereotype", "pnmStereotypeTags");
-    showToast(`PNM added: ${payload.pnm.pnm_code}`);
+    showToast(`Rushee added: ${payload.pnm.pnm_code}`);
     await refreshAll();
     state.selectedPnmId = payload.pnm.pnm_id;
     applyRatingFormForSelected();
     await loadPnmDetail(state.selectedPnmId);
   } catch (error) {
-    showToast(error.message || "Unable to create PNM.");
+    showToast(error.message || "Unable to create rushee.");
   }
 }
 
@@ -5759,7 +5759,7 @@ async function handlePhotoUpload(event) {
   event.preventDefault();
   const selectedId = Number(state.selectedPnmId || ratingPnm.value || 0);
   if (!selectedId) {
-    showToast("Select a PNM before uploading a photo.");
+    showToast("Select a rushee before uploading a photo.");
     return;
   }
   if (!roleCanManagePhotos()) {
@@ -5791,7 +5791,7 @@ async function handlePhotoUpload(event) {
 async function handleRefreshInstagramPhoto() {
   const selectedId = Number(state.selectedPnmId || ratingPnm.value || 0);
   if (!selectedId) {
-    showToast("Select a PNM first.");
+    showToast("Select a rushee first.");
     return;
   }
   if (!roleCanManagePhotos()) {
@@ -5826,7 +5826,7 @@ async function handleRatingSave(event) {
   const selectedId = Number(ratingPnm.value || state.selectedPnmId || 0);
 
   if (!selectedId) {
-    showToast("Select a PNM before saving a rating.");
+    showToast("Select a rushee before saving a rating.");
     return;
   }
 
@@ -6768,7 +6768,7 @@ async function handleAssignOfficer() {
   }
   const pnmId = Number(state.selectedPnmId || ratingPnm.value || 0);
   if (!pnmId) {
-    showToast("Select a PNM first.");
+    showToast("Select a rushee first.");
     return;
   }
 
@@ -6801,7 +6801,7 @@ async function handleClearAssignment() {
   }
   const pnmId = Number(state.selectedPnmId || ratingPnm.value || 0);
   if (!pnmId) {
-    showToast("Select a PNM first.");
+    showToast("Select a rushee first.");
     return;
   }
   clearAssignBtn.disabled = true;
@@ -6916,7 +6916,7 @@ async function handleSeasonReset() {
     return;
   }
   const confirmed = window.confirm(
-    "Archive the current rush season and reset PNMs, ratings, lunches, and participation counters for next season?"
+    "Archive the current rush season and reset rushees, ratings, touchpoints, and participation counters for next season?"
   );
   if (!confirmed) {
     return;
@@ -7472,7 +7472,7 @@ function attachEvents() {
         await loadScheduledLunches();
         showToast("Scheduled lunches refreshed.");
       } catch (error) {
-        showToast(error.message || "Unable to refresh scheduled lunches.");
+        showToast(error.message || "Unable to refresh scheduled touchpoints.");
       }
     });
   }

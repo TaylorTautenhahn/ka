@@ -228,7 +228,7 @@ function renderPnmTable() {
           <th>Code</th>
           <th>Name</th>
           <th>Total</th>
-          <th>Lunches</th>
+          <th>Touchpoints</th>
         </tr>
       </thead>
       <tbody>${tableRows}</tbody>

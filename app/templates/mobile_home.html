@@ -59,7 +59,7 @@
           <p class="muted">Search for a demo rushee, tap a recent lunch follow-up card, then update the rating and comments in one flow.</p>
           <div class="mobile-action-grid">
             <a href="#mobileHomeSearchPanel" class="quick-nav-link">Search</a>
-            <a href="#mobileHomeRecentLunchesPanel" class="quick-nav-link">Lunch Follow-Up</a>
+            <a href="#mobileHomeRecentLunchesPanel" class="quick-nav-link">Touchpoint Follow-Up</a>
             <a href="#mobileHomeQuickRatePanel" class="quick-nav-link">Quick Rate</a>
           </div>
         </div>
@@ -89,8 +89,8 @@
         <section id="mobileHomeRecentLunchesPanel" class="panel mobile-panel">
           <div class="section-head">
             <div>
-              <h2>Lunch Follow-Up</h2>
-              <p class="muted">Rushees you have already been on lunch with for quick post-event updates.</p>
+              <h2>Touchpoint Follow-Up</h2>
+              <p class="muted">Rushees you have already met with for quick post-event updates.</p>
             </div>
             <span id="mobileHomeRecentLunchCount" class="muted">0</span>
           </div>
@@ -103,7 +103,7 @@
               <h2>Quick Rating</h2>
               <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or lunch follow-up to start rating.</p>
             </div>
-            <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
+            <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Packet</a>
           </div>
           <form id="mobileCommandRatingForm" class="stack">
             <div class="inline-grid two-cols compact-inputs">
@@ -135,16 +135,16 @@
       </section>
 
       <section id="mobileNonOfficerNotice" class="panel mobile-panel hidden">
-        <h2>Summary Dashboard</h2>
+        <h2>Live Snapshot</h2>
         <p class="muted">Quick mobile rating tools are available to Head Rush Officers and Rush Officers. You still have access to the core team views below.</p>
       </section>
 
       <section id="mobileHomeSecondarySection" class="panel mobile-panel">
         <h2>Live Snapshot</h2>
         <div class="mobile-kpi-grid">
-          <article class="card"><strong id="mobilePnmCount">0</strong><p>PNMs</p></article>
+          <article class="card"><strong id="mobilePnmCount">0</strong><p>Rushees</p></article>
           <article class="card"><strong id="mobileRatingCount">0</strong><p>Ratings</p></article>
-          <article class="card"><strong id="mobileLunchCount">0</strong><p>Lunches</p></article>
+          <article class="card"><strong id="mobileLunchCount">0</strong><p>Touchpoints</p></article>
         </div>
         <div class="mobile-action-grid">
           <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
@@ -164,7 +164,7 @@
 
       <div id="mobileCommandStickyActions" class="mobile-command-sticky hidden">
         <button id="mobileCommandStickySaveBtn" type="button">Save Rating</button>
-        <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting</a>
+        <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Packet</a>
       </div>
     </main>
 

@@ -332,11 +332,11 @@ function applySessionHeader(user) {
     return;
   }
   if (!user) {
-    sessionTitle.textContent = "Meeting Packets";
+    sessionTitle.textContent = "Meeting Packet";
     sessionSubtitle.textContent = "";
     return;
   }
-  sessionTitle.textContent = user.username || "Meeting Packets";
+  sessionTitle.textContent = user.username || "Meeting Packet";
   const emoji = user.emoji ? `${user.emoji} ` : "";
   sessionSubtitle.textContent = `${emoji}${user.role || ""}`.trim();
 }
@@ -495,7 +495,7 @@ function renderPacket(payload) {
         const notes = row.notes ? `<br /><span class="meeting-list-note">${escapeHtml(row.notes)}</span>` : "";
         return `<li><strong>${escapeHtml(row.lunch_date)}</strong>: ${escapeHtml(row.username)} (${escapeHtml(row.role)})${detail}${notes}</li>`;
       })
-      .join("") || "<li>No lunch logs yet.</li>";
+      .join("") || "<li>No touchpoint logs yet.</li>";
 
   const ratingCommentMarkup =
     ratingUpdateComments
@@ -528,7 +528,7 @@ function renderPacket(payload) {
           </li>
         `;
       })
-      .join("") || "<li>No lunch notes yet.</li>";
+      .join("") || "<li>No touchpoint notes yet.</li>";
 
   const matchMarkup =
     matches
@@ -560,7 +560,7 @@ function renderPacket(payload) {
       </article>
       <article class="card"><strong>Ratings Count</strong><p>${summary.ratings_count}</p></article>
       <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
-      <article class="card"><strong>Total Lunches</strong><p>${summary.total_lunches}</p></article>
+      <article class="card"><strong>Total Touchpoints</strong><p>${summary.total_lunches}</p></article>
     </div>
     <article class="list-column">
       <div class="entry-title">
@@ -573,7 +573,7 @@ function renderPacket(payload) {
     <article class="list-column">
       <div class="entry-title">
         <h3>Category Ranking Averages</h3>
-        <span class="warn">${Number(summary.cohort_size || 0)} PNMs</span>
+        <span class="warn">${Number(summary.cohort_size || 0)} Rushees</span>
       </div>
       <p class="muted">Weighted category averages with standing across the active roster.</p>
       ${renderCategoryRankingBars(categoryRankings)}
@@ -584,7 +584,7 @@ function renderPacket(payload) {
         <ul class="meeting-list">${ratingsMarkup}</ul>
       </article>
       <article class="list-column">
-        <h3>Lunches</h3>
+        <h3>Touchpoints</h3>
         <ul class="meeting-list">${lunchMarkup}</ul>
       </article>
     </div>
@@ -594,7 +594,7 @@ function renderPacket(payload) {
         <ul class="meeting-list meeting-list-detailed">${ratingCommentMarkup}</ul>
       </article>
       <article class="list-column">
-        <h3>All Lunch Notes</h3>
+        <h3>All Touchpoint Notes</h3>
         <ul class="meeting-list meeting-list-detailed">${lunchCommentMarkup}</ul>
       </article>
     </div>
@@ -629,7 +629,7 @@ async function loadPnms() {
   const payload = await api("/api/pnms");
   const pnms = payload.pnms || [];
   pnmSelect.innerHTML =
-    '<option value="">Select PNM</option>' +
+    '<option value="">Select rushee</option>' +
     pnms
       .map((pnm) => `<option value="${pnm.pnm_id}">${escapeHtml(`${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`)}</option>`)
       .join("");

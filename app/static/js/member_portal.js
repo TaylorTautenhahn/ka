@@ -426,7 +426,7 @@ function renderSelectedPnm() {
 
   memberPnmKpis.innerHTML = `
     <article class="card"><strong>${pnm.days_since_first_event}</strong><p>Days Since First Event</p></article>
-    <article class="card"><strong>${pnm.total_lunches}</strong><p>Total Lunches</p></article>
+    <article class="card"><strong>${pnm.total_lunches}</strong><p>Total Touchpoints</p></article>
     <article class="card"><strong>${escapeHtml(pnm.class_year || "-")}</strong><p>Class Year</p></article>
     <article class="card"><strong>${escapeHtml(pnm.phone_number || "None")}</strong><p>Phone</p></article>
   `;

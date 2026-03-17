@@ -14,7 +14,7 @@
               <a class="quick-nav-link" href="#commandCenterSection">Jump to Queue</a>
               <a class="quick-nav-link" href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}">Open Rushees</a>
               <a class="quick-nav-link" href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}">Open Operations</a>
-              <a class="quick-nav-link" href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}">Open Meetings</a>
+              <a class="quick-nav-link" href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}">Open Meetings Command</a>
             </div>
           </div>
         </details>
@@ -34,7 +34,7 @@
             <article class="card"><p>Recent Decisions</p><strong id="commandRecentCount">0</strong></article>
             <article class="card"><p>Pending Approvals</p><strong id="commandPendingCount">0</strong></article>
             <article class="card"><p>Needs Help</p><strong id="commandNeedsHelpCount">0</strong></article>
-            <article class="card"><p>Unassigned PNMs</p><strong id="commandUnassignedCount">0</strong></article>
+            <article class="card"><p>Unassigned Rushees</p><strong id="commandUnassignedCount">0</strong></article>
           </div>
         </section>
 
@@ -80,11 +80,11 @@
             <article class="list-column command-composer-column">
               <div class="command-selected-head">
                 <div class="meeting-photo-wrap command-selected-photo-wrap">
-                  <img id="commandSelectedPhoto" class="meeting-photo hidden" alt="Selected queue PNM" />
+                  <img id="commandSelectedPhoto" class="meeting-photo hidden" alt="Selected queue rushee" />
                   <div id="commandSelectedPhotoPlaceholder" class="photo-placeholder">Select a queue item to begin.</div>
                 </div>
                 <div>
-                  <h3 id="commandSelectedName">Select a PNM from queue</h3>
+                  <h3 id="commandSelectedName">Select a rushee from queue</h3>
                   <p id="commandSelectedMeta" class="muted">Queue details, assignment ownership, and latest touchpoint appear here.</p>
               <div class="action-row">
                     <a id="commandOpenMeetingBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Packet</a>

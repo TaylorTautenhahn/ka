@@ -40,7 +40,7 @@
       <header class="hero mobile-hero">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Add Rushee</h1>
-        <p>Create PNMs quickly from your phone during events.</p>
+        <p>Create rushees quickly from your phone during events.</p>
       </header>
 
       <section class="panel mobile-panel">
@@ -78,10 +78,10 @@
             <input id="mobilePnmStereotype" type="hidden" value="" />
             <p class="muted">Choose one approved stereotype tag.</p>
           </label>
-          <label>Lunch stats (optional)<input id="mobilePnmLunchStats" type="text" /></label>
+          <label>Touchpoint stats (optional)<input id="mobilePnmLunchStats" type="text" /></label>
           <label>Notes (optional)<textarea id="mobilePnmNotes" rows="3" placeholder="Talking points, strengths, concerns"></textarea></label>
           <label>Photo (optional)<input id="mobilePnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" /></label>
-          <button type="submit">Create PNM</button>
+          <button type="submit">Create Rushee</button>
         </form>
       </section>
     </main>
@@ -89,10 +89,10 @@
     <datalist id="mobileStateHints"></datalist>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Dashboard</a>
+      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Command</a>
       <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab is-active">Rushees</a>
       <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Calendar</a>
+      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
       <a href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-tab">Admin</a>
     </nav>
 

@@ -37,17 +37,26 @@
         <header id="authHero" class="hero reveal">
           <div class="hero-shell hero-shell-single">
             <div class="hero-copy">
-              {% if app_config.logo_path %}
-              <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-              {% endif %}
+              <div class="auth-brand-lockup">
+                <img src="/static/icons/bidboard-shield.svg" alt="BidBoard shield" class="auth-brand-mark" />
+                {% if app_config.logo_path %}
+                <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+                {% endif %}
+              </div>
               <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
-              <h1>Connected Rush Evaluation</h1>
+              <h1>BidBoard Command For {{ app_config.chapter_name if app_config else 'Your Chapter' }}</h1>
               <p>
-                {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'Transparent, role-aware recruitment tracking with instant updates across PNMs, members, ratings, and lunches.' }}
+                {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'One premium command layer for rushees, touchpoints, packets, assignments, and team coordination.' }}
               </p>
+              <div class="auth-feature-strip">
+                <span>Command</span>
+                <span>Touchpoints</span>
+                <span>Meeting Packets</span>
+                <span>Team Coordination</span>
+              </div>
               <div id="heroStats" class="hero-stats hidden">
                 <article class="stat-card">
-                  <p>PNMs Tracked</p>
+                  <p>Rushees Tracked</p>
                   <strong id="heroPnmCount">0</strong>
                 </article>
                 <article class="stat-card">
@@ -55,8 +64,18 @@
                   <strong id="heroRatingCount">0</strong>
                 </article>
                 <article class="stat-card">
-                  <p>Lunch Logs</p>
+                  <p>Touchpoints Logged</p>
                   <strong id="heroLunchCount">0</strong>
+                </article>
+              </div>
+              <div class="auth-proof-grid">
+                <article class="auth-proof-card">
+                  <strong>Live Team Context</strong>
+                  <span>Assignments, scoring, and packets stay aligned in one workspace.</span>
+                </article>
+                <article class="auth-proof-card">
+                  <strong>Meeting-Ready Decisions</strong>
+                  <span>Open a packet with trend history, comments, and ownership already attached.</span>
                 </article>
               </div>
             </div>
@@ -90,7 +109,7 @@
 
           <article>
             <h2>Register New Rush Officer</h2>
-            <p class="muted">Register with username and password. Emoji is optional. Create and manage PNMs after login.</p>
+            <p class="muted">Register with username and password. Emoji is optional. Create, rate, and coordinate rushees after approval.</p>
             <form id="registerForm" class="stack">
               <label>
                 Username
@@ -206,10 +225,10 @@
               <div class="app-search-field">
                 <label>
                   Search
-                  <input id="globalSearchInput" type="search" placeholder="Search PNMs, members, commands" autocomplete="off" />
+                  <input id="globalSearchInput" type="search" placeholder="Search rushees, members, commands" autocomplete="off" />
                 </label>
               </div>
-              <p class="muted app-toolbar-hint">Use search to jump to rushees, members, or the commands you need next.</p>
+              <p class="muted app-toolbar-hint">Use search to jump to rushees, members, packets, or the commands you need next.</p>
             </section>
 
             <div class="desktop-pages app-workspace-pages">
@@ -248,9 +267,9 @@
         </div>
         <label>
           Search or run a command
-          <input id="commandPaletteInput" type="search" placeholder="Search PNMs, members, or commands" autocomplete="off" />
+          <input id="commandPaletteInput" type="search" placeholder="Search rushees, members, or commands" autocomplete="off" />
         </label>
-        <div id="commandPaletteResults" class="list-box muted">Start typing to search PNMs, members, or common actions.</div>
+        <div id="commandPaletteResults" class="list-box muted">Start typing to search rushees, members, or common actions.</div>
       </section>
     </div>
 
@@ -260,13 +279,13 @@
         <div class="section-head">
           <div>
             <h2 id="touchpointDrawerTitle">Schedule Touchpoint</h2>
-            <p id="touchpointDrawerSubtitle" class="muted">Create one shared lunch touchpoint from any workspace.</p>
+            <p id="touchpointDrawerSubtitle" class="muted">Create one shared touchpoint from any workspace.</p>
           </div>
           <button id="touchpointDrawerCloseBtn" type="button" class="secondary">Close</button>
         </div>
         <form id="touchpointDrawerForm" class="stack">
           <label>
-            PNM
+            Rushee
             <select id="touchpointDrawerPnm" required></select>
           </label>
           <label>

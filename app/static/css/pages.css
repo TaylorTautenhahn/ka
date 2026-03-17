@@ -1303,13 +1303,23 @@ body.desktop-product-auth .tutorial-highlight {
 }
 
 /* Design polish pass */
+body.desktop-product-auth {
+  --backend-space-xs: 0.7rem;
+  --backend-space-sm: 0.9rem;
+  --backend-space-md: 1rem;
+  --backend-space-lg: 1.15rem;
+  --backend-space-xl: 1.35rem;
+}
+
 body.desktop-product-auth .app-frame {
-  gap: 1.45rem;
+  gap: var(--backend-space-lg);
 }
 
 body.desktop-product-auth .app-main,
+body.desktop-product-auth .app-workspace-pages,
+body.desktop-product-auth .desktop-page.is-active,
 body.desktop-product-auth .desktop-subpage.is-active {
-  gap: 1.25rem;
+  gap: var(--backend-space-md);
 }
 
 body.desktop-product-auth .app-sidebar,
@@ -1320,10 +1330,12 @@ body.desktop-product-auth .command-queue-workspace,
 body.desktop-product-auth .rushee-action-shell,
 body.desktop-product-auth .rushee-roster-panel,
 body.desktop-product-auth .rushee-inspector-panel,
+body.desktop-product-auth .desktop-page[data-page="meetings"] > .panel:first-child,
+body.desktop-product-auth .desktop-page[data-page="admin"] > #adminPanel,
 body.desktop-product-auth .notifications-tray-card,
 body.desktop-product-auth .command-palette-card,
 body.desktop-product-auth .touchpoint-drawer-card {
-  border-radius: 30px;
+  border-radius: 26px;
 }
 
 body.desktop-product-auth .app-sidebar,
@@ -1335,7 +1347,7 @@ body.desktop-product-auth .app-toolbar {
 }
 
 body.desktop-product-auth .app-sidebar {
-  padding: 1.2rem;
+  padding: var(--backend-space-lg);
   background:
     radial-gradient(circle at 0% 0%, rgba(var(--accent-rgb), 0.12), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.035), transparent 24%),
@@ -1349,7 +1361,7 @@ body.desktop-product-auth .app-sidebar-brand-top {
 
 body.desktop-product-auth .app-sidebar-tenant-card {
   border-radius: 22px;
-  padding: 1rem;
+  padding: var(--backend-space-md);
 }
 
 body.desktop-product-auth .app-nav-link {
@@ -1380,7 +1392,7 @@ body.desktop-product-auth .app-nav-link.is-active::before {
 
 body.desktop-product-auth .app-topbar {
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 1.2rem 1.25rem;
+  padding: var(--backend-space-lg);
 }
 
 body.desktop-product-auth .app-topbar-copy {
@@ -1394,8 +1406,8 @@ body.desktop-product-auth .app-topbar-copy h2 {
 
 body.desktop-product-auth .app-topbar-actions {
   align-self: start;
-  gap: 0.6rem;
-  padding: 0.55rem;
+  gap: 0.5rem;
+  padding: 0.45rem;
   border: 1px solid rgba(115, 168, 222, 0.12);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.03);
@@ -1413,7 +1425,7 @@ body.desktop-product-auth .app-session-card {
 
 body.desktop-product-auth .app-toolbar {
   grid-template-columns: minmax(0, 1fr) auto;
-  padding: 1rem 1.15rem;
+  padding: var(--backend-space-md) var(--backend-space-lg);
 }
 
 body.desktop-product-auth .app-search-field input {
@@ -1423,20 +1435,25 @@ body.desktop-product-auth .app-search-field input {
 
 body.desktop-product-auth .app-toolbar-hint {
   max-width: 24rem;
-  padding: 0.78rem 0.9rem;
+  padding: 0.72rem 0.82rem;
   border: 1px solid rgba(115, 168, 222, 0.12);
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.035);
 }
 
+body.desktop-product-auth .cards {
+  gap: var(--backend-space-sm);
+}
+
 body.desktop-product-auth .section-head {
-  gap: 0.9rem;
+  gap: 0.65rem 0.9rem;
   align-items: flex-start;
+  margin-bottom: var(--backend-space-sm);
 }
 
 body.desktop-product-auth .section-head .muted:last-child,
 body.desktop-product-auth .section-head > span.muted {
-  padding-top: 0.3rem;
+  padding-top: 0.15rem;
 }
 
 body.desktop-product-auth .card,
@@ -1459,6 +1476,8 @@ body.desktop-product-auth #operationsSummaryCards .card,
 body.desktop-product-auth #headAdminSummary .card,
 body.desktop-product-auth #rushCalendarStats .card,
 body.desktop-product-auth #weeklyGoalSummary .card {
+  padding: 0.88rem 0.94rem;
+  min-height: 110px;
   background:
     linear-gradient(180deg, rgba(var(--accent-rgb), 0.09), transparent 72%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 34%),
@@ -1466,7 +1485,7 @@ body.desktop-product-auth #weeklyGoalSummary .card {
 }
 
 body.desktop-product-auth .command-queue-workspace .command-center-grid {
-  gap: 1.2rem;
+  gap: var(--backend-space-md);
 }
 
 body.desktop-product-auth .command-center-grid .list-box,
@@ -1481,16 +1500,16 @@ body.desktop-product-auth .meeting-photo-wrap {
 
 body.desktop-product-auth .command-composer-column form,
 body.desktop-product-auth .rushee-inline-panel {
-  padding: 1rem;
+  padding: var(--backend-space-md);
   border: 1px solid rgba(115, 168, 222, 0.12);
   border-radius: 24px;
 }
 
 body.desktop-product-auth .command-selected-head {
-  gap: 1rem;
+  gap: var(--backend-space-md);
   grid-template-columns: 138px minmax(0, 1fr);
-  padding-bottom: 1rem;
-  margin-bottom: 1rem;
+  padding-bottom: var(--backend-space-md);
+  margin-bottom: var(--backend-space-md);
   border-bottom: 1px solid rgba(115, 168, 222, 0.12);
 }
 
@@ -1508,7 +1527,7 @@ body.desktop-product-auth .rushee-board-card,
 body.desktop-product-auth .meetings-queue-card,
 body.desktop-product-auth .compare-candidate-card,
 body.desktop-product-auth .team-load-card {
-  padding: 0.92rem;
+  padding: 0.86rem 0.92rem;
 }
 
 body.desktop-product-auth .command-list .entry:hover,
@@ -1530,7 +1549,7 @@ body.desktop-product-auth .rushee-inline-panel {
 }
 
 body.desktop-product-auth .rushee-workspace-grid {
-  gap: 1.25rem;
+  gap: var(--backend-space-md);
   grid-template-columns: minmax(0, 1.05fr) minmax(440px, 0.95fr);
 }
 
@@ -1539,7 +1558,7 @@ body.desktop-product-auth .rushee-inspector-panel {
 }
 
 body.desktop-product-auth .rushee-inspector-grid {
-  gap: 1.15rem;
+  gap: var(--backend-space-md);
 }
 
 body.desktop-product-auth .tag-picker {
@@ -1562,14 +1581,14 @@ body.desktop-product-auth .touchpoint-drawer-card {
 body.desktop-product-auth .meetings-signal-strip,
 body.desktop-product-auth .admin-signal-strip {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.85rem;
-  margin: 1rem 0 0;
+  gap: var(--backend-space-sm);
+  margin: var(--backend-space-sm) 0 0;
 }
 
 body.desktop-product-auth .meetings-signal-strip .card,
 body.desktop-product-auth .admin-signal-strip .card {
-  min-height: 132px;
-  padding: 1rem 1.05rem;
+  min-height: 118px;
+  padding: 0.9rem 0.96rem;
   background:
     radial-gradient(circle at 100% 0%, rgba(var(--accent-rgb), 0.12), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 32%),
@@ -1587,13 +1606,13 @@ body.desktop-product-auth .admin-signal-strip .card strong {
 
 body.desktop-product-auth .desktop-page[data-page="meetings"] > .panel:first-child,
 body.desktop-product-auth .desktop-page[data-page="admin"] > #adminPanel {
-  padding: 1.2rem 1.25rem;
+  padding: var(--backend-space-lg);
 }
 
 body.desktop-product-auth .desktop-page[data-page="meetings"] .grid-two > .panel,
 body.desktop-product-auth .desktop-page[data-page="admin"] .grid-two > .panel,
 body.desktop-product-auth .desktop-page[data-page="admin"] > .panel {
-  padding: 1.05rem;
+  padding: var(--backend-space-md);
 }
 
 body.desktop-product-auth .desktop-page[data-page="meetings"] .list-box,
@@ -1606,14 +1625,15 @@ body.desktop-product-auth .desktop-page[data-page="admin"] .table-wrap {
 
 body.desktop-product-auth .desktop-page[data-page="meetings"] .section-head,
 body.desktop-product-auth .desktop-page[data-page="admin"] .section-head {
-  padding-bottom: 0.75rem;
+  padding-bottom: 0.6rem;
   border-bottom: 1px solid rgba(115, 168, 222, 0.12);
-  margin-bottom: 0.95rem;
+  margin-bottom: var(--backend-space-sm);
 }
 
 body.desktop-product-auth .desktop-page[data-page="meetings"] .compare-summary-grid,
 body.desktop-product-auth .desktop-page[data-page="admin"] .grid-two {
   align-items: start;
+  gap: var(--backend-space-md);
 }
 
 body.desktop-product-auth .desktop-page[data-page="admin"] .operation-tab-bar {

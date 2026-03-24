@@ -2910,3 +2910,333 @@ body.meeting-packet-page .linked-meeting-actions button {
     min-height: 220px;
   }
 }
+
+/* Production spacing pass: reduce shell bloat and normalize workspace density */
+body.desktop-product-auth {
+  --backend-space-2xs: 0.35rem;
+  --backend-space-xs: 0.55rem;
+  --backend-space-sm: 0.75rem;
+  --backend-space-md: 0.95rem;
+  --backend-space-lg: 1.1rem;
+}
+
+body.desktop-product-auth .app-frame {
+  gap: 0.85rem;
+}
+
+body.desktop-product-auth .app-main,
+body.desktop-product-auth .app-workspace-pages,
+body.desktop-product-auth .desktop-subpage.is-active {
+  gap: 0.85rem;
+}
+
+body.desktop-product-auth .app-shell .panel,
+body.desktop-product-auth .panel {
+  padding: 0.95rem;
+}
+
+body.desktop-product-auth .app-topbar,
+body.desktop-product-auth .app-toolbar,
+body.desktop-product-auth .app-sidebar,
+body.desktop-product-auth .command-summary-shell,
+body.desktop-product-auth .command-queue-workspace,
+body.desktop-product-auth .rushee-action-shell,
+body.desktop-product-auth .rushee-roster-panel,
+body.desktop-product-auth .rushee-inspector-panel,
+body.desktop-product-auth .desktop-page[data-page="meetings"] > .panel:first-child,
+body.desktop-product-auth .desktop-page[data-page="admin"] > #adminPanel {
+  border-radius: 22px;
+}
+
+body.desktop-product-auth .app-topbar {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0.75rem 1rem;
+  padding: 0.95rem 1rem;
+}
+
+body.desktop-product-auth .app-topbar-copy {
+  max-width: 42rem;
+  gap: 0.45rem;
+}
+
+body.desktop-product-auth .app-topbar-copy h2 {
+  font-size: clamp(1.85rem, 2.2vw, 2.45rem);
+  line-height: 1.02;
+}
+
+body.desktop-product-auth .app-topbar-copy .muted {
+  max-width: 33rem;
+  font-size: 0.96rem;
+  line-height: 1.45;
+}
+
+body.desktop-product-auth .app-topbar-actions {
+  gap: 0.45rem;
+  padding: 0.3rem;
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .app-session-card {
+  min-width: 220px;
+  max-width: 260px;
+  padding: 0.72rem 0.82rem;
+}
+
+body.desktop-product-auth .app-toolbar {
+  grid-template-columns: minmax(0, 1fr) minmax(250px, auto);
+  gap: 0.8rem 1rem;
+  padding: 0.85rem 1rem;
+}
+
+body.desktop-product-auth .app-search-field input {
+  min-height: 3rem;
+}
+
+body.desktop-product-auth .app-toolbar-hint {
+  max-width: 20rem;
+  padding: 0.62rem 0.72rem;
+  border-radius: 16px;
+  font-size: 0.9rem;
+}
+
+body.desktop-product-auth .section-head {
+  gap: 0.55rem 0.8rem;
+  margin-bottom: 0.75rem;
+}
+
+body.desktop-product-auth .section-head h2,
+body.desktop-product-auth .section-head h3 {
+  margin-bottom: 0;
+}
+
+body.desktop-product-auth .card,
+body.desktop-product-auth .list-box,
+body.desktop-product-auth .list-column,
+body.desktop-product-auth .entry,
+body.desktop-product-auth .table-wrap,
+body.desktop-product-auth .rushee-board-card,
+body.desktop-product-auth .meetings-queue-card,
+body.desktop-product-auth .compare-candidate-card,
+body.desktop-product-auth .team-load-card,
+body.desktop-product-auth .command-palette-result,
+body.desktop-product-auth .demo-guide-panel {
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .command-summary-shell {
+  padding: 1rem;
+}
+
+body.desktop-product-auth .command-summary-shell .command-summary-row {
+  gap: 0.75rem;
+}
+
+body.desktop-product-auth .command-summary-shell .card,
+body.desktop-product-auth .command-pulse-cards .card,
+body.desktop-product-auth #operationsSummaryCards .card,
+body.desktop-product-auth #headAdminSummary .card,
+body.desktop-product-auth #rushCalendarStats .card,
+body.desktop-product-auth #weeklyGoalSummary .card {
+  min-height: 98px;
+  padding: 0.78rem 0.82rem;
+}
+
+body.desktop-product-auth .command-summary-shell-primary .card:first-child {
+  min-height: 122px;
+  padding: 0.9rem 0.95rem;
+}
+
+body.desktop-product-auth .command-queue-workspace {
+  padding: 1rem;
+}
+
+body.desktop-product-auth .command-queue-workspace .command-center-grid {
+  gap: 1rem;
+  grid-template-columns: minmax(420px, 1.02fr) minmax(0, 0.98fr);
+}
+
+body.desktop-product-auth #commandCenterQueue {
+  max-height: 680px;
+  padding: 0.25rem;
+}
+
+body.desktop-product-auth .command-list .entry {
+  padding: 0.16rem;
+}
+
+body.desktop-product-auth .command-queue-btn {
+  gap: 0.32rem;
+  padding: 0.75rem 0.82rem;
+  border-radius: 14px;
+}
+
+body.desktop-product-auth .command-composer-shell,
+body.desktop-product-auth .command-support-grid {
+  gap: 0.85rem;
+}
+
+body.desktop-product-auth .command-support-grid-top {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, 0.82fr);
+}
+
+body.desktop-product-auth .command-strategy-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 0.9fr);
+  gap: 0.85rem;
+}
+
+body.desktop-product-auth .command-selected-head {
+  gap: 0.85rem;
+  grid-template-columns: 124px minmax(0, 1fr);
+  padding: 0.1rem 0 0.85rem;
+  margin-bottom: 0.1rem;
+}
+
+body.desktop-product-auth .command-selected-photo-wrap .meeting-photo,
+body.desktop-product-auth .command-selected-photo-wrap .photo-placeholder {
+  width: 124px;
+  min-height: 160px;
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .command-selected-stats {
+  gap: 0.5rem;
+}
+
+body.desktop-product-auth .command-stat-card {
+  padding: 0.62rem 0.7rem;
+  border-radius: 14px;
+}
+
+body.desktop-product-auth .command-form-head {
+  padding: 0.75rem 0.82rem;
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .command-score-grid label,
+body.desktop-product-auth .rushee-inspector-block .compact-inputs label {
+  padding: 0.62rem 0.66rem;
+  border-radius: 16px;
+}
+
+body.desktop-product-auth .rushee-action-shell,
+body.desktop-product-auth .rushee-roster-panel,
+body.desktop-product-auth .rushee-inspector-panel,
+body.desktop-product-auth .desktop-page[data-page="meetings"] > .panel:first-child,
+body.desktop-product-auth .desktop-page[data-page="admin"] > #adminPanel,
+body.desktop-product-auth .meetings-compare-panel {
+  padding: 1rem;
+}
+
+body.desktop-product-auth .rushee-workspace-grid {
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.16fr) minmax(400px, 0.84fr);
+}
+
+body.desktop-product-auth .rushee-inspector-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 0.9fr);
+  gap: 0.9rem;
+}
+
+body.desktop-product-auth .rushee-inspector-column {
+  gap: 0.8rem;
+}
+
+body.desktop-product-auth .rushee-inspector-block {
+  gap: 0.6rem;
+  padding: 0.88rem;
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .rushee-inspector-disclosure,
+body.desktop-product-auth .meetings-pinned-panel {
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .rushee-inspector-disclosure summary {
+  padding: 0.82rem 0.9rem;
+}
+
+body.desktop-product-auth .rushee-inline-panel {
+  max-width: 760px;
+  border-radius: 18px;
+}
+
+body.desktop-product-auth .rushee-create-panel {
+  max-width: 900px;
+}
+
+body.desktop-product-auth .meetings-signal-strip,
+body.desktop-product-auth .admin-signal-strip {
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+body.desktop-product-auth .meetings-signal-strip .card,
+body.desktop-product-auth .admin-signal-strip .card {
+  min-height: 92px;
+  padding: 0.72rem 0.78rem;
+}
+
+body.desktop-product-auth .meetings-overview-grid {
+  grid-template-columns: minmax(0, 1.08fr) minmax(340px, 0.92fr);
+  gap: 1rem;
+}
+
+body.desktop-product-auth .meetings-pinned-panel {
+  gap: 0.6rem;
+  padding: 0.88rem;
+}
+
+body.desktop-product-auth .meetings-grid-top {
+  grid-template-columns: minmax(0, 1.04fr) minmax(300px, 0.96fr);
+  gap: 0.95rem;
+}
+
+body.desktop-product-auth .meetings-compare-selectors {
+  gap: 0.75rem;
+}
+
+body.desktop-product-auth .compare-summary-grid,
+body.desktop-product-auth .desktop-page[data-page="admin"] .grid-two {
+  gap: 0.9rem;
+}
+
+body.desktop-product-auth .meetings-queue-card,
+body.desktop-product-auth .compare-candidate-card,
+body.desktop-product-auth .command-list .entry,
+body.desktop-product-auth .entry {
+  padding: 0.78rem 0.84rem;
+}
+
+@media (max-width: 1440px) {
+  body.desktop-product-auth .command-summary-shell-primary .command-summary-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.desktop-product-auth .command-queue-workspace .command-center-grid,
+  body.desktop-product-auth .command-support-grid-top,
+  body.desktop-product-auth .command-strategy-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1280px) {
+  body.desktop-product-auth .app-topbar,
+  body.desktop-product-auth .app-toolbar,
+  body.desktop-product-auth .rushee-workspace-grid,
+  body.desktop-product-auth .meetings-grid-top,
+  body.desktop-product-auth .meetings-overview-grid,
+  body.desktop-product-auth .admin-overview-grid,
+  body.desktop-product-auth .compare-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .app-topbar-actions {
+    justify-content: flex-start;
+  }
+
+  body.desktop-product-auth .app-session-card,
+  body.desktop-product-auth .app-toolbar-hint {
+    max-width: none;
+  }
+}

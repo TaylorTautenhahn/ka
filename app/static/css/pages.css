@@ -21,13 +21,23 @@
   display: none;
 }
 
+body.desktop-backend-body {
+  --backend-space-2xs: 0.35rem;
+  --backend-space-xs: 0.7rem;
+  --backend-space-sm: 0.9rem;
+  --backend-space-md: 1rem;
+  --backend-space-lg: 1.15rem;
+  --backend-space-xl: 1.35rem;
+  --backend-space-2xl: 1.7rem;
+}
+
 body.desktop-backend-body:not(.desktop-product-auth) .shell-app-shell {
   width: min(calc(100% - 1rem), 1480px);
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) .auth-shell {
   display: grid;
-  gap: 1.4rem;
+  gap: var(--backend-space-xl);
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) #authHero,
@@ -43,18 +53,19 @@ body.desktop-backend-body:not(.desktop-product-auth) #authSection > article {
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) #authHero {
-  padding: 1.45rem 1.55rem;
-  border-radius: 32px;
+  padding: var(--backend-space-xl);
+  border-radius: 28px;
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) .auth-grid {
   grid-template-columns: minmax(0, 0.95fr) minmax(320px, 0.8fr);
   align-items: start;
+  gap: var(--backend-space-lg);
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) #authSection > article {
-  padding: 1.35rem;
-  border-radius: 28px;
+  padding: var(--backend-space-lg);
+  border-radius: 24px;
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) .auth-brand-lockup {
@@ -125,13 +136,13 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-feature-strip span {
 body.desktop-backend-body:not(.desktop-product-auth) .auth-proof-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.8rem;
-  margin-top: 1rem;
+  gap: var(--backend-space-sm);
+  margin-top: var(--backend-space-md);
 }
 
 body.desktop-backend-body:not(.desktop-product-auth) .auth-proof-card {
-  padding: 0.95rem 1rem;
-  border-radius: 22px;
+  padding: 0.85rem 0.95rem;
+  border-radius: 18px;
   border: 1px solid rgba(115, 168, 222, 0.14);
   background: rgba(255, 255, 255, 0.035);
   display: grid;
@@ -140,7 +151,7 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-proof-card {
 
 body.desktop-backend-body:not(.desktop-product-auth) .auth-panel {
   display: grid;
-  gap: 1rem;
+  gap: var(--backend-space-md);
   min-height: 100%;
 }
 
@@ -158,8 +169,8 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-panel-register {
 
 body.desktop-backend-body:not(.desktop-product-auth) .auth-member-signup {
   display: grid;
-  gap: 0.85rem;
-  padding: 1rem;
+  gap: var(--backend-space-sm);
+  padding: var(--backend-space-md);
   border: 1px solid rgba(115, 168, 222, 0.14);
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.035);
@@ -168,7 +179,7 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-member-signup {
 body.desktop-backend-body:not(.desktop-product-auth) .auth-member-signup .signup-qr {
   width: min(220px, 100%);
   padding: 0.55rem;
-  border-radius: 22px;
+  border-radius: 18px;
   border: 1px solid rgba(115, 168, 222, 0.14);
   background: rgba(255, 255, 255, 0.04);
 }
@@ -870,94 +881,6 @@ body.desktop-product-auth .app-nav-link.is-active {
   background:
     linear-gradient(135deg, rgba(var(--accent-rgb), 0.18), rgba(255, 255, 255, 0.04));
   box-shadow: 0 16px 28px rgba(0, 0, 0, 0.22);
-}
-
-body.desktop-product-auth .app-topbar,
-body.desktop-product-auth .app-toolbar {
-  padding: 1.05rem 1.15rem;
-}
-
-body.desktop-product-auth .app-topbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1.22fr) minmax(390px, 0.78fr);
-  align-items: start;
-  gap: 1rem 1.2rem;
-}
-
-body.desktop-product-auth .app-topbar-copy {
-  display: grid;
-  gap: 0.58rem;
-  align-content: start;
-}
-
-body.desktop-product-auth .app-topbar-copy h2 {
-  margin: 0;
-  font-family: "Space Grotesk", sans-serif;
-  font-size: clamp(2.15rem, 3vw, 2.9rem);
-  letter-spacing: -0.05em;
-  line-height: 0.96;
-}
-
-body.desktop-product-auth .app-topbar-copy .muted {
-  max-width: 35rem;
-  font-size: 1.02rem;
-  line-height: 1.48;
-}
-
-body.desktop-product-auth .app-topbar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 0.7rem;
-  justify-content: end;
-}
-
-body.desktop-product-auth .app-session-card {
-  grid-column: 1 / -1;
-  min-width: 0;
-  max-width: none;
-  padding: 0.8rem 0.95rem;
-  border: 1px solid rgba(115, 168, 222, 0.14);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.04);
-  text-align: left;
-}
-
-body.desktop-product-auth .app-session-card strong {
-  color: var(--ink);
-  font-family: "Space Grotesk", sans-serif;
-  font-size: 1rem;
-}
-
-body.desktop-product-auth .app-topbar-actions > button.secondary {
-  min-width: 0;
-  padding-inline: 0.96rem;
-}
-
-body.desktop-product-auth .app-menu summary.secondary,
-body.desktop-product-auth .app-menu > summary.secondary {
-  min-width: 0;
-  padding-inline: 0.96rem;
-}
-
-body.desktop-product-auth .app-toolbar {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 1rem 1.1rem;
-}
-
-body.desktop-product-auth .app-search-field label {
-  color: #d7e6f7;
-}
-
-body.desktop-product-auth .app-search-field input {
-  min-width: min(620px, 100%);
-}
-
-body.desktop-product-auth .app-toolbar-hint {
-  text-align: right;
-  max-width: 24rem;
 }
 
 body.desktop-product-auth .desktop-page .section-head h2,
@@ -2424,23 +2347,6 @@ body.desktop-product-auth .desktop-page[data-page="admin"] .operation-tab-bar {
 
 body.desktop-product-auth #adminPanel .section-head {
   margin-bottom: var(--backend-space-md);
-}
-
-body.desktop-backend-body:not(.desktop-product-auth) #authHero {
-  padding: 1.65rem 1.7rem;
-}
-
-body.desktop-backend-body:not(.desktop-product-auth) .hero-copy {
-  display: grid;
-  gap: 0.9rem;
-}
-
-body.desktop-backend-body:not(.desktop-product-auth) .auth-proof-grid {
-  margin-top: 0.35rem;
-}
-
-body.desktop-backend-body:not(.desktop-product-auth) #authSection > article {
-  padding: 1.45rem;
 }
 
 @keyframes fade-slide-in {

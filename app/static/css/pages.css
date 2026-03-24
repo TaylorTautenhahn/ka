@@ -2160,20 +2160,20 @@ body.desktop-product-auth .rushee-create-panel {
 body.desktop-product-auth .rushee-workspace-grid {
   display: grid;
   gap: var(--backend-shell-gap);
-  grid-template-columns: minmax(0, 1.18fr) minmax(460px, 0.96fr);
+  grid-template-columns: 1fr;
   align-items: start;
 }
 
 body.desktop-product-auth .rushee-inspector-panel {
-  position: sticky;
-  top: 1rem;
-  max-height: calc(100vh - 2rem);
-  overflow: auto;
+  position: relative;
+  top: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 body.desktop-product-auth .rushee-inspector-grid {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
   gap: var(--backend-shell-gap);
 }
 
@@ -2214,8 +2214,8 @@ body.desktop-product-auth .rushee-inspector-column-primary {
 
 body.desktop-product-auth .rushee-inspector-column-secondary {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--backend-shell-gap);
+  grid-template-columns: 1fr;
+  gap: var(--backend-space-sm);
   align-content: start;
 }
 
@@ -2590,6 +2590,10 @@ body.desktop-product-auth #adminPanel .section-head {
   }
 
   body.desktop-product-auth .meetings-compare-selectors {
+    grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .rushee-inspector-grid {
     grid-template-columns: 1fr;
   }
 }

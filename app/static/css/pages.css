@@ -43,6 +43,36 @@ body.desktop-backend-body {
   --backend-stack-gap: 0.82rem;
 }
 
+body.desktop-backend-body:not(.desktop-product-auth) {
+  --ink: #eef6ff;
+  --ink-soft: #a8bfd8;
+  --heading: #f4f8fc;
+  background:
+    radial-gradient(circle at 8% 6%, rgba(var(--accent-rgb), 0.18), transparent 32%),
+    radial-gradient(circle at 90% 0%, rgba(var(--gold-rgb), 0.08), transparent 28%),
+    radial-gradient(circle at 86% 88%, rgba(83, 184, 255, 0.08), transparent 34%),
+    linear-gradient(180deg, #07111d 0%, #0d1828 42%, #132338 100%);
+  color: var(--ink);
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) .aura {
+  filter: blur(110px);
+  opacity: 0.72;
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) .aura-one {
+  background: rgba(var(--accent-rgb), 0.22);
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) .aura-two {
+  background: rgba(var(--gold-rgb), 0.14);
+}
+
+body.desktop-backend-body:not(.desktop-product-auth) .noise {
+  opacity: 0.08;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.2) 0.45px, transparent 0.45px);
+}
+
 body.desktop-backend-body:not(.desktop-product-auth) .shell-app-shell {
   width: min(calc(100% - 1rem), 1480px);
 }

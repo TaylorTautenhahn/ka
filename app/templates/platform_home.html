@@ -6,7 +6,7 @@
 {% block body_class %}bb-page-organizations{% endblock %}
 
 {% block page_content %}
-<section class="bb-page-hero bb-reveal" data-delay="20">
+<section class="bb-page-hero bb-page-hero-org bb-reveal" data-delay="20">
   <p class="bb-kicker">Organization Login</p>
   <h1 class="bb-page-title">Choose your chapter workspace and continue into Command.</h1>
   <p class="bb-page-subtitle">
@@ -16,9 +16,23 @@
     <a class="bb-cta bb-cta-ghost" href="/">Back Home</a>
     <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
   </div>
+  <div class="bb-org-hero-metrics" aria-hidden="true">
+    <article>
+      <strong>{{ tenants|length }}</strong>
+      <span>Configured chapter workspace{{ '' if tenants|length == 1 else 's' }}</span>
+    </article>
+    <article>
+      <strong>Private</strong>
+      <span>Every login path stays scoped to one organization</span>
+    </article>
+    <article>
+      <strong>Connected</strong>
+      <span>Command, Meetings, Team, and Admin use the same operating flow</span>
+    </article>
+  </div>
 </section>
 
-<section class="bb-section bb-reveal" data-delay="28">
+<section class="bb-section bb-section-org-proof bb-reveal" data-delay="28">
   <div class="bb-trust-card-row bb-org-entry-strip">
     <article class="bb-bento-card">
       <p class="bb-bento-label">Private Workspace</p>
@@ -35,17 +49,23 @@
   </div>
 </section>
 
-<section class="bb-section bb-reveal" data-delay="35">
+<section class="bb-section bb-org-directory-section bb-reveal" data-delay="35">
   <div class="bb-section-head">
     <p class="bb-kicker">Available Workspaces</p>
     <h2>Open the right chapter workspace without crossing organization data.</h2>
   </div>
-  <div class="bb-org-search-row">
+  <div class="bb-org-search-row bb-org-search-shell">
     <label class="bb-org-search-field">
       <span>Search organizations</span>
       <input id="bbOrgSearchInput" type="search" placeholder="Search by chapter name, display name, or slug" autocomplete="off" />
     </label>
-    <p id="bbOrgSearchCount" class="bb-page-subtitle">Showing {{ tenants|length }} organization{{ '' if tenants|length == 1 else 's' }}.</p>
+    <div class="bb-org-search-meta">
+      <p id="bbOrgSearchCount" class="bb-page-subtitle">Showing {{ tenants|length }} organization{{ '' if tenants|length == 1 else 's' }}.</p>
+      <div class="bb-org-search-pills" aria-hidden="true">
+        <span>Private workspace paths</span>
+        <span>One Command system</span>
+      </div>
+    </div>
   </div>
   <div class="bb-org-grid">
     {% for tenant in tenants %}
@@ -61,6 +81,10 @@
             <strong>{{ tenant.display_name }}</strong>
             <p>{{ tenant.chapter_name }}</p>
           </div>
+        </div>
+        <div class="bb-org-card-status" aria-hidden="true">
+          <span>Private workspace</span>
+          <span>Command + Meetings</span>
         </div>
         <div class="bb-chip-row bb-chip-row-org">
           <span>{{ tenant.org_type }}</span>

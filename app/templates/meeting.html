@@ -19,7 +19,10 @@
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/meeting.js" defer></script>
   </head>
-  <body data-app-config='{{ app_config | tojson | forceescape }}'>
+  <body class="desktop-backend-body desktop-product-auth meeting-route-body meeting-packet-page" data-app-config='{{ app_config | tojson | forceescape }}'>
+    <div class="aura aura-one"></div>
+    <div class="aura aura-two"></div>
+    <div class="noise"></div>
     <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
       <div class="pwa-splash-card">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
@@ -33,13 +36,27 @@
         <div class="app-frame">
           <aside class="panel app-sidebar">
             <div class="app-sidebar-brand">
-              {% if app_config.logo_path %}
-              <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-              {% endif %}
-              <div>
-                <p class="eyebrow">{{ app_config.chapter_name }}</p>
-                <h2>Meetings</h2>
-                <p class="muted">Packet detail inside the Meetings workflow.</p>
+              <div class="app-sidebar-brand-top">
+                <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="app-shell-mark" />
+                <div>
+                  <p class="eyebrow">BidBoard</p>
+                  <strong>Recruitment Command</strong>
+                </div>
+              </div>
+              <div class="app-sidebar-tenant-card">
+                {% if app_config.logo_path %}
+                <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+                {% endif %}
+                <div>
+                  <p class="eyebrow">{{ app_config.chapter_name }}</p>
+                  <h2>Meeting Packet</h2>
+                  <p class="muted">Discussion-ready packet detail inside Meetings.</p>
+                </div>
+              </div>
+              <div class="app-sidebar-meta">
+                <span>Packet Detail</span>
+                <span>Touchpoint History</span>
+                <span>PDF Export</span>
               </div>
             </div>
 
@@ -59,6 +76,11 @@
                 <p class="eyebrow">Meetings</p>
                 <h2>Meeting Packet</h2>
                 <p class="muted">A packet drill-down inside Meetings with trend-backed review, touchpoint context, and PDF export.</p>
+                <div class="app-topbar-pills">
+                  <span>Trend-backed review</span>
+                  <span>Comment timeline</span>
+                  <span>Shortlist aware</span>
+                </div>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
@@ -71,7 +93,7 @@
               </div>
             </header>
 
-            <section class="panel app-toolbar">
+            <section class="panel app-toolbar meeting-toolbar">
               <div class="app-search-field">
                 <label>
                   Rushee
@@ -79,13 +101,38 @@
                 </label>
               </div>
               <div class="action-row app-toolbar-actions">
+                <div class="app-toolbar-status" aria-hidden="true">
+                  <span>Live pin state</span>
+                  <span>Touchpoint context</span>
+                  <span>Ready for export</span>
+                </div>
                 <button id="meetingLoadBtn" type="button">Load Packet</button>
                 <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="quick-nav-link">Back to Meetings Queue</a>
               </div>
             </section>
 
-            <section id="meetingPacket" class="panel meeting-view packet-detail-shell">
-              <p class="muted">Select a rushee and click Load Packet.</p>
+            <section id="meetingPacket" class="panel meeting-view packet-detail-shell meeting-packet-panel">
+              <div class="meeting-packet-empty">
+                <div>
+                  <p class="eyebrow">Packet Ready</p>
+                  <h3>Select a rushee and load the full discussion view.</h3>
+                  <p class="muted">Weighted trend, comment history, touchpoint notes, and member-fit context appear here in one meeting-ready packet.</p>
+                </div>
+                <div class="meeting-packet-empty-grid">
+                  <article class="card">
+                    <strong>Trend History</strong>
+                    <p>Long-term scoring movement with rank and percentile context.</p>
+                  </article>
+                  <article class="card">
+                    <strong>Touchpoint Notes</strong>
+                    <p>Every lunch log, comment, and timeline event in one place.</p>
+                  </article>
+                  <article class="card">
+                    <strong>Decision Support</strong>
+                    <p>Best member matches, linked rushees, and quick navigation paths.</p>
+                  </article>
+                </div>
+              </div>
             </section>
           </div>
         </div>

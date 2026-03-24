@@ -606,6 +606,20 @@ def main() -> None:
                 raise AssertionError("Officer search should not expose head-only commands.")
             checks.append("Global search API works")
 
+            response = client.get("/kappaalphaorder/api/search/global?q=alex%20carter")
+            expect_status(response, 200, "Global search full-name API")
+            full_name_results = response.json().get("pnms", [])
+            if not any(str(item.get("name") or "").lower() == "alex carter" for item in full_name_results):
+                raise AssertionError("Global search should match full-name PNM queries.")
+            checks.append("Global search full-name matching works")
+
+            response = client.get("/kappaalphaorder/api/search/global?q=head%20officer")
+            expect_status(response, 200, "Global search member full-name API")
+            member_full_name_results = response.json().get("members", [])
+            if not any(item.get("username") == "headseed" for item in member_full_name_results):
+                raise AssertionError("Global search should match member full-name queries.")
+            checks.append("Global search member full-name matching works")
+
             response = client.get("/kappaalphaorder/api/search/global?q=touchpoint")
             expect_status(response, 200, "Global search command filtering API")
             touchpoint_search_payload = response.json()

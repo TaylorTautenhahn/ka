@@ -185,6 +185,41 @@ function formatTrendTimestamp(value) {
   return parsed.toLocaleString();
 }
 
+function requestedPnmIdFromQuery() {
+  const pnmId = Number(new URLSearchParams(window.location.search).get("pnm_id") || 0);
+  return pnmId > 0 ? pnmId : null;
+}
+
+function syncMeetingPacketRoute(pnmId, historyMode = "replace") {
+  const mode = String(historyMode || "replace").trim().toLowerCase();
+  if (mode === "none") {
+    return;
+  }
+  const url = new URL(window.location.href);
+  const selectedId = Number(pnmId || 0);
+  if (selectedId > 0) {
+    url.searchParams.set("pnm_id", String(selectedId));
+  } else {
+    url.searchParams.delete("pnm_id");
+  }
+  const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextUrl === currentUrl) {
+    return;
+  }
+  if (mode === "push") {
+    window.history.pushState({}, "", nextUrl);
+    return;
+  }
+  window.history.replaceState({}, "", nextUrl);
+}
+
+function clearPacket(message = "Select a rushee to load a meeting packet.") {
+  currentPnmId = null;
+  currentPacketLabel = "";
+  packetEl.innerHTML = `<p class="muted">${escapeHtml(message)}</p>`;
+}
+
 function renderTrendChart(points) {
   if (!points || points.length < 2) {
     return '<p class="muted">Trend chart appears after at least two rating updates.</p>';
@@ -258,12 +293,17 @@ function renderCategoryRankingBars(rankings) {
       const pointsFromLeader = Number.isFinite(Number(row.points_from_leader)) ? Number(row.points_from_leader) : 0;
       const leaderLabel = pointsFromLeader <= 0 ? "Leader" : `${pointsFromLeader.toFixed(2)} behind`;
       return `
-        <div class="meeting-bar-row" style="--bar-width: ${percent.toFixed(1)}%; --bar-delay: ${index * 45}ms;">
+        <div class="meeting-bar-row">
           <div class="meeting-bar-head">
             <strong>${escapeHtml(row.label || row.field || "Category")}</strong>
             <span>${value.toFixed(2)} / ${max}</span>
           </div>
-          <div class="meeting-bar-track"><span class="meeting-bar-fill"></span></div>
+          <div class="meeting-bar-track">
+            <svg class="meeting-bar-track-svg" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+              <rect class="meeting-bar-track-base" x="0" y="0" width="100" height="10" rx="5" ry="5"></rect>
+              <rect class="meeting-bar-fill-rect" x="0" y="0" width="${percent.toFixed(1)}" height="10" rx="5" ry="5"></rect>
+            </svg>
+          </div>
           <div class="meeting-bar-meta">
             <span>Rank #${rank || "-"}${cohort ? ` / ${cohort}` : ""}</span>
             <span>${percentile.toFixed(1)} percentile</span>
@@ -478,6 +518,12 @@ function renderPacket(payload) {
     summary && Number.isFinite(Number(summary.weighted_total_percentile))
       ? `${Number(summary.weighted_total_percentile).toFixed(1)} percentile`
       : "Percentile N/A";
+  const interestsText = Array.isArray(pnm.interests) && pnm.interests.length
+    ? pnm.interests.map((item) => escapeHtml(item)).join(", ")
+    : "No interests tagged";
+  const contactText = pnm.phone_number ? escapeHtml(pnm.phone_number) : "No phone on file";
+  const instagramText = pnm.instagram_handle ? escapeHtml(pnm.instagram_handle) : "No Instagram linked";
+  const notesText = pnm.notes ? escapeHtml(pnm.notes) : "No notes recorded yet.";
   const photoMarkup = pnm.photo_url
     ? `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}" class="meeting-photo large" loading="lazy" />`
     : '<div class="photo-placeholder large">No photo uploaded.</div>';
@@ -573,13 +619,38 @@ function renderPacket(payload) {
     </div>
     <div class="meeting-header">
       ${photoMarkup}
-      <div>
-        <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
-        <p class="muted">${escapeHtml(pnm.hometown)} | ${escapeHtml(pnm.class_year)} | ${escapeHtml(pnm.instagram_handle)} | ${escapeHtml(pnm.phone_number || "No phone")}</p>
-        <p class="muted">Interests: ${pnm.interests.map((item) => escapeHtml(item)).join(", ")} | Stereotype: ${escapeHtml(pnm.stereotype)}</p>
-        <p class="muted">Notes: ${escapeHtml(pnm.notes || "None")}</p>
-        <p class="muted">Assigned Rush Officer: ${escapeHtml(assignedOfficer)}</p>
-        <p class="muted">Linked With: ${escapeHtml(linkedSummaryText)}</p>
+      <div class="meeting-hero-copy">
+        <div>
+          <p class="eyebrow">Packet Read</p>
+          <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
+          <p class="muted">Meeting-ready context, linked packet relationships, and rush-team notes in one review surface.</p>
+        </div>
+        <div class="meeting-meta-grid">
+          <article class="meeting-meta-card">
+            <span>Profile</span>
+            <strong>${escapeHtml(pnm.hometown)} | ${escapeHtml(pnm.class_year)}</strong>
+            <p>Stereotype: ${escapeHtml(pnm.stereotype || "Not set")} | Interests: ${interestsText}</p>
+          </article>
+          <article class="meeting-meta-card">
+            <span>Contact</span>
+            <strong>${instagramText}</strong>
+            <p>${contactText}</p>
+          </article>
+          <article class="meeting-meta-card">
+            <span>Assignment</span>
+            <strong>${escapeHtml(assignedOfficer)}</strong>
+            <p>${escapeHtml(weightedRankLabel)} | ${escapeHtml(weightedPercentileLabel)}</p>
+          </article>
+          <article class="meeting-meta-card">
+            <span>Linked With</span>
+            <strong>${escapeHtml(linkedSummaryText)}</strong>
+            <p>${escapeHtml(pinMeta)}</p>
+          </article>
+        </div>
+        <div class="meeting-note-callout">
+          <span>Notes</span>
+          <p>${notesText}</p>
+        </div>
         ${linkedActionMarkup}
       </div>
     </div>
@@ -593,7 +664,8 @@ function renderPacket(payload) {
       <article class="card"><strong>Highest / Lowest</strong><p>${summary.highest_rating_total ?? "-"} / ${summary.lowest_rating_total ?? "-"}</p></article>
       <article class="card"><strong>Total Touchpoints</strong><p>${summary.total_lunches}</p></article>
     </div>
-    <article class="list-column">
+    <div class="meeting-analytics-grid">
+    <article class="list-column meeting-section-card">
       <div class="entry-title">
         <h3>Long-Term Rating Trend</h3>
         <span class="${trendDeltaClass}">${trendDeltaLabel}</span>
@@ -601,7 +673,7 @@ function renderPacket(payload) {
       <p class="muted">Weighted total trajectory over time from rating history events: ${trendEvents}</p>
       ${renderTrendChart(trendPoints)}
     </article>
-    <article class="list-column">
+    <article class="list-column meeting-section-card">
       <div class="entry-title">
         <h3>Category Ranking Averages</h3>
         <span class="warn">${Number(summary.cohort_size || 0)} Rushees</span>
@@ -609,31 +681,32 @@ function renderPacket(payload) {
       <p class="muted">Weighted category averages with standing across the active roster.</p>
       ${renderCategoryRankingBars(categoryRankings)}
     </article>
-    <div class="grid-two">
-      <article class="list-column">
+    </div>
+    <div class="grid-two meeting-detail-grid">
+      <article class="list-column meeting-section-card">
         <h3>Ratings</h3>
         <ul class="meeting-list">${ratingsMarkup}</ul>
       </article>
-      <article class="list-column">
+      <article class="list-column meeting-section-card">
         <h3>Touchpoints</h3>
         <ul class="meeting-list">${lunchMarkup}</ul>
       </article>
     </div>
-    <div class="grid-two">
-      <article class="list-column">
+    <div class="grid-two meeting-comment-grid">
+      <article class="list-column meeting-section-card">
         <h3>All Rating Update Comments</h3>
         <ul class="meeting-list meeting-list-detailed">${ratingCommentMarkup}</ul>
       </article>
-      <article class="list-column">
+      <article class="list-column meeting-section-card">
         <h3>All Touchpoint Notes</h3>
         <ul class="meeting-list meeting-list-detailed">${lunchCommentMarkup}</ul>
       </article>
     </div>
-    <article class="list-column">
+    <article class="list-column meeting-section-card">
       <h3>Rush Comment Timeline</h3>
       ${renderRushCommentTimeline(rushCommentTimeline)}
     </article>
-    <article class="list-column">
+    <article class="list-column meeting-section-card">
       <h3>Best Member Matches</h3>
       <ul class="meeting-list">${matchMarkup}</ul>
     </article>
@@ -669,7 +742,7 @@ async function handleMeetingPinToggle(event) {
   showToast(wasPinned ? "Removed from Meetings pins." : "Pinned for Meetings.");
 }
 
-async function loadPacket() {
+async function loadPacket(options = {}) {
   const selected = Number(pnmSelect.value || 0);
   if (!selected) {
     showToast("Select a rushee first.");
@@ -679,6 +752,7 @@ async function loadPacket() {
   try {
     const payload = await api(`/api/pnms/${selected}/meeting`);
     renderPacket(payload);
+    syncMeetingPacketRoute(selected, options.historyMode || "replace");
   } catch (error) {
     packetEl.innerHTML = '<p class="muted">Unable to load meeting packet.</p>';
     showToast(error.message || "Unable to load meeting packet.");
@@ -696,6 +770,7 @@ async function loadPnms() {
   if (currentPnmId && pnms.find((item) => item.pnm_id === currentPnmId)) {
     pnmSelect.value = String(currentPnmId);
   }
+  return pnms;
 }
 
 async function ensureSession() {
@@ -729,13 +804,15 @@ async function handleLogout() {
 }
 
 function attachEvents() {
-  loadBtn.addEventListener("click", loadPacket);
+  loadBtn.addEventListener("click", () => {
+    loadPacket({ historyMode: "push" });
+  });
   refreshBtn.addEventListener("click", async () => {
     try {
       await loadPnms();
       if (currentPnmId) {
         pnmSelect.value = String(currentPnmId);
-        await loadPacket();
+        await loadPacket({ historyMode: "none" });
       }
       showToast("Refreshed.");
     } catch (error) {
@@ -767,10 +844,18 @@ function attachEvents() {
     }
     currentPnmId = linkedId;
     pnmSelect.value = String(linkedId);
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.set("pnm_id", String(linkedId));
-    window.history.replaceState({}, "", nextUrl.toString());
-    await loadPacket();
+    await loadPacket({ historyMode: "push" });
+  });
+  window.addEventListener("popstate", async () => {
+    currentPnmId = requestedPnmIdFromQuery();
+    const pnms = await loadPnms();
+    if (currentPnmId && pnms.some((item) => Number(item.pnm_id) === Number(currentPnmId))) {
+      pnmSelect.value = String(currentPnmId);
+      await loadPacket({ historyMode: "none" });
+      return;
+    }
+    pnmSelect.value = "";
+    clearPacket();
   });
 }
 
@@ -780,14 +865,16 @@ async function init() {
     return;
   }
   await loadMeetingPins();
-  const fromQuery = Number(new URLSearchParams(window.location.search).get("pnm_id") || 0);
+  const fromQuery = Number(requestedPnmIdFromQuery() || 0);
   if (fromQuery) {
     currentPnmId = fromQuery;
   }
   await loadPnms();
   if (currentPnmId) {
     pnmSelect.value = String(currentPnmId);
-    await loadPacket();
+    await loadPacket({ historyMode: "none" });
+  } else {
+    clearPacket();
   }
   attachEvents();
 }

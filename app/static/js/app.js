@@ -628,6 +628,8 @@ const state = {
     compareB: null,
     compareSummaryA: null,
     compareSummaryB: null,
+    compareRequestA: 0,
+    compareRequestB: 0,
   },
   adminOverview: {
     storage: null,
@@ -1268,10 +1270,6 @@ function desktopRoutePathForPage(page) {
 }
 
 function currentRequestedDesktopPage() {
-  const fromConfig = mapDesktopRouteToPage(APP_CONFIG.desktop_page);
-  if (fromConfig) {
-    return fromConfig;
-  }
   const viewRequested = mapDesktopRouteToPage(new URLSearchParams(window.location.search).get("view"));
   if (viewRequested) {
     return viewRequested;
@@ -1283,13 +1281,86 @@ function currentRequestedDesktopPage() {
   if (fromPath) {
     return fromPath;
   }
+  const fromConfig = mapDesktopRouteToPage(APP_CONFIG.desktop_page);
+  if (fromConfig) {
+    return fromConfig;
+  }
   return DEFAULT_DESKTOP_PAGE;
+}
+
+function normalizeDesktopNavigationOptions(options) {
+  if (typeof options === "boolean") {
+    return {
+      historyMode: options ? "replace" : "none",
+      refresh: Boolean(options),
+      pnmId: null,
+    };
+  }
+  const config = options && typeof options === "object" ? options : {};
+  const rawMode = String(config.historyMode || "replace").trim().toLowerCase();
+  const historyMode = rawMode === "push" || rawMode === "replace" ? rawMode : "none";
+  return {
+    historyMode,
+    refresh: config.refresh !== undefined ? Boolean(config.refresh) : historyMode !== "none",
+    pnmId: Number(config.pnmId || 0) || null,
+  };
+}
+
+function desktopRouteUrlForPage(page, options = {}) {
+  const targetPath = desktopRoutePathForPage(page);
+  const url = new URL(window.location.href);
+  url.pathname = targetPath;
+  url.hash = "";
+  url.searchParams.delete("notice");
+  if (page === "rushees") {
+    const selectedPnmId = Number(options.pnmId || state.selectedPnmId || 0);
+    if (selectedPnmId > 0) {
+      url.searchParams.set("pnm_id", String(selectedPnmId));
+    } else {
+      url.searchParams.delete("pnm_id");
+    }
+  } else {
+    url.searchParams.delete("pnm_id");
+  }
+  const nextQuery = url.searchParams.toString();
+  return `${url.pathname}${nextQuery ? `?${nextQuery}` : ""}${url.hash || ""}`;
+}
+
+function syncDesktopRoute(options = {}) {
+  const page = options.page || state.activeDesktopPage || DEFAULT_DESKTOP_PAGE;
+  const historyMode = String(options.historyMode || "replace").trim().toLowerCase();
+  if (historyMode === "none") {
+    return false;
+  }
+  const nextUrl = desktopRouteUrlForPage(page, options);
+  const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash || ""}`;
+  if (!nextUrl || currentUrl === nextUrl) {
+    return false;
+  }
+  if (historyMode === "push") {
+    window.history.pushState({}, "", nextUrl);
+    return true;
+  }
+  window.history.replaceState({}, "", nextUrl);
+  return true;
+}
+
+function syncSelectedRusheeRoute(historyMode = "replace") {
+  if (state.activeDesktopPage !== "rushees") {
+    return;
+  }
+  syncDesktopRoute({
+    page: "rushees",
+    historyMode,
+    pnmId: state.selectedPnmId,
+  });
 }
 
 function setActiveDesktopPage(page, updateUrl = true) {
   if (!desktopPages.length) {
     return;
   }
+  const navigation = normalizeDesktopNavigationOptions(updateUrl);
   const available = new Set(availableDesktopPages());
   let target = available.has(page) ? page : DEFAULT_DESKTOP_PAGE;
   if (target === "admin" && !roleCanUseAdminPanel()) {
@@ -1305,19 +1376,12 @@ function setActiveDesktopPage(page, updateUrl = true) {
   updateWorkspaceHeader();
   closeAppMenus();
 
-  if (!updateUrl) {
-    return;
-  }
-  const shouldRefresh = Boolean(state.user);
-  const nextPath = desktopRoutePathForPage(target);
-  const current = window.location.pathname;
-  if (!nextPath || current === nextPath) {
-    if (shouldRefresh) {
-      refreshByActivePage().catch(() => {});
-    }
-    return;
-  }
-  window.history.replaceState({}, "", nextPath);
+  syncDesktopRoute({
+    page: target,
+    historyMode: navigation.historyMode,
+    pnmId: navigation.pnmId,
+  });
+  const shouldRefresh = Boolean(state.user && navigation.refresh);
   if (shouldRefresh) {
     refreshByActivePage().catch(() => {});
   }
@@ -1476,6 +1540,30 @@ function requestedPnmIdFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const pnmId = Number(params.get("pnm_id") || 0);
   return pnmId > 0 ? pnmId : null;
+}
+
+function pushDesktopRoute(page, params = {}) {
+  const nextUrl = new URL(window.location.origin + desktopRoutePathForPage(page));
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value == null || value === "") {
+      return;
+    }
+    nextUrl.searchParams.set(key, String(value));
+  });
+  const nextRelativeUrl = `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`;
+  const currentRelativeUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+  if (nextRelativeUrl === currentRelativeUrl) {
+    return;
+  }
+  window.history.pushState({}, "", nextRelativeUrl);
+}
+
+function navigateDesktopPage(page, params = {}) {
+  setActiveDesktopPage(page, {
+    historyMode: "push",
+    refresh: Boolean(state.user),
+    pnmId: Number((params && params.pnm_id) || 0) || null,
+  });
 }
 
 function roleCanSeeRaters() {
@@ -4039,16 +4127,28 @@ function renderMeetingCompareCard(payload, fallbackLabel) {
 async function loadMeetingCompareSummary(slot) {
   const key = slot === "B" ? "compareB" : "compareA";
   const targetId = Number(state.meetingsWorkspace[key] || 0);
+  const requestKey = `compareRequest${slot}`;
+  const summaryKey = `compareSummary${slot}`;
+  state.meetingsWorkspace[requestKey] = Number(state.meetingsWorkspace[requestKey] || 0) + 1;
+  const requestId = state.meetingsWorkspace[requestKey];
   if (!targetId) {
-    state.meetingsWorkspace[`compareSummary${slot}`] = null;
+    state.meetingsWorkspace[summaryKey] = null;
     renderMeetingsWorkspace();
     return;
   }
+  state.meetingsWorkspace[summaryKey] = null;
+  renderMeetingsWorkspace();
   try {
     const payload = await api(`/api/pnms/${targetId}/meeting`);
-    state.meetingsWorkspace[`compareSummary${slot}`] = payload;
+    if (state.meetingsWorkspace[requestKey] !== requestId) {
+      return;
+    }
+    state.meetingsWorkspace[summaryKey] = payload;
   } catch {
-    state.meetingsWorkspace[`compareSummary${slot}`] = null;
+    if (state.meetingsWorkspace[requestKey] !== requestId) {
+      return;
+    }
+    state.meetingsWorkspace[summaryKey] = null;
   }
   renderMeetingsWorkspace();
 }
@@ -4139,7 +4239,7 @@ function focusSoon(target) {
 }
 
 function openAdminStorageView() {
-  setActiveDesktopPage("admin");
+  navigateDesktopPage("admin");
   setAdminTab("storage");
 }
 
@@ -4172,7 +4272,7 @@ function performCommandAction(action, context = null) {
       showToast("Only rush officers can add rushees.");
       return;
     }
-    setActiveDesktopPage("rushees");
+    navigateDesktopPage("rushees");
     focusSoon(document.getElementById("pnmFirstName"));
     return;
   }
@@ -4187,7 +4287,7 @@ function performCommandAction(action, context = null) {
         0
     );
     if (state.activeDesktopPage !== "calendar" && !selectedPnmId) {
-      setActiveDesktopPage("calendar");
+      navigateDesktopPage("calendar");
       setOperationsTab("timeline");
     }
     openTouchpointDrawer({
@@ -4201,7 +4301,7 @@ function performCommandAction(action, context = null) {
       showToast("Only Head Rush Officers can create events from search.");
       return;
     }
-    setActiveDesktopPage("calendar");
+    navigateDesktopPage("calendar");
     setOperationsTab("timeline");
     focusSoon(rushEventTitle);
     return;
@@ -4229,7 +4329,7 @@ function performCommandAction(action, context = null) {
       showToast("Meetings workspace is limited to rush officers.");
       return;
     }
-    setActiveDesktopPage("meetings");
+    navigateDesktopPage("meetings");
   }
 }
 
@@ -4266,8 +4366,8 @@ function renderCommandPaletteResults() {
     .map(
       (item) => `
         <button type="button" class="command-palette-result" data-command-open-member="${Number(item.user_id)}">
-          <strong>${escapeHtml(item.username)}</strong>
-          <div class="muted">${escapeHtml(item.role || "")}</div>
+          <strong>${escapeHtml(item.name || item.username || "Unknown Member")}</strong>
+          <div class="muted">${escapeHtml(item.username || "")}${item.role ? ` | ${escapeHtml(item.role)}` : ""}</div>
         </button>
       `
     )
@@ -5496,6 +5596,7 @@ async function loadRusheesWorkspace() {
   if (!state.selectedPnmId && state.pnms.length) {
     state.selectedPnmId = state.pnms[0].pnm_id;
   }
+  syncSelectedRusheeRoute("replace");
   renderPnmTable();
   renderPnmBoard();
   renderAssignmentControls();
@@ -5558,12 +5659,30 @@ async function loadMeetingsWorkspace() {
   state.meetingsWorkspace.candidates = payload.candidates || [];
   state.meetingsWorkspace.pins = payload.pins || [];
   applyMeetingPins(payload.pins || []);
-  state.meetingsWorkspace.compareDefaults = payload.compare_defaults || [];
-  if (!state.meetingsWorkspace.compareA && state.meetingsWorkspace.compareDefaults[0]) {
-    state.meetingsWorkspace.compareA = Number(state.meetingsWorkspace.compareDefaults[0]);
+  const candidateIds = (state.meetingsWorkspace.candidates || [])
+    .map((item) => Number(item.pnm_id || 0))
+    .filter((value) => value > 0);
+  const candidateIdSet = new Set(candidateIds);
+  const preferredCompareIds = [...new Set((payload.compare_defaults || [])
+    .map((value) => Number(value || 0))
+    .filter((value) => candidateIdSet.has(value))
+    .concat(candidateIds))];
+  state.meetingsWorkspace.compareDefaults = preferredCompareIds;
+  let compareA = Number(state.meetingsWorkspace.compareA || 0);
+  if (!candidateIdSet.has(compareA)) {
+    compareA = preferredCompareIds[0] || null;
   }
-  if (!state.meetingsWorkspace.compareB && state.meetingsWorkspace.compareDefaults[1]) {
-    state.meetingsWorkspace.compareB = Number(state.meetingsWorkspace.compareDefaults[1]);
+  let compareB = Number(state.meetingsWorkspace.compareB || 0);
+  if (!candidateIdSet.has(compareB) || (compareA && compareB === compareA)) {
+    compareB = preferredCompareIds.find((value) => value !== compareA) || null;
+  }
+  state.meetingsWorkspace.compareA = compareA || null;
+  state.meetingsWorkspace.compareB = compareB || null;
+  if (Number((state.meetingsWorkspace.compareSummaryA && state.meetingsWorkspace.compareSummaryA.pnm && state.meetingsWorkspace.compareSummaryA.pnm.pnm_id) || 0) !== Number(state.meetingsWorkspace.compareA || 0)) {
+    state.meetingsWorkspace.compareSummaryA = null;
+  }
+  if (Number((state.meetingsWorkspace.compareSummaryB && state.meetingsWorkspace.compareSummaryB.pnm && state.meetingsWorkspace.compareSummaryB.pnm.pnm_id) || 0) !== Number(state.meetingsWorkspace.compareB || 0)) {
+    state.meetingsWorkspace.compareSummaryB = null;
   }
   renderPnmSelectOptions();
   renderMeetingsWorkspace();
@@ -6662,6 +6781,7 @@ async function handlePnmTableClick(event) {
 
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
+  syncSelectedRusheeRoute("replace");
   renderPnmTable();
   applyRatingFormForSelected();
   await loadPnmDetail(pnmId);
@@ -6693,14 +6813,11 @@ async function handleGlobalOpenPnmClick(event) {
   if (!pnmId) {
     return;
   }
-  setActiveDesktopPage("rushees");
   state.selectedPnmId = pnmId;
+  state.headAssignmentPnmId = pnmId;
+  pushDesktopRoute("rushees", { pnm_id: pnmId });
+  setActiveDesktopPage("rushees", false);
   await loadRusheesWorkspace();
-  state.selectedPnmId = pnmId;
-  renderPnmTable();
-  renderPnmBoard();
-  applyRatingFormForSelected();
-  await loadPnmDetail(pnmId);
 }
 
 function handleSeasonKickoffJumpClick(event) {
@@ -6708,7 +6825,7 @@ function handleSeasonKickoffJumpClick(event) {
   if (!button) {
     return;
   }
-  setActiveDesktopPage("admin");
+  navigateDesktopPage("admin");
   setAdminTab(button.dataset.kickoffTab || "season");
 }
 
@@ -6742,17 +6859,11 @@ function handleCommandPaletteResultsClick(event) {
     const pnmId = Number(openPnm.dataset.commandOpenPnm || 0);
     if (pnmId) {
       closeCommandPalette();
-      setActiveDesktopPage("rushees");
       state.selectedPnmId = pnmId;
-      loadRusheesWorkspace()
-        .then(() => {
-          state.selectedPnmId = pnmId;
-          renderPnmTable();
-          renderPnmBoard();
-          applyRatingFormForSelected();
-          return loadPnmDetail(pnmId);
-        })
-        .catch(() => {});
+      state.headAssignmentPnmId = pnmId;
+      pushDesktopRoute("rushees", { pnm_id: pnmId });
+      setActiveDesktopPage("rushees", false);
+      loadRusheesWorkspace().catch(() => {});
     }
     return;
   }
@@ -6761,7 +6872,8 @@ function handleCommandPaletteResultsClick(event) {
     const userId = Number(openMember.dataset.commandOpenMember || 0);
     if (userId) {
       closeCommandPalette();
-      setActiveDesktopPage("team");
+      pushDesktopRoute("team");
+      setActiveDesktopPage("team", false);
       state.selectedMemberId = userId;
       loadTeamWorkspace().catch(() => {});
     }
@@ -6905,17 +7017,14 @@ async function handleSameStatePnmsClick(event) {
     };
   }
   syncFilterInputsFromState();
-  await loadPnms();
-  if (!state.pnms.some((pnm) => Number(pnm.pnm_id) === pnmId)) {
-    showToast("Rushee not visible under current filters.");
-    return;
-  }
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
-  renderPnmTable();
-  applyRatingFormForSelected();
-  await loadPnmDetail(pnmId);
-  setActiveDesktopPage("rushees");
+  pushDesktopRoute("rushees", { pnm_id: pnmId });
+  setActiveDesktopPage("rushees", false);
+  await loadRusheesWorkspace();
+  if (!state.pnms.some((pnm) => Number(pnm.pnm_id) === pnmId)) {
+    showToast("Rushee not visible under current filters.");
+  }
 }
 
 async function handleAdminPnmEditorSubmit(event) {
@@ -8084,6 +8193,7 @@ function attachEvents() {
       return;
     }
     state.selectedPnmId = selectedId;
+    syncSelectedRusheeRoute("replace");
     renderPnmTable();
     applyRatingFormForSelected();
     await loadPnmDetail(selectedId);
@@ -8095,12 +8205,16 @@ function attachEvents() {
       if (!link) {
         return;
       }
-      setActiveDesktopPage((link.dataset.page || DEFAULT_DESKTOP_PAGE).toLowerCase(), false);
+      navigateDesktopPage((link.dataset.page || DEFAULT_DESKTOP_PAGE).toLowerCase());
     });
   }
 
   window.addEventListener("popstate", () => {
-    setActiveDesktopPage(currentRequestedDesktopPage(), false);
+    setActiveDesktopPage(currentRequestedDesktopPage(), {
+      historyMode: "none",
+      refresh: Boolean(state.user),
+      pnmId: requestedPnmIdFromQuery(),
+    });
   });
 
   if (tutorialLayer) {

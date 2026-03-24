@@ -54,6 +54,11 @@
                 <span>Meetings</span>
                 <span>Team Coordination</span>
               </div>
+              <div class="auth-entry-meta">
+                <span>Chapter-specific branding</span>
+                <span>Approval-based officer access</span>
+                <span>Member portal linked</span>
+              </div>
               <div id="heroStats" class="hero-stats hidden">
                 <article class="stat-card">
                   <p>Rushees Tracked</p>
@@ -91,8 +96,16 @@
         </header>
 
         <section id="authSection" class="panel auth-grid reveal delay-1">
-          <article>
-            <h2>Login</h2>
+          <article class="auth-panel auth-panel-login">
+            <div class="auth-panel-head">
+              <p class="eyebrow">Approved Access</p>
+              <h2>Login</h2>
+              <p class="muted">Sign in with your approved username and password.</p>
+            </div>
+            <div class="auth-panel-badges" aria-hidden="true">
+              <span>Remember this device</span>
+              <span>Scoped to this chapter</span>
+            </div>
             <form id="loginForm" class="stack">
               <label>
                 Username
@@ -108,16 +121,27 @@
               </label>
               <button type="submit">Sign In</button>
             </form>
-            <p class="muted">Sign in with your approved username and password.</p>
+            <div class="auth-inline-note">
+              <strong>Rush team access only</strong>
+              <span>Approved officers land in Command, Meetings, Operations, and Team with the same workspace context.</span>
+            </div>
             <p class="muted">
               Fraternity member and not on rush team?
               <a href="{{ app_config.member_base if app_config else '/member' }}">Use the Member Portal</a>.
             </p>
           </article>
 
-          <article>
-            <h2>Register New Rush Officer</h2>
-            <p class="muted">Register with username and password. Emoji is optional. Create, rate, and coordinate rushees after approval.</p>
+          <article class="auth-panel auth-panel-register">
+            <div class="auth-panel-head">
+              <p class="eyebrow">New Officer Setup</p>
+              <h2>Register New Rush Officer</h2>
+              <p class="muted">Register with username and password. Emoji is optional. Create, rate, and coordinate rushees after approval.</p>
+            </div>
+            <div class="auth-panel-badges" aria-hidden="true">
+              <span>Approval required</span>
+              <span>Emoji optional</span>
+              <span>Profile city + state</span>
+            </div>
             <form id="registerForm" class="stack">
               <label>
                 Username
@@ -144,18 +168,25 @@
               <button type="submit" class="secondary">Submit for Approval</button>
             </form>
             <div class="divider"></div>
-            <h3>Member Signup QR</h3>
-            <p class="muted">Share this with members so they can open the simplified member login and registration page.</p>
-            <div class="action-row">
-              <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
+            <div class="auth-member-signup auth-qr-panel">
+              <div>
+                <p class="eyebrow">Member Portal</p>
+                <h3>Member Signup QR</h3>
+                <p class="muted">Share this with members so they can open the simplified member login and registration page.</p>
+              </div>
+              <div class="action-row">
+                <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
+              </div>
+              <div class="auth-qr-frame">
+                <img
+                  id="memberSignupQrImage"
+                  class="signup-qr"
+                  src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
+                  alt="Member signup QR code"
+                  loading="lazy"
+                />
+              </div>
             </div>
-            <img
-              id="memberSignupQrImage"
-              class="signup-qr"
-              src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
-              alt="Member signup QR code"
-              loading="lazy"
-            />
           </article>
         </section>
       </section>

@@ -2447,7 +2447,9 @@ def instagram_avatar_fallback_url(instagram_handle: str | None) -> str | None:
     username = instagram_username_from_handle(instagram_handle)
     if not username:
         return None
-    return f"https://unavatar.io/instagram/{quote(username, safe='')}"
+    # Use a local placeholder in the app shell instead of a third-party avatar
+    # request so missing photos do not generate noisy browser errors.
+    return demo_pnm_placeholder_url()
 
 
 def demo_pnm_placeholder_url() -> str:
@@ -16871,7 +16873,7 @@ def global_search(
     q: str = Query(default="", min_length=1, max_length=120),
     user: sqlite3.Row = Depends(current_user),
 ) -> dict[str, Any]:
-    token = q.strip()
+    token = " ".join(q.strip().split())
     if not token:
         return {"query": "", "pnms": [], "members": [], "commands": []}
     like_token = f"%{token.lower()}%"
@@ -16893,25 +16895,30 @@ def global_search(
                 lower(p.pnm_code) LIKE ?
                 OR lower(p.first_name) LIKE ?
                 OR lower(p.last_name) LIKE ?
+                OR lower(trim(p.first_name || ' ' || p.last_name)) LIKE ?
                 OR lower(COALESCE(p.instagram_handle, '')) LIKE ?
                 OR lower(COALESCE(p.hometown, '')) LIKE ?
             ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
             LIMIT 8
             """,
-            (like_token, like_token, like_token, like_token, like_token),
+            (like_token, like_token, like_token, like_token, like_token, like_token),
         ).fetchall()
         user_rows: list[sqlite3.Row] = []
         if user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}:
             user_rows = conn.execute(
                 """
-                SELECT id, username, role, emoji
+                SELECT id, username, role, emoji, first_name, last_name
                 FROM users
                 WHERE is_approved = 1
-                  AND (lower(username) LIKE ? OR lower(role) LIKE ?)
+                  AND (
+                    lower(username) LIKE ?
+                    OR lower(role) LIKE ?
+                    OR lower(trim(COALESCE(first_name, '') || ' ' || COALESCE(last_name, ''))) LIKE ?
+                  )
                 ORDER BY username ASC
                 LIMIT 8
                 """,
-                (like_token, like_token),
+                (like_token, like_token, like_token),
             ).fetchall()
     return {
         "query": token,
@@ -16935,6 +16942,7 @@ def global_search(
             {
                 "user_id": int(row["id"]),
                 "username": row["username"],
+                "name": f"{row['first_name']} {row['last_name']}".strip(),
                 "role": row["role"],
                 "emoji": row["emoji"],
             }

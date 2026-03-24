@@ -11,80 +11,86 @@
             </div>
           </div>
           <div class="rushee-quick-actions-grid">
-            <section class="panel rushee-inline-panel rushee-create-panel">
-              <div class="section-head">
-                <h3>Create Rushee</h3>
+            <details class="panel rushee-inline-panel rushee-create-panel rushee-inline-drawer">
+              <summary class="rushee-create-summary">
+                <div>
+                  <h3>Create Rushee</h3>
+                  <p class="muted">Open the quick-add form when you need to seed a new rushee into the roster.</p>
+                </div>
+                <span class="rushee-inline-drawer-hint">Open Form</span>
+              </summary>
+              <div class="rushee-inline-drawer-body">
+                <form id="pnmForm" class="stack">
+                  <div class="inline-grid">
+                    <label>
+                      First name
+                      <input id="pnmFirstName" type="text" required />
+                    </label>
+                    <label>
+                      Last name
+                      <input id="pnmLastName" type="text" required />
+                    </label>
+                  </div>
+                  <div class="inline-grid">
+                    <label>
+                      Class year
+                      <select id="pnmClassYear" required>
+                        <option>F</option>
+                        <option>S</option>
+                        <option>J</option>
+                      </select>
+                    </label>
+                    <label>
+                      First event date
+                      <input id="pnmEventDate" type="date" required />
+                    </label>
+                  </div>
+                  <div class="inline-grid two-cols">
+                    <label>
+                      Hometown
+                      <input id="pnmHometown" type="text" required />
+                    </label>
+                    <label>
+                      State (optional)
+                      <input id="pnmState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" />
+                    </label>
+                  </div>
+                  <label>
+                    Phone number (optional)
+                    <input id="pnmPhone" type="text" placeholder="+1 555 123 4567" />
+                  </label>
+                  <label>
+                    Instagram handle
+                    <input id="pnmInstagram" type="text" required placeholder="@username" />
+                  </label>
+                  <label>
+                    Interests
+                    <div id="pnmInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
+                    <input id="pnmInterests" type="hidden" value="" />
+                    <p class="muted">Choose approved interest tags only.</p>
+                  </label>
+                  <label>
+                    Stereotype
+                    <div id="pnmStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
+                    <input id="pnmStereotype" type="hidden" value="" />
+                    <p class="muted">Choose one approved stereotype tag.</p>
+                  </label>
+                  <label>
+                    Lunch stats (optional)
+                    <input id="pnmLunchStats" type="text" placeholder="3 lunches this week" />
+                  </label>
+                  <label>
+                    Notes (optional)
+                    <textarea id="pnmNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea>
+                  </label>
+                  <label>
+                    Rushee photo (optional)
+                    <input id="pnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
+                  </label>
+                  <button type="submit">Add Rushee</button>
+                </form>
               </div>
-              <form id="pnmForm" class="stack">
-                <div class="inline-grid">
-                  <label>
-                    First name
-                    <input id="pnmFirstName" type="text" required />
-                  </label>
-                  <label>
-                    Last name
-                    <input id="pnmLastName" type="text" required />
-                  </label>
-                </div>
-                <div class="inline-grid">
-                  <label>
-                    Class year
-                    <select id="pnmClassYear" required>
-                      <option>F</option>
-                      <option>S</option>
-                      <option>J</option>
-                    </select>
-                  </label>
-                  <label>
-                    First event date
-                    <input id="pnmEventDate" type="date" required />
-                  </label>
-                </div>
-                <div class="inline-grid two-cols">
-                  <label>
-                    Hometown
-                    <input id="pnmHometown" type="text" required />
-                  </label>
-                  <label>
-                    State (optional)
-                    <input id="pnmState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" />
-                  </label>
-                </div>
-                <label>
-                  Phone number (optional)
-                  <input id="pnmPhone" type="text" placeholder="+1 555 123 4567" />
-                </label>
-                <label>
-                  Instagram handle
-                  <input id="pnmInstagram" type="text" required placeholder="@username" />
-                </label>
-                <label>
-                  Interests
-                  <div id="pnmInterestTags" class="tag-picker" aria-label="Default interest tags"></div>
-                  <input id="pnmInterests" type="hidden" value="" />
-                  <p class="muted">Choose approved interest tags only.</p>
-                </label>
-                <label>
-                  Stereotype
-                  <div id="pnmStereotypeTags" class="tag-picker" aria-label="Default stereotype tags"></div>
-                  <input id="pnmStereotype" type="hidden" value="" />
-                  <p class="muted">Choose one approved stereotype tag.</p>
-                </label>
-                <label>
-                  Lunch stats (optional)
-                  <input id="pnmLunchStats" type="text" placeholder="3 lunches this week" />
-                </label>
-                <label>
-                  Notes (optional)
-                  <textarea id="pnmNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea>
-                </label>
-                <label>
-                  Rushee photo (optional)
-                  <input id="pnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" />
-                </label>
-                <button type="submit">Add Rushee</button>
-              </form>
-            </section>
+            </details>
           </div>
         </section>
 

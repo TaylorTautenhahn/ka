@@ -109,11 +109,11 @@
             <form id="loginForm" class="stack">
               <label>
                 Username
-                <input id="loginUsername" type="text" required placeholder="Your approved username" />
+                <input id="loginUsername" type="text" required placeholder="Your approved username" autocomplete="username" />
               </label>
               <label>
                 Password
-                <input id="loginAccessCode" type="password" required placeholder="Enter password" />
+                <input id="loginAccessCode" type="password" required placeholder="Enter password" autocomplete="current-password" />
               </label>
               <label class="checkbox-line">
                 <input id="loginRememberMe" type="checkbox" />
@@ -145,7 +145,7 @@
             <form id="registerForm" class="stack">
               <label>
                 Username
-                <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" />
+                <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" autocomplete="username" />
               </label>
               <label>
                 Emoji (optional)
@@ -153,7 +153,7 @@
               </label>
               <label>
                 Password
-                <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" />
+                <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" autocomplete="new-password" />
               </label>
               <div class="inline-grid two-cols">
                 <label>

@@ -1204,10 +1204,12 @@ function setAuthView(isAuthenticated) {
   document.body.classList.toggle("desktop-product-auth", Boolean(isAuthenticated));
   if (authShell) {
     authShell.classList.toggle("hidden", isAuthenticated);
-  } else {
+  } else if (authSection) {
     authSection.classList.toggle("hidden", isAuthenticated);
   }
-  appSection.classList.toggle("hidden", !isAuthenticated);
+  if (appSection) {
+    appSection.classList.toggle("hidden", !isAuthenticated);
+  }
   if (heroStats) {
     heroStats.classList.toggle("hidden", !isAuthenticated);
   }
@@ -5073,9 +5075,13 @@ function renderAdminPanel() {
 function applyRatingFormForSelected() {
   syncOpenMeetingLink();
   if (!state.selectedPnmId) {
-    ratingForm.reset();
+    if (ratingForm) {
+      ratingForm.reset();
+    }
     renderSelectedPnmPhoto(null);
-    photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+    if (photoForm) {
+      photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+    }
     renderAssignmentControls();
     renderPackageDealPanel();
     return;
@@ -5084,7 +5090,9 @@ function applyRatingFormForSelected() {
   const selected = state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId);
   if (!selected) {
     renderSelectedPnmPhoto(null);
-    photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+    if (photoForm) {
+      photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+    }
     renderAssignmentControls();
     renderPackageDealPanel();
     return;
@@ -5096,8 +5104,12 @@ function applyRatingFormForSelected() {
   const packageInfo = packageInfoForPnm(selected);
   const packageText = packageInfo.id ? `${packageInfo.label} (${packageInfo.count})` : "Solo";
   const phone = selected.phone_number || "No phone";
-  selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Primary: ${assigned} | Team: ${assignmentTeamText} | Package: ${packageText}`;
-  ratingPnm.value = String(selected.pnm_id);
+  if (selectedPnmLabel) {
+    selectedPnmLabel.textContent = `${selected.pnm_code} | ${selected.first_name} ${selected.last_name} | ${phone} | Primary: ${assigned} | Team: ${assignmentTeamText} | Package: ${packageText}`;
+  }
+  if (ratingPnm) {
+    ratingPnm.value = String(selected.pnm_id);
+  }
   if (touchpointDrawerPnm) {
     touchpointDrawerPnm.value = String(selected.pnm_id);
   }
@@ -5115,7 +5127,9 @@ function applyRatingFormForSelected() {
   document.getElementById("rateIg").value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
   document.getElementById("rateComment").value = own ? own.comment || "" : "";
   renderSelectedPnmPhoto(selected);
-  photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+  if (photoForm) {
+    photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+  }
   renderAssignmentControls();
   renderPackageDealPanel();
   syncWatchButtons();
@@ -5123,6 +5137,9 @@ function applyRatingFormForSelected() {
 }
 
 function renderRatingEntries(data) {
+  if (!ratingList) {
+    return;
+  }
   if (!data.ratings.length) {
     ratingList.innerHTML = '<p class="muted">No ratings for this PNM yet.</p>';
     return;
@@ -5169,6 +5186,9 @@ function renderRatingEntries(data) {
 }
 
 function renderLunchEntries(data) {
+  if (!lunchHistory) {
+    return;
+  }
   if (!data.lunches.length) {
     lunchHistory.innerHTML = '<p class="muted">No touchpoints logged for this rushee.</p>';
     return;
@@ -5192,8 +5212,12 @@ function renderLunchEntries(data) {
 
 async function loadPnmDetail(pnmId) {
   if (!pnmId) {
-    ratingList.innerHTML = '<p class="muted">Select a rushee to view rating entries.</p>';
-    lunchHistory.innerHTML = '<p class="muted">Select a rushee to view touchpoint logs.</p>';
+    if (ratingList) {
+      ratingList.innerHTML = '<p class="muted">Select a rushee to view rating entries.</p>';
+    }
+    if (lunchHistory) {
+      lunchHistory.innerHTML = '<p class="muted">Select a rushee to view touchpoint logs.</p>';
+    }
     renderSelectedPnmPhoto(null);
     syncOpenMeetingLink();
     renderAssignmentControls();
@@ -7868,9 +7892,15 @@ function setupPwaInstall() {
 }
 
 function attachEvents() {
-  loginForm.addEventListener("submit", handleLogin);
-  registerForm.addEventListener("submit", handleRegister);
-  logoutBtn.addEventListener("click", handleLogout);
+  if (loginForm) {
+    loginForm.addEventListener("submit", handleLogin);
+  }
+  if (registerForm) {
+    registerForm.addEventListener("submit", handleRegister);
+  }
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", handleLogout);
+  }
   if (openTutorialBtn) {
     openTutorialBtn.addEventListener("click", handleTutorialShortcut);
   }
@@ -8080,9 +8110,15 @@ function attachEvents() {
     });
   }
 
-  pnmForm.addEventListener("submit", handlePnmCreate);
-  ratingForm.addEventListener("submit", handleRatingSave);
-  photoForm.addEventListener("submit", handlePhotoUpload);
+  if (pnmForm) {
+    pnmForm.addEventListener("submit", handlePnmCreate);
+  }
+  if (ratingForm) {
+    ratingForm.addEventListener("submit", handleRatingSave);
+  }
+  if (photoForm) {
+    photoForm.addEventListener("submit", handlePhotoUpload);
+  }
   if (rushEventForm) {
     rushEventForm.addEventListener("submit", handleRushEventCreate);
   }

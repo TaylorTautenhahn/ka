@@ -3043,6 +3043,7 @@ function renderMemberTable() {
   }
 
   const canDisapproveUsers = roleCanApproveUsers();
+  const canDeleteUsers = Boolean(state.user && state.user.role === "Head Rush Officer");
   const rows = state.members
     .map((member) => {
       const avgRating = member.avg_rating_given == null ? "Hidden" : member.avg_rating_given.toFixed(2);
@@ -3055,8 +3056,16 @@ function renderMemberTable() {
         state.user &&
         member.user_id !== state.user.user_id &&
         member.role !== "Head Rush Officer";
+      const canDelete =
+        canDeleteUsers &&
+        state.user &&
+        member.user_id !== state.user.user_id &&
+        member.role !== "Head Rush Officer";
       const disapproveAction = canDisapprove
         ? `<button type="button" class="secondary disapprove-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Disapprove</button>`
+        : "";
+      const deleteAction = canDelete
+        ? `<button type="button" class="secondary delete-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Delete</button>`
         : "";
       return `
         <tr class="${selectedClass}">
@@ -3075,6 +3084,7 @@ function renderMemberTable() {
             <div class="action-row">
               <button type="button" class="secondary select-member" data-user-id="${member.user_id}">Select</button>
               ${disapproveAction}
+              ${deleteAction}
             </div>
           </td>
         </tr>
@@ -4607,6 +4617,11 @@ function renderOfficerMetrics() {
         <td>${officer.assigned_pnms_count}</td>
         <td>${Number(officer.participation_score || 0).toFixed(2)}</td>
         <td>${escapeHtml(formatLastSeen(officer.last_login_at))}</td>
+        <td>
+          <div class="action-row">
+            <button type="button" class="secondary delete-officer" data-user-id="${officer.user_id}" data-username="${escapeHtml(officer.username)}">Delete</button>
+          </div>
+        </td>
       </tr>
     `
     )
@@ -4625,6 +4640,7 @@ function renderOfficerMetrics() {
           <th>Assigned Rushees</th>
           <th>Participation</th>
           <th>Last Login</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
@@ -6958,6 +6974,29 @@ async function handleMemberTableClick(event) {
   }
 
   const button = event.target.closest("button.disapprove-user");
+  const deleteButton = event.target.closest("button.delete-user");
+  if (deleteButton) {
+    const userId = Number(deleteButton.dataset.userId || 0);
+    if (!userId) {
+      return;
+    }
+    const username = deleteButton.dataset.username || "this user";
+    const confirmed = window.confirm(`Delete ${username}? This removes their account and signs them out.`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await api(`/api/users/${userId}`, {
+        method: "DELETE",
+      });
+      showToast("Rush team member deleted.");
+      await Promise.all([loadApprovals(), loadMembers(), loadMatching(), loadHeadAdminData()]);
+    } catch (error) {
+      showToast(error.message || "Unable to delete user.");
+    }
+    return;
+  }
   if (!button) {
     return;
   }
@@ -6980,6 +7019,32 @@ async function handleMemberTableClick(event) {
     await Promise.all([loadApprovals(), loadMembers(), loadMatching(), loadHeadAdminData()]);
   } catch (error) {
     showToast(error.message || "Unable to disapprove user.");
+  }
+}
+
+async function handleOfficerMetricsClick(event) {
+  const button = event.target.closest("button.delete-officer");
+  if (!button) {
+    return;
+  }
+  const userId = Number(button.dataset.userId || 0);
+  if (!userId) {
+    return;
+  }
+  const username = button.dataset.username || "this officer";
+  const confirmed = window.confirm(`Delete ${username}? This removes their account and signs them out.`);
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    await api(`/api/users/${userId}`, {
+      method: "DELETE",
+    });
+    showToast("Rush Officer deleted.");
+    await Promise.all([loadApprovals(), loadMembers(), loadMatching(), loadHeadAdminData()]);
+  } catch (error) {
+    showToast(error.message || "Unable to delete Rush Officer.");
   }
 }
 
@@ -7352,7 +7417,7 @@ async function handleSeasonReset() {
     return;
   }
   const confirmed = window.confirm(
-    "Archive the current rush season and reset rushees, ratings, touchpoints, and participation counters for next season?"
+    "Archive the current rush season, reset rushees/ratings/touchpoints, and remove all non-head team accounts for next season?"
   );
   if (!confirmed) {
     return;
@@ -8151,6 +8216,9 @@ function attachEvents() {
   }
   pendingList.addEventListener("click", handlePendingClick);
   memberTable.addEventListener("click", handleMemberTableClick);
+  if (officerMetricsTable) {
+    officerMetricsTable.addEventListener("click", handleOfficerMetricsClick);
+  }
   adminPnmTable.addEventListener("click", handleAdminPanelClick);
   if (promoteOfficerBtn) {
     promoteOfficerBtn.addEventListener("click", handlePromoteOfficer);

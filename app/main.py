@@ -9522,6 +9522,15 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
         pnm_count = int(counts_row["pnm_count"])
         rating_count = int(counts_row["rating_count"])
         lunch_count = int(counts_row["lunch_count"])
+        removable_rows = conn.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE role != ?
+            ORDER BY username ASC
+            """,
+            (ROLE_HEAD,),
+        ).fetchall()
 
         conn.execute("DELETE FROM rating_changes")
         conn.execute("DELETE FROM rating_history")
@@ -9538,6 +9547,16 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
         conn.execute("DELETE FROM user_contact_downloads")
         conn.execute("DELETE FROM lunches")
         conn.execute("DELETE FROM pnms")
+        deleted_member_usernames: list[str] = []
+        for removable in removable_rows:
+            deleted_user = delete_team_member_account(
+                conn,
+                target_user_id=int(removable["id"]),
+                actor_user_id=int(head_user["id"]),
+                emit_audit=False,
+                delete_reason="season_reset",
+            )
+            deleted_member_usernames.append(str(deleted_user["username"]))
         conn.execute(
             """
             INSERT INTO season_setup_state (
@@ -9610,6 +9629,8 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
                 "pnm_count": pnm_count,
                 "rating_count": rating_count,
                 "lunch_count": lunch_count,
+                "deleted_member_count": len(deleted_member_usernames),
+                "deleted_member_usernames": deleted_member_usernames,
             },
         )
         create_job_run(
@@ -9624,13 +9645,18 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
                 "pnm_count": pnm_count,
                 "rating_count": rating_count,
                 "lunch_count": lunch_count,
+                "deleted_member_count": len(deleted_member_usernames),
             },
         )
 
     purge_pnm_uploads_dir()
 
     return {
-        "message": "Rush season archived and reset for next season.",
+        "message": (
+            "Rush season archived and reset for next season. "
+            f"Removed {len(deleted_member_usernames)} non-head team account"
+            f"{'' if len(deleted_member_usernames) == 1 else 's'}."
+        ),
         "archive": {
             "archive_path": str(archive_file),
             "archive_download_path": "/api/admin/season/archive/download",
@@ -9641,6 +9667,7 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
             "pnm_count": pnm_count,
             "rating_count": rating_count,
             "lunch_count": lunch_count,
+            "deleted_member_count": len(deleted_member_usernames),
         },
     }
 
@@ -10394,6 +10421,110 @@ def disapprove_user(user_id: int, actor: sqlite3.Row = Depends(require_officer))
         )
 
     return {"message": f"{row['username']} has been disapproved and moved to pending approval."}
+
+
+def delete_team_member_account(
+    conn: sqlite3.Connection,
+    *,
+    target_user_id: int,
+    actor_user_id: int,
+    emit_audit: bool = True,
+    delete_reason: str = "manual_delete",
+) -> dict[str, Any]:
+    target = conn.execute(
+        "SELECT id, username, role, is_approved FROM users WHERE id = ?",
+        (target_user_id,),
+    ).fetchone()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if int(target["id"]) == int(actor_user_id):
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+    if target["role"] == ROLE_HEAD:
+        raise HTTPException(status_code=400, detail="Head Rush Officer accounts cannot be deleted.")
+
+    changed_at = now_iso()
+
+    conn.execute("UPDATE users SET approved_by = NULL WHERE approved_by = ?", (target_user_id,))
+    conn.execute("UPDATE pnms SET photo_uploaded_by = NULL WHERE photo_uploaded_by = ?", (target_user_id,))
+    conn.execute(
+        """
+        UPDATE pnms
+        SET
+            assigned_officer_id = NULL,
+            assigned_by = NULL,
+            assigned_at = NULL,
+            assignment_status = 'unassigned',
+            assignment_due_date = NULL,
+            assignment_notes = '',
+            assignment_updated_at = ?
+        WHERE assigned_officer_id = ?
+        """,
+        (changed_at, target_user_id),
+    )
+    conn.execute("UPDATE pnms SET assigned_by = NULL WHERE assigned_by = ?", (target_user_id,))
+    conn.execute("UPDATE pnms SET funnel_stage_updated_by = NULL WHERE funnel_stage_updated_by = ?", (target_user_id,))
+    conn.execute("UPDATE pnms SET created_by = ? WHERE created_by = ?", (actor_user_id, target_user_id))
+    conn.execute("UPDATE rush_events SET created_by = ? WHERE created_by = ?", (actor_user_id, target_user_id))
+    conn.execute("UPDATE weekly_goals SET created_by = ? WHERE created_by = ?", (actor_user_id, target_user_id))
+    conn.execute(
+        """
+        UPDATE engagement_events
+        SET
+            created_by = CASE WHEN created_by = ? THEN ? ELSE created_by END,
+            owner_user_id = CASE WHEN owner_user_id = ? THEN NULL ELSE owner_user_id END
+        WHERE created_by = ? OR owner_user_id = ?
+        """,
+        (target_user_id, actor_user_id, target_user_id, target_user_id, target_user_id),
+    )
+    conn.execute("UPDATE pnm_stage_history SET changed_by = ? WHERE changed_by = ?", (actor_user_id, target_user_id))
+    conn.execute(
+        "UPDATE season_archive_state SET archived_by = ? WHERE archived_by = ?",
+        (actor_user_id, target_user_id),
+    )
+    conn.execute(
+        "UPDATE meeting_pins SET pinned_by = ?, updated_at = ? WHERE pinned_by = ?",
+        (actor_user_id, changed_at, target_user_id),
+    )
+    conn.execute("DELETE FROM sessions WHERE user_id = ?", (target_user_id,))
+    conn.execute("DELETE FROM users WHERE id = ?", (target_user_id,))
+
+    if emit_audit:
+        append_audit_entry(
+            conn,
+            actor_user_id=int(actor_user_id),
+            action_type="user_delete",
+            entity_type="user",
+            entity_id=int(target_user_id),
+            payload={
+                "username": target["username"],
+                "role": target["role"],
+                "reason": delete_reason,
+            },
+        )
+
+    return {
+        "user_id": int(target_user_id),
+        "username": str(target["username"]),
+        "role": str(target["role"]),
+        "is_approved": bool(target["is_approved"]),
+    }
+
+
+@app.delete("/api/users/{user_id}")
+def delete_user(user_id: int, actor: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    with db_session() as conn:
+        deleted = delete_team_member_account(
+            conn,
+            target_user_id=int(user_id),
+            actor_user_id=int(actor["id"]),
+            emit_audit=True,
+            delete_reason="manual_delete",
+        )
+
+    return {
+        "message": f"{deleted['username']} has been deleted from the rush team.",
+        "deleted_user": deleted,
+    }
 
 
 @app.get("/api/admin/rush-officers")

@@ -230,6 +230,9 @@ def main() -> None:
                 json={"username": "headseed", "access_code": "HeadSeed123!", "remember_me": True},
             )
             expect_status(response, 200, "Head login")
+            head_user_id = int(response.json().get("user", {}).get("user_id") or 0)
+            if not head_user_id:
+                raise AssertionError("Head login payload should include the user id.")
             sync_csrf_header()
             session_cookie = client.cookies.get(main_module.SESSION_COOKIE)
             if not session_cookie:
@@ -1214,6 +1217,91 @@ def main() -> None:
             response = client.get("/kappaalphaorder/api/admin/storage")
             expect_status(response, 200, "Storage diagnostics API")
             checks.append("Storage diagnostics endpoint works")
+
+            temp_delete_officer_username = "cleanupofficer"
+            temp_delete_officer_password = "CleanupOfficer123!"
+            response = client.post(
+                "/kappaalphaorder/api/auth/register",
+                json={
+                    "username": temp_delete_officer_username,
+                    "access_code": temp_delete_officer_password,
+                    "emoji": "🧹",
+                    "city": "Waco",
+                    "state": "TX",
+                },
+            )
+            expect_status(response, 200, "Temporary officer registration for delete flow")
+
+            response = client.get("/kappaalphaorder/api/users/pending")
+            expect_status(response, 200, "Pending users list before manual delete")
+            temp_pending = next(
+                (item for item in response.json().get("pending", []) if item.get("username") == temp_delete_officer_username),
+                None,
+            )
+            if temp_pending is None:
+                raise AssertionError("Temporary officer should appear in the pending queue before approval.")
+            temp_delete_officer_id = int(temp_pending["user_id"])
+
+            response = client.post(f"/kappaalphaorder/api/users/pending/{temp_delete_officer_id}/approve")
+            expect_status(response, 200, "Approve temporary officer for delete flow")
+
+            response = client.delete(f"/kappaalphaorder/api/users/{head_user_id}")
+            expect_status(response, 400, "Head self-delete blocked")
+            checks.append("Head self-delete guard works")
+
+            response = client.delete(f"/kappaalphaorder/api/users/{temp_delete_officer_id}")
+            expect_status(response, 200, "Head deletes rush team member")
+            deleted_payload = response.json().get("deleted_user", {})
+            if deleted_payload.get("username") != temp_delete_officer_username:
+                raise AssertionError("Delete user API should return the removed username.")
+            checks.append("Head can delete rush team members")
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": temp_delete_officer_username, "access_code": temp_delete_officer_password},
+            )
+            expect_status(response, 401, "Deleted officer login blocked")
+            checks.append("Deleted rush team members cannot sign in")
+
+            response = client.get("/kappaalphaorder/api/admin/rush-officers")
+            expect_status(response, 200, "Rush officer metrics after delete")
+            officer_usernames = {item.get("username") for item in response.json().get("rush_officers", [])}
+            if temp_delete_officer_username in officer_usernames:
+                raise AssertionError("Deleted officer should be removed from admin leadership metrics.")
+            checks.append("Deleted rush team members disappear from leadership metrics")
+
+            response = client.post(
+                "/kappaalphaorder/api/admin/season/reset",
+                json={
+                    "confirm_phrase": "RESET RUSH SEASON",
+                    "archive_label": "Smoke Reset",
+                    "head_chair_confirmation": True,
+                },
+            )
+            expect_status(response, 200, "Season reset deletes non-head team accounts")
+            archive_payload = response.json().get("archive", {})
+            if int(archive_payload.get("deleted_member_count", 0)) < 1:
+                raise AssertionError("Season reset should report that non-head team accounts were deleted.")
+            checks.append("Season reset removes non-head team accounts")
+
+            response = client.get("/kappaalphaorder/api/users")
+            expect_status(response, 200, "Users list after season reset")
+            remaining_roles = {item.get("role") for item in response.json().get("users", [])}
+            if remaining_roles != {"Head Rush Officer"}:
+                raise AssertionError("Season reset should leave only Head Rush Officer accounts.")
+            checks.append("Season reset leaves only head accounts")
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": officer_username, "access_code": officer_password},
+            )
+            expect_status(response, 401, "Reset-deleted officer login blocked")
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": member_username, "access_code": member_password},
+            )
+            expect_status(response, 401, "Reset-deleted member login blocked")
+            checks.append("Season reset deleted accounts cannot sign in")
 
             response = client.post(
                 "/platform/api/auth/login",

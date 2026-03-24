@@ -204,6 +204,12 @@ const seasonArchiveLabel = document.getElementById("seasonArchiveLabel");
 const seasonHeadChairConfirm = document.getElementById("seasonHeadChairConfirm");
 const seasonResetBtn = document.getElementById("seasonResetBtn");
 const seasonArchiveDownloadBtn = document.getElementById("seasonArchiveDownloadBtn");
+const seasonKickoffForm = document.getElementById("seasonKickoffForm");
+const seasonKickoffLabel = document.getElementById("seasonKickoffLabel");
+const seasonKickoffCriteria = document.getElementById("seasonKickoffCriteria");
+const seasonKickoffInvites = document.getElementById("seasonKickoffInvites");
+const seasonKickoffComplete = document.getElementById("seasonKickoffComplete");
+const seasonKickoffSaveBtn = document.getElementById("seasonKickoffSaveBtn");
 const adminTabBar = document.getElementById("adminTabBar");
 const adminStorageDiagnostics = document.getElementById("adminStorageDiagnostics");
 
@@ -338,7 +344,7 @@ const meetingsCompareSelectA = document.getElementById("meetingsCompareSelectA")
 const meetingsCompareSelectB = document.getElementById("meetingsCompareSelectB");
 const meetingsCompareSummary = document.getElementById("meetingsCompareSummary");
 
-const DEFAULT_DESKTOP_PAGE = "overview";
+const DEFAULT_DESKTOP_PAGE = "dashboard";
 const ROLE_HEAD = "Head Rush Officer";
 const ROLE_RUSH_OFFICER = "Rush Officer";
 const ROLE_RUSHER = "Rusher";
@@ -590,7 +596,7 @@ const state = {
   headAssignmentPnmId: null,
   packagePartnerId: null,
   seasonArchive: null,
-  watchlist: readStoredJson("watchlist", []),
+  meetingPins: [],
   viewPrefs: {
     pnmView: readStoredJson("pnm-view", "table"),
     operationsTab: readStoredJson("operations-tab", "timeline"),
@@ -602,6 +608,8 @@ const state = {
     teamPulse: null,
     watchCandidates: [],
     notifications: null,
+    weeklyRoi: null,
+    seasonSetup: null,
   },
   teamWorkspace: {
     assignmentOverview: null,
@@ -614,6 +622,7 @@ const state = {
     shortlist: [],
     attention: [],
     candidates: [],
+    pins: [],
     compareDefaults: [],
     compareA: null,
     compareB: null,
@@ -625,6 +634,8 @@ const state = {
     assignments: null,
     leadership: null,
     pending: null,
+    kickoff: null,
+    trustCenter: null,
   },
   searchResults: {
     query: "",
@@ -1213,13 +1224,13 @@ function mapDesktopRouteToPage(value) {
     return "";
   }
   if (token === "dashboard" || token === "overview") {
-    return "overview";
+    return "dashboard";
   }
   if (token === "calendar" || token === "operations") {
-    return "operations";
+    return "calendar";
   }
   if (token === "team" || token === "members") {
-    return "members";
+    return "team";
   }
   if (token === "rushees") {
     return "rushees";
@@ -1235,13 +1246,13 @@ function mapDesktopRouteToPage(value) {
 
 function desktopRoutePathForPage(page) {
   const routeMap = APP_CONFIG.desktop_routes || {};
-  if (page === "overview") {
+  if (page === "dashboard") {
     return routeMap.dashboard || `${BASE_PATH}/dashboard`;
   }
-  if (page === "operations") {
+  if (page === "calendar") {
     return routeMap.calendar || `${BASE_PATH}/calendar`;
   }
-  if (page === "members") {
+  if (page === "team") {
     return routeMap.team || `${BASE_PATH}/team`;
   }
   if (page === "rushees") {
@@ -1335,10 +1346,10 @@ function workspaceMetaForPage(page) {
   if (page === "meetings") {
     return { eyebrow: "Workspace", title: "Meetings", subtitle: "Shortlist, compare, and packet launch from one queue." };
   }
-  if (page === "members") {
+  if (page === "team") {
     return { eyebrow: "Workspace", title: "Team", subtitle: "Approvals, workload, assignment coverage, and member alignment." };
   }
-  if (page === "operations") {
+  if (page === "calendar") {
     return { eyebrow: "Workspace", title: "Operations", subtitle: "Timeline, goals, touchpoints, and officer chat." };
   }
   if (page === "admin") {
@@ -1362,7 +1373,7 @@ function updateWorkspaceHeader() {
 
 function refreshLoadersForActivePage() {
   const page = state.activeDesktopPage || DEFAULT_DESKTOP_PAGE;
-  if (page === "operations") {
+  if (page === "calendar") {
     return [loadOperationsWorkspace];
   }
   if (page === "rushees") {
@@ -1371,7 +1382,7 @@ function refreshLoadersForActivePage() {
   if (page === "meetings") {
     return [loadMeetingsWorkspace];
   }
-  if (page === "members") {
+  if (page === "team") {
     return [loadTeamWorkspace];
   }
   if (page === "admin") {
@@ -1461,16 +1472,22 @@ function showRouteNoticeFromQuery() {
   window.history.replaceState({}, "", nextUrl);
 }
 
+function requestedPnmIdFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const pnmId = Number(params.get("pnm_id") || 0);
+  return pnmId > 0 ? pnmId : null;
+}
+
 function roleCanSeeRaters() {
   return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
 }
 
 function roleCanManagePhotos() {
-  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+  return Boolean(state.user && (state.user.capabilities ? state.user.capabilities.can_schedule_touchpoints : (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer")));
 }
 
 function roleCanUseAdminPanel() {
-  return state.user && state.user.role === "Head Rush Officer";
+  return Boolean(state.user && (state.user.capabilities ? state.user.capabilities.can_manage_admin : state.user.role === "Head Rush Officer"));
 }
 
 function roleCanApproveUsers() {
@@ -1482,15 +1499,15 @@ function roleCanAssignOfficer() {
 }
 
 function roleCanViewAssignedRushes() {
-  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+  return Boolean(state.user && (state.user.capabilities ? state.user.capabilities.can_use_team : (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer")));
 }
 
 function roleCanUseCommandCenter() {
-  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+  return Boolean(state.user && (state.user.capabilities ? state.user.capabilities.can_use_command : (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer")));
 }
 
 function roleCanManageOperations() {
-  return state.user && (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer");
+  return Boolean(state.user && (state.user.capabilities ? state.user.capabilities.can_use_operations : (state.user.role === "Head Rush Officer" || state.user.role === "Rush Officer")));
 }
 
 function roleCanManagePackages() {
@@ -1552,7 +1569,7 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: keep this sequence strict after every event block so decisions stay consistent and auditable.",
     },
     {
-      page: "overview",
+      page: "dashboard",
       target: "#desktopPageNav",
       title: "Use Navigation As The Command Rail",
       body: "Move between Command, Rushees, Meetings, Operations, Team, and Admin from the left navigation rail.",
@@ -1561,7 +1578,7 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: keep one tab on Calendar and one on Rushees during live events for faster execution.",
     },
     {
-      page: "overview",
+      page: "dashboard",
       target: "#globalSearchInput",
       title: "Use Command Search To Move Fast",
       body: "Use the top search to jump to rushees, members, and common actions without leaving your current workspace.",
@@ -1615,7 +1632,7 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: schedule lunches by assignment owner so accountability is clear before key decisions.",
     },
     {
-      page: "operations",
+      page: "calendar",
       operationsTab: "timeline",
       target: "#rushCalendarTable",
       title: "Track One Shared Rush Timeline",
@@ -1625,7 +1642,7 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: compare timeline density against rating activity to spot under-covered rushees quickly.",
     },
     {
-      page: "operations",
+      page: "calendar",
       operationsTab: "goals",
       target: "#weeklyGoalsList",
       title: "Use Weekly Goals For Accountability",
@@ -1635,7 +1652,7 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: align goals to funnel stage movement so progress reflects recruiting outcomes, not just activity.",
     },
     {
-      page: "operations",
+      page: "calendar",
       operationsTab: "comms",
       target: "#officerChatForm",
       title: "Coordinate In Live Officer Chat",
@@ -1645,16 +1662,16 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: standardize tags by event type so chat stats become a reliable operations diagnostic.",
     },
     {
-      page: "members",
+      page: "team",
       target: "#memberFiltersSection",
       title: "Filter Team Coverage By Role + Location",
-      body: "Use Team filters to sort members by role, state, city, and location-first ordering.",
+      body: "Use Team filters to sort teammates by role, state, city, and location-first ordering.",
       hint: "This is the fastest way to verify member coverage by region.",
       advanced:
         "Advanced workflow: audit coverage by state before each round and rebalance assignments proactively.",
     },
     {
-      page: "members",
+      page: "team",
       target: "#sameStatePnmsSection",
       title: "Use Same-State Discovery",
       body: "Select a member to instantly see rushees from the same state for stronger local connections.",
@@ -1663,7 +1680,7 @@ function tutorialBaseStepsForRole(role) {
         "Advanced workflow: use same-state lists to assign warm introductions before high-stakes events.",
     },
     {
-      page: "members",
+      page: "team",
       target: "#assignedRushPanel",
       title: "Check Assigned Rushee Ownership",
       body: "Assignment visibility keeps outreach accountable and prevents coverage gaps.",
@@ -1711,10 +1728,10 @@ function tutorialBaseStepsForRole(role) {
   if (role === ROLE_RUSH_OFFICER) {
     return commonOfficerSteps.concat([
       {
-        page: "members",
+        page: "team",
         target: "#approvalsPanel",
         title: "Approve New Team Accounts Quickly",
-        body: "Rush Officers can approve pending users so new members can contribute quickly.",
+        body: "Rush Officers can approve pending users so new teammates can contribute quickly.",
         hint: "Approve only known accounts to keep data quality and security tight.",
         advanced:
           "Advanced workflow: review pending accounts at fixed windows each day so onboarding is fast but controlled.",
@@ -1724,7 +1741,7 @@ function tutorialBaseStepsForRole(role) {
 
   return [
     {
-      page: "overview",
+      page: "dashboard",
       target: "#leaderboardSection",
       title: "Track Priority Rushees",
       body: "Use leaderboard context to focus your feedback on top-priority candidates.",
@@ -3515,31 +3532,39 @@ function setViewPreference(key, value) {
   writeStoredJson(key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`), value);
 }
 
+function applyMeetingPins(pins) {
+  state.meetingPins = Array.isArray(pins)
+    ? pins.filter((item) => item && Number(item.pnm_id || 0) > 0)
+    : [];
+}
+
 function currentWatchlistIds() {
-  return Array.isArray(state.watchlist) ? state.watchlist.map((value) => Number(value)).filter((value) => value > 0) : [];
+  return Array.isArray(state.meetingPins) ? state.meetingPins.map((item) => Number(item.pnm_id || 0)).filter((value) => value > 0) : [];
 }
 
 function isWatchedPnm(pnmId) {
   return currentWatchlistIds().includes(Number(pnmId));
 }
 
-function toggleWatchlistPnm(pnmId) {
+function meetingPinEntry(pnmId) {
+  return (state.meetingPins || []).find((item) => Number(item.pnm_id) === Number(pnmId)) || null;
+}
+
+async function toggleWatchlistPnm(pnmId) {
   const target = Number(pnmId || 0);
   if (!target) {
     return false;
   }
-  const next = new Set(currentWatchlistIds());
-  if (next.has(target)) {
-    next.delete(target);
-  } else {
-    next.add(target);
-  }
-  state.watchlist = Array.from(next);
-  writeStoredJson("watchlist", state.watchlist);
+  const alreadyPinned = isWatchedPnm(target);
+  const payload = alreadyPinned
+    ? await api(`/api/meetings/pins/${target}`, { method: "DELETE" })
+    : await api("/api/meetings/pins", { method: "POST", body: { pnm_id: target } });
+  applyMeetingPins(payload.pins || []);
   renderCommandWorkspaceExtras();
   renderMeetingsWorkspace();
+  renderPnmBoard();
   syncWatchButtons();
-  return next.has(target);
+  return !alreadyPinned;
 }
 
 function syncWatchButtons() {
@@ -3603,6 +3628,96 @@ function toggleNotificationsTray(forceOpen) {
   appNotificationsTray.setAttribute("aria-hidden", next ? "false" : "true");
 }
 
+function renderWeeklyRoiCards() {
+  const container = document.getElementById("commandWeeklyRoiCards");
+  if (!container) {
+    return;
+  }
+  const payload = state.commandWorkspace.weeklyRoi;
+  const cards = payload && Array.isArray(payload.cards) ? payload.cards : [];
+  container.innerHTML = cards.length
+    ? cards
+        .map((item) => {
+          const delta = Number(item.delta || 0);
+          const deltaClass = delta > 0 ? "good" : delta < 0 ? "bad" : "muted";
+          const deltaLabel = delta > 0 ? `+${delta}` : `${delta}`;
+          return `
+            <article class="card roi-card">
+              <p>${escapeHtml(item.label || "Metric")}</p>
+              <strong>${escapeHtml(String(item.value ?? 0))}</strong>
+              <span class="${deltaClass}">vs last week ${escapeHtml(deltaLabel)}</span>
+              <small>${escapeHtml(item.detail || "")}</small>
+            </article>
+          `;
+        })
+        .join("")
+    : '<p class="muted">Weekly ROI cards will appear after the first week of activity.</p>';
+}
+
+function renderSeasonKickoffCard() {
+  const summaryEl = document.getElementById("commandSeasonSetupSummary");
+  const listEl = document.getElementById("commandSeasonSetupList");
+  if (!summaryEl || !listEl) {
+    return;
+  }
+  const payload = state.commandWorkspace.seasonSetup;
+  if (!payload) {
+    summaryEl.textContent = "Season setup loading...";
+    listEl.innerHTML = "";
+    return;
+  }
+  const progress = payload.progress || {};
+  const seasonLabel = String(payload.season_label || "").trim();
+  summaryEl.textContent = seasonLabel
+    ? `${seasonLabel} • ${Number(progress.completed || 0)} of ${Number(progress.total || 0)} setup steps complete`
+    : `${Number(progress.completed || 0)} of ${Number(progress.total || 0)} setup steps complete`;
+  const steps = Array.isArray(payload.steps) ? payload.steps : [];
+  listEl.innerHTML = steps.length
+    ? steps
+        .map(
+          (step) => `
+            <div class="entry${step.is_complete ? " is-complete" : ""}">
+              <div class="entry-title">
+                <strong>${escapeHtml(step.label || "Setup step")}</strong>
+                <span>${step.is_complete ? "Done" : "In Progress"}</span>
+              </div>
+              <div class="muted">${escapeHtml(step.detail || "")}</div>
+              <div class="action-row">
+                <button type="button" class="secondary season-kickoff-jump-btn" data-kickoff-tab="${escapeHtml(step.target_tab || "season")}">Open</button>
+              </div>
+            </div>
+          `
+        )
+        .join("")
+    : '<p class="muted">No setup steps configured yet.</p>';
+}
+
+function syncSeasonKickoffForm() {
+  if (!seasonKickoffForm) {
+    return;
+  }
+  const payload = state.adminOverview.kickoff || state.commandWorkspace.seasonSetup;
+  if (!payload) {
+    seasonKickoffForm.classList.add("hidden");
+    return;
+  }
+  seasonKickoffForm.classList.remove("hidden");
+  if (seasonKickoffLabel) {
+    seasonKickoffLabel.value = String(payload.season_label || "");
+  }
+  if (seasonKickoffCriteria) {
+    const criteriaStep = Array.isArray(payload.steps) ? payload.steps.find((step) => step.step_id === "criteria") : null;
+    seasonKickoffCriteria.checked = Boolean(criteriaStep && criteriaStep.is_complete);
+  }
+  if (seasonKickoffInvites) {
+    const inviteStep = Array.isArray(payload.steps) ? payload.steps.find((step) => step.step_id === "invites") : null;
+    seasonKickoffInvites.checked = Boolean(inviteStep && inviteStep.is_complete);
+  }
+  if (seasonKickoffComplete) {
+    seasonKickoffComplete.checked = Boolean(payload.kickoff_completed_at);
+  }
+}
+
 function renderCommandWorkspaceExtras() {
   if (commandPendingCount) {
     commandPendingCount.textContent = String(Number((state.commandWorkspace.teamPulse && state.commandWorkspace.teamPulse.pending_approvals) || 0));
@@ -3627,7 +3742,7 @@ function renderCommandWorkspaceExtras() {
                 <div class="muted">${escapeHtml(item.detail || "")}</div>
                 <div class="action-row">
                   <button type="button" class="secondary" data-open-pnm-id="${Number(item.pnm_id)}">Open Rushee</button>
-                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Meeting Packet</a>
                 </div>
               </div>
             `
@@ -3665,6 +3780,8 @@ function renderCommandWorkspaceExtras() {
       .map((item) => `<article class="card"><p>${escapeHtml(item.label)}</p><strong>${item.value}</strong></article>`)
       .join("");
   }
+  renderWeeklyRoiCards();
+  renderSeasonKickoffCard();
   syncWatchButtons();
 }
 
@@ -3684,7 +3801,7 @@ function renderPnmBoard() {
               <div class="action-row">
                 <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
                 <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
-                <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Packet</a>
+                <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Meeting Packet</a>
               </div>
             </article>
           `
@@ -3786,19 +3903,117 @@ function renderAdminWorkspaceExtras() {
   const payload = state.adminOverview.storage;
   if (!payload) {
     adminStorageDiagnostics.innerHTML = '<p class="muted">Storage diagnostics unavailable.</p>';
-    return;
+  } else {
+    const tableCounts = payload.table_counts || {};
+    adminStorageDiagnostics.innerHTML = `
+      <div class="entry">
+        <div class="entry-title"><strong>Persistent Paths OK</strong><span>${payload.persistent_paths_ok ? "Yes" : "No"}</span></div>
+        <div class="muted">Users ${Number(tableCounts.users || 0)} | Rushees ${Number(tableCounts.pnms || 0)} | Ratings ${Number(tableCounts.ratings || 0)} | Touchpoints ${Number(tableCounts.lunches || 0)}</div>
+      </div>
+      <div class="entry">
+        <div class="entry-title"><strong>Active Tenant DB</strong><span>${escapeHtml((payload.paths && payload.paths.ACTIVE_TENANT_DB_PATH) || "-")}</span></div>
+        <div class="muted">${escapeHtml((payload.warnings || []).join(" | ") || "No warnings.")}</div>
+      </div>
+    `;
   }
-  const tableCounts = payload.table_counts || {};
-  adminStorageDiagnostics.innerHTML = `
-    <div class="entry">
-      <div class="entry-title"><strong>Persistent Paths OK</strong><span>${payload.persistent_paths_ok ? "Yes" : "No"}</span></div>
-      <div class="muted">Users ${Number(tableCounts.users || 0)} | Rushees ${Number(tableCounts.pnms || 0)} | Ratings ${Number(tableCounts.ratings || 0)} | Touchpoints ${Number(tableCounts.lunches || 0)}</div>
-    </div>
-    <div class="entry">
-      <div class="entry-title"><strong>Active Tenant DB</strong><span>${escapeHtml((payload.paths && payload.paths.ACTIVE_TENANT_DB_PATH) || "-")}</span></div>
-      <div class="muted">${escapeHtml((payload.warnings || []).join(" | ") || "No warnings.")}</div>
-    </div>
-  `;
+  const kickoffSummary = document.getElementById("seasonKickoffSummary");
+  const kickoffList = document.getElementById("seasonKickoffList");
+  const kickoffPayload = state.adminOverview.kickoff;
+  if (kickoffSummary && kickoffList) {
+    if (!kickoffPayload) {
+      kickoffSummary.textContent = "Loading season kickoff…";
+      kickoffList.innerHTML = "";
+    } else {
+      const progress = kickoffPayload.progress || {};
+      const seasonLabel = String(kickoffPayload.season_label || "").trim();
+      kickoffSummary.textContent = seasonLabel
+        ? `${seasonLabel} • ${Number(progress.completed || 0)} of ${Number(progress.total || 0)} steps complete`
+        : `${Number(progress.completed || 0)} of ${Number(progress.total || 0)} steps complete`;
+      const steps = Array.isArray(kickoffPayload.steps) ? kickoffPayload.steps : [];
+      kickoffList.innerHTML = steps.length
+        ? steps
+            .map(
+              (step) => `
+                <div class="entry${step.is_complete ? " is-complete" : ""}">
+                  <div class="entry-title">
+                    <strong>${escapeHtml(step.label || "Step")}</strong>
+                    <span>${step.is_complete ? "Done" : "Open"}</span>
+                  </div>
+                  <div class="muted">${escapeHtml(step.detail || "")}</div>
+                  <div class="action-row">
+                    <button type="button" class="secondary season-kickoff-jump-btn" data-kickoff-tab="${escapeHtml(step.target_tab || "season")}">Open</button>
+                  </div>
+                </div>
+              `
+            )
+            .join("")
+        : '<p class="muted">No kickoff steps available.</p>';
+    }
+  }
+  syncSeasonKickoffForm();
+  const trustCapabilities = document.getElementById("trustCapabilitiesList");
+  const importHistory = document.getElementById("adminImportHistoryList");
+  const trustActivity = document.getElementById("trustActivityStorageList");
+  const trustPayload = state.adminOverview.trustCenter;
+  if (trustCapabilities) {
+    const capabilities = trustPayload && trustPayload.capabilities ? trustPayload.capabilities : {};
+    const enabled = Object.entries(capabilities).filter(([, value]) => Boolean(value));
+    trustCapabilities.innerHTML = enabled.length
+      ? enabled
+          .map(
+            ([key]) => `
+              <div class="entry">
+                <div class="entry-title"><strong>${escapeHtml(toTitleCase(key.replaceAll("_", " ")))}</strong><span>Enabled</span></div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">Capability summary unavailable.</p>';
+  }
+  const recentImports = (trustPayload && trustPayload.recent_imports) || [];
+  if (importHistory) {
+    importHistory.innerHTML = recentImports.length
+      ? recentImports
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title"><strong>${escapeHtml(toTitleCase(String(item.import_type || "").replaceAll("_", " ")))}</strong><span>${escapeHtml(formatTrendTimestamp(item.created_at))}</span></div>
+                <div class="muted">${escapeHtml(item.source_name || "")}</div>
+                <div class="muted">${Number(item.created_count || 0)} created | ${Number(item.skipped_count || 0)} skipped | ${Number(item.error_count || 0)} errors</div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No recent import activity yet.</p>';
+  }
+  if (trustActivity) {
+    const items = [
+      ...recentImports.map((item) => ({
+        title: `${toTitleCase(String(item.import_type || "").replaceAll("_", " "))} import`,
+        detail: `${item.created_count} created | ${item.error_count} errors`,
+        when: item.created_at,
+      })),
+      ...((trustPayload && trustPayload.recent_jobs) || []).map((item) => ({
+        title: toTitleCase(String(item.job_type || "").replaceAll("_", " ")),
+        detail: item.summary,
+        when: item.finished_at,
+      })),
+    ]
+      .sort((a, b) => String(b.when || "").localeCompare(String(a.when || "")))
+      .slice(0, 8);
+    trustActivity.innerHTML = items.length
+      ? items
+          .map(
+            (item) => `
+              <div class="entry">
+                <div class="entry-title"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(formatTrendTimestamp(item.when))}</span></div>
+                <div class="muted">${escapeHtml(item.detail || "")}</div>
+              </div>
+            `
+          )
+          .join("")
+      : '<p class="muted">No recent trust-center activity yet.</p>';
+  }
 }
 
 function renderMeetingCompareCard(payload, fallbackLabel) {
@@ -3850,7 +4065,7 @@ function renderMeetingsWorkspace() {
                 <div class="compare-candidate-meta">Ready ${Number(item.meeting_ready_score || 0)} | Weighted ${Number(item.weighted_total || 0).toFixed(2)} | Ratings ${Number(item.rating_count || 0)}</div>
                 <div class="compare-candidate-meta">${escapeHtml(item.flags.join(" • ") || "Meeting-ready context in place")}</div>
                 <div class="action-row">
-                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Meeting Packet</a>
                   <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
                 </div>
               </div>
@@ -3875,23 +4090,17 @@ function renderMeetingsWorkspace() {
       : '<p class="muted">No meeting prep exceptions right now.</p>';
   }
   if (meetingsWatchlist) {
-    const rows = currentWatchlistIds()
-      .map(
-        (pnmId) =>
-          (state.meetingsWorkspace.candidates || []).find((item) => Number(item.pnm_id) === pnmId) ||
-          (state.pnms || []).find((item) => Number(item.pnm_id) === pnmId) ||
-          (state.commandCenter.queue || []).find((item) => Number(item.pnm_id) === pnmId)
-      )
-      .filter(Boolean);
+    const rows = Array.isArray(state.meetingPins) ? state.meetingPins : [];
     meetingsWatchlist.innerHTML = rows.length
       ? rows
           .map(
             (item) => `
         <div class="entry">
                 <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name || `${item.first_name || ""} ${item.last_name || ""}`.trim())}</strong><span>${Number(item.weighted_total || 0).toFixed(2)}</span></div>
+                <div class="muted">Pinned by ${escapeHtml(item.pinned_by_username || "Rush team")} | ${escapeHtml(formatTrendTimestamp(item.pinned_at))}</div>
                 <div class="action-row">
                   <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove from Meetings</button>
-                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Packet</a>
+                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Meeting Packet</a>
                 </div>
               </div>
             `
@@ -3977,12 +4186,12 @@ function performCommandAction(action, context = null) {
         state.commandCenter.selectedQueuePnmId ||
         0
     );
-    if (state.activeDesktopPage !== "operations" && !selectedPnmId) {
-      setActiveDesktopPage("operations");
+    if (state.activeDesktopPage !== "calendar" && !selectedPnmId) {
+      setActiveDesktopPage("calendar");
       setOperationsTab("timeline");
     }
     openTouchpointDrawer({
-      source: state.activeDesktopPage === "operations" ? "operations" : "context",
+      source: state.activeDesktopPage === "calendar" ? "operations" : "context",
       pnmId: selectedPnmId || null,
     });
     return;
@@ -3992,7 +4201,7 @@ function performCommandAction(action, context = null) {
       showToast("Only Head Rush Officers can create events from search.");
       return;
     }
-    setActiveDesktopPage("operations");
+    setActiveDesktopPage("calendar");
     setOperationsTab("timeline");
     focusSoon(rushEventTitle);
     return;
@@ -4030,7 +4239,7 @@ function renderCommandPaletteResults() {
   }
   const query = String(state.searchResults.query || "").trim();
   if (!query) {
-    commandPaletteResults.innerHTML = '<p class="muted">Start typing to search rushees, members, or common actions.</p>';
+    commandPaletteResults.innerHTML = '<p class="muted">Start typing to search rushees, team members, or common actions.</p>';
     return;
   }
   const pnmMarkup = (state.searchResults.pnms || [])
@@ -4079,7 +4288,7 @@ function renderCommandPaletteResults() {
       ${pnmMarkup || '<p class="muted">No rushee matches.</p>'}
     </div>
     <div class="command-palette-result-group">
-      <h3>Members</h3>
+      <h3>Team</h3>
       ${memberMarkup || '<p class="muted">No member matches.</p>'}
     </div>
     <div class="command-palette-result-group">
@@ -4948,7 +5157,7 @@ async function loadPnms(options = {}) {
 
 async function loadMembers(options = {}) {
   const includeSameState =
-    options.includeSameState !== undefined ? Boolean(options.includeSameState) : state.activeDesktopPage === "members";
+    options.includeSameState !== undefined ? Boolean(options.includeSameState) : state.activeDesktopPage === "team";
   const query = toQuery(state.memberFilters);
   const payload = await api(`/api/users${query}`);
   state.members = payload.users || [];
@@ -5251,6 +5460,9 @@ async function loadCommandWorkspace() {
   state.commandWorkspace.today = payload.today || [];
   state.commandWorkspace.teamPulse = payload.team_pulse || null;
   state.commandWorkspace.watchCandidates = payload.watch_candidates || [];
+  state.commandWorkspace.weeklyRoi = payload.weekly_roi || null;
+  state.commandWorkspace.seasonSetup = payload.season_setup || null;
+  applyMeetingPins(payload.meeting_pins || []);
   state.notifications = (payload.notifications && payload.notifications.notifications) || [];
   state.unreadNotifications = Number(payload.notifications && payload.notifications.unread_count ? payload.notifications.unread_count : 0);
   state.assignedRushRows = payload.assignments || [];
@@ -5267,11 +5479,17 @@ async function loadRusheesWorkspace() {
   state.pnms = payload.pnms || [];
   state.calendarShare = payload.calendar_share || null;
   state.scheduledLunches = payload.scheduled_lunches || [];
+  applyMeetingPins(payload.meeting_pins || []);
   if (payload.analytics) {
     renderAnalytics(payload.analytics);
   }
   updateHeroStats();
   renderPnmSelectOptions();
+  const requestedPnmId = requestedPnmIdFromQuery();
+  if (requestedPnmId && state.pnms.some((pnm) => Number(pnm.pnm_id) === requestedPnmId)) {
+    state.selectedPnmId = requestedPnmId;
+    state.headAssignmentPnmId = requestedPnmId;
+  }
   if (state.selectedPnmId && !state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId)) {
     state.selectedPnmId = null;
   }
@@ -5338,6 +5556,8 @@ async function loadMeetingsWorkspace() {
   state.meetingsWorkspace.shortlist = payload.shortlist || [];
   state.meetingsWorkspace.attention = payload.attention || [];
   state.meetingsWorkspace.candidates = payload.candidates || [];
+  state.meetingsWorkspace.pins = payload.pins || [];
+  applyMeetingPins(payload.pins || []);
   state.meetingsWorkspace.compareDefaults = payload.compare_defaults || [];
   if (!state.meetingsWorkspace.compareA && state.meetingsWorkspace.compareDefaults[0]) {
     state.meetingsWorkspace.compareA = Number(state.meetingsWorkspace.compareDefaults[0]);
@@ -5362,7 +5582,10 @@ async function loadAdminWorkspace() {
   state.teamWorkspace.assignmentOverview = payload.assignments || state.teamWorkspace.assignmentOverview;
   state.adminOverview.storage = payload.storage || null;
   state.adminOverview.pending = payload.pending || null;
+  state.adminOverview.kickoff = payload.kickoff || null;
+  state.adminOverview.trustCenter = payload.trust_center || null;
   renderAdminWorkspaceExtras();
+  renderGoogleImportResult(null);
 }
 
 async function refreshAll() {
@@ -5702,7 +5925,7 @@ async function applyMemberFilters(options = {}) {
   const silent = Boolean(options.silent);
   state.memberFilters = getMemberFilters();
   try {
-    if (state.activeDesktopPage === "members") {
+    if (state.activeDesktopPage === "team") {
       await loadTeamWorkspace();
     } else {
       await loadMembers();
@@ -5721,7 +5944,7 @@ function scheduleAutoApplyFilters(kind) {
     clearTimeout(timerMap[kind]);
   }
   timerMap[kind] = window.setTimeout(() => {
-    if (kind === "members") {
+    if (kind === "team") {
       applyMemberFilters({ silent: true }).catch(() => {});
       return;
     }
@@ -6076,11 +6299,11 @@ async function submitTouchpointDrawer() {
       loadScheduledLunches(),
       loadWeeklyGoals(),
     ]);
-    if (state.activeDesktopPage === "operations") {
+    if (state.activeDesktopPage === "calendar") {
       await loadOperationsWorkspace();
     } else if (state.activeDesktopPage === "meetings") {
       await loadMeetingsWorkspace();
-    } else if (state.activeDesktopPage === "members") {
+    } else if (state.activeDesktopPage === "team") {
       await loadTeamWorkspace();
     }
     if (state.activeDesktopPage === "rushees" || state.activeDesktopPage === "admin") {
@@ -6444,7 +6667,7 @@ async function handlePnmTableClick(event) {
   await loadPnmDetail(pnmId);
 }
 
-function handleWatchToggleClick(event) {
+async function handleWatchToggleClick(event) {
   const button = event.target.closest("[data-watch-pnm-id]");
   if (!button) {
     return;
@@ -6453,8 +6676,12 @@ function handleWatchToggleClick(event) {
   if (!pnmId) {
     return;
   }
-  const watching = toggleWatchlistPnm(pnmId);
-  showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
+  try {
+    const watching = await toggleWatchlistPnm(pnmId);
+    showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
+  } catch (error) {
+    showToast(error.message || "Unable to update Meetings pin.");
+  }
 }
 
 async function handleGlobalOpenPnmClick(event) {
@@ -6474,6 +6701,15 @@ async function handleGlobalOpenPnmClick(event) {
   renderPnmBoard();
   applyRatingFormForSelected();
   await loadPnmDetail(pnmId);
+}
+
+function handleSeasonKickoffJumpClick(event) {
+  const button = event.target.closest("[data-kickoff-tab]");
+  if (!button) {
+    return;
+  }
+  setActiveDesktopPage("admin");
+  setAdminTab(button.dataset.kickoffTab || "season");
 }
 
 function handleOperationsTabClick(event) {
@@ -6525,7 +6761,7 @@ function handleCommandPaletteResultsClick(event) {
     const userId = Number(openMember.dataset.commandOpenMember || 0);
     if (userId) {
       closeCommandPalette();
-      setActiveDesktopPage("members");
+      setActiveDesktopPage("team");
       state.selectedMemberId = userId;
       loadTeamWorkspace().catch(() => {});
     }
@@ -6905,6 +7141,41 @@ async function handleDbBackupDownload(trigger = null) {
   }
 }
 
+async function handleSeasonKickoffSave(event) {
+  event.preventDefault();
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  if (seasonKickoffSaveBtn) {
+    seasonKickoffSaveBtn.disabled = true;
+    seasonKickoffSaveBtn.textContent = "Saving...";
+  }
+  try {
+    const payload = await api("/api/admin/season/kickoff", {
+      method: "PATCH",
+      body: {
+        season_label: seasonKickoffLabel ? seasonKickoffLabel.value.trim() || null : null,
+        rating_criteria_confirmed: seasonKickoffCriteria ? Boolean(seasonKickoffCriteria.checked) : null,
+        member_invites_shared: seasonKickoffInvites ? Boolean(seasonKickoffInvites.checked) : null,
+        kickoff_completed: seasonKickoffComplete ? Boolean(seasonKickoffComplete.checked) : null,
+      },
+    });
+    state.adminOverview.kickoff = payload;
+    state.commandWorkspace.seasonSetup = payload;
+    renderAdminWorkspaceExtras();
+    renderCommandWorkspaceExtras();
+    showToast("Season kickoff updated.");
+  } catch (error) {
+    showToast(error.message || "Unable to update season kickoff.");
+  } finally {
+    if (seasonKickoffSaveBtn) {
+      seasonKickoffSaveBtn.disabled = false;
+      seasonKickoffSaveBtn.textContent = "Save Kickoff Progress";
+    }
+  }
+}
+
 async function handleSeasonArchiveDownload() {
   if (!roleCanUseAdminPanel()) {
     showToast("Head Rush Officer access required.");
@@ -6994,7 +7265,24 @@ function renderGoogleImportResult(payload) {
     return;
   }
   if (!payload) {
-    googleImportResult.innerHTML = '<p class="muted">No imports yet.</p>';
+    const recentImport = state.adminOverview && state.adminOverview.trustCenter && Array.isArray(state.adminOverview.trustCenter.recent_imports)
+      ? state.adminOverview.trustCenter.recent_imports[0]
+      : null;
+    if (!recentImport) {
+      googleImportResult.innerHTML = '<p class="muted">No imports yet.</p>';
+      return;
+    }
+    googleImportResult.innerHTML = `
+      <div class="entry">
+        <div class="entry-title">
+          <strong>Most Recent Import</strong>
+          <span>${escapeHtml(recentImport.created_count || 0)} created</span>
+        </div>
+        <p class="muted">${escapeHtml(recentImport.source_name || "Google Form CSV")} | ${escapeHtml(formatTrendTimestamp(recentImport.created_at))}</p>
+        <p class="muted">Rows processed: ${recentImport.rows_processed || 0} | Created: ${recentImport.created_count || 0} | Duplicates skipped: ${recentImport.skipped_count || 0} | Errors: ${recentImport.error_count || 0}</p>
+        <p class="muted">${escapeHtml(recentImport.message || "")}</p>
+      </div>
+    `;
     return;
   }
   const issues = (payload.errors || [])
@@ -7480,6 +7768,9 @@ function attachEvents() {
   if (seasonResetBtn) {
     seasonResetBtn.addEventListener("click", handleSeasonReset);
   }
+  if (seasonKickoffForm) {
+    seasonKickoffForm.addEventListener("submit", handleSeasonKickoffSave);
+  }
   if (seasonArchiveDownloadBtn) {
     seasonArchiveDownloadBtn.addEventListener("click", handleSeasonArchiveDownload);
   }
@@ -7527,14 +7818,18 @@ function attachEvents() {
     commandCenterQueue.addEventListener("click", handleQueueSelect);
   }
   if (commandWatchToggleBtn) {
-    commandWatchToggleBtn.addEventListener("click", () => {
+    commandWatchToggleBtn.addEventListener("click", async () => {
       const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
       if (!selectedId) {
         showToast("Select a queue item first.");
         return;
       }
-      const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
+      try {
+        const watching = await toggleWatchlistPnm(selectedId);
+        showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
+      } catch (error) {
+        showToast(error.message || "Unable to update Meetings pin.");
+      }
     });
   }
   if (commandScheduleTouchpointBtn) {
@@ -7548,14 +7843,18 @@ function attachEvents() {
     });
   }
   if (rusheeWatchToggleBtn) {
-    rusheeWatchToggleBtn.addEventListener("click", () => {
+    rusheeWatchToggleBtn.addEventListener("click", async () => {
       const selectedId = Number(state.selectedPnmId || 0);
       if (!selectedId) {
         showToast("Select a rushee first.");
         return;
       }
-      const watching = toggleWatchlistPnm(selectedId);
-      showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
+      try {
+        const watching = await toggleWatchlistPnm(selectedId);
+        showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
+      } catch (error) {
+        showToast(error.message || "Unable to update Meetings pin.");
+      }
     });
   }
   if (rusheeScheduleTouchpointBtn) {
@@ -7599,8 +7898,8 @@ function attachEvents() {
   });
   [memberFilterRole, memberFilterState, memberFilterCity, memberSortSelectDesktop].forEach((input) => {
     if (input) {
-      input.addEventListener("input", () => scheduleAutoApplyFilters("members"));
-      input.addEventListener("change", () => scheduleAutoApplyFilters("members"));
+      input.addEventListener("input", () => scheduleAutoApplyFilters("team"));
+      input.addEventListener("change", () => scheduleAutoApplyFilters("team"));
     }
   });
   if (pnmViewToggleTable) {
@@ -7762,6 +8061,7 @@ function attachEvents() {
     sameStatePnmsList.addEventListener("click", handleSameStatePnmsClick);
   }
   document.addEventListener("click", handleWatchToggleClick);
+  document.addEventListener("click", handleSeasonKickoffJumpClick);
   document.addEventListener("click", (event) => {
     handleGlobalOpenPnmClick(event).catch(() => {});
   });

@@ -124,15 +124,38 @@
                 <h2>Inspector</h2>
                 <p id="selectedPnmLabel" class="muted">Select a rushee to review packet readiness, ratings, and ownership.</p>
               </div>
-              <div class="action-row">
-                <button id="rusheeWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
-                <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
-                <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
-              </div>
             </div>
 
             <div class="grid-two rushee-inspector-grid">
-              <article class="rushee-inspector-column">
+              <article class="rushee-inspector-column rushee-inspector-column-primary">
+                <section class="rushee-inspector-block rushee-identity-block">
+                  <div class="section-head section-head-compact">
+                    <div>
+                      <h3>Identity + Packet Readiness</h3>
+                      <p class="muted">Photo, assignment ownership, and meeting prep status.</p>
+                    </div>
+                  </div>
+                  <div class="meeting-photo-wrap">
+                    <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected rushee" />
+                    <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
+                  </div>
+                  <div class="action-row shared-rushee-action-strip">
+                    <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
+                    <button id="rusheeWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
+                    <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
+                  </div>
+                  <form id="photoForm" class="stack compact-upload">
+                    <label>
+                      Update photo
+                      <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+                    </label>
+                    <div class="action-row">
+                      <button type="submit" class="secondary">Upload Photo</button>
+                      <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                    </div>
+                  </form>
+                </section>
+
                 <section class="rushee-inspector-block">
                   <div class="section-head section-head-compact">
                     <div>
@@ -177,64 +200,47 @@
                 </section>
               </article>
 
-              <article class="rushee-inspector-column">
-                <section class="rushee-inspector-block rushee-identity-block">
-                  <div class="section-head section-head-compact">
-                    <div>
-                      <h3>Identity + Packet Readiness</h3>
-                      <p class="muted">Photo, assignment ownership, and meeting prep status.</p>
+              <article class="rushee-inspector-column rushee-inspector-column-secondary">
+                <details class="rushee-inspector-disclosure" open>
+                  <summary>Assignment Ownership</summary>
+                  <section id="assignPanel" class="stack hidden rushee-inspector-block">
+                    <div class="section-head section-head-compact">
+                      <div>
+                        <h3>Assignment Ownership</h3>
+                        <p class="muted">Head-only control for primary ownership.</p>
+                      </div>
                     </div>
-                  </div>
-                  <div class="meeting-photo-wrap">
-                    <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected rushee" />
-                    <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
-                  </div>
-                  <form id="photoForm" class="stack compact-upload">
                     <label>
-                      Update photo
-                      <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+                      Assigned officer
+                      <select id="assignOfficerSelect"></select>
                     </label>
                     <div class="action-row">
-                      <button type="submit" class="secondary">Upload Photo</button>
-                      <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                      <button id="assignOfficerBtn" type="button">Assign</button>
+                      <button id="clearAssignBtn" type="button" class="secondary">Clear</button>
                     </div>
-                  </form>
-                </section>
+                  </section>
+                </details>
 
-                <section id="assignPanel" class="stack hidden rushee-inspector-block">
-                  <div class="section-head section-head-compact">
-                    <div>
-                      <h3>Assignment Ownership</h3>
-                      <p class="muted">Head-only control for primary ownership.</p>
+                <details class="rushee-inspector-disclosure" open>
+                  <summary>Package Deals</summary>
+                  <section id="packageDealPanel" class="stack rushee-inspector-block">
+                    <div class="section-head section-head-compact">
+                      <div>
+                        <h3>Package Deals</h3>
+                        <p class="muted">Keep linked rushees grouped across assignments and packet prep.</p>
+                      </div>
                     </div>
-                  </div>
-                  <label>
-                    Assigned officer
-                    <select id="assignOfficerSelect"></select>
-                  </label>
-                  <div class="action-row">
-                    <button id="assignOfficerBtn" type="button">Assign</button>
-                    <button id="clearAssignBtn" type="button" class="secondary">Clear</button>
-                  </div>
-                </section>
-
-                <section id="packageDealPanel" class="stack rushee-inspector-block">
-                  <div class="section-head section-head-compact">
-                    <div>
-                      <h3>Package Deals</h3>
-                      <p class="muted">Keep linked rushees grouped across assignments and packet prep.</p>
+                    <label>
+                      Link selected rushee with
+                      <select id="packagePartnerSelect"></select>
+                    </label>
+                    <div class="action-row">
+                      <button id="packageLinkBtn" type="button">Link Package Deal</button>
+                      <button id="packageUnlinkBtn" type="button" class="secondary">Unlink Selected</button>
                     </div>
-                  </div>
-                  <label>
-                    Link selected rushee with
-                    <select id="packagePartnerSelect"></select>
-                  </label>
-                  <div class="action-row">
-                    <button id="packageLinkBtn" type="button">Link Package Deal</button>
-                    <button id="packageUnlinkBtn" type="button" class="secondary">Unlink Selected</button>
-                  </div>
-                  <p id="packageDealSummary" class="muted">No package deal linked for this rushee yet.</p>
-                </section>
+                    <p id="packageDealSummary" class="muted">No package deal linked for this rushee yet.</p>
+                  </section>
+                </details>
               </article>
             </div>
           </section>

@@ -1130,6 +1130,14 @@ a {
   gap: 1rem;
 }
 
+.bb-org-entry-strip {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bb-org-entry-strip .bb-bento-card {
+  min-height: 100%;
+}
+
 .bb-org-card {
   display: grid;
   gap: 1rem;
@@ -1311,6 +1319,7 @@ html[data-theme="light"] .bb-hero-inline-proof article {
   }
 
   .bb-org-grid,
+  .bb-org-entry-strip,
   .bb-faq-grid,
   .bb-outcome-grid,
   .bb-surface-grid {
@@ -1460,6 +1469,7 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 
   .bb-bento-grid,
   .bb-org-grid,
+  .bb-org-entry-strip,
   .bb-faq-grid,
   .bb-outcome-grid,
   .bb-surface-grid {

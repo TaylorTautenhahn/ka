@@ -151,6 +151,8 @@ const toastEl = document.getElementById("meetingToast");
 
 let currentPnmId = null;
 let currentUser = null;
+let currentMeetingPins = [];
+let currentPacketLabel = "";
 
 function escapeHtml(input) {
   return String(input)
@@ -319,6 +321,14 @@ function showToast(message) {
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2600);
 }
 
+function currentMeetingPinnedIds() {
+  return Array.isArray(currentMeetingPins) ? currentMeetingPins.map((item) => Number(item.pnm_id || 0)).filter((value) => value > 0) : [];
+}
+
+function isMeetingPinned(pnmId) {
+  return currentMeetingPinnedIds().includes(Number(pnmId));
+}
+
 function desktopRoutePath(key, fallbackSuffix) {
   const fromConfig = DESKTOP_ROUTES && DESKTOP_ROUTES[key] ? String(DESKTOP_ROUTES[key]) : "";
   if (fromConfig) {
@@ -331,14 +341,16 @@ function applySessionHeader(user) {
   if (!sessionTitle || !sessionSubtitle) {
     return;
   }
+  const packetLabel = currentPacketLabel || "Meeting Packet";
   if (!user) {
-    sessionTitle.textContent = "Meeting Packet";
+    sessionTitle.textContent = packetLabel;
     sessionSubtitle.textContent = "";
     return;
   }
-  sessionTitle.textContent = user.username || "Meeting Packet";
+  sessionTitle.textContent = packetLabel;
   const emoji = user.emoji ? `${user.emoji} ` : "";
-  sessionSubtitle.textContent = `${emoji}${user.role || ""}`.trim();
+  const identity = [emoji ? emoji.trimEnd() : "", user.username || "", user.role || ""].filter(Boolean).join(" · ");
+  sessionSubtitle.textContent = identity;
 }
 
 function applyRoleNavVisibility(user) {
@@ -437,6 +449,7 @@ function renderPacket(payload) {
     lunch_comment_history: lunchCommentHistory = [],
     rush_comment_timeline: rushCommentTimeline = [],
     can_view_rater_identity: canSeeRaters,
+    meeting_pin: meetingPin = {},
   } = payload;
   const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
   const linkedSummaryText = Array.isArray(linkedPnms) && linkedPnms.length
@@ -468,6 +481,12 @@ function renderPacket(payload) {
   const photoMarkup = pnm.photo_url
     ? `<img src="${escapeHtml(pnm.photo_url)}" alt="${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}" class="meeting-photo large" loading="lazy" />`
     : '<div class="photo-placeholder large">No photo uploaded.</div>';
+  const pinLabel = meetingPin && meetingPin.is_pinned ? "Pinned for Meetings" : "Pin for Meetings";
+  const pinMeta = meetingPin && meetingPin.is_pinned
+    ? `Pinned by ${meetingPin.pinned_by_username || "Rush team"} | ${formatTrendTimestamp(meetingPin.pinned_at)}`
+    : "Use the Meetings shortlist as the single source of truth for packet prep.";
+  currentPacketLabel = `${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`;
+  applySessionHeader(currentUser);
 
   const ratingsMarkup =
     ratings
@@ -540,6 +559,18 @@ function renderPacket(payload) {
       .join("") || "<li>No fit matches yet.</li>";
 
   packetEl.innerHTML = `
+    <div class="meeting-parent-strip">
+      <div>
+        <p class="eyebrow">Meetings Workspace</p>
+        <h3>Meeting Packet</h3>
+        <p class="muted">${escapeHtml(pinMeta)}</p>
+      </div>
+      <div class="action-row">
+        <button type="button" class="secondary meeting-pin-toggle-btn" data-meeting-pin-id="${Number(pnm.pnm_id)}">${escapeHtml(pinLabel)}</button>
+        <a class="quick-nav-link" href="${escapeHtml(`${desktopRoutePath("rushees", "rushees")}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Rushee Workspace</a>
+        <a class="quick-nav-link" href="${escapeHtml(desktopRoutePath("meetings", "meetings"))}">Back to Meetings Queue</a>
+      </div>
+    </div>
     <div class="meeting-header">
       ${photoMarkup}
       <div>
@@ -607,6 +638,35 @@ function renderPacket(payload) {
       <ul class="meeting-list">${matchMarkup}</ul>
     </article>
   `;
+}
+
+async function loadMeetingPins() {
+  try {
+    const payload = await api("/api/meetings/pins");
+    currentMeetingPins = Array.isArray(payload.pins) ? payload.pins : [];
+  } catch {
+    currentMeetingPins = [];
+  }
+}
+
+async function handleMeetingPinToggle(event) {
+  const button = event.target.closest("[data-meeting-pin-id]");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.meetingPinId || 0);
+  if (!pnmId) {
+    return;
+  }
+  const wasPinned = isMeetingPinned(pnmId);
+  const payload = wasPinned
+    ? await api(`/api/meetings/pins/${pnmId}`, { method: "DELETE" })
+    : await api("/api/meetings/pins", { method: "POST", body: { pnm_id: pnmId } });
+  currentMeetingPins = Array.isArray(payload.pins) ? payload.pins : [];
+  if (currentPnmId === pnmId) {
+    await loadPacket();
+  }
+  showToast(wasPinned ? "Removed from Meetings pins." : "Pinned for Meetings.");
 }
 
 async function loadPacket() {
@@ -689,6 +749,14 @@ function attachEvents() {
     logoutBtn.addEventListener("click", handleLogout);
   }
   packetEl.addEventListener("click", async (event) => {
+    if (event.target.closest("[data-meeting-pin-id]")) {
+      try {
+        await handleMeetingPinToggle(event);
+      } catch (error) {
+        showToast(error.message || "Unable to update Meetings pin.");
+      }
+      return;
+    }
     const button = event.target.closest(".linked-meeting-open-btn");
     if (!button) {
       return;
@@ -711,6 +779,7 @@ async function init() {
   if (!ok) {
     return;
   }
+  await loadMeetingPins();
   const fromQuery = Number(new URLSearchParams(window.location.search).get("pnm_id") || 0);
   if (fromQuery) {
     currentPnmId = fromQuery;

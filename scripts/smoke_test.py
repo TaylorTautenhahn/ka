@@ -254,6 +254,13 @@ def main() -> None:
             expect_status(response, 200, "Head can open admin route")
             checks.append("Head can access admin route")
 
+            response = client.get("/kappaalphaorder/api/auth/capabilities")
+            expect_status(response, 200, "Head capabilities API")
+            capabilities = response.json().get("capabilities", {})
+            if not capabilities.get("can_manage_admin") or not capabilities.get("can_export_backups"):
+                raise AssertionError("Head capabilities should expose admin and backup access.")
+            checks.append("Head capabilities API works")
+
             response = client.get("/kappaalphaorder/api/users/pending")
             expect_status(response, 200, "Pending users list")
             pending = response.json().get("pending", [])
@@ -490,11 +497,26 @@ def main() -> None:
                 raise AssertionError("Command center summary should reflect requested 72-hour window.")
             checks.append("Officer command center API works")
 
+            response = client.get("/kappaalphaorder/api/auth/capabilities")
+            expect_status(response, 200, "Officer capabilities API")
+            capabilities_payload = response.json().get("capabilities", {})
+            if not capabilities_payload.get("can_use_command") or not capabilities_payload.get("can_pin_for_meetings"):
+                raise AssertionError("Officer capabilities should include command and Meetings pin permissions.")
+            if capabilities_payload.get("can_manage_admin"):
+                raise AssertionError("Officer capabilities should not expose head-only admin permission.")
+            checks.append("Officer capabilities API works")
+
             response = client.get("/kappaalphaorder/api/workspace/command")
             expect_status(response, 200, "Command workspace API")
             command_workspace = response.json()
             if "command_center" not in command_workspace or "team_pulse" not in command_workspace:
                 raise AssertionError("Command workspace payload should include command_center and team_pulse.")
+            if "weekly_roi" not in command_workspace or "season_setup" not in command_workspace or "meeting_pins" not in command_workspace:
+                raise AssertionError("Command workspace payload should include weekly_roi, season_setup, and meeting_pins.")
+            if not isinstance((command_workspace.get("weekly_roi") or {}).get("cards"), list):
+                raise AssertionError("Command workspace weekly ROI payload should include cards.")
+            if not isinstance((command_workspace.get("season_setup") or {}).get("steps"), list):
+                raise AssertionError("Command workspace season setup payload should include steps.")
             checks.append("Command workspace API works")
 
             response = client.get("/kappaalphaorder/api/workspace/rushees?state=TX")
@@ -521,9 +543,28 @@ def main() -> None:
             response = client.get("/kappaalphaorder/api/workspace/meetings")
             expect_status(response, 200, "Meetings workspace API")
             meetings_workspace = response.json()
-            if "shortlist" not in meetings_workspace or "candidates" not in meetings_workspace:
-                raise AssertionError("Meetings workspace payload should include shortlist and candidates.")
+            if "shortlist" not in meetings_workspace or "candidates" not in meetings_workspace or "pins" not in meetings_workspace:
+                raise AssertionError("Meetings workspace payload should include shortlist, candidates, and pins.")
             checks.append("Meetings workspace API works")
+
+            response = client.get("/kappaalphaorder/api/meetings/pins")
+            expect_status(response, 200, "Meetings pins list API")
+            if response.json().get("pins") != []:
+                raise AssertionError("Meetings pins should start empty in smoke tests.")
+            response = client.post("/kappaalphaorder/api/meetings/pins", json={"pnm_id": pnm_id})
+            expect_status(response, 200, "Create meeting pin")
+            pins_payload = response.json().get("pins", [])
+            if not any(int(item.get("pnm_id") or 0) == pnm_id for item in pins_payload):
+                raise AssertionError("Meeting pin creation should return the pinned rushee.")
+            response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/meeting")
+            expect_status(response, 200, "Meeting packet includes pin state")
+            if not (response.json().get("meeting_pin") or {}).get("is_pinned"):
+                raise AssertionError("Meeting packet payload should expose current meeting pin state.")
+            response = client.delete(f"/kappaalphaorder/api/meetings/pins/{pnm_id}")
+            expect_status(response, 200, "Delete meeting pin")
+            if any(int(item.get("pnm_id") or 0) == pnm_id for item in response.json().get("pins", [])):
+                raise AssertionError("Meeting pin delete should remove the selected rushee.")
+            checks.append("Meetings pin APIs work")
 
             response = client.get("/kappaalphaorder/api/mobile/home")
             expect_status(response, 200, "Officer mobile home API")
@@ -563,9 +604,19 @@ def main() -> None:
             }
             if "backup_csv" in officer_commands or "create_event" in officer_commands:
                 raise AssertionError("Officer search should not expose head-only commands.")
-            if "create_lunch" not in officer_commands or "open_meetings" not in officer_commands:
-                raise AssertionError("Officer search should expose officer-safe command actions.")
             checks.append("Global search API works")
+
+            response = client.get("/kappaalphaorder/api/search/global?q=touchpoint")
+            expect_status(response, 200, "Global search command filtering API")
+            touchpoint_search_payload = response.json()
+            touchpoint_commands = {
+                str(item.get("action"))
+                for item in touchpoint_search_payload.get("commands", [])
+                if isinstance(item, dict) and item.get("action")
+            }
+            if "schedule_touchpoint" not in touchpoint_commands and "create_lunch" not in touchpoint_commands:
+                raise AssertionError("Command-like searches should expose touchpoint scheduling.")
+            checks.append("Global search command filtering works")
 
             response = client.post(
                 "/kappaalphaorder/api/ratings",
@@ -657,6 +708,32 @@ def main() -> None:
             expect_status(response, 409, "Duplicate lunch blocked")
             checks.append("Lunch dedupe rule enforced")
 
+            response = client.get("/kappaalphaorder/api/meetings/pins")
+            expect_status(response, 200, "Officer list meeting pins")
+            if response.json().get("pins") != []:
+                raise AssertionError("Meeting pins should start empty in the smoke flow.")
+
+            response = client.post("/kappaalphaorder/api/meetings/pins", json={"pnm_id": pnm_id})
+            expect_status(response, 200, "Officer create meeting pin")
+            meeting_pins = response.json().get("pins", [])
+            if not any(int(item.get("pnm_id") or 0) == pnm_id for item in meeting_pins):
+                raise AssertionError("Created meeting pin should appear in the shared pin list.")
+
+            response = client.get("/kappaalphaorder/api/workspace/command")
+            expect_status(response, 200, "Command workspace with meeting pin")
+            if not any(int(item.get("pnm_id") or 0) == pnm_id for item in response.json().get("meeting_pins", [])):
+                raise AssertionError("Command workspace should mirror persisted meeting pins.")
+
+            response = client.get("/kappaalphaorder/api/workspace/meetings")
+            expect_status(response, 200, "Meetings workspace with meeting pin")
+            meetings_payload = response.json()
+            if not any(int(item.get("pnm_id") or 0) == pnm_id for item in meetings_payload.get("pins", [])):
+                raise AssertionError("Meetings workspace should mirror persisted meeting pins.")
+            shortlist = meetings_payload.get("shortlist", [])
+            if not shortlist or int(shortlist[0].get("pnm_id") or 0) != pnm_id:
+                raise AssertionError("Persisted meeting pins should be prioritized at the front of the shortlist.")
+            checks.append("Meeting pins persist across Command and Meetings workspaces")
+
             response = client.post(
                 "/kappaalphaorder/api/rush-events",
                 json={
@@ -702,7 +779,16 @@ def main() -> None:
             rush_comment_timeline = meeting_payload.get("rush_comment_timeline", [])
             if not isinstance(rush_comment_timeline, list):
                 raise AssertionError("Meeting view rush_comment_timeline should be a list.")
+            meeting_pin = meeting_payload.get("meeting_pin", {})
+            if not meeting_pin.get("is_pinned"):
+                raise AssertionError("Meeting packet payload should expose persisted meeting pin state.")
             checks.append("Meeting view API works")
+
+            response = client.delete(f"/kappaalphaorder/api/meetings/pins/{pnm_id}")
+            expect_status(response, 200, "Officer remove meeting pin")
+            if any(int(item.get("pnm_id") or 0) == pnm_id for item in response.json().get("pins", [])):
+                raise AssertionError("Meeting pin removal should clear the pinned rushee from shared state.")
+            checks.append("Meeting pins can be removed")
 
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Officer logout")
@@ -808,11 +894,23 @@ def main() -> None:
             blocked_rusher_commands = {"add_rushee", "create_event", "backup_csv", "open_meetings"}
             if rusher_commands & blocked_rusher_commands:
                 raise AssertionError("Rusher search should not expose officer or head-only commands.")
-            if "create_lunch" not in rusher_commands or "open_tutorial" not in rusher_commands:
-                raise AssertionError("Rusher search should still expose safe self-service commands.")
+            if "create_lunch" in rusher_commands:
+                raise AssertionError("Rusher search should not expose touchpoint scheduling.")
             if rusher_search_payload.get("members"):
                 raise AssertionError("Rusher search should not expose member roster results.")
             checks.append("Global search hides restricted commands for rushers")
+
+            response = client.get("/kappaalphaorder/api/search/global?q=tutorial")
+            expect_status(response, 200, "Rusher tutorial search API")
+            tutorial_search_payload = response.json()
+            tutorial_commands = {
+                str(item.get("action"))
+                for item in tutorial_search_payload.get("commands", [])
+                if isinstance(item, dict) and item.get("action")
+            }
+            if "open_tutorial" not in tutorial_commands:
+                raise AssertionError("Tutorial queries should still expose tutorial access.")
+            checks.append("Tutorial search exposes tutorial access")
 
             response = client.patch(
                 f"/kappaalphaorder/api/users/{officer_user_id}/location",
@@ -831,6 +929,46 @@ def main() -> None:
             )
             expect_status(response, 200, "Head re-login")
             sync_csrf_header()
+
+            response = client.get("/kappaalphaorder/api/auth/capabilities")
+            expect_status(response, 200, "Head capabilities API")
+            head_capabilities = response.json().get("capabilities", {})
+            if not head_capabilities.get("can_manage_admin") or not head_capabilities.get("can_export_backups"):
+                raise AssertionError("Head capabilities should expose admin and backup permissions.")
+            checks.append("Head capabilities API works")
+
+            response = client.get("/kappaalphaorder/api/admin/season/kickoff")
+            expect_status(response, 200, "Head season kickoff API")
+            kickoff_payload = response.json()
+            if "steps" not in kickoff_payload or "progress" not in kickoff_payload:
+                raise AssertionError("Season kickoff payload should include steps and progress.")
+
+            response = client.patch(
+                "/kappaalphaorder/api/admin/season/kickoff",
+                json={
+                    "season_label": "Fall 2026 Rush",
+                    "rating_criteria_confirmed": True,
+                    "member_invites_shared": True,
+                    "kickoff_completed": True,
+                },
+            )
+            expect_status(response, 200, "Head updates season kickoff")
+            kickoff_payload = response.json()
+            if kickoff_payload.get("season_label") != "Fall 2026 Rush":
+                raise AssertionError("Season kickoff update should persist the season label.")
+            if not kickoff_payload.get("kickoff_completed_at"):
+                raise AssertionError("Season kickoff update should allow marking kickoff complete.")
+            checks.append("Season kickoff API works")
+
+            response = client.get("/kappaalphaorder/api/admin/overview")
+            expect_status(response, 200, "Admin overview API")
+            admin_overview = response.json()
+            if "kickoff" not in admin_overview or "trust_center" not in admin_overview:
+                raise AssertionError("Admin overview should include kickoff and trust_center payloads.")
+            trust_center = admin_overview.get("trust_center", {})
+            if "recent_jobs" not in trust_center or "capabilities" not in trust_center:
+                raise AssertionError("Trust center payload should include capabilities and recent job history.")
+            checks.append("Admin overview trust center payload works")
 
             response = client.post(
                 "/kappaalphaorder/api/rush-events",

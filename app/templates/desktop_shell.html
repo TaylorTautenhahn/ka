@@ -44,9 +44,9 @@
                 {% endif %}
               </div>
               <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
-              <h1>BidBoard Command For {{ app_config.chapter_name if app_config else 'Your Chapter' }}</h1>
+              <h1>Continue Into Your Chapter Command Center</h1>
               <p>
-                {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'One premium command layer for rushees, touchpoints, packets, assignments, and team coordination.' }}
+                {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'BidBoard keeps rushees, touchpoints, meeting packets, assignments, and team coordination in one shared chapter workspace.' }}
               </p>
               <div class="auth-feature-strip">
                 <span>Command</span>
@@ -68,7 +68,15 @@
                   <strong id="heroLunchCount">0</strong>
                 </article>
               </div>
-              <div class="auth-proof-grid">
+              <div class="auth-proof-grid auth-proof-grid-entry">
+                <article class="auth-proof-card">
+                  <strong>Isolated Chapter Data</strong>
+                  <span>Every organization keeps its own roster, approvals, and exports.</span>
+                </article>
+                <article class="auth-proof-card">
+                  <strong>Shared Rush System</strong>
+                  <span>Command, Rushees, Meetings, Operations, Team, and Admin stay aligned after login.</span>
+                </article>
                 <article class="auth-proof-card">
                   <strong>Live Team Context</strong>
                   <span>Assignments, scoring, and packets stay aligned in one workspace.</span>
@@ -176,11 +184,11 @@
             </div>
 
             <nav id="desktopPageNav" class="app-nav" aria-label="Desktop pages">
-              <a href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'overview' %} is-active{% endif %}" data-page="overview">Command</a>
+              <a href="{{ app_config.desktop_routes.dashboard if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/dashboard') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'dashboard' %} is-active{% endif %}" data-page="dashboard">Command</a>
               <a href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'rushees' %} is-active{% endif %}" data-page="rushees">Rushees</a>
               <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'meetings' %} is-active{% endif %}" data-page="meetings">Meetings</a>
-              <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'operations' %} is-active{% endif %}" data-page="operations">Operations <span id="operationsUnreadBadge" class="nav-badge hidden">0</span></a>
-              <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'members' %} is-active{% endif %}" data-page="members">Team</a>
+              <a href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'calendar' %} is-active{% endif %}" data-page="calendar">Operations <span id="operationsUnreadBadge" class="nav-badge hidden">0</span></a>
+              <a href="{{ app_config.desktop_routes.team if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/team') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'team' %} is-active{% endif %}" data-page="team">Team</a>
               <a id="adminNavLink" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}" class="app-nav-link desktop-page-link{% if app_config and app_config.desktop_page == 'admin' %} is-active{% endif %}" data-page="admin">Admin</a>
             </nav>
           </aside>
@@ -225,10 +233,10 @@
               <div class="app-search-field">
                 <label>
                   Search
-                  <input id="globalSearchInput" type="search" placeholder="Search rushees, members, commands" autocomplete="off" />
+                  <input id="globalSearchInput" type="search" placeholder="Search rushees, team, commands" autocomplete="off" />
                 </label>
               </div>
-              <p class="muted app-toolbar-hint">Use search to jump to rushees, members, packets, or the commands you need next.</p>
+              <p class="muted app-toolbar-hint">Use search to jump to rushees, team members, packets, or the commands you need next.</p>
             </section>
 
             <div class="desktop-pages app-workspace-pages">
@@ -267,9 +275,9 @@
         </div>
         <label>
           Search or run a command
-          <input id="commandPaletteInput" type="search" placeholder="Search rushees, members, or commands" autocomplete="off" />
+          <input id="commandPaletteInput" type="search" placeholder="Search rushees, team, or commands" autocomplete="off" />
         </label>
-        <div id="commandPaletteResults" class="list-box muted">Start typing to search rushees, members, or common actions.</div>
+        <div id="commandPaletteResults" class="list-box muted">Start typing to search rushees, team members, or common actions.</div>
       </section>
     </div>
 

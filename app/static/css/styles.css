@@ -3290,6 +3290,11 @@ body[data-mobile-page] .mobile-kpi-grid {
   gap: 0.6rem;
 }
 
+body[data-mobile-page] .mobile-command-score-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
 body[data-mobile-page] .mobile-kpi-grid .card,
 body[data-mobile-page] .mobile-panel .card {
   border-radius: 18px;
@@ -3388,6 +3393,10 @@ body[data-mobile-page] .toast {
 
   body[data-mobile-page] .mobile-action-grid {
     grid-template-columns: 1fr;
+  }
+
+  body[data-mobile-page] .mobile-command-score-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

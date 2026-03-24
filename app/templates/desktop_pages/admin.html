@@ -64,6 +64,35 @@
         <section class="desktop-subpage reveal delay-3" data-admin-tab="season">
           <div class="grid-two admin-workspace-grid">
             <section class="panel">
+              <h3>Season Kickoff Wizard</h3>
+              <p class="muted">Use this checklist to get the chapter ready before rush activity accelerates.</p>
+              <div id="seasonKickoffSummary" class="muted">Loading season kickoff...</div>
+              <div id="seasonKickoffList" class="list-box muted">Loading season kickoff steps...</div>
+              <form id="seasonKickoffForm" class="stack season-kickoff-form">
+                <div class="inline-grid two-cols">
+                  <label>
+                    Season label
+                    <input id="seasonKickoffLabel" type="text" maxlength="120" placeholder="Fall 2026 Rush" />
+                  </label>
+                  <label class="checkbox-line season-kickoff-checkbox">
+                    <input id="seasonKickoffComplete" type="checkbox" />
+                    Mark kickoff as complete
+                  </label>
+                </div>
+                <label class="checkbox-line season-kickoff-checkbox">
+                  <input id="seasonKickoffCriteria" type="checkbox" />
+                  Rating criteria has been confirmed for this season
+                </label>
+                <label class="checkbox-line season-kickoff-checkbox">
+                  <input id="seasonKickoffInvites" type="checkbox" />
+                  Member invite flow has been shared with the chapter
+                </label>
+                <div class="action-row">
+                  <button id="seasonKickoffSaveBtn" type="submit">Save Kickoff Progress</button>
+                </div>
+              </form>
+            </section>
+            <section class="panel">
               <h3>Season Archive + Reset</h3>
               <p class="muted">Archive the current season and reset for the next rush cycle. Only one archive is retained.</p>
               <div id="seasonArchiveSummary" class="list-box muted">Loading season archive status...</div>
@@ -144,6 +173,15 @@
               </div>
             </section>
           </div>
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <h3>Import History</h3>
+                <p class="muted">Recent import activity is mirrored here so you can trust what reached the roster.</p>
+              </div>
+            </div>
+            <div id="adminImportHistoryList" class="list-box muted">No recent import activity yet.</div>
+          </section>
         </section>
 
         <section class="desktop-subpage reveal delay-3" data-admin-tab="roster">
@@ -289,6 +327,18 @@
                   <p class="muted">Use the summary cards above before drilling into leadership, roster tools, or storage actions.</p>
                 </div>
               </div>
+            </section>
+          </div>
+          <div class="grid-two admin-workspace-grid">
+            <section class="panel">
+              <h3>Trust Center</h3>
+              <p class="muted">Role visibility, imports, backups, and system confidence in one place.</p>
+              <div id="trustCapabilitiesList" class="list-box muted">Loading trust capabilities...</div>
+            </section>
+            <section class="panel">
+              <h3>Trust Activity</h3>
+              <p class="muted">Recent imports, backups, and season control events.</p>
+              <div id="trustActivityStorageList" class="list-box muted">Loading trust activity...</div>
             </section>
           </div>
         </section>

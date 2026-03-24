@@ -1,4 +1,4 @@
-          <div class="desktop-page{% if app_config and app_config.desktop_page == 'overview' %} is-active{% endif %}" data-page="overview">
+          <div class="desktop-page{% if app_config and app_config.desktop_page == 'dashboard' %} is-active{% endif %}" data-page="dashboard">
         {% if is_demo_mode or (app_config and app_config.is_demo_tenant) %}
         <details class="panel reveal delay-2 demo-banner demo-guide-panel" open>
           <summary class="demo-guide-summary">
@@ -36,6 +36,29 @@
             <article class="card"><p>Needs Help</p><strong id="commandNeedsHelpCount">0</strong></article>
             <article class="card"><p>Unassigned Rushees</p><strong id="commandUnassignedCount">0</strong></article>
           </div>
+        </section>
+
+        <section class="command-support-grid command-support-grid-top reveal delay-3 command-strategy-grid">
+          <section class="panel">
+            <div class="section-head">
+              <div>
+                <h2>Season Kickoff</h2>
+                <p id="commandSeasonSetupSummary" class="muted">Loading season setup progress...</p>
+              </div>
+              <a class="quick-nav-link" href="{{ app_config.desktop_routes.admin if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/admin') }}">Open Admin</a>
+            </div>
+            <div id="commandSeasonSetupList" class="list-box command-list compact">Loading season setup progress...</div>
+          </section>
+
+          <section class="panel command-roi-panel">
+            <div class="section-head">
+              <div>
+                <h2>Weekly ROI</h2>
+                <p class="muted">This week’s activity signal versus the previous week.</p>
+              </div>
+            </div>
+            <div id="commandWeeklyRoiCards" class="cards command-roi-cards">Loading weekly ROI...</div>
+          </section>
         </section>
 
         <section class="command-support-grid command-support-grid-top reveal delay-3">
@@ -90,7 +113,7 @@
                     <p id="commandSelectedMeta" class="muted">Queue details, assignment ownership, and latest touchpoint appear here.</p>
                     <div id="commandSelectedSignal" class="command-selected-signal muted">Pick a rushee to load assignment, freshness, and packet context.</div>
                     <div id="commandSelectedStats" class="command-selected-stats"></div>
-                    <div class="action-row command-selected-actions">
+                    <div class="action-row command-selected-actions shared-rushee-action-strip">
                       <a id="commandOpenMeetingBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
                       <button id="commandWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
                       <button id="commandScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>

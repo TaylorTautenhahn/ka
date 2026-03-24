@@ -3524,6 +3524,43 @@ def pnm_payload_with_assignment_links(
     )
 
 
+def meeting_pin_payload_for_row(row: sqlite3.Row) -> dict[str, Any]:
+    return {
+        "pnm_id": int(row["id"]),
+        "pnm_code": row["pnm_code"],
+        "name": f"{row['first_name']} {row['last_name']}".strip(),
+        "photo_url": resolve_pnm_photo_url(row["photo_path"], row["instagram_handle"]),
+        "weighted_total": round(float(row["weighted_total"] or 0.0), 2),
+        "rating_count": int(row["rating_count"] or 0),
+        "total_lunches": int(row["total_lunches"] or 0),
+        "assigned_officer_username": row["assigned_officer_username"] or "",
+        "pinned_at": row["pinned_at"],
+        "pinned_by_username": row["pinned_by_username"] or "",
+    }
+
+
+def list_meeting_pins_payload(
+    conn: sqlite3.Connection,
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT
+            mp.pnm_id,
+            mp.pinned_at,
+            mp.pinned_by,
+            pin_user.username AS pinned_by_username,
+            p.*,
+            ao.username AS assigned_officer_username
+        FROM meeting_pins mp
+        JOIN pnms p ON p.id = mp.pnm_id
+        LEFT JOIN users pin_user ON pin_user.id = mp.pinned_by
+        LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+        ORDER BY mp.pinned_at DESC, p.weighted_total DESC, p.last_name ASC, p.first_name ASC
+        """
+    ).fetchall()
+    return [meeting_pin_payload_for_row(row) for row in rows]
+
+
 def default_engagement_status_for_date(event_date_raw: str, *, is_cancelled: bool = False) -> str:
     if is_cancelled:
         return "cancelled"
@@ -4446,6 +4483,48 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             lunch_count INTEGER NOT NULL DEFAULT 0
         );
 
+        CREATE TABLE IF NOT EXISTS meeting_pins (
+            pnm_id INTEGER PRIMARY KEY REFERENCES pnms(id) ON DELETE CASCADE,
+            pinned_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            pinned_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS season_setup_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            season_label TEXT NOT NULL DEFAULT '',
+            rating_criteria_confirmed INTEGER NOT NULL DEFAULT 0,
+            member_invites_shared INTEGER NOT NULL DEFAULT 0,
+            kickoff_completed_at TEXT,
+            created_at TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS import_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            import_type TEXT NOT NULL,
+            source_name TEXT NOT NULL DEFAULT '',
+            rows_processed INTEGER NOT NULL DEFAULT 0,
+            created_count INTEGER NOT NULL DEFAULT 0,
+            skipped_count INTEGER NOT NULL DEFAULT 0,
+            error_count INTEGER NOT NULL DEFAULT 0,
+            message TEXT NOT NULL DEFAULT '',
+            detail_json TEXT NOT NULL DEFAULT '{}',
+            triggered_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS job_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_type TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed',
+            summary TEXT NOT NULL DEFAULT '',
+            detail_json TEXT NOT NULL DEFAULT '{}',
+            triggered_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT NOT NULL
+        );
+
         CREATE INDEX IF NOT EXISTS idx_users_stereotype ON users(stereotype);
         CREATE INDEX IF NOT EXISTS idx_users_interests ON users(interests_norm);
         CREATE INDEX IF NOT EXISTS idx_pnms_stereotype ON pnms(stereotype);
@@ -4480,6 +4559,11 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_pnm_stage_history_pnm_changed_at ON pnm_stage_history(pnm_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_audit_ledger_created_at ON audit_ledger(created_at);
         CREATE INDEX IF NOT EXISTS idx_audit_ledger_entity ON audit_ledger(entity_type, entity_id, created_at);
+        CREATE INDEX IF NOT EXISTS idx_meeting_pins_pinned_at ON meeting_pins(pinned_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_import_runs_created_at ON import_runs(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_import_runs_type ON import_runs(import_type, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_job_runs_finished_at ON job_runs(finished_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_job_runs_type ON job_runs(job_type, finished_at DESC);
         """
     )
 
@@ -4819,6 +4903,70 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE season_archive_state ADD COLUMN rating_count INTEGER NOT NULL DEFAULT 0")
     if "lunch_count" not in season_columns:
         conn.execute("ALTER TABLE season_archive_state ADD COLUMN lunch_count INTEGER NOT NULL DEFAULT 0")
+
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS meeting_pins (
+            pnm_id INTEGER PRIMARY KEY REFERENCES pnms(id) ON DELETE CASCADE,
+            pinned_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            pinned_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_meeting_pins_pinned_at ON meeting_pins(pinned_at DESC);
+
+        CREATE TABLE IF NOT EXISTS season_setup_state (
+            id INTEGER PRIMARY KEY CHECK (id = 1),
+            season_label TEXT NOT NULL DEFAULT '',
+            rating_criteria_confirmed INTEGER NOT NULL DEFAULT 0,
+            member_invites_shared INTEGER NOT NULL DEFAULT 0,
+            kickoff_completed_at TEXT,
+            created_at TEXT NOT NULL DEFAULT '',
+            updated_at TEXT NOT NULL DEFAULT ''
+        );
+
+        CREATE TABLE IF NOT EXISTS import_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            import_type TEXT NOT NULL,
+            source_name TEXT NOT NULL DEFAULT '',
+            rows_processed INTEGER NOT NULL DEFAULT 0,
+            created_count INTEGER NOT NULL DEFAULT 0,
+            skipped_count INTEGER NOT NULL DEFAULT 0,
+            error_count INTEGER NOT NULL DEFAULT 0,
+            message TEXT NOT NULL DEFAULT '',
+            detail_json TEXT NOT NULL DEFAULT '{}',
+            triggered_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_import_runs_created_at ON import_runs(created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_import_runs_type ON import_runs(import_type, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS job_runs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            job_type TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'completed',
+            summary TEXT NOT NULL DEFAULT '',
+            detail_json TEXT NOT NULL DEFAULT '{}',
+            triggered_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+            started_at TEXT NOT NULL,
+            finished_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_job_runs_finished_at ON job_runs(finished_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_job_runs_type ON job_runs(job_type, finished_at DESC);
+        """
+    )
+    kickoff_columns = {row["name"] for row in conn.execute("PRAGMA table_info(season_setup_state)").fetchall()}
+    if "season_label" not in kickoff_columns:
+        conn.execute("ALTER TABLE season_setup_state ADD COLUMN season_label TEXT NOT NULL DEFAULT ''")
+    if "rating_criteria_confirmed" not in kickoff_columns:
+        conn.execute("ALTER TABLE season_setup_state ADD COLUMN rating_criteria_confirmed INTEGER NOT NULL DEFAULT 0")
+    if "member_invites_shared" not in kickoff_columns:
+        conn.execute("ALTER TABLE season_setup_state ADD COLUMN member_invites_shared INTEGER NOT NULL DEFAULT 0")
+    if "kickoff_completed_at" not in kickoff_columns:
+        conn.execute("ALTER TABLE season_setup_state ADD COLUMN kickoff_completed_at TEXT")
+    if "created_at" not in kickoff_columns:
+        conn.execute("ALTER TABLE season_setup_state ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
+    if "updated_at" not in kickoff_columns:
+        conn.execute("ALTER TABLE season_setup_state ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
 
     conn.executescript(
         """
@@ -6806,6 +6954,27 @@ def bootstrap_platform_and_tenants() -> None:
                 ensure_demo_seed_dataset(tenant_conn)
 
 
+def capability_manifest_for_user(user: sqlite3.Row) -> dict[str, bool]:
+    role = str(user["role"])
+    is_head = role == ROLE_HEAD
+    is_officer = role in {ROLE_HEAD, ROLE_RUSH_OFFICER}
+    return {
+        "can_use_command": is_officer,
+        "can_use_team": is_officer,
+        "can_use_operations": is_officer,
+        "can_use_meetings": is_officer,
+        "can_view_meeting_packets": is_officer,
+        "can_pin_for_meetings": is_officer,
+        "can_schedule_touchpoints": is_officer,
+        "can_add_rushees": is_officer,
+        "can_manage_admin": is_head,
+        "can_create_events": is_head,
+        "can_manage_imports": is_head,
+        "can_export_backups": is_head,
+        "can_manage_leadership": is_head,
+    }
+
+
 def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str, Any]:
     can_view_rating_stats = viewer_role in {ROLE_HEAD, ROLE_RUSH_OFFICER} or row["id"] == viewer_id
     keys = set(row.keys())
@@ -6838,6 +7007,7 @@ def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str
             "version": onboarding_version,
             "required": onboarding_completed_at is None or onboarding_version < ONBOARDING_TUTORIAL_VERSION,
         },
+        "capabilities": capability_manifest_for_user(row),
     }
     if can_view_rating_stats:
         payload["rating_count"] = int(row["rating_count"])
@@ -7725,6 +7895,25 @@ class SeasonResetRequest(BaseModel):
     @field_validator("archive_label")
     @classmethod
     def normalize_archive_label(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        token = value.strip()
+        return token or None
+
+
+class MeetingPinCreateRequest(BaseModel):
+    pnm_id: int = Field(..., ge=1)
+
+
+class SeasonKickoffUpdateRequest(BaseModel):
+    season_label: str | None = Field(default=None, max_length=120)
+    member_invites_shared: bool | None = None
+    rating_criteria_confirmed: bool | None = None
+    kickoff_completed: bool | None = None
+
+    @field_validator("season_label")
+    @classmethod
+    def normalize_season_label(cls, value: str | None) -> str | None:
         if value is None:
             return None
         token = value.strip()
@@ -8757,17 +8946,384 @@ def storage_diagnostics(_: sqlite3.Row = Depends(require_head)) -> dict[str, Any
     }
 
 
+def create_job_run(
+    conn: sqlite3.Connection,
+    *,
+    job_type: str,
+    status: str,
+    summary: str,
+    triggered_by: int | None,
+    detail: dict[str, Any] | None = None,
+    started_at: str | None = None,
+    finished_at: str | None = None,
+) -> int:
+    started = started_at or now_iso()
+    finished = finished_at or started
+    cursor = conn.execute(
+        """
+        INSERT INTO job_runs (job_type, status, summary, detail_json, triggered_by, started_at, finished_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            job_type,
+            status,
+            summary[:240],
+            json.dumps(detail or {}, ensure_ascii=True),
+            triggered_by,
+            started,
+            finished,
+        ),
+    )
+    return int(cursor.lastrowid or 0)
+
+
+def create_import_run(
+    conn: sqlite3.Connection,
+    *,
+    import_type: str,
+    source_name: str,
+    rows_processed: int,
+    created_count: int,
+    skipped_count: int,
+    error_count: int,
+    message: str,
+    triggered_by: int | None,
+    detail: dict[str, Any] | None = None,
+) -> int:
+    cursor = conn.execute(
+        """
+        INSERT INTO import_runs (
+            import_type,
+            source_name,
+            rows_processed,
+            created_count,
+            skipped_count,
+            error_count,
+            message,
+            detail_json,
+            triggered_by,
+            created_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            import_type,
+            source_name[:200],
+            int(rows_processed),
+            int(created_count),
+            int(skipped_count),
+            int(error_count),
+            message[:500],
+            json.dumps(detail or {}, ensure_ascii=True),
+            triggered_by,
+            now_iso(),
+        ),
+    )
+    return int(cursor.lastrowid or 0)
+
+
+def recent_import_runs(conn: sqlite3.Connection, *, limit: int = 8) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT
+            ir.*,
+            u.username AS triggered_by_username
+        FROM import_runs ir
+        LEFT JOIN users u ON u.id = ir.triggered_by
+        ORDER BY ir.created_at DESC, ir.id DESC
+        LIMIT ?
+        """,
+        (max(1, min(int(limit), 40)),),
+    ).fetchall()
+    return [
+        {
+            "import_run_id": int(row["id"]),
+            "import_type": row["import_type"],
+            "source_name": row["source_name"],
+            "rows_processed": int(row["rows_processed"] or 0),
+            "created_count": int(row["created_count"] or 0),
+            "skipped_count": int(row["skipped_count"] or 0),
+            "error_count": int(row["error_count"] or 0),
+            "message": row["message"] or "",
+            "triggered_by_username": row["triggered_by_username"] or "",
+            "created_at": row["created_at"],
+        }
+        for row in rows
+    ]
+
+
+def recent_job_runs(conn: sqlite3.Connection, *, limit: int = 8) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT
+            jr.*,
+            u.username AS triggered_by_username
+        FROM job_runs jr
+        LEFT JOIN users u ON u.id = jr.triggered_by
+        ORDER BY jr.finished_at DESC, jr.id DESC
+        LIMIT ?
+        """,
+        (max(1, min(int(limit), 40)),),
+    ).fetchall()
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        try:
+            detail = json.loads(row["detail_json"] or "{}")
+        except (TypeError, ValueError):
+            detail = {}
+        out.append(
+            {
+                "job_run_id": int(row["id"]),
+                "job_type": row["job_type"],
+                "status": row["status"],
+                "summary": row["summary"] or "",
+                "detail": detail,
+                "triggered_by_username": row["triggered_by_username"] or "",
+                "started_at": row["started_at"],
+                "finished_at": row["finished_at"],
+            }
+        )
+    return out
+
+
+def season_kickoff_status_payload(conn: sqlite3.Connection) -> dict[str, Any]:
+    row = conn.execute("SELECT * FROM season_setup_state WHERE id = 1").fetchone()
+    if not row:
+        stamp = now_iso()
+        conn.execute(
+            """
+            INSERT INTO season_setup_state (
+                id,
+                season_label,
+                rating_criteria_confirmed,
+                member_invites_shared,
+                kickoff_completed_at,
+                created_at,
+                updated_at
+            )
+            VALUES (1, '', 0, 0, NULL, ?, ?)
+            """,
+            (stamp, stamp),
+        )
+        row = conn.execute("SELECT * FROM season_setup_state WHERE id = 1").fetchone()
+
+    counts = conn.execute(
+        """
+        SELECT
+            (SELECT COUNT(*) FROM pnms) AS pnm_count,
+            (SELECT COUNT(*) FROM import_runs) AS import_count,
+            (SELECT COUNT(*) FROM users WHERE is_approved = 1 AND role IN (?, ?)) AS officer_count,
+            (SELECT COUNT(*) FROM pnm_officer_assignments) AS assignment_count,
+            (SELECT COUNT(*) FROM rush_events WHERE is_cancelled = 0) AS rush_event_count,
+            (SELECT COUNT(*) FROM weekly_goals WHERE is_archived = 0) AS weekly_goal_count
+        """,
+        (ROLE_HEAD, ROLE_RUSH_OFFICER),
+    ).fetchone()
+
+    steps = [
+        {
+            "step_id": "criteria",
+            "label": "Confirm rating criteria",
+            "detail": "Lock your chapter scoring model before rush starts.",
+            "is_complete": bool(row["rating_criteria_confirmed"]) or bool(current_tenant().rating_criteria),
+            "target_tab": "season",
+        },
+        {
+            "step_id": "import",
+            "label": "Import or add your first rushees",
+            "detail": "Seed the roster so Command and Meetings can populate.",
+            "is_complete": int(counts["pnm_count"] or 0) > 0 or int(counts["import_count"] or 0) > 0,
+            "target_tab": "imports",
+        },
+        {
+            "step_id": "assignments",
+            "label": "Assign rush ownership",
+            "detail": "Make sure officers are ready and rushees have coverage.",
+            "is_complete": int(counts["officer_count"] or 0) > 0 and int(counts["assignment_count"] or 0) > 0,
+            "target_tab": "leadership",
+        },
+        {
+            "step_id": "events",
+            "label": "Create your first rush event",
+            "detail": "Give Operations a live timeline to coordinate around.",
+            "is_complete": int(counts["rush_event_count"] or 0) > 0,
+            "target_tab": "season",
+        },
+        {
+            "step_id": "goals",
+            "label": "Set weekly goals",
+            "detail": "Track ratings, touchpoints, and team accountability from day one.",
+            "is_complete": int(counts["weekly_goal_count"] or 0) > 0,
+            "target_tab": "season",
+        },
+        {
+            "step_id": "invites",
+            "label": "Share member invite flow",
+            "detail": "Make sure members know where to register and participate.",
+            "is_complete": bool(row["member_invites_shared"]),
+            "target_tab": "season",
+        },
+    ]
+    completed = sum(1 for step in steps if step["is_complete"])
+    total = len(steps)
+    return {
+        "season_label": row["season_label"] or "",
+        "kickoff_completed_at": row["kickoff_completed_at"],
+        "steps": steps,
+        "progress": {
+            "completed": completed,
+            "total": total,
+            "percent": round((completed / total) * 100, 1) if total else 0.0,
+        },
+    }
+
+
+def trust_center_payload(conn: sqlite3.Connection, user: sqlite3.Row) -> dict[str, Any]:
+    storage = storage_diagnostics(_=user)
+    archive = season_archive_status(_=user)
+    capabilities = capability_manifest_for_user(user)
+    return {
+        "storage": storage,
+        "archive": archive,
+        "capabilities": capabilities,
+        "recent_imports": recent_import_runs(conn, limit=6),
+        "recent_jobs": recent_job_runs(conn, limit=8),
+    }
+
+
+def weekly_roi_payload(conn: sqlite3.Connection) -> dict[str, Any]:
+    today = date.today()
+    current_start, current_end = week_bounds_for(today)
+    previous_start = current_start - timedelta(days=7)
+    previous_end = current_end - timedelta(days=7)
+    current_start_s = current_start.isoformat()
+    current_end_s = current_end.isoformat()
+    previous_start_s = previous_start.isoformat()
+    previous_end_s = previous_end.isoformat()
+
+    def _count(query: str, params: tuple[Any, ...]) -> int:
+        row = conn.execute(query, params).fetchone()
+        return int(row["count"] or 0) if row else 0
+
+    current_ratings = _count(
+        "SELECT COUNT(*) AS count FROM rating_comment_events WHERE date(changed_at) BETWEEN date(?) AND date(?)",
+        (current_start_s, current_end_s),
+    )
+    previous_ratings = _count(
+        "SELECT COUNT(*) AS count FROM rating_comment_events WHERE date(changed_at) BETWEEN date(?) AND date(?)",
+        (previous_start_s, previous_end_s),
+    )
+    current_touchpoints = _count(
+        "SELECT COUNT(*) AS count FROM lunches WHERE lunch_date BETWEEN date(?) AND date(?)",
+        (current_start_s, current_end_s),
+    )
+    previous_touchpoints = _count(
+        "SELECT COUNT(*) AS count FROM lunches WHERE lunch_date BETWEEN date(?) AND date(?)",
+        (previous_start_s, previous_end_s),
+    )
+    current_events = _count(
+        "SELECT COUNT(*) AS count FROM rush_events WHERE is_cancelled = 0 AND event_date BETWEEN date(?) AND date(?)",
+        (current_start_s, current_end_s),
+    )
+    previous_events = _count(
+        "SELECT COUNT(*) AS count FROM rush_events WHERE is_cancelled = 0 AND event_date BETWEEN date(?) AND date(?)",
+        (previous_start_s, previous_end_s),
+    )
+    current_goals_closed = _count(
+        "SELECT COUNT(*) AS count FROM weekly_goals WHERE completed_at IS NOT NULL AND date(completed_at) BETWEEN date(?) AND date(?)",
+        (current_start_s, current_end_s),
+    )
+    active_goal_row = conn.execute(
+        "SELECT COUNT(*) AS count FROM weekly_goals WHERE is_archived = 0"
+    ).fetchone()
+    active_goals = int(active_goal_row["count"] or 0)
+    meeting_ready_row = conn.execute(
+        """
+        SELECT COUNT(*) AS count
+        FROM pnms
+        WHERE rating_count >= 2
+          AND trim(COALESCE(notes, '')) != ''
+          AND total_lunches > 0
+          AND photo_path IS NOT NULL
+          AND trim(COALESCE(photo_path, '')) != ''
+        """
+    ).fetchone()
+    meeting_ready = int(meeting_ready_row["count"] or 0)
+
+    def _delta(current: int, previous: int) -> int:
+        return int(current) - int(previous)
+
+    return {
+        "window": {
+            "current_start": current_start_s,
+            "current_end": current_end_s,
+            "previous_start": previous_start_s,
+            "previous_end": previous_end_s,
+        },
+        "cards": [
+            {
+                "label": "Ratings Logged",
+                "value": current_ratings,
+                "delta": _delta(current_ratings, previous_ratings),
+                "detail": "Team rating updates this week",
+            },
+            {
+                "label": "Touchpoints Logged",
+                "value": current_touchpoints,
+                "delta": _delta(current_touchpoints, previous_touchpoints),
+                "detail": "Touchpoints captured this week",
+            },
+            {
+                "label": "Rush Events Run",
+                "value": current_events,
+                "delta": _delta(current_events, previous_events),
+                "detail": "Live calendar activity this week",
+            },
+            {
+                "label": "Meeting-Ready Packets",
+                "value": meeting_ready,
+                "delta": 0,
+                "detail": "Rushees with touchpoints, notes, photo, and multiple ratings",
+            },
+            {
+                "label": "Goals Closed",
+                "value": current_goals_closed,
+                "delta": 0,
+                "detail": f"{active_goals} active goals still in play",
+            },
+        ],
+    }
+
+
 @app.get("/api/export/csv")
-def export_csv_backup(_: sqlite3.Row = Depends(require_head)) -> Response:
+def export_csv_backup(user: sqlite3.Row = Depends(require_head)) -> Response:
     archive_bytes, slug = build_csv_backup_archive()
     filename = f"kao-rush-backup-{slug}.zip"
     headers = {"Content-Disposition": f'attachment; filename="{filename}"'}
+    with db_session() as conn:
+        create_job_run(
+            conn,
+            job_type="backup_csv",
+            status="completed",
+            summary=f"CSV backup generated: {filename}",
+            triggered_by=int(user["id"]),
+            detail={"filename": filename, "slug": slug},
+        )
     return Response(content=archive_bytes, media_type="application/zip", headers=headers)
 
 
 @app.get("/api/export/sqlite")
-def export_sqlite_backup(_: sqlite3.Row = Depends(require_head)) -> FileResponse:
+def export_sqlite_backup(user: sqlite3.Row = Depends(require_head)) -> FileResponse:
     snapshot = create_sqlite_snapshot(prefix="manual")
+    with db_session() as conn:
+        create_job_run(
+            conn,
+            job_type="backup_sqlite",
+            status="completed",
+            summary=f"SQLite backup generated: {snapshot.name}",
+            triggered_by=int(user["id"]),
+            detail={"filename": snapshot.name},
+        )
     return FileResponse(
         snapshot,
         media_type="application/x-sqlite3",
@@ -8829,6 +9385,89 @@ def season_archive_status(_: sqlite3.Row = Depends(require_head)) -> dict[str, A
             "lunch_count": int(counts_row["lunch_count"]),
         },
     }
+
+
+@app.get("/api/admin/season/kickoff")
+def season_kickoff_status(user: sqlite3.Row = Depends(require_head)) -> dict[str, Any]:
+    with db_session() as conn:
+        return season_kickoff_status_payload(conn)
+
+
+@app.patch("/api/admin/season/kickoff")
+def update_season_kickoff(
+    payload: SeasonKickoffUpdateRequest,
+    user: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        existing = conn.execute("SELECT * FROM season_setup_state WHERE id = 1").fetchone()
+        if not existing:
+            stamp = now_iso()
+            conn.execute(
+                """
+                INSERT INTO season_setup_state (
+                    id,
+                    season_label,
+                    rating_criteria_confirmed,
+                    member_invites_shared,
+                    kickoff_completed_at,
+                    created_at,
+                    updated_at
+                )
+                VALUES (1, '', 0, 0, NULL, ?, ?)
+                """,
+                (stamp, stamp),
+            )
+            existing = conn.execute("SELECT * FROM season_setup_state WHERE id = 1").fetchone()
+
+        season_label = existing["season_label"] or ""
+        if payload.season_label is not None:
+            season_label = payload.season_label
+        rating_criteria_confirmed = bool(existing["rating_criteria_confirmed"])
+        if payload.rating_criteria_confirmed is not None:
+            rating_criteria_confirmed = bool(payload.rating_criteria_confirmed)
+        member_invites_shared = bool(existing["member_invites_shared"])
+        if payload.member_invites_shared is not None:
+            member_invites_shared = bool(payload.member_invites_shared)
+        kickoff_completed_at = existing["kickoff_completed_at"]
+        if payload.kickoff_completed is True:
+            kickoff_completed_at = now_iso()
+        elif payload.kickoff_completed is False:
+            kickoff_completed_at = None
+
+        updated_at = now_iso()
+        conn.execute(
+            """
+            UPDATE season_setup_state
+            SET
+                season_label = ?,
+                rating_criteria_confirmed = ?,
+                member_invites_shared = ?,
+                kickoff_completed_at = ?,
+                updated_at = ?
+            WHERE id = 1
+            """,
+            (
+                season_label,
+                1 if rating_criteria_confirmed else 0,
+                1 if member_invites_shared else 0,
+                kickoff_completed_at,
+                updated_at,
+            ),
+        )
+        create_job_run(
+            conn,
+            job_type="season_kickoff_update",
+            status="completed",
+            summary="Season kickoff setup updated",
+            triggered_by=int(user["id"]),
+            detail={
+                "season_label": season_label,
+                "rating_criteria_confirmed": rating_criteria_confirmed,
+                "member_invites_shared": member_invites_shared,
+                "kickoff_completed_at": kickoff_completed_at,
+            },
+        )
+        return season_kickoff_status_payload(conn)
 
 
 @app.get("/api/admin/season/archive/download")
@@ -8899,6 +9538,27 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
         conn.execute("DELETE FROM pnms")
         conn.execute(
             """
+            INSERT INTO season_setup_state (
+                id,
+                season_label,
+                rating_criteria_confirmed,
+                member_invites_shared,
+                kickoff_completed_at,
+                created_at,
+                updated_at
+            )
+            VALUES (1, ?, 0, 0, NULL, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                season_label = excluded.season_label,
+                rating_criteria_confirmed = 0,
+                member_invites_shared = 0,
+                kickoff_completed_at = NULL,
+                updated_at = excluded.updated_at
+            """,
+            ("", reset_at, reset_at),
+        )
+        conn.execute(
+            """
             UPDATE users
             SET rating_count = 0, avg_rating_given = 0, total_lunches = 0, lunches_per_week = 0, updated_at = ?
             """,
@@ -8943,6 +9603,20 @@ def reset_for_next_rush_season(payload: SeasonResetRequest, head_user: sqlite3.R
             entity_type="season",
             entity_id=1,
             payload={
+                "archive_path": str(archive_file),
+                "archive_label": label,
+                "pnm_count": pnm_count,
+                "rating_count": rating_count,
+                "lunch_count": lunch_count,
+            },
+        )
+        create_job_run(
+            conn,
+            job_type="season_reset",
+            status="completed",
+            summary=f"Season archive + reset completed for {label}",
+            triggered_by=int(head_user["id"]),
+            detail={
                 "archive_path": str(archive_file),
                 "archive_label": label,
                 "pnm_count": pnm_count,
@@ -9166,6 +9840,34 @@ async def import_google_form_csv(
         imported_message += f" Skipped {skipped_duplicates} duplicate instagram handle(s)."
     if total_errors:
         imported_message += f" {total_errors} row(s) had validation issues."
+
+    with db_session() as conn:
+        create_import_run(
+            conn,
+            import_type="google_form_csv",
+            source_name=filename or "google-form-responses.csv",
+            rows_processed=row_count,
+            created_count=created_count,
+            skipped_count=skipped_duplicates,
+            error_count=total_errors,
+            message=imported_message,
+            triggered_by=int(head_user["id"]),
+            detail={"column_mapping": column_map, "errors_sample": errors[:10]},
+        )
+        create_job_run(
+            conn,
+            job_type="google_form_import",
+            status="completed" if total_errors == 0 else "completed_with_warnings",
+            summary=imported_message,
+            triggered_by=int(head_user["id"]),
+            detail={
+                "source_name": filename or "google-form-responses.csv",
+                "rows_processed": row_count,
+                "created_count": created_count,
+                "skipped_duplicates": skipped_duplicates,
+                "error_count": total_errors,
+            },
+        )
 
     return {
         "message": imported_message,
@@ -9568,7 +10270,13 @@ def auth_me(
     return {
         "authenticated": True,
         "user": user_payload(user, user["role"], user["id"]),
+        "capabilities": capability_manifest_for_user(user),
     }
+
+
+@app.get("/api/auth/capabilities")
+def auth_capabilities(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+    return {"capabilities": capability_manifest_for_user(user)}
 
 
 @app.post("/api/auth/tutorial/complete")
@@ -12226,6 +12934,15 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
                 """,
                 (package_group_id, pnm_id),
             ).fetchall()
+        pin_row = conn.execute(
+            """
+            SELECT mp.pinned_at, u.username AS pinned_by_username
+            FROM meeting_pins mp
+            LEFT JOIN users u ON u.id = mp.pinned_by
+            WHERE mp.pnm_id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
 
         own = fetch_own_rating(conn, pnm_id, user["id"])
         rating_rows = conn.execute(
@@ -12595,6 +13312,15 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             }
             for row in linked_rows
         ],
+        "meeting_pin": (
+            {
+                "is_pinned": True,
+                "pinned_at": pin_row["pinned_at"],
+                "pinned_by_username": pin_row["pinned_by_username"] or "",
+            }
+            if pin_row
+            else {"is_pinned": False, "pinned_at": None, "pinned_by_username": ""}
+        ),
     }
 
 
@@ -15937,6 +16663,10 @@ def workspace_command(
     calendar_payload = rush_calendar(request=request, include_past=False, limit=80, _=user)
     pnms_payload = list_pnms(user=user)
     pending_payload = pending_users(_=user)
+    with db_session() as conn:
+        meeting_pins = list_meeting_pins_payload(conn)
+        weekly_roi = weekly_roi_payload(conn)
+        season_setup = season_kickoff_status_payload(conn)
 
     team_pulse = {
         "pending_approvals": len(pending_payload.get("pending", [])),
@@ -15954,6 +16684,9 @@ def workspace_command(
         "attention": build_command_attention_items(pnms_payload.get("pnms", []), command_payload, assignments_payload),
         "team_pulse": team_pulse,
         "watch_candidates": leaderboard_payload.get("leaderboard", [])[:6],
+        "meeting_pins": meeting_pins,
+        "weekly_roi": weekly_roi,
+        "season_setup": season_setup,
         "notifications": notifications_payload,
     }
 
@@ -15966,6 +16699,8 @@ def workspace_rushees(
     state: str | None = None,
     user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
+    with db_session() as conn:
+        meeting_pins = list_meeting_pins_payload(conn)
     return {
         "pnms": list_pnms(interest=interest, stereotype=stereotype, state=state, user=user).get("pnms", []),
         "analytics": analytics_overview(user=user),
@@ -15973,6 +16708,7 @@ def workspace_rushees(
         "calendar_share": calendar_share_payload(request, current_tenant()),
         "assignments": assignments_overview(include_completed=False, user=user),
         "interest_hints": list_interests(_=user),
+        "meeting_pins": meeting_pins,
     }
 
 
@@ -16018,6 +16754,8 @@ def workspace_meetings(
     pnms = list_pnms(user=user).get("pnms", [])
     assignments_payload = assignments_overview(include_completed=False, user=user)
     leaderboard_rows = pnm_leaderboard(limit=18, _=user).get("leaderboard", [])
+    with db_session() as conn:
+        meeting_pins = list_meeting_pins_payload(conn)
 
     candidates: list[dict[str, Any]] = []
     for pnm in pnms:
@@ -16050,13 +16788,35 @@ def workspace_meetings(
         )
 
     candidates.sort(key=lambda item: (-item["meeting_ready_score"], -item["weighted_total"], item["name"].lower()))
-    compare_defaults = [item["pnm_id"] for item in candidates[:2] if int(item["pnm_id"]) > 0]
+    pinned_ids = [int(item["pnm_id"]) for item in meeting_pins if int(item["pnm_id"]) > 0]
+    compare_defaults = pinned_ids[:2]
+    if len(compare_defaults) < 2:
+        for item in candidates:
+            if int(item["pnm_id"]) <= 0 or int(item["pnm_id"]) in compare_defaults:
+                continue
+            compare_defaults.append(int(item["pnm_id"]))
+            if len(compare_defaults) >= 2:
+                break
+    shortlist = []
+    candidate_by_id = {int(item["pnm_id"]): item for item in candidates}
+    for pnm_id in pinned_ids:
+        candidate = candidate_by_id.get(int(pnm_id))
+        if candidate:
+            shortlist.append(candidate)
+    if len(shortlist) < 12:
+        for item in candidates:
+            if int(item["pnm_id"]) in {int(row["pnm_id"]) for row in shortlist}:
+                continue
+            shortlist.append(item)
+            if len(shortlist) >= 12:
+                break
 
     return {
         "candidates": candidates,
-        "shortlist": candidates[:12],
+        "shortlist": shortlist,
         "attention": build_command_attention_items(pnms, {"stale_alerts": []}, assignments_payload),
         "watch_candidates": leaderboard_rows[:8],
+        "pins": meeting_pins,
         "compare_defaults": compare_defaults,
     }
 
@@ -16065,27 +16825,45 @@ def workspace_meetings(
 def workspace_admin_overview(
     user: sqlite3.Row = Depends(require_head),
 ) -> dict[str, Any]:
-    return {
-        "leadership": head_admin_officer_metrics(_=user),
-        "assignments": assignments_overview(include_completed=True, user=user),
-        "storage": storage_diagnostics(_=user),
-        "pending": pending_users(_=user),
-        "goals": list_weekly_goals(include_archived=False, _=user),
-    }
+    with db_session() as conn:
+        return {
+            "leadership": head_admin_officer_metrics(_=user),
+            "assignments": assignments_overview(include_completed=True, user=user),
+            "storage": storage_diagnostics(_=user),
+            "pending": pending_users(_=user),
+            "goals": list_weekly_goals(include_archived=False, _=user),
+            "kickoff": season_kickoff_status_payload(conn),
+            "trust_center": trust_center_payload(conn, user),
+        }
 
 
-def global_search_commands_for_user(user: sqlite3.Row) -> list[dict[str, str]]:
-    commands: list[dict[str, str]] = [
-        {"command_id": "create_lunch", "label": "Schedule Touchpoint", "action": "create_lunch"},
-        {"command_id": "open_tutorial", "label": "Open Tutorial", "action": "open_tutorial"},
-    ]
+def global_search_commands_for_user(user: sqlite3.Row, query: str = "") -> list[dict[str, str]]:
+    capabilities = capability_manifest_for_user(user)
+    commands: list[dict[str, str]] = [{"command_id": "open_tutorial", "label": "Open Tutorial", "action": "open_tutorial"}]
+    if capabilities.get("can_schedule_touchpoints"):
+        commands.append({"command_id": "schedule_touchpoint", "label": "Schedule Touchpoint", "action": "schedule_touchpoint"})
     if user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}:
         commands.append({"command_id": "add_rushee", "label": "Add Rushee", "action": "add_rushee"})
         commands.append({"command_id": "open_meetings", "label": "Open Meetings Workspace", "action": "open_meetings"})
-    if user["role"] == ROLE_HEAD:
+    if capabilities.get("can_create_events"):
         commands.append({"command_id": "create_event", "label": "Create Event", "action": "create_event"})
+    if capabilities.get("can_export_backups"):
         commands.append({"command_id": "backup_csv", "label": "Backup CSV", "action": "backup_csv"})
-    return commands
+    token = query.strip().lower()
+    if not token:
+        return commands
+    filtered_commands: list[dict[str, str]] = []
+    for command in commands:
+        haystack = " ".join(
+            [
+                str(command.get("command_id") or ""),
+                str(command.get("label") or ""),
+                str(command.get("action") or ""),
+            ]
+        ).lower()
+        if token in haystack:
+            filtered_commands.append(command)
+    return filtered_commands
 
 
 @app.get("/api/search/global")
@@ -16162,8 +16940,66 @@ def global_search(
             }
             for row in user_rows
         ],
-        "commands": global_search_commands_for_user(user),
+        "commands": global_search_commands_for_user(user, token),
     }
+
+
+@app.get("/api/meetings/pins")
+def list_meeting_pins(user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
+    with db_session() as conn:
+        return {"pins": list_meeting_pins_payload(conn)}
+
+
+@app.post("/api/meetings/pins")
+def create_meeting_pin(
+    payload: MeetingPinCreateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        row = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Rushee not found.")
+        stamp = now_iso()
+        conn.execute(
+            """
+            INSERT INTO meeting_pins (pnm_id, pinned_by, pinned_at, updated_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(pnm_id) DO UPDATE SET
+                pinned_by = excluded.pinned_by,
+                pinned_at = excluded.pinned_at,
+                updated_at = excluded.updated_at
+            """,
+            (int(payload.pnm_id), int(user["id"]), stamp, stamp),
+        )
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="meeting_pin_create",
+            entity_type="meeting_pin",
+            entity_id=int(payload.pnm_id),
+            payload={"pnm_id": int(payload.pnm_id)},
+        )
+        pins = list_meeting_pins_payload(conn)
+    return {"message": "Pinned for Meetings.", "pins": pins}
+
+
+@app.delete("/api/meetings/pins/{pnm_id}")
+def delete_meeting_pin(
+    pnm_id: int,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    with db_session() as conn:
+        conn.execute("DELETE FROM meeting_pins WHERE pnm_id = ?", (int(pnm_id),))
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="meeting_pin_delete",
+            entity_type="meeting_pin",
+            entity_id=int(pnm_id),
+            payload={"pnm_id": int(pnm_id)},
+        )
+        pins = list_meeting_pins_payload(conn)
+    return {"message": "Removed from Meetings pins.", "pins": pins}
 
 
 @app.get("/api/matching")

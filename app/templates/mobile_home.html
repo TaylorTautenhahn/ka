@@ -103,10 +103,9 @@
               <h2>Quick Rating</h2>
               <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or lunch follow-up to start rating.</p>
             </div>
-            <a id="mobileCommandStickyMeetingLink" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting Packet</a>
           </div>
           <form id="mobileCommandRatingForm" class="stack">
-            <div class="inline-grid two-cols compact-inputs">
+            <div class="inline-grid compact-inputs mobile-command-score-grid">
               <label><span id="mobileCommandRateGirlsLabel">Girls (0-10)</span><input id="mobileCommandRateGirls" type="number" min="0" max="10" required /></label>
               <label><span id="mobileCommandRateProcessLabel">Process (0-10)</span><input id="mobileCommandRateProcess" type="number" min="0" max="10" required /></label>
               <label><span id="mobileCommandRatePersonableLabel">Personable (0-10)</span><input id="mobileCommandRatePersonable" type="number" min="0" max="10" required /></label>

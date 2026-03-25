@@ -226,6 +226,10 @@ const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
 );
 const RATING_CRITERIA = parseRatingCriteria(APP_CONFIG.rating_criteria);
 const RATING_CRITERIA_BY_FIELD = new Map(RATING_CRITERIA.map((item) => [item.field, item]));
+const RATING_TOTAL_MAX =
+  Number.isFinite(Number(APP_CONFIG.rating_total_max)) && Number(APP_CONFIG.rating_total_max) > 0
+    ? Number(APP_CONFIG.rating_total_max)
+    : RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0);
 const STATE_OPTIONS = parseStateOptions(APP_CONFIG.state_options);
 const mobileStateHints = document.getElementById("mobileStateHints");
 const mobilePnmStateHints = document.getElementById("mobilePnmStateHints");
@@ -283,6 +287,37 @@ function showToast(message) {
   toastEl.classList.remove("hidden");
   clearTimeout(showToast.timer);
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2500);
+}
+
+function ratingTierMeta(score, totalMax = RATING_TOTAL_MAX) {
+  const safeTotal = Number(totalMax) > 0 ? Number(totalMax) : 45;
+  const normalized = (Number(score || 0) / safeTotal) * 45;
+  if (normalized >= 40) {
+    return { label: "A Tier", className: "score-tier-a" };
+  }
+  if (normalized >= 30) {
+    return { label: "B Tier", className: "score-tier-b" };
+  }
+  if (normalized >= 20) {
+    return { label: "C Tier", className: "score-tier-c" };
+  }
+  if (normalized >= 10) {
+    return { label: "D Tier", className: "score-tier-d" };
+  }
+  return { label: "F Tier", className: "score-tier-f" };
+}
+
+function ratingTierBadgeMarkup(score, totalMax = RATING_TOTAL_MAX) {
+  const tier = ratingTierMeta(score, totalMax);
+  return `<span class="pill score-tier ${tier.className}">${tier.label}</span>`;
+}
+
+function formatWeightedScore(score, totalMax = RATING_TOTAL_MAX) {
+  return `${Number(score || 0).toFixed(2)} / ${Number(totalMax || RATING_TOTAL_MAX).toFixed(0)}`;
+}
+
+function confirmRusheeRatingSubmission() {
+  return window.confirm("Are you finished with this Rushee profile and ready to save this rating?");
 }
 
 function ratingCriteriaForField(field) {
@@ -1178,15 +1213,16 @@ function renderMobileHomeSearchResults() {
     .map((pnm) => {
       const selectedClass = Number(mobileHomeSelectedPnmId) === Number(pnm.pnm_id) ? " is-selected" : "";
       const ownRating = pnm.own_rating && Number.isFinite(Number(pnm.own_rating.total_score))
-        ? `${Number(pnm.own_rating.total_score).toFixed(0)}/${RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0)}`
+        ? `${Number(pnm.own_rating.total_score).toFixed(0)}/${RATING_TOTAL_MAX}`
         : "Not rated";
       return `
         <article class="entry mobile-card${selectedClass}">
           <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(pnm.pnm_id)}">
             <div class="entry-title">
               <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
-              <span>${Number(pnm.weighted_total || 0).toFixed(2)}</span>
+              <span>${formatWeightedScore(pnm.weighted_total)}</span>
             </div>
+            <div class="command-chip-row">${ratingTierBadgeMarkup(pnm.weighted_total)}</div>
             <div class="muted">Assigned: ${escapeHtml(mobileHomeAssignedLabel(pnm))}</div>
             <div class="muted">My Rating: ${escapeHtml(ownRating)} | Touchpoints: ${Number(pnm.total_lunches || 0)}</div>
           </button>
@@ -1216,8 +1252,9 @@ function renderMobileHomeRecentLunches() {
           <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(row.pnm_id)}">
             <div class="entry-title">
               <strong>${escapeHtml(row.pnm_code)} | ${escapeHtml(row.name)}</strong>
-              <span>${Number(row.weighted_total || 0).toFixed(2)}</span>
+              <span>${formatWeightedScore(row.weighted_total)}</span>
             </div>
+            <div class="command-chip-row">${ratingTierBadgeMarkup(row.weighted_total)}</div>
             <div class="muted">${escapeHtml(timing || "Recent lunch")}</div>
             <div class="muted">${escapeHtml(row.notes || "Tap to add a post-lunch rating update.")}</div>
           </button>
@@ -1369,7 +1406,7 @@ function renderMobileCommandSelection() {
     .join(" | ");
   if (metaEl) {
     metaEl.textContent =
-      `${selected.pnm_code} | ${selected.name || `${selected.first_name} ${selected.last_name}`} | Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assigned} | Last lunch: ${touchpoint}${lunchContext ? ` (${lunchContext})` : ""} | My Rating: ${mine} | ${stale}`;
+      `${selected.pnm_code} | ${selected.name || `${selected.first_name} ${selected.last_name}`} | Score ${formatWeightedScore(selected.weighted_total)} (${ratingTierMeta(selected.weighted_total).label}) | Assigned: ${assigned} | Last lunch: ${touchpoint}${lunchContext ? ` (${lunchContext})` : ""} | My Rating: ${mine} | ${stale}`;
   }
   if (stickyMeetingLink) {
     stickyMeetingLink.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
@@ -1457,11 +1494,11 @@ function renderMobileCommandCenter() {
               <button type="button" class="mobile-command-queue-btn" data-mobile-command-pnm-id="${Number(item.pnm_id)}">
                 <div class="entry-title">
                   <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
-                  <span>${Number(item.weighted_total || 0).toFixed(2)}</span>
+                  <span>${formatWeightedScore(item.weighted_total)}</span>
                 </div>
                 <div class="muted">Touchpoint: ${escapeHtml(touchpoint)}</div>
                 <div class="muted">Assigned: ${escapeHtml(item.assigned_officer_username || "Unassigned")}</div>
-                <div class="command-chip-row">${staleBadge}${assignedBadge}</div>
+                <div class="command-chip-row">${ratingTierBadgeMarkup(item.weighted_total)}${staleBadge}${assignedBadge}</div>
               </button>
             </article>
           `;
@@ -1616,8 +1653,9 @@ function renderPnmCards(pnms) {
         <article class="entry mobile-card">
           <div class="entry-title">
             <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
-            <span>${pnm.weighted_total.toFixed(2)}</span>
+            <span>${formatWeightedScore(pnm.weighted_total)}</span>
           </div>
+          <div class="command-chip-row">${ratingTierBadgeMarkup(pnm.weighted_total)}</div>
           <div class="mobile-card-row">
             ${photo}
             <div>
@@ -1726,8 +1764,9 @@ function renderSameStatePnms(member, pnms, errorMessage = "") {
         <article class="entry mobile-card">
           <div class="entry-title">
             <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
-            <span>${Number(pnm.weighted_total || 0).toFixed(2)}</span>
+            <span>${formatWeightedScore(pnm.weighted_total)}</span>
           </div>
+          <div class="command-chip-row">${ratingTierBadgeMarkup(pnm.weighted_total)}</div>
           <div class="muted">${escapeHtml(pnm.hometown || "")}${pnm.hometown_state_code ? `, ${escapeHtml(pnm.hometown_state_code)}` : ""}</div>
           <div class="action-row">
             <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Meeting Packet</a>
@@ -1783,6 +1822,9 @@ async function handleMobileCommandSaveRating() {
     saveBtn.textContent = "Saving...";
   }
   try {
+    if (!confirmRusheeRatingSubmission()) {
+      return;
+    }
     const payload = await api("/api/ratings", {
       method: "POST",
       body: {

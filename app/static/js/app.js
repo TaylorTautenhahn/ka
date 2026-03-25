@@ -493,6 +493,40 @@ const RATING_TOTAL_MAX =
   Number.isFinite(Number(APP_CONFIG.rating_total_max)) && Number(APP_CONFIG.rating_total_max) > 0
     ? Number(APP_CONFIG.rating_total_max)
     : RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0);
+
+function ratingTierMeta(score, totalMax = RATING_TOTAL_MAX) {
+  const safeTotal = Number(totalMax) > 0 ? Number(totalMax) : 45;
+  const normalized = (Number(score || 0) / safeTotal) * 45;
+  if (normalized >= 40) {
+    return { label: "A Tier", className: "score-tier-a" };
+  }
+  if (normalized >= 30) {
+    return { label: "B Tier", className: "score-tier-b" };
+  }
+  if (normalized >= 20) {
+    return { label: "C Tier", className: "score-tier-c" };
+  }
+  if (normalized >= 10) {
+    return { label: "D Tier", className: "score-tier-d" };
+  }
+  return { label: "F Tier", className: "score-tier-f" };
+}
+
+function ratingTierBadgeMarkup(score, totalMax = RATING_TOTAL_MAX) {
+  const tier = ratingTierMeta(score, totalMax);
+  return `<span class="pill score-tier ${tier.className}">${tier.label}</span>`;
+}
+
+function formatWeightedScore(score, totalMax = RATING_TOTAL_MAX) {
+  return `${Number(score || 0).toFixed(2)} / ${Number(totalMax || RATING_TOTAL_MAX).toFixed(0)}`;
+}
+
+function confirmRusheeRatingSubmission(options = {}) {
+  const message = options.advance
+    ? "Are you finished with this Rushee profile and ready to save + move to the next one?"
+    : "Are you finished with this Rushee profile and ready to save this rating?";
+  return window.confirm(message);
+}
 const DEFAULT_INTEREST_TAGS = parseConfiguredTagList(APP_CONFIG.default_interest_tags, BASE_DEFAULT_INTEREST_TAGS);
 const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
   APP_CONFIG.default_stereotype_tags,
@@ -2993,7 +3027,8 @@ function renderPnmTable() {
           <td>${pnm.rating_count}</td>
           <td>
             <div class="score-wrap">
-              <strong>${pnm.weighted_total.toFixed(2)}</strong>
+              <strong>${formatWeightedScore(pnm.weighted_total)}</strong>
+              ${ratingTierBadgeMarkup(pnm.weighted_total)}
               <svg class="score-bar" viewBox="0 0 58 7" aria-hidden="true" focusable="false">
                 <rect x="0" y="0" width="58" height="7" rx="4" class="score-bar-track"></rect>
                 <rect x="0" y="0" width="${barWidth}" height="7" rx="4" class="score-bar-fill"></rect>
@@ -3456,12 +3491,14 @@ function applyCommandRatingFormForSelected() {
   const touchpointLabel = selected.last_touchpoint_at ? formatTrendTimestamp(selected.last_touchpoint_at) : "None";
   const mineLabel = selected.last_rating_by_me_at ? formatTrendTimestamp(selected.last_rating_by_me_at) : "Never";
   const staleLabel = selected.needs_rating_update ? staleReasonLabel(selected.stale_reason) : "Fresh";
+  const scoreLabel = formatWeightedScore(selected.weighted_total);
+  const tierLabel = ratingTierMeta(selected.weighted_total).label;
   if (commandSelectedName) {
     commandSelectedName.textContent = `${selected.pnm_code} | ${selected.name}`;
   }
   if (commandSelectedMeta) {
     commandSelectedMeta.textContent =
-      `Score ${Number(selected.weighted_total || 0).toFixed(2)} | Assigned: ${assignedLabel} | Touchpoint: ${touchpointLabel} | My Rating: ${mineLabel} | ${staleLabel}`;
+      `Score ${scoreLabel} (${tierLabel}) | Assigned: ${assignedLabel} | Touchpoint: ${touchpointLabel} | My Rating: ${mineLabel} | ${staleLabel}`;
   }
   if (commandSelectedSignal) {
     commandSelectedSignal.textContent =
@@ -3471,7 +3508,8 @@ function applyCommandRatingFormForSelected() {
     commandSelectedStats.innerHTML = `
       <article class="command-stat-card">
         <span>Weighted Total</span>
-        <strong>${Number(selected.weighted_total || 0).toFixed(2)}</strong>
+        <strong>${scoreLabel}</strong>
+        ${ratingTierBadgeMarkup(selected.weighted_total)}
       </article>
       <article class="command-stat-card">
         <span>Ratings</span>
@@ -3563,11 +3601,11 @@ function renderCommandCenter() {
               <button type="button" class="command-queue-btn" data-command-queue-pnm-id="${Number(item.pnm_id)}">
                 <div class="entry-title">
                   <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
-                  <span>${Number(item.weighted_total || 0).toFixed(2)}</span>
+                  <span>${formatWeightedScore(item.weighted_total)}</span>
                 </div>
                 <div class="muted">Touchpoint: ${escapeHtml(touchpoint)}</div>
                 <div class="muted">Assigned: ${escapeHtml(item.assigned_officer_username || "Unassigned")}</div>
-                <div class="command-chip-row">${staleBadge}${assignedBadge}</div>
+                <div class="command-chip-row">${ratingTierBadgeMarkup(item.weighted_total)}${staleBadge}${assignedBadge}</div>
               </button>
             </div>
           `;
@@ -3896,7 +3934,7 @@ function renderPnmBoard() {
           (pnm) => `
             <article class="rushee-board-card">
               <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
-              <div class="rushee-board-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
+              <div class="rushee-board-meta">Weighted ${formatWeightedScore(pnm.weighted_total)} | ${ratingTierMeta(pnm.weighted_total).label} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
               <div class="rushee-board-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
               <div class="action-row">
                 <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
@@ -4125,7 +4163,7 @@ function renderMeetingCompareCard(payload, fallbackLabel) {
   return `
     <article class="compare-candidate-card">
       <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
-      <div class="compare-candidate-meta">Weighted ${Number(pnm.weighted_total || 0).toFixed(2)} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
+      <div class="compare-candidate-meta">Weighted ${formatWeightedScore(pnm.weighted_total)} | ${ratingTierMeta(pnm.weighted_total).label} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
       <div class="compare-candidate-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
       <div class="compare-candidate-meta">Rank ${metrics.weighted_rank || "-"} of ${metrics.cohort_size || "-"}</div>
       <div class="action-row">
@@ -6254,6 +6292,10 @@ async function handleRatingSave(event) {
     comment: document.getElementById("rateComment").value.trim(),
   };
 
+  if (!confirmRusheeRatingSubmission()) {
+    return;
+  }
+
   try {
     const payload = await api("/api/ratings", {
       method: "POST",
@@ -6329,6 +6371,9 @@ async function submitCommandRating(options = {}) {
   const selectedId = Number(selected.pnm_id || 0);
   if (!selectedId) {
     showToast("Invalid queue selection.");
+    return;
+  }
+  if (!confirmRusheeRatingSubmission({ advance })) {
     return;
   }
 

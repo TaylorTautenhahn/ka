@@ -129,6 +129,37 @@ const RATING_TOTAL_MAX =
     ? Number(APP_CONFIG.rating_total_max)
     : RATING_CRITERIA.reduce((sum, item) => sum + Number(item.max || 0), 0);
 
+function ratingTierMeta(score, totalMax = RATING_TOTAL_MAX) {
+  const safeTotal = Number(totalMax) > 0 ? Number(totalMax) : 45;
+  const normalized = (Number(score || 0) / safeTotal) * 45;
+  if (normalized >= 40) {
+    return { label: "A Tier", className: "score-tier-a" };
+  }
+  if (normalized >= 30) {
+    return { label: "B Tier", className: "score-tier-b" };
+  }
+  if (normalized >= 20) {
+    return { label: "C Tier", className: "score-tier-c" };
+  }
+  if (normalized >= 10) {
+    return { label: "D Tier", className: "score-tier-d" };
+  }
+  return { label: "F Tier", className: "score-tier-f" };
+}
+
+function ratingTierBadgeMarkup(score, totalMax = RATING_TOTAL_MAX) {
+  const tier = ratingTierMeta(score, totalMax);
+  return `<span class="pill score-tier ${tier.className}">${tier.label}</span>`;
+}
+
+function formatWeightedScore(score, totalMax = RATING_TOTAL_MAX) {
+  return `${Number(score || 0).toFixed(2)} / ${Number(totalMax || RATING_TOTAL_MAX).toFixed(0)}`;
+}
+
+function confirmRusheeRatingSubmission() {
+  return window.confirm("Are you finished with this Rushee profile and ready to save this rating?");
+}
+
 const authSection = document.getElementById("memberAuthSection");
 const appSection = document.getElementById("memberAppSection");
 const memberLoginForm = document.getElementById("memberLoginForm");
@@ -427,7 +458,7 @@ function renderSelectedPnm() {
   memberPnmKpis.innerHTML = `
     <article class="card"><strong>${pnm.days_since_first_event}</strong><p>Days Since First Event</p></article>
     <article class="card"><strong>${pnm.total_lunches}</strong><p>Total Touchpoints</p></article>
-    <article class="card"><strong>${escapeHtml(pnm.class_year || "-")}</strong><p>Class Year</p></article>
+    <article class="card"><strong>${formatWeightedScore(pnm.weighted_total)}</strong><p>${ratingTierMeta(pnm.weighted_total).label}</p></article>
     <article class="card"><strong>${escapeHtml(pnm.phone_number || "None")}</strong><p>Phone</p></article>
   `;
 
@@ -710,6 +741,10 @@ async function handleRatingSave(event) {
     instagram_marketability: Number(document.getElementById("memberRateIg").value),
     comment: document.getElementById("memberRateComment").value.trim(),
   };
+
+  if (!confirmRusheeRatingSubmission()) {
+    return;
+  }
 
   try {
     await api("/api/ratings", {

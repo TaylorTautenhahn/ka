@@ -1647,6 +1647,36 @@ td strong {
   margin-right: 0.2rem;
 }
 
+.pill.score-tier {
+  margin-right: 0;
+  font-weight: 700;
+}
+
+.pill.score-tier.score-tier-a {
+  background: rgba(31, 112, 62, 0.18);
+  color: #0d6a34;
+}
+
+.pill.score-tier.score-tier-b {
+  background: rgba(52, 132, 211, 0.18);
+  color: #175d9e;
+}
+
+.pill.score-tier.score-tier-c {
+  background: rgba(196, 142, 36, 0.18);
+  color: #8a5d08;
+}
+
+.pill.score-tier.score-tier-d {
+  background: rgba(191, 111, 34, 0.18);
+  color: #94520f;
+}
+
+.pill.score-tier.score-tier-f {
+  background: rgba(176, 54, 68, 0.16);
+  color: #9a2433;
+}
+
 .contact-check {
   display: inline-flex;
   align-items: center;
@@ -2022,6 +2052,7 @@ td strong {
   display: flex;
   align-items: center;
   gap: 0.45rem;
+  flex-wrap: wrap;
 }
 
 .score-bar {

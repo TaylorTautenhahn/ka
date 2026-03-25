@@ -4197,6 +4197,81 @@ body[data-mobile-page] .mobile-subsection-details {
   border: 1px solid rgba(112, 179, 242, 0.12);
 }
 
+body[data-mobile-page="meeting"] .mobile-meeting-controls,
+body[data-mobile-page="meeting"] .panel.meeting-view,
+body[data-mobile-page="meeting"] .meeting-chart-card,
+body[data-mobile-page="meeting"] .meeting-trend-chart,
+body[data-mobile-page="meeting"] .meeting-analytics-bar-chart,
+body[data-mobile-page="meeting"] .meeting-list-detailed li,
+body[data-mobile-page="meeting"] .meeting-comment-item,
+body[data-mobile-page="meeting"] .meeting-bar-row {
+  border-color: rgba(112, 179, 242, 0.16);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 42%),
+    rgba(11, 22, 36, 0.94);
+  box-shadow: 0 16px 30px rgba(4, 11, 20, 0.3);
+}
+
+body[data-mobile-page="meeting"] .meeting-header,
+body[data-mobile-page="meeting"] .meeting-header h2,
+body[data-mobile-page="meeting"] .meeting-section h3,
+body[data-mobile-page="meeting"] .meeting-bar-head strong,
+body[data-mobile-page="meeting"] .meeting-list-detailed strong,
+body[data-mobile-page="meeting"] .meeting-comment-item strong {
+  color: #f4f8fc;
+}
+
+body[data-mobile-page="meeting"] .meeting-list-note,
+body[data-mobile-page="meeting"] .comment-meta,
+body[data-mobile-page="meeting"] .meeting-bar-head span,
+body[data-mobile-page="meeting"] .meeting-bar-meta,
+body[data-mobile-page="meeting"] .meeting-header p,
+body[data-mobile-page="meeting"] .meeting-section .muted,
+body[data-mobile-page="meeting"] .meeting-view .muted {
+  color: #9bb0c9;
+}
+
+body[data-mobile-page="meeting"] .meeting-bar-track-base {
+  fill: rgba(112, 179, 242, 0.14);
+}
+
+body[data-mobile-page="meeting"] .meeting-bar-fill-rect {
+  fill: rgba(111, 182, 245, 0.9);
+  filter: drop-shadow(0 0 10px rgba(111, 182, 245, 0.18));
+}
+
+body[data-mobile-page="meeting"] .trend-grid {
+  stroke: rgba(112, 179, 242, 0.14);
+}
+
+body[data-mobile-page="meeting"] .trend-area {
+  fill: rgba(111, 182, 245, 0.16);
+}
+
+body[data-mobile-page="meeting"] .trend-line {
+  stroke: rgba(111, 182, 245, 0.92);
+}
+
+body[data-mobile-page="meeting"] .trend-point {
+  fill: #dff1ff;
+  stroke: rgba(111, 182, 245, 0.92);
+}
+
+body[data-mobile-page="meeting"] .comment-chip.rating {
+  background: rgba(111, 182, 245, 0.18);
+  color: #dff1ff;
+}
+
+body[data-mobile-page="meeting"] .comment-chip.lunch {
+  background: rgba(214, 179, 106, 0.18);
+  color: #f6e2b6;
+}
+
+body[data-mobile-page="meeting"] .comment-chip.note {
+  background: rgba(126, 205, 255, 0.16);
+  color: #dff1ff;
+}
+
 body[data-mobile-page] .mobile-command-sticky {
   display: none !important;
 }

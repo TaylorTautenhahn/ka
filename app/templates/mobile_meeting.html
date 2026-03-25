@@ -33,17 +33,16 @@
           </div>
         </a>
         <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
+          <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-link">Command</a>
         </div>
       </div>
-      <header class="hero mobile-hero">
+      <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Meeting Packet</h1>
-        <p>Packet detail inside Meetings with quick refresh and PDF export for chapter review.</p>
+        <p>Load one packet fast, refresh it, and keep decisions moving during chapter review.</p>
       </header>
 
-      <section class="panel mobile-panel">
+      <section class="panel mobile-panel mobile-meeting-controls">
         <div class="inline-grid">
           <label>
             Rushee

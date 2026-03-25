@@ -33,35 +33,48 @@
           </div>
         </a>
         <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
+          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add Rushee</a>
         </div>
       </div>
-      <header class="hero mobile-hero">
+      <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Rushees</h1>
-        <p>Tap a rushee to jump directly into meeting packet review.</p>
+        <p>Keep the roster first. Open utilities only when you need them.</p>
       </header>
 
       <section class="panel mobile-panel">
-        <div class="inline-grid two-cols">
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Roster Filters</h2>
+            <p class="muted">State filter applies automatically as you type.</p>
+          </div>
+          <button id="mobileRefreshPnmsBtn" type="button" class="secondary">Refresh</button>
+        </div>
+        <div class="inline-grid two-cols mobile-filter-grid">
           <label>
             State filter
             <input id="mobilePnmStateFilter" list="mobilePnmStateHints" type="text" placeholder="All states" />
           </label>
-          <label class="btn-wrap">
-            <span>&nbsp;</span>
-            <button id="mobileApplyPnmFiltersBtn" type="button">Apply Filters</button>
+          <label>
+            Search
+            <input id="mobilePnmSearchHint" type="search" placeholder="Use Command to search + rate fast" disabled />
           </label>
-        </div>
-        <div class="action-row">
-          <button id="mobileRefreshPnmsBtn" type="button" class="secondary">Refresh</button>
         </div>
       </section>
 
       <section class="panel mobile-panel">
-        <h2>Package Deals</h2>
-        <p class="muted">Link rushees as a package so they stay grouped across assignments and meeting prep.</p>
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Roster</h2>
+            <p class="muted">Tap a rushee to jump into Meeting Packet review.</p>
+          </div>
+        </div>
+        <div id="mobilePnmList" class="mobile-list"></div>
+      </section>
+
+      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+        <summary>Package Deals</summary>
+        <p class="muted">Link rushees so they stay grouped across assignments and meeting prep.</p>
         <div class="inline-grid">
           <label>
             Primary rushee
@@ -77,10 +90,10 @@
           <button id="mobilePackageUnlinkBtn" type="button" class="secondary">Unlink Primary</button>
         </div>
         <p id="mobilePackageSummary" class="muted">No package deal selected.</p>
-      </section>
+      </details>
 
-      <section class="panel mobile-panel">
-        <h2>iPhone Contacts Panel</h2>
+      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+        <summary>Contact Export</summary>
         <p class="muted">Download one rushee at a time or export all. Checkmarks are saved per account.</p>
         <div class="inline-grid">
           <label>
@@ -97,11 +110,7 @@
         </div>
         <p id="mobileContactProgress" class="muted">Loading download status...</p>
         <div id="mobileContactStatusList" class="list-box"></div>
-      </section>
-
-      <section class="panel mobile-panel">
-        <div id="mobilePnmList" class="mobile-list"></div>
-      </section>
+      </details>
     </main>
 
     <datalist id="mobilePnmStateHints"></datalist>

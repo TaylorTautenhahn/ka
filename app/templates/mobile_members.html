@@ -32,19 +32,22 @@
             <strong>BidBoard</strong>
           </div>
         </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
-        </div>
       </div>
-      <header class="hero mobile-hero">
+      <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Team</h1>
-        <p>Review participation, assignments, and same-state matches from your phone.</p>
+        <p>Participation first. Same-state matching appears after you pick a member.</p>
       </header>
 
       <section class="panel mobile-panel">
-        <div class="inline-grid two-cols">
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Team Filters</h2>
+            <p class="muted">Filters apply automatically and stay local to Team.</p>
+          </div>
+          <button id="mobileRefreshMembersBtn" type="button" class="secondary">Refresh</button>
+        </div>
+        <div class="inline-grid two-cols mobile-filter-grid">
           <label>
             Role
             <select id="mobileMemberRoleFilter">
@@ -73,17 +76,19 @@
             </select>
           </label>
         </div>
-        <div class="action-row">
-          <button id="mobileApplyMemberFiltersBtn" type="button">Apply Filters</button>
-          <button id="mobileRefreshMembersBtn" type="button" class="secondary">Refresh</button>
-        </div>
       </section>
 
       <section class="panel mobile-panel">
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Participation</h2>
+            <p class="muted">Tap a member to load their same-state rushees.</p>
+          </div>
+        </div>
         <div id="mobileMemberList" class="mobile-list"></div>
       </section>
 
-      <section class="panel mobile-panel">
+      <section class="panel mobile-panel mobile-secondary-panel">
         <h2 id="mobileSameStateHeader">Same-State Rushees</h2>
         <p id="mobileSameStateHint" class="muted">Select a member card to load same-state rushees.</p>
         <div id="mobileSameStateList" class="mobile-list"></div>

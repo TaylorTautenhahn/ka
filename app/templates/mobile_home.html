@@ -33,17 +33,19 @@
           </div>
         </a>
         <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
+          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add Rushee</a>
         </div>
       </div>
-      <header class="hero mobile-hero">
-        {% if app_config.logo_path %}
-        <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-        {% endif %}
-        <p class="eyebrow">{{ app_config.chapter_name }}</p>
-        <h1>Command</h1>
-        <p>Search rushees fast, update ratings immediately, and revisit lunch follow-up without switching screens.</p>
+      <header class="hero mobile-hero mobile-hero-compact">
+        <div class="mobile-hero-copy">
+          <p class="eyebrow">{{ app_config.chapter_name }}</p>
+          <h1>Command</h1>
+          <p>Search, rate, and follow up from one fast mobile workspace.</p>
+        </div>
+        <div class="mobile-hero-badges">
+          <span class="mobile-inline-pill">Search-first</span>
+          <span class="mobile-inline-pill mobile-inline-pill-soft">Touchpoint-ready</span>
+        </div>
       </header>
 
       {% if app_config.is_demo_tenant %}
@@ -66,43 +68,40 @@
       </details>
       {% endif %}
 
-      <section id="mobileOfficerCommandCenter" class="hidden">
-        <section id="mobileHomeSearchPanel" class="panel mobile-panel">
-          <div class="section-head">
+      <section id="mobileOfficerCommandCenter" class="hidden mobile-command-stack">
+        <section id="mobileHomeSearchPanel" class="panel mobile-panel mobile-command-well">
+          <div class="section-head section-head-compact">
             <div>
-              <h2>Search Rushees</h2>
-              <p class="muted">Find any rushee by name, code, hometown, or Instagram.</p>
+              <h2>Find a Rushee</h2>
+              <p class="muted">Search by name, code, hometown, or Instagram and jump straight into rating.</p>
             </div>
-            <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="quick-nav-link">Add Rushee</a>
           </div>
-          <label>
-            Search
-            <input id="mobileHomeSearchInput" type="search" placeholder="Search Jimmy, JJO02112026, Austin, @jimmy" autocomplete="off" />
-          </label>
-          <div class="mobile-action-grid">
-            <button id="mobileHomeClearSearchBtn" type="button" class="secondary">Clear</button>
+          <div class="mobile-search-shell">
+            <label class="mobile-search-label">
+              <span>Search</span>
+              <input id="mobileHomeSearchInput" type="search" placeholder="Jimmy, JJO02112026, Austin, @jimmy" autocomplete="off" />
+            </label>
+            <button id="mobileHomeClearSearchBtn" type="button" class="secondary mobile-clear-btn">Clear</button>
           </div>
-          <p id="mobileHomeSearchMeta" class="muted">Loading rushees...</p>
-          <div id="mobileHomeSearchResults" class="mobile-list"></div>
+          <p id="mobileHomeSearchMeta" class="muted mobile-search-meta">Loading rushees...</p>
+          <div id="mobileHomeSearchResults" class="mobile-list mobile-command-results"></div>
+          <details id="mobileHomeRecentLunchesPanel" class="mobile-subsection-details" open>
+            <summary>
+              <span>Touchpoint Follow-Up</span>
+              <strong id="mobileHomeRecentLunchCount">0</strong>
+            </summary>
+            <p class="muted">Rushees you have already met with for fast post-event updates.</p>
+            <div id="mobileHomeRecentLunches" class="mobile-list"></div>
+          </details>
         </section>
 
-        <section id="mobileHomeRecentLunchesPanel" class="panel mobile-panel">
-          <div class="section-head">
-            <div>
-              <h2>Touchpoint Follow-Up</h2>
-              <p class="muted">Rushees you have already met with for quick post-event updates.</p>
-            </div>
-            <span id="mobileHomeRecentLunchCount" class="muted">0</span>
-          </div>
-          <div id="mobileHomeRecentLunches" class="mobile-list"></div>
-        </section>
-
-        <section id="mobileHomeQuickRatePanel" class="panel mobile-panel">
-          <div class="section-head">
+        <section id="mobileHomeQuickRatePanel" class="panel mobile-panel mobile-rating-panel">
+          <div class="section-head section-head-compact">
             <div>
               <h2>Quick Rating</h2>
-              <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or lunch follow-up to start rating.</p>
+              <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or touchpoint follow-up to start rating.</p>
             </div>
+            <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Meeting Packet</a>
           </div>
           <form id="mobileCommandRatingForm" class="stack">
             <div class="inline-grid compact-inputs mobile-command-score-grid">
@@ -114,12 +113,12 @@
             </div>
             <label>
               Comment
-              <textarea id="mobileCommandRateComment" rows="3" placeholder="Add context after the event or lunch"></textarea>
+              <textarea id="mobileCommandRateComment" rows="3" placeholder="What changed after the event or touchpoint?"></textarea>
             </label>
           </form>
         </section>
 
-        <details class="panel mobile-panel mobile-collapsible">
+        <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
           <summary>Needs Rating Queue</summary>
           <div class="mobile-kpi-grid">
             <article class="card"><strong id="mobileCommandQueueCount">0</strong><p>Queue</p></article>
@@ -139,7 +138,12 @@
       </section>
 
       <section id="mobileHomeSecondarySection" class="panel mobile-panel">
-        <h2>Live Snapshot</h2>
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Live Snapshot</h2>
+            <p class="muted">Keep the broader chapter picture close without crowding the command flow.</p>
+          </div>
+        </div>
         <div class="mobile-kpi-grid">
           <article class="card"><strong id="mobilePnmCount">0</strong><p>Rushees</p></article>
           <article class="card"><strong id="mobileRatingCount">0</strong><p>Ratings</p></article>
@@ -152,7 +156,7 @@
         </div>
       </section>
 
-      <details class="panel mobile-panel mobile-collapsible">
+      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
         <summary>Shared Calendar</summary>
         <div class="mobile-action-grid">
           <button id="mobileCopyCalendarBtn" type="button" class="secondary">Copy Calendar URL</button>

@@ -32,15 +32,11 @@
             <strong>BidBoard</strong>
           </div>
         </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
-        </div>
       </div>
-      <header class="hero mobile-hero">
+      <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Admin</h1>
-        <p>Head Rush controls for approvals, officer metrics, backups, and storage status.</p>
+        <p>Keep the essentials visible first. Put maintenance tools one tap lower.</p>
       </header>
 
       <section id="mobileAdminDeniedPanel" class="panel mobile-panel hidden">
@@ -50,24 +46,18 @@
 
       <section id="mobileAdminPanel" class="hidden">
         <section class="panel mobile-panel">
-          <h2>Admin Snapshot</h2>
+          <div class="section-head section-head-compact">
+            <div>
+              <h2>Admin Snapshot</h2>
+              <p class="muted">Approvals and team health first.</p>
+            </div>
+            <button id="mobileAdminRefreshBtn" type="button" class="secondary">Refresh</button>
+          </div>
           <div class="mobile-kpi-grid">
             <article class="card"><strong id="mobileAdminPendingCount">0</strong><p>Pending Users</p></article>
             <article class="card"><strong id="mobileAdminOfficerCount">0</strong><p>Rush Officers</p></article>
             <article class="card"><strong id="mobileAdminActiveAssignments">0</strong><p>Active Assignments</p></article>
           </div>
-          <div class="action-row">
-            <button id="mobileAdminRefreshBtn" type="button" class="secondary">Refresh</button>
-          </div>
-        </section>
-
-        <section class="panel mobile-panel">
-          <h2>Backups</h2>
-          <div class="mobile-action-grid">
-            <button id="mobileAdminBackupCsvBtn" type="button">Backup CSV</button>
-            <button id="mobileAdminBackupDbBtn" type="button" class="secondary">Backup DB</button>
-          </div>
-          <p class="muted">Use backups before major roster updates or season reset actions.</p>
         </section>
 
         <section class="panel mobile-panel">
@@ -80,10 +70,19 @@
           <div id="mobileAdminOfficerList" class="mobile-list"></div>
         </section>
 
-        <section class="panel mobile-panel">
-          <h2>Storage Diagnostics</h2>
+        <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+          <summary>Backups</summary>
+          <div class="mobile-action-grid">
+            <button id="mobileAdminBackupCsvBtn" type="button">Backup CSV</button>
+            <button id="mobileAdminBackupDbBtn" type="button" class="secondary">Backup DB</button>
+          </div>
+          <p class="muted">Use backups before major roster updates or season reset actions.</p>
+        </details>
+
+        <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+          <summary>Storage Diagnostics</summary>
           <div id="mobileAdminStorage" class="mobile-list"></div>
-        </section>
+        </details>
       </section>
     </main>
 

@@ -193,6 +193,18 @@ function parseRatingCriteria(raw) {
   });
 }
 
+function debounce(callback, wait = 220) {
+  let timer = null;
+  return (...args) => {
+    if (timer) {
+      window.clearTimeout(timer);
+    }
+    timer = window.setTimeout(() => {
+      callback(...args);
+    }, wait);
+  };
+}
+
 function normalizeStateCodeToken(value) {
   const token = String(value || "").trim().toUpperCase();
   return /^[A-Z]{2}$/.test(token) ? token : "";
@@ -2464,6 +2476,17 @@ function attachPageEvents() {
         }
       });
     }
+    const applyPnmFilters = async () => {
+      mobileFilters.pnms.state = stateInput ? stateInput.value : "";
+      await loadPnmsPage();
+    };
+    const debouncedPnmFilters = debounce(async () => {
+      try {
+        await applyPnmFilters();
+      } catch (error) {
+        showToast(error.message || "Unable to apply rushee filters.");
+      }
+    }, 200);
     if (applyFiltersBtn) {
       applyFiltersBtn.addEventListener("click", async () => {
         mobileFilters.pnms.state = stateInput ? stateInput.value : "";
@@ -2477,15 +2500,19 @@ function attachPageEvents() {
     }
     if (stateInput) {
       stateInput.value = mobileFilters.pnms.state;
+      stateInput.addEventListener("input", () => {
+        debouncedPnmFilters();
+      });
+      stateInput.addEventListener("change", () => {
+        debouncedPnmFilters();
+      });
       stateInput.addEventListener("keydown", async (event) => {
         if (event.key !== "Enter") {
           return;
         }
         event.preventDefault();
-        mobileFilters.pnms.state = stateInput.value;
         try {
-          await loadPnmsPage();
-          showToast("Rushee filters applied.");
+          await applyPnmFilters();
         } catch (error) {
           showToast(error.message || "Unable to apply filters.");
         }
@@ -2557,6 +2584,13 @@ function attachPageEvents() {
       mobileFilters.members.sort = sortInput ? sortInput.value : "location";
       await loadMembersPage();
     };
+    const debouncedMemberFilters = debounce(async () => {
+      try {
+        await applyMemberFilters();
+      } catch (error) {
+        showToast(error.message || "Unable to apply team filters.");
+      }
+    }, 220);
     if (applyFiltersBtn) {
       applyFiltersBtn.addEventListener("click", async () => {
         try {
@@ -2567,6 +2601,20 @@ function attachPageEvents() {
         }
       });
     }
+    [roleInput, stateInput, cityInput, sortInput].forEach((input) => {
+      if (!input) {
+        return;
+      }
+      const eventName = input.tagName === "SELECT" ? "change" : "input";
+      input.addEventListener(eventName, () => {
+        debouncedMemberFilters();
+      });
+      if (eventName !== "change") {
+        input.addEventListener("change", () => {
+          debouncedMemberFilters();
+        });
+      }
+    });
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
         try {

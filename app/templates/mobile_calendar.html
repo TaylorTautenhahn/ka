@@ -32,19 +32,31 @@
             <strong>BidBoard</strong>
           </div>
         </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
-        </div>
       </div>
-      <header class="hero mobile-hero">
+      <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Operations</h1>
-        <p>One timeline for rush events and touchpoints with shared subscription links.</p>
+        <p>Timeline first. Sharing and setup tools stay available without crowding the feed.</p>
       </header>
 
       <section class="panel mobile-panel">
-        <h2>Shared Calendar</h2>
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Timeline Snapshot</h2>
+            <p class="muted">One feed for official events and touchpoints.</p>
+          </div>
+          <button id="mobileRefreshCalendarBtn" type="button" class="secondary">Refresh</button>
+        </div>
+        <div id="mobileCalendarStats" class="mobile-kpi-grid">
+          <article class="card"><strong id="mobileCalendarTotalCount">0</strong><p>Total</p></article>
+          <article class="card"><strong id="mobileCalendarEventCount">0</strong><p>Events</p></article>
+          <article class="card"><strong id="mobileCalendarLunchCount">0</strong><p>Touchpoints</p></article>
+        </div>
+        <div id="mobileCalendarList" class="mobile-list"></div>
+      </section>
+
+      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+        <summary>Shared Calendar</summary>
         <div class="mobile-action-grid">
           <button id="mobileCalendarCopyFeedBtn" type="button">Copy Main Feed</button>
           <a id="mobileCalendarGoogleSubscribeLink" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
@@ -53,10 +65,10 @@
         </div>
         <p id="mobileCalendarFeedPreview" class="muted breakable">Loading calendar feed...</p>
         <p id="mobileCalendarLunchFeedPreview" class="muted breakable">Loading lunch feed...</p>
-      </section>
+      </details>
 
-      <section id="mobileCalendarHeadTools" class="panel mobile-panel hidden">
-        <h2>Add Official Rush Event</h2>
+      <details id="mobileCalendarHeadTools" class="panel mobile-panel mobile-collapsible mobile-secondary-details hidden">
+        <summary>Add Official Rush Event</summary>
         <p class="muted">Head Rush Officers can create official events directly from mobile.</p>
         <form id="mobileRushEventForm" class="stack">
           <label>Title<input id="mobileRushEventTitle" type="text" required maxlength="80" placeholder="Rush Kickoff" /></label>
@@ -80,23 +92,7 @@
           <label>Details (optional)<textarea id="mobileRushEventDetails" rows="2" placeholder="Notes for the rush team"></textarea></label>
           <button id="mobileRushEventCreateBtn" type="submit">Create Event</button>
         </form>
-      </section>
-
-      <section class="panel mobile-panel">
-        <h2>Timeline Snapshot</h2>
-        <div id="mobileCalendarStats" class="mobile-kpi-grid">
-          <article class="card"><strong id="mobileCalendarTotalCount">0</strong><p>Total</p></article>
-          <article class="card"><strong id="mobileCalendarEventCount">0</strong><p>Events</p></article>
-          <article class="card"><strong id="mobileCalendarLunchCount">0</strong><p>Touchpoints</p></article>
-        </div>
-      </section>
-
-      <section class="panel mobile-panel">
-        <div class="action-row">
-          <button id="mobileRefreshCalendarBtn" type="button" class="secondary">Refresh</button>
-        </div>
-        <div id="mobileCalendarList" class="mobile-list"></div>
-      </section>
+      </details>
     </main>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">

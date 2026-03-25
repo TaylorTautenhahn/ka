@@ -33,14 +33,13 @@
           </div>
         </a>
         <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-          <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="mobile-appbar-link">Meetings</a>
+          <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-appbar-link">Roster</a>
         </div>
       </div>
-      <header class="hero mobile-hero">
+      <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Add Rushee</h1>
-        <p>Create rushees quickly from your phone during events.</p>
+        <p>Fast create flow for events. Keep it short and finish the rest later from the roster.</p>
       </header>
 
       <section class="panel mobile-panel">

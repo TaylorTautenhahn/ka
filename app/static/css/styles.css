@@ -1677,6 +1677,38 @@ td strong {
   color: #9a2433;
 }
 
+.inline-confirm-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.85rem;
+  padding: 0.82rem 0.95rem;
+  border-radius: 16px;
+  border: 1px solid rgba(var(--accent-rgb), 0.18);
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow: 0 10px 24px rgba(var(--accent-shadow-rgb), 0.08);
+}
+
+.inline-confirm-copy {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.inline-confirm-copy strong {
+  color: var(--heading);
+  font-size: 0.94rem;
+}
+
+.inline-confirm-copy p {
+  margin: 0;
+}
+
+.inline-confirm-actions {
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
 .contact-check {
   display: inline-flex;
   align-items: center;
@@ -2053,6 +2085,23 @@ td strong {
   align-items: center;
   gap: 0.45rem;
   flex-wrap: wrap;
+}
+
+@media (max-width: 780px) {
+  .inline-confirm-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .inline-confirm-actions {
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .inline-confirm-actions > button,
+  .inline-confirm-actions > .quick-nav-link {
+    flex: 1 1 100%;
+  }
 }
 
 .score-bar {

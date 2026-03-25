@@ -157,7 +157,7 @@ function formatWeightedScore(score, totalMax = RATING_TOTAL_MAX) {
 }
 
 function confirmRusheeRatingSubmission() {
-  return window.confirm("Are you finished with this Rushee profile and ready to save this rating?");
+  return "Are you finished with this Rushee profile and ready to save this rating?";
 }
 
 const authSection = document.getElementById("memberAuthSection");
@@ -254,6 +254,76 @@ function showToast(message) {
   state.toastTimer = setTimeout(() => {
     memberToast.classList.add("hidden");
   }, 3200);
+}
+
+const inlineConfirmActions = new WeakMap();
+
+function ensureInlineConfirmBar(form, key) {
+  if (!form) {
+    return null;
+  }
+  const selector = `.inline-confirm-bar[data-confirm-key="${key}"]`;
+  let bar = form.parentElement ? form.parentElement.querySelector(selector) : null;
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "inline-confirm-bar hidden";
+    bar.dataset.confirmKey = key;
+    bar.innerHTML = `
+      <div class="inline-confirm-copy">
+        <strong>Confirm Rating Submission</strong>
+        <p class="muted">Double-check this rushee profile before saving.</p>
+      </div>
+      <div class="action-row inline-confirm-actions">
+        <button type="button" class="secondary inline-confirm-cancel">Keep Editing</button>
+        <button type="button" class="inline-confirm-accept">Yes, Save Rating</button>
+      </div>
+    `;
+    form.insertAdjacentElement("afterend", bar);
+    const cancelBtn = bar.querySelector(".inline-confirm-cancel");
+    const confirmBtn = bar.querySelector(".inline-confirm-accept");
+    cancelBtn?.addEventListener("click", () => {
+      inlineConfirmActions.delete(form);
+      bar.classList.add("hidden");
+    });
+    confirmBtn?.addEventListener("click", async () => {
+      const action = inlineConfirmActions.get(form);
+      inlineConfirmActions.delete(form);
+      bar.classList.add("hidden");
+      if (typeof action === "function") {
+        await action();
+      }
+    });
+  }
+  return bar;
+}
+
+function clearInlineConfirmBar(form, key) {
+  if (!form) {
+    return;
+  }
+  inlineConfirmActions.delete(form);
+  const bar = form.parentElement ? form.parentElement.querySelector(`.inline-confirm-bar[data-confirm-key="${key}"]`) : null;
+  if (bar) {
+    bar.classList.add("hidden");
+  }
+}
+
+function promptInlineConfirm(form, key, { message, confirmLabel, onConfirm }) {
+  const bar = ensureInlineConfirmBar(form, key);
+  if (!bar) {
+    return;
+  }
+  const copy = bar.querySelector(".inline-confirm-copy p");
+  const confirmBtn = bar.querySelector(".inline-confirm-accept");
+  if (copy) {
+    copy.textContent = message;
+  }
+  if (confirmBtn) {
+    confirmBtn.textContent = confirmLabel;
+  }
+  inlineConfirmActions.set(form, onConfirm);
+  bar.classList.remove("hidden");
+  confirmBtn?.focus();
 }
 
 function resolveApiPath(path) {
@@ -438,11 +508,13 @@ function renderSelectedPnm() {
     memberPnmDetail.classList.add("hidden");
     memberEmptyState.classList.remove("hidden");
     memberEmptyState.textContent = "Select a rushee to view details and rate.";
+    clearInlineConfirmBar(memberRatingForm, "member-rating");
     return;
   }
 
   memberEmptyState.classList.add("hidden");
   memberPnmDetail.classList.remove("hidden");
+  clearInlineConfirmBar(memberRatingForm, "member-rating");
 
   memberPnmName.textContent = `${pnm.pnm_code} | ${pnm.first_name} ${pnm.last_name}`;
   memberPnmMeta.textContent = `${pnm.class_year} | ${pnm.hometown} | ${pnm.instagram_handle} | ${pnm.phone_number || "No phone"}`;
@@ -741,21 +813,23 @@ async function handleRatingSave(event) {
     instagram_marketability: Number(document.getElementById("memberRateIg").value),
     comment: document.getElementById("memberRateComment").value.trim(),
   };
-
-  if (!confirmRusheeRatingSubmission()) {
-    return;
-  }
-
-  try {
-    await api("/api/ratings", {
-      method: "POST",
-      body,
-    });
-    showToast("Rating saved.");
-    await loadPnms();
-  } catch (error) {
-    showToast(error.message || "Unable to save rating.");
-  }
+  promptInlineConfirm(memberRatingForm, "member-rating", {
+    message: confirmRusheeRatingSubmission(),
+    confirmLabel: "Yes, Save Rating",
+    onConfirm: async () => {
+      try {
+        await api("/api/ratings", {
+          method: "POST",
+          body,
+        });
+        showToast("Rating saved.");
+        await loadPnms();
+      } catch (error) {
+        showToast(error.message || "Unable to save rating.");
+      }
+    },
+  });
+  showToast("Confirm the rating below to avoid accidental saves.");
 }
 
 async function handlePnmListClick(event) {

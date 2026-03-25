@@ -289,6 +289,76 @@ function showToast(message) {
   showToast.timer = setTimeout(() => toastEl.classList.add("hidden"), 2500);
 }
 
+const inlineConfirmActions = new WeakMap();
+
+function ensureInlineConfirmBar(form, key) {
+  if (!form) {
+    return null;
+  }
+  const selector = `.inline-confirm-bar[data-confirm-key="${key}"]`;
+  let bar = form.parentElement ? form.parentElement.querySelector(selector) : null;
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "inline-confirm-bar hidden";
+    bar.dataset.confirmKey = key;
+    bar.innerHTML = `
+      <div class="inline-confirm-copy">
+        <strong>Confirm Rating Submission</strong>
+        <p class="muted">Double-check this rushee profile before saving.</p>
+      </div>
+      <div class="action-row inline-confirm-actions">
+        <button type="button" class="secondary inline-confirm-cancel">Keep Editing</button>
+        <button type="button" class="inline-confirm-accept">Yes, Save Rating</button>
+      </div>
+    `;
+    form.insertAdjacentElement("afterend", bar);
+    const cancelBtn = bar.querySelector(".inline-confirm-cancel");
+    const confirmBtn = bar.querySelector(".inline-confirm-accept");
+    cancelBtn?.addEventListener("click", () => {
+      inlineConfirmActions.delete(form);
+      bar.classList.add("hidden");
+    });
+    confirmBtn?.addEventListener("click", async () => {
+      const action = inlineConfirmActions.get(form);
+      inlineConfirmActions.delete(form);
+      bar.classList.add("hidden");
+      if (typeof action === "function") {
+        await action();
+      }
+    });
+  }
+  return bar;
+}
+
+function clearInlineConfirmBar(form, key) {
+  if (!form) {
+    return;
+  }
+  inlineConfirmActions.delete(form);
+  const bar = form.parentElement ? form.parentElement.querySelector(`.inline-confirm-bar[data-confirm-key="${key}"]`) : null;
+  if (bar) {
+    bar.classList.add("hidden");
+  }
+}
+
+function promptInlineConfirm(form, key, { message, confirmLabel, onConfirm }) {
+  const bar = ensureInlineConfirmBar(form, key);
+  if (!bar) {
+    return;
+  }
+  const copy = bar.querySelector(".inline-confirm-copy p");
+  const confirmBtn = bar.querySelector(".inline-confirm-accept");
+  if (copy) {
+    copy.textContent = message;
+  }
+  if (confirmBtn) {
+    confirmBtn.textContent = confirmLabel;
+  }
+  inlineConfirmActions.set(form, onConfirm);
+  bar.classList.remove("hidden");
+  confirmBtn?.focus();
+}
+
 function ratingTierMeta(score, totalMax = RATING_TOTAL_MAX) {
   const safeTotal = Number(totalMax) > 0 ? Number(totalMax) : 45;
   const normalized = (Number(score || 0) / safeTotal) * 45;
@@ -317,7 +387,7 @@ function formatWeightedScore(score, totalMax = RATING_TOTAL_MAX) {
 }
 
 function confirmRusheeRatingSubmission() {
-  return window.confirm("Are you finished with this Rushee profile and ready to save this rating?");
+  return "Are you finished with this Rushee profile and ready to save this rating?";
 }
 
 function ratingCriteriaForField(field) {
@@ -1386,9 +1456,12 @@ function renderMobileCommandSelection() {
     const ratingForm = document.getElementById("mobileCommandRatingForm");
     if (ratingForm) {
       ratingForm.reset();
+      clearInlineConfirmBar(ratingForm, "mobile-rating");
     }
     return;
   }
+  const ratingForm = document.getElementById("mobileCommandRatingForm");
+  clearInlineConfirmBar(ratingForm, "mobile-rating");
 
   const assigned = mobileHomeAssignedLabel(selected);
   const touchpoint = selected.last_lunch_with_me_at
@@ -1811,6 +1884,7 @@ async function handleMobileCommandSaveRating() {
   const alcoholInput = document.getElementById("mobileCommandRateAlcohol");
   const igInput = document.getElementById("mobileCommandRateIg");
   const commentInput = document.getElementById("mobileCommandRateComment");
+  const ratingForm = document.getElementById("mobileCommandRatingForm");
   if (!girlsInput || !processInput || !personableInput || !alcoholInput || !igInput || !commentInput) {
     showToast("Rating controls are unavailable.");
     return;
@@ -1821,36 +1895,44 @@ async function handleMobileCommandSaveRating() {
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving...";
   }
-  try {
-    if (!confirmRusheeRatingSubmission()) {
-      return;
-    }
-    const payload = await api("/api/ratings", {
-      method: "POST",
-      body: {
-        pnm_id: Number(selected.pnm_id),
-        good_with_girls: Number(girlsInput.value),
-        will_make_it: Number(processInput.value),
-        personable: Number(personableInput.value),
-        alcohol_control: Number(alcoholInput.value),
-        instagram_marketability: Number(igInput.value),
-        comment: String(commentInput.value || "").trim(),
-      },
-    });
-    await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
-    if (payload.change && Number(payload.change.delta_total) > 0) {
-      showToast(`Rating up +${payload.change.delta_total}.`);
-    } else {
-      showToast("Rating saved.");
-    }
-  } catch (error) {
-    showToast(error.message || "Unable to save rating.");
-  } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Save Rating";
-    }
+  promptInlineConfirm(ratingForm, "mobile-rating", {
+    message: confirmRusheeRatingSubmission(),
+    confirmLabel: "Yes, Save Rating",
+    onConfirm: async () => {
+      try {
+        const payload = await api("/api/ratings", {
+          method: "POST",
+          body: {
+            pnm_id: Number(selected.pnm_id),
+            good_with_girls: Number(girlsInput.value),
+            will_make_it: Number(processInput.value),
+            personable: Number(personableInput.value),
+            alcohol_control: Number(alcoholInput.value),
+            instagram_marketability: Number(igInput.value),
+            comment: String(commentInput.value || "").trim(),
+          },
+        });
+        await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+        if (payload.change && Number(payload.change.delta_total) > 0) {
+          showToast(`Rating up +${payload.change.delta_total}.`);
+        } else {
+          showToast("Rating saved.");
+        }
+      } catch (error) {
+        showToast(error.message || "Unable to save rating.");
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save Rating";
+        }
+      }
+    },
+  });
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save Rating";
   }
+  showToast("Confirm the rating below to avoid accidental saves.");
 }
 
 async function handleMobileCommandScheduleLunch() {

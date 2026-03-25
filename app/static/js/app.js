@@ -522,10 +522,9 @@ function formatWeightedScore(score, totalMax = RATING_TOTAL_MAX) {
 }
 
 function confirmRusheeRatingSubmission(options = {}) {
-  const message = options.advance
-    ? "Are you finished with this Rushee profile and ready to save + move to the next one?"
+  return options.advance
+    ? "Are you finished with this Rushee profile and ready to save this rating and move to the next one?"
     : "Are you finished with this Rushee profile and ready to save this rating?";
-  return window.confirm(message);
 }
 const DEFAULT_INTEREST_TAGS = parseConfiguredTagList(APP_CONFIG.default_interest_tags, BASE_DEFAULT_INTEREST_TAGS);
 const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
@@ -1038,6 +1037,76 @@ function showToast(message) {
   state.toastTimer = setTimeout(() => {
     toastEl.classList.add("hidden");
   }, 3300);
+}
+
+const inlineConfirmActions = new WeakMap();
+
+function ensureInlineConfirmBar(form, key) {
+  if (!form) {
+    return null;
+  }
+  const selector = `.inline-confirm-bar[data-confirm-key="${key}"]`;
+  let bar = form.parentElement ? form.parentElement.querySelector(selector) : null;
+  if (!bar) {
+    bar = document.createElement("div");
+    bar.className = "inline-confirm-bar hidden";
+    bar.dataset.confirmKey = key;
+    bar.innerHTML = `
+      <div class="inline-confirm-copy">
+        <strong>Confirm Rating Submission</strong>
+        <p class="muted">Double-check this rushee profile before saving.</p>
+      </div>
+      <div class="action-row inline-confirm-actions">
+        <button type="button" class="secondary inline-confirm-cancel">Keep Editing</button>
+        <button type="button" class="inline-confirm-accept">Yes, Save Rating</button>
+      </div>
+    `;
+    form.insertAdjacentElement("afterend", bar);
+    const cancelBtn = bar.querySelector(".inline-confirm-cancel");
+    const confirmBtn = bar.querySelector(".inline-confirm-accept");
+    cancelBtn?.addEventListener("click", () => {
+      inlineConfirmActions.delete(form);
+      bar.classList.add("hidden");
+    });
+    confirmBtn?.addEventListener("click", async () => {
+      const action = inlineConfirmActions.get(form);
+      inlineConfirmActions.delete(form);
+      bar.classList.add("hidden");
+      if (typeof action === "function") {
+        await action();
+      }
+    });
+  }
+  return bar;
+}
+
+function clearInlineConfirmBar(form, key) {
+  if (!form) {
+    return;
+  }
+  inlineConfirmActions.delete(form);
+  const bar = form.parentElement ? form.parentElement.querySelector(`.inline-confirm-bar[data-confirm-key="${key}"]`) : null;
+  if (bar) {
+    bar.classList.add("hidden");
+  }
+}
+
+function promptInlineConfirm(form, key, { message, confirmLabel, onConfirm }) {
+  const bar = ensureInlineConfirmBar(form, key);
+  if (!bar) {
+    return;
+  }
+  const copy = bar.querySelector(".inline-confirm-copy p");
+  const confirmBtn = bar.querySelector(".inline-confirm-accept");
+  if (copy) {
+    copy.textContent = message;
+  }
+  if (confirmBtn) {
+    confirmBtn.textContent = confirmLabel;
+  }
+  inlineConfirmActions.set(form, onConfirm);
+  bar.classList.remove("hidden");
+  confirmBtn?.focus();
 }
 
 function animateCounter(element, nextValue) {
@@ -3457,6 +3526,7 @@ function applyCommandRatingFormForSelected() {
   renderCommandSelectedPhoto(selected);
   if (!selected) {
     commandRatingForm.reset();
+    clearInlineConfirmBar(commandRatingForm, "command-rating");
     if (commandSelectedName) {
       commandSelectedName.textContent = "Select a rushee from queue";
     }
@@ -3472,6 +3542,7 @@ function applyCommandRatingFormForSelected() {
     syncCommandMeetingLink();
     return;
   }
+  clearInlineConfirmBar(commandRatingForm, "command-rating");
 
   const own = selected.own_rating || null;
   const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
@@ -5131,6 +5202,7 @@ function applyRatingFormForSelected() {
   if (!state.selectedPnmId) {
     if (ratingForm) {
       ratingForm.reset();
+      clearInlineConfirmBar(ratingForm, "rushee-rating");
     }
     renderSelectedPnmPhoto(null);
     if (photoForm) {
@@ -5143,6 +5215,7 @@ function applyRatingFormForSelected() {
 
   const selected = state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId);
   if (!selected) {
+    clearInlineConfirmBar(ratingForm, "rushee-rating");
     renderSelectedPnmPhoto(null);
     if (photoForm) {
       photoForm.classList.toggle("hidden", !roleCanManagePhotos());
@@ -5151,6 +5224,7 @@ function applyRatingFormForSelected() {
     renderPackageDealPanel();
     return;
   }
+  clearInlineConfirmBar(ratingForm, "rushee-rating");
 
   const assignmentTeam = assignmentTeamForPnm(selected);
   const assigned = primaryAssignmentLabel(selected, assignmentTeam);
@@ -6291,29 +6365,31 @@ async function handleRatingSave(event) {
     instagram_marketability: Number(document.getElementById("rateIg").value),
     comment: document.getElementById("rateComment").value.trim(),
   };
+  promptInlineConfirm(ratingForm, "rushee-rating", {
+    message: confirmRusheeRatingSubmission(),
+    confirmLabel: "Yes, Save Rating",
+    onConfirm: async () => {
+      try {
+        const payload = await api("/api/ratings", {
+          method: "POST",
+          body,
+        });
+        state.selectedPnmId = selectedId;
+        await refreshAll();
+        await loadPnmDetail(selectedId);
 
-  if (!confirmRusheeRatingSubmission()) {
-    return;
-  }
-
-  try {
-    const payload = await api("/api/ratings", {
-      method: "POST",
-      body,
-    });
-    state.selectedPnmId = selectedId;
-    await refreshAll();
-    await loadPnmDetail(selectedId);
-
-    if (payload.change && Number(payload.change.delta_total) > 0) {
-      spawnSuccessBurst();
-      showToast(`Rating increased to ${payload.change.new_total}/${RATING_TOTAL_MAX} (+${payload.change.delta_total}).`);
-    } else {
-      showToast("Rating saved.");
-    }
-  } catch (error) {
-    showToast(error.message || "Unable to save rating.");
-  }
+        if (payload.change && Number(payload.change.delta_total) > 0) {
+          spawnSuccessBurst();
+          showToast(`Rating increased to ${payload.change.new_total}/${RATING_TOTAL_MAX} (+${payload.change.delta_total}).`);
+        } else {
+          showToast("Rating saved.");
+        }
+      } catch (error) {
+        showToast(error.message || "Unable to save rating.");
+      }
+    },
+  });
+  showToast("Confirm the rating below to avoid accidental saves.");
 }
 
 function nextCommandQueuePnmId(previousId) {
@@ -6373,9 +6449,6 @@ async function submitCommandRating(options = {}) {
     showToast("Invalid queue selection.");
     return;
   }
-  if (!confirmRusheeRatingSubmission({ advance })) {
-    return;
-  }
 
   const saveBtn = document.getElementById("commandSaveBtn");
   if (saveBtn) {
@@ -6386,43 +6459,57 @@ async function submitCommandRating(options = {}) {
     commandSaveNextBtn.disabled = true;
   }
 
-  try {
-    const payload = await api("/api/ratings", {
-      method: "POST",
-      body: {
-        pnm_id: selectedId,
-        good_with_girls: Number(girlsInput.value),
-        will_make_it: Number(processInput.value),
-        personable: Number(personableInput.value),
-        alcohol_control: Number(alcoholInput.value),
-        instagram_marketability: Number(igInput.value),
-        comment: String(commentInput.value || "").trim(),
-      },
-    });
-    const currentId = selectedId;
-    await refreshCommandCenterDependencies();
-    if (advance) {
-      state.commandCenter.selectedQueuePnmId = nextCommandQueuePnmId(currentId);
-      renderCommandCenter();
-    }
+  promptInlineConfirm(commandRatingForm, "command-rating", {
+    message: confirmRusheeRatingSubmission({ advance }),
+    confirmLabel: advance ? "Yes, Save & Next" : "Yes, Save Rating",
+    onConfirm: async () => {
+      try {
+        const payload = await api("/api/ratings", {
+          method: "POST",
+          body: {
+            pnm_id: selectedId,
+            good_with_girls: Number(girlsInput.value),
+            will_make_it: Number(processInput.value),
+            personable: Number(personableInput.value),
+            alcohol_control: Number(alcoholInput.value),
+            instagram_marketability: Number(igInput.value),
+            comment: String(commentInput.value || "").trim(),
+          },
+        });
+        const currentId = selectedId;
+        await refreshCommandCenterDependencies();
+        if (advance) {
+          state.commandCenter.selectedQueuePnmId = nextCommandQueuePnmId(currentId);
+          renderCommandCenter();
+        }
 
-    if (payload.change && Number(payload.change.delta_total) > 0) {
-      spawnSuccessBurst();
-      showToast(`Rating increased to ${payload.change.new_total}/${RATING_TOTAL_MAX} (+${payload.change.delta_total}).`);
-    } else {
-      showToast(advance ? "Rating saved. Advanced to next." : "Rating saved.");
-    }
-  } catch (error) {
-    showToast(error.message || "Unable to save rating.");
-  } finally {
-    if (saveBtn) {
-      saveBtn.disabled = false;
-      saveBtn.textContent = "Save Rating";
-    }
-    if (commandSaveNextBtn) {
-      commandSaveNextBtn.disabled = false;
-    }
+        if (payload.change && Number(payload.change.delta_total) > 0) {
+          spawnSuccessBurst();
+          showToast(`Rating increased to ${payload.change.new_total}/${RATING_TOTAL_MAX} (+${payload.change.delta_total}).`);
+        } else {
+          showToast(advance ? "Rating saved. Advanced to next." : "Rating saved.");
+        }
+      } catch (error) {
+        showToast(error.message || "Unable to save rating.");
+      } finally {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save Rating";
+        }
+        if (commandSaveNextBtn) {
+          commandSaveNextBtn.disabled = false;
+        }
+      }
+    },
+  });
+  if (saveBtn) {
+    saveBtn.disabled = false;
+    saveBtn.textContent = "Save Rating";
   }
+  if (commandSaveNextBtn) {
+    commandSaveNextBtn.disabled = false;
+  }
+  showToast("Confirm the rating below to avoid accidental saves.");
 }
 
 async function handleQuickRatingSave(event) {

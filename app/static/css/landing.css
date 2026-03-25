@@ -1727,16 +1727,75 @@ html[data-theme="light"] .bb-hero-inline-proof article {
     radial-gradient(circle at 100% 0%, rgba(var(--bb-accent-2-rgb), 0.14), transparent 34%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.06), transparent 30%),
     rgba(13, 25, 40, 0.82);
+  padding: 1.35rem;
+  gap: 1rem;
 }
 
 .bb-page-organizations .bb-page-hero-org .bb-page-title {
-  max-width: 14ch;
+  max-width: 13ch;
+}
+
+.bb-page-organizations .bb-org-hero-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.18fr) minmax(300px, 0.82fr);
+  gap: 1rem;
+  align-items: stretch;
+  margin-bottom: 0.9rem;
+}
+
+.bb-page-organizations .bb-org-hero-copy {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+}
+
+.bb-page-organizations .bb-org-hero-aside {
+  border: 1px solid rgba(var(--bb-accent-rgb), 0.14);
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 34%),
+    rgba(14, 27, 43, 0.78);
+  padding: 1rem 1.02rem;
+}
+
+.bb-page-organizations .bb-org-hero-flow {
+  display: grid;
+  gap: 0.72rem;
+  margin-top: 0.72rem;
+}
+
+.bb-page-organizations .bb-org-hero-flow article {
+  display: grid;
+  gap: 0.18rem;
+  padding: 0.78rem 0.82rem;
+  border: 1px solid rgba(var(--bb-accent-rgb), 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.bb-page-organizations .bb-org-hero-flow strong {
+  color: var(--bb-text);
+  font-size: 0.96rem;
+}
+
+.bb-page-organizations .bb-org-hero-flow span {
+  color: var(--bb-muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.bb-page-organizations .bb-topbar-pill {
+  display: none;
+}
+
+.bb-page-organizations .bb-topbar-utilities {
+  gap: 0.4rem;
 }
 
 .bb-page-organizations .bb-org-hero-metrics {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.8rem;
+  gap: 0.7rem;
 }
 
 .bb-page-organizations .bb-org-hero-metrics article,
@@ -1751,7 +1810,7 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 }
 
 .bb-page-organizations .bb-org-hero-metrics article {
-  padding: 1rem 1.05rem;
+  padding: 0.88rem 0.95rem;
 }
 
 .bb-page-organizations .bb-org-hero-metrics article::before,
@@ -1767,7 +1826,7 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 
 .bb-page-organizations .bb-org-hero-metrics strong {
   display: block;
-  margin-bottom: 0.24rem;
+  margin-bottom: 0.18rem;
   font-family: var(--bb-font-display);
   font-size: clamp(1.35rem, 2vw, 1.9rem);
   color: var(--bb-text);
@@ -1775,8 +1834,8 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 
 .bb-page-organizations .bb-org-hero-metrics span {
   color: var(--bb-muted);
-  font-size: 0.95rem;
-  line-height: 1.55;
+  font-size: 0.9rem;
+  line-height: 1.48;
 }
 
 .bb-page-organizations .bb-section-org-proof {
@@ -1786,17 +1845,20 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 }
 
 .bb-page-organizations .bb-org-directory-section .bb-section-head {
-  margin-bottom: 1rem;
+  margin-bottom: 0.8rem;
 }
 
 .bb-page-organizations .bb-org-entry-strip .bb-bento-card {
-  min-height: 188px;
+  min-height: 162px;
   align-content: space-between;
+  padding: 1rem 1.02rem;
 }
 
 .bb-page-organizations .bb-org-search-shell {
-  align-items: stretch;
-  padding: 1rem 1.05rem;
+  grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.82fr);
+  align-items: center;
+  gap: 1rem;
+  padding: 0.92rem 0.98rem;
 }
 
 .bb-page-organizations .bb-org-search-shell > * {
@@ -1806,8 +1868,8 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 
 .bb-page-organizations .bb-org-search-meta {
   display: grid;
-  gap: 0.55rem;
-  align-content: end;
+  gap: 0.42rem;
+  align-content: center;
   justify-items: end;
 }
 
@@ -1830,13 +1892,13 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 .bb-page-organizations .bb-org-card-status span {
   display: inline-flex;
   align-items: center;
-  min-height: 2rem;
-  padding: 0.4rem 0.72rem;
+  min-height: 1.82rem;
+  padding: 0.34rem 0.66rem;
   border-radius: 999px;
   border: 1px solid rgba(var(--bb-accent-rgb), 0.18);
   background: rgba(255, 255, 255, 0.04);
   color: var(--bb-muted-strong);
-  font-size: 0.76rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1844,9 +1906,9 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 
 .bb-page-organizations .bb-org-card {
   position: relative;
-  padding: 0.32rem;
+  padding: 0.24rem;
   min-height: 100%;
-  gap: 0.85rem;
+  gap: 0.65rem;
   transition: transform 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
 }
 
@@ -1863,17 +1925,18 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 
 .bb-page-organizations .bb-org-card-main {
   min-height: 100%;
-  padding: 1rem;
+  padding: 0.88rem;
   border-radius: calc(var(--bb-radius-md) - 4px);
   background: rgba(255, 255, 255, 0.02);
+  gap: 0.82rem;
 }
 
 .bb-page-organizations .bb-org-card strong {
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .bb-page-organizations .bb-org-card-top {
-  gap: 1rem;
+  gap: 0.82rem;
 }
 
 .bb-page-organizations .bb-org-logo,
@@ -1890,7 +1953,7 @@ html[data-theme="light"] .bb-hero-inline-proof article {
 }
 
 .bb-page-organizations .bb-org-card-actions {
-  padding: 0 1rem 1rem;
+  padding: 0 0.88rem 0.88rem;
 }
 
 .bb-page-organizations .bb-org-card-actions .bb-cta {
@@ -1907,6 +1970,10 @@ html[data-theme="light"] .bb-page-organizations .bb-section-org-proof {
 }
 
 @media (max-width: 1180px) {
+  .bb-page-organizations .bb-org-hero-layout {
+    grid-template-columns: 1fr;
+  }
+
   .bb-page-organizations .bb-org-hero-metrics {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -1925,6 +1992,10 @@ html[data-theme="light"] .bb-page-organizations .bb-section-org-proof {
 @media (max-width: 720px) {
   .bb-page-organizations .bb-org-hero-metrics {
     grid-template-columns: 1fr;
+  }
+
+  .bb-page-organizations .bb-org-hero-aside {
+    padding: 0.92rem;
   }
 
   .bb-page-organizations .bb-org-search-shell {

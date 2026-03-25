@@ -1487,11 +1487,13 @@ function renderMobileCommandSelection() {
     if (ratingForm) {
       ratingForm.reset();
       clearInlineConfirmBar(ratingForm, "mobile-rating");
+      clearInlineConfirmBar(ratingForm, "mobile-comment");
     }
     return;
   }
   const ratingForm = document.getElementById("mobileCommandRatingForm");
   clearInlineConfirmBar(ratingForm, "mobile-rating");
+  clearInlineConfirmBar(ratingForm, "mobile-comment");
 
   const assigned = mobileHomeAssignedLabel(selected);
   const touchpoint = selected.last_lunch_with_me_at
@@ -1996,6 +1998,64 @@ async function handleMobileCommandSaveRating() {
   showToast("Confirm the rating below to avoid accidental saves.");
 }
 
+async function handleMobileCommandAddComment() {
+  if (!mobileCanUseCommandCenter()) {
+    showToast("Rush Officer access required.");
+    return;
+  }
+  const selected = mobileCommandSelectedItem();
+  if (!selected) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  const commentInput = document.getElementById("mobileCommandRateComment");
+  const ratingForm = document.getElementById("mobileCommandRatingForm");
+  const commentBtn = document.getElementById("mobileCommandCommentBtn");
+  if (!commentInput) {
+    showToast("Comment box is unavailable.");
+    return;
+  }
+  const comment = String(commentInput.value || "").trim();
+  if (!comment) {
+    showToast("Write a quick comment first.");
+    commentInput.focus();
+    return;
+  }
+
+  if (commentBtn) {
+    commentBtn.disabled = true;
+    commentBtn.textContent = "Saving...";
+  }
+
+  promptInlineConfirm(ratingForm, "mobile-comment", {
+    message: "Add this note without changing the rating?",
+    confirmLabel: "Yes, Add Comment",
+    onConfirm: async () => {
+      try {
+        await api(`/api/pnms/${Number(selected.pnm_id)}/comments`, {
+          method: "POST",
+          body: { comment },
+        });
+        await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+        showToast("Comment added to the meeting packet.");
+      } catch (error) {
+        showToast(error.message || "Unable to add the comment.");
+      } finally {
+        if (commentBtn) {
+          commentBtn.disabled = false;
+          commentBtn.textContent = "Add Comment Only";
+        }
+      }
+    },
+  });
+
+  if (commentBtn) {
+    commentBtn.disabled = false;
+    commentBtn.textContent = "Add Comment Only";
+  }
+  showToast("Confirm the note below so we don't post it by accident.");
+}
+
 async function handleMobileCommandScheduleLunch() {
   if (!mobileCanUseCommandCenter()) {
     showToast("Rush Officer access required.");
@@ -2495,6 +2555,10 @@ function attachPageEvents() {
         event.preventDefault();
         await handleMobileCommandSaveRating();
       });
+    }
+    const mobileCommentBtn = document.getElementById("mobileCommandCommentBtn");
+    if (mobileCommentBtn) {
+      mobileCommentBtn.addEventListener("click", handleMobileCommandAddComment);
     }
   }
 

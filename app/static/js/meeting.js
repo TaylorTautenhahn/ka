@@ -351,8 +351,15 @@ function renderRushCommentTimeline(entries) {
     <div class="meeting-comment-feed">
       ${entries
         .map((entry) => {
-          const source = entry.source === "rating_update" ? "Rating Update" : "Lunch Note";
-          const chipClass = entry.source === "rating_update" ? "rating" : "lunch";
+          let source = "Rush Note";
+          let chipClass = "note";
+          if (entry.source === "rating_update") {
+            source = "Rating Update";
+            chipClass = "rating";
+          } else if (entry.source === "lunch_note") {
+            source = "Lunch Note";
+            chipClass = "lunch";
+          }
           const actor = entry.role ? `${entry.username} (${entry.role})` : `${entry.username}`;
           const metaBits = [formatTrendTimestamp(entry.occurred_at), actor].filter(Boolean);
           if (entry.source === "rating_update" && typeof entry.delta_total === "number") {

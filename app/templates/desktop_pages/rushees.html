@@ -182,10 +182,13 @@
                       <label><span id="rateIgLabel">IG (0-5)</span><input id="rateIg" type="number" min="0" max="5" required /></label>
                     </div>
                     <label>
-                      Comment (required on updates; must exceed 5 words)
-                      <textarea id="rateComment" rows="3" placeholder="Explain what changed and why"></textarea>
+                      Comment or quick note (required on rating updates; also used for comment-only notes)
+                      <textarea id="rateComment" rows="3" placeholder="Explain what changed, or add a quick note for the meeting packet."></textarea>
                     </label>
-                    <button type="submit">Save Rating</button>
+                    <div class="action-row">
+                      <button type="submit">Save Rating</button>
+                      <button id="rusheeCommentOnlyBtn" type="button" class="secondary">Add Comment Only</button>
+                    </div>
                   </form>
                 </section>
 

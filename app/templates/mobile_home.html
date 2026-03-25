@@ -103,13 +103,14 @@
               <label><span id="mobileCommandRateIgLabel">IG (0-5)</span><input id="mobileCommandRateIg" type="number" min="0" max="5" required /></label>
             </div>
             <label>
-              Comment
-              <textarea id="mobileCommandRateComment" rows="3" placeholder="What changed after the event or touchpoint?"></textarea>
+              Comment or quick note
+              <textarea id="mobileCommandRateComment" rows="3" placeholder="Add a rating note or a quick standalone comment for Meetings."></textarea>
             </label>
             <div class="mobile-command-inline-actions">
               <button id="mobileCommandSaveBtn" type="submit">Save Rating</button>
               <a id="mobileCommandMeetingShortcut" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
             </div>
+            <button id="mobileCommandCommentBtn" type="button" class="secondary mobile-comment-only-btn">Add Comment Only</button>
           </form>
         </section>
 

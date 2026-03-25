@@ -183,6 +183,7 @@ const openMeetingPageBtn = document.getElementById("openMeetingPageBtn");
 const rusheeWatchToggleBtn = document.getElementById("rusheeWatchToggleBtn");
 const rusheeScheduleTouchpointBtn = document.getElementById("rusheeScheduleTouchpointBtn");
 const ratingPnm = document.getElementById("ratingPnm");
+const rusheeCommentOnlyBtn = document.getElementById("rusheeCommentOnlyBtn");
 const assignPanel = document.getElementById("assignPanel");
 const assignOfficerSelect = document.getElementById("assignOfficerSelect");
 const assignOfficerBtn = document.getElementById("assignOfficerBtn");
@@ -254,6 +255,7 @@ const commandWatchToggleBtn = document.getElementById("commandWatchToggleBtn");
 const commandScheduleTouchpointBtn = document.getElementById("commandScheduleTouchpointBtn");
 const commandRatingForm = document.getElementById("commandRatingForm");
 const commandSaveNextBtn = document.getElementById("commandSaveNextBtn");
+const commandCommentOnlyBtn = document.getElementById("commandCommentOnlyBtn");
 const copyCalendarFeedBtn = document.getElementById("copyCalendarFeedBtn");
 const openGoogleSubscribeBtn = document.getElementById("openGoogleSubscribeBtn");
 const calendarFeedPreview = document.getElementById("calendarFeedPreview");
@@ -3576,6 +3578,7 @@ function applyCommandRatingFormForSelected() {
   if (!selected) {
     commandRatingForm.reset();
     clearInlineConfirmBar(commandRatingForm, "command-rating");
+    clearInlineConfirmBar(commandRatingForm, "command-comment");
     if (commandSelectedName) {
       commandSelectedName.textContent = "Select a rushee from queue";
     }
@@ -3592,6 +3595,7 @@ function applyCommandRatingFormForSelected() {
     return;
   }
   clearInlineConfirmBar(commandRatingForm, "command-rating");
+  clearInlineConfirmBar(commandRatingForm, "command-comment");
 
   const own = selected.own_rating || null;
   const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
@@ -5265,6 +5269,7 @@ function applyRatingFormForSelected() {
     if (ratingForm) {
       ratingForm.reset();
       clearInlineConfirmBar(ratingForm, "rushee-rating");
+      clearInlineConfirmBar(ratingForm, "rushee-comment");
     }
     renderSelectedPnmPhoto(null);
     if (photoForm) {
@@ -5278,6 +5283,7 @@ function applyRatingFormForSelected() {
   const selected = state.pnms.find((pnm) => pnm.pnm_id === state.selectedPnmId);
   if (!selected) {
     clearInlineConfirmBar(ratingForm, "rushee-rating");
+    clearInlineConfirmBar(ratingForm, "rushee-comment");
     renderSelectedPnmPhoto(null);
     if (photoForm) {
       photoForm.classList.toggle("hidden", !roleCanManagePhotos());
@@ -5287,6 +5293,7 @@ function applyRatingFormForSelected() {
     return;
   }
   clearInlineConfirmBar(ratingForm, "rushee-rating");
+  clearInlineConfirmBar(ratingForm, "rushee-comment");
 
   const assignmentTeam = assignmentTeamForPnm(selected);
   const assigned = primaryAssignmentLabel(selected, assignmentTeam);
@@ -6409,6 +6416,85 @@ async function handleRefreshInstagramPhoto() {
   }
 }
 
+async function submitStandalonePnmComment(options = {}) {
+  const pnmId = Number(options.pnmId || 0);
+  const form = options.form || null;
+  const confirmKey = String(options.confirmKey || "pnm-comment");
+  const commentInput = options.commentInput || null;
+  const actionButton = options.actionButton || null;
+  const afterSuccess = typeof options.afterSuccess === "function" ? options.afterSuccess : null;
+  const successMessage = String(options.successMessage || "Comment added to the meeting packet.");
+  const idleLabel = String(options.idleLabel || "Add Comment Only");
+
+  if (!pnmId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  if (!commentInput) {
+    showToast("Comment box is unavailable.");
+    return;
+  }
+
+  const comment = String(commentInput.value || "").trim();
+  if (!comment) {
+    showToast("Write a quick comment first.");
+    commentInput.focus();
+    return;
+  }
+
+  if (actionButton) {
+    actionButton.disabled = true;
+    actionButton.textContent = "Saving...";
+  }
+
+  promptInlineConfirm(form, confirmKey, {
+    message: "Add this note without changing the rating?",
+    confirmLabel: "Yes, Add Comment",
+    onConfirm: async () => {
+      try {
+        await api(`/api/pnms/${pnmId}/comments`, {
+          method: "POST",
+          body: { comment },
+        });
+        if (afterSuccess) {
+          await afterSuccess();
+        }
+        showToast(successMessage);
+      } catch (error) {
+        showToast(error.message || "Unable to add the comment.");
+      } finally {
+        if (actionButton) {
+          actionButton.disabled = false;
+          actionButton.textContent = idleLabel;
+        }
+      }
+    },
+  });
+
+  if (actionButton) {
+    actionButton.disabled = false;
+    actionButton.textContent = idleLabel;
+  }
+  showToast("Confirm the note below so we don't post it by accident.");
+}
+
+async function handleRusheeCommentOnly() {
+  const selectedId = Number(ratingPnm.value || state.selectedPnmId || 0);
+  const commentInput = document.getElementById("rateComment");
+  await submitStandalonePnmComment({
+    pnmId: selectedId,
+    form: ratingForm,
+    confirmKey: "rushee-comment",
+    commentInput,
+    actionButton: rusheeCommentOnlyBtn,
+    afterSuccess: async () => {
+      state.selectedPnmId = selectedId;
+      await refreshAll();
+      await loadPnmDetail(selectedId);
+    },
+  });
+}
+
 async function handleRatingSave(event) {
   event.preventDefault();
   const selectedId = Number(ratingPnm.value || state.selectedPnmId || 0);
@@ -6581,6 +6667,22 @@ async function handleQuickRatingSave(event) {
 
 async function handleQuickRatingSaveNext() {
   await submitCommandRating({ advance: true });
+}
+
+async function handleCommandCommentOnly() {
+  const selected = commandQueueSelectedItem();
+  const commentInput = document.getElementById("commandRateComment");
+  await submitStandalonePnmComment({
+    pnmId: Number(selected && selected.pnm_id ? selected.pnm_id : 0),
+    form: commandRatingForm,
+    confirmKey: "command-comment",
+    commentInput,
+    actionButton: commandCommentOnlyBtn,
+    afterSuccess: async () => {
+      await refreshCommandCenterDependencies();
+      renderCommandCenter();
+    },
+  });
 }
 
 async function submitTouchpointDrawer() {
@@ -8270,6 +8372,9 @@ function attachEvents() {
   if (commandSaveNextBtn) {
     commandSaveNextBtn.addEventListener("click", handleQuickRatingSaveNext);
   }
+  if (commandCommentOnlyBtn) {
+    commandCommentOnlyBtn.addEventListener("click", handleCommandCommentOnly);
+  }
   if (commandCenterQueue) {
     commandCenterQueue.addEventListener("click", handleQueueSelect);
   }
@@ -8432,6 +8537,9 @@ function attachEvents() {
   }
   if (ratingForm) {
     ratingForm.addEventListener("submit", handleRatingSave);
+  }
+  if (rusheeCommentOnlyBtn) {
+    rusheeCommentOnlyBtn.addEventListener("click", handleRusheeCommentOnly);
   }
   if (photoForm) {
     photoForm.addEventListener("submit", handlePhotoUpload);

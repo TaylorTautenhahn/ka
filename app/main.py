@@ -2822,6 +2822,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
         rating_change_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_changes ORDER BY id ASC").fetchall()]
         rating_history_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_history ORDER BY id ASC").fetchall()]
         rating_comment_event_rows = [dict(row) for row in conn.execute("SELECT * FROM rating_comment_events ORDER BY id ASC").fetchall()]
+        pnm_comment_rows = [dict(row) for row in conn.execute("SELECT * FROM pnm_comments ORDER BY id ASC").fetchall()]
         lunch_rows = [dict(row) for row in conn.execute("SELECT * FROM lunches ORDER BY id ASC").fetchall()]
         rush_event_rows = [dict(row) for row in conn.execute("SELECT * FROM rush_events ORDER BY id ASC").fetchall()]
         engagement_event_rows = [dict(row) for row in conn.execute("SELECT * FROM engagement_events ORDER BY id ASC").fetchall()]
@@ -2963,6 +2964,13 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "comment",
             "changed_at",
         ], rating_comment_event_rows))
+        zf.writestr("pnm_comments.csv", csv_bytes_from_rows(list(pnm_comment_rows[0].keys()) if pnm_comment_rows else [
+            "id",
+            "pnm_id",
+            "user_id",
+            "comment",
+            "created_at",
+        ], pnm_comment_rows))
         zf.writestr("lunches.csv", csv_bytes_from_rows(list(lunch_rows[0].keys()) if lunch_rows else [
             "id",
             "pnm_id",
@@ -3075,7 +3083,7 @@ def build_csv_backup_archive() -> tuple[bytes, str]:
             "KAO Rush Backup Export\n"
             f"Generated (UTC): {datetime.now(timezone.utc).isoformat()}\n"
             f"Database path: {db_path}\n"
-            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, rating_comment_events.csv, lunches.csv, rush_events.csv, engagement_events.csv, weekly_goals.csv, pnm_stage_history.csv, audit_ledger.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
+            "Contains: users.csv, pnms.csv, ratings.csv, rating_changes.csv, rating_history.csv, rating_comment_events.csv, pnm_comments.csv, lunches.csv, rush_events.csv, engagement_events.csv, weekly_goals.csv, pnm_stage_history.csv, audit_ledger.csv, officer_chat_messages.csv, officer_chat_tags.csv, officer_chat_mentions.csv, notifications.csv\n"
             "Password hashes are intentionally excluded from users.csv for security.\n"
         )
         zf.writestr("README.txt", readme.encode("utf-8"))
@@ -4336,6 +4344,14 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             changed_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS pnm_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            comment TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+
         CREATE TABLE IF NOT EXISTS lunches (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
@@ -4540,6 +4556,8 @@ def setup_schema(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_rating_history_rating_changed_at ON rating_history(rating_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_rating_comment_events_pnm_changed_at ON rating_comment_events(pnm_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_rating_comment_events_rating_changed_at ON rating_comment_events(rating_id, changed_at);
+        CREATE INDEX IF NOT EXISTS idx_pnm_comments_pnm_created_at ON pnm_comments(pnm_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_pnm_comments_user_created_at ON pnm_comments(user_id, created_at DESC);
         CREATE INDEX IF NOT EXISTS idx_lunches_pnm ON lunches(pnm_id);
         CREATE INDEX IF NOT EXISTS idx_lunches_user ON lunches(user_id);
         CREATE INDEX IF NOT EXISTS idx_rush_events_date ON rush_events(event_date, start_time);
@@ -4879,6 +4897,16 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         );
         CREATE INDEX IF NOT EXISTS idx_rating_comment_events_pnm_changed_at ON rating_comment_events(pnm_id, changed_at);
         CREATE INDEX IF NOT EXISTS idx_rating_comment_events_rating_changed_at ON rating_comment_events(rating_id, changed_at);
+
+        CREATE TABLE IF NOT EXISTS pnm_comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            comment TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_pnm_comments_pnm_created_at ON pnm_comments(pnm_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_pnm_comments_user_created_at ON pnm_comments(user_id, created_at DESC);
         """
     )
 
@@ -7570,6 +7598,10 @@ class RatingUpsertRequest(BaseModel):
     alcohol_control: int = Field(..., ge=0, le=10)
     instagram_marketability: int = Field(..., ge=0, le=5)
     comment: str | None = Field(default=None, max_length=1000)
+
+
+class PNMCommentCreateRequest(BaseModel):
+    comment: str = Field(..., min_length=2, max_length=1000)
 
 
 class LunchCreateRequest(BaseModel):
@@ -13199,6 +13231,23 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             """,
             (pnm_id,),
         ).fetchall()
+        pnm_comment_rows = conn.execute(
+            """
+            SELECT
+                pc.id,
+                pc.user_id,
+                pc.comment,
+                pc.created_at,
+                u.username,
+                u.role,
+                u.emoji
+            FROM pnm_comments pc
+            JOIN users u ON u.id = pc.user_id
+            WHERE pc.pnm_id = ?
+            ORDER BY pc.created_at DESC, pc.id DESC
+            """,
+            (pnm_id,),
+        ).fetchall()
         ranking_rows = conn.execute(
             """
             SELECT
@@ -13377,6 +13426,26 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             }
         )
 
+    standalone_comment_history: list[dict[str, Any]] = []
+    for row in pnm_comment_rows:
+        from_me = int(row["user_id"]) == int(user["id"])
+        if not can_view_identity and not from_me:
+            continue
+        comment = str(row["comment"] or "").strip()
+        if not comment:
+            continue
+        entry: dict[str, Any] = {
+            "comment_id": int(row["id"]),
+            "from_me": from_me,
+            "comment": comment,
+            "created_at": row["created_at"],
+        }
+        if can_view_identity:
+            entry["author"] = {"username": row["username"], "role": row["role"], "emoji": row["emoji"]}
+        elif from_me:
+            entry["author"] = {"username": "You", "role": row["role"], "emoji": None}
+        standalone_comment_history.append(entry)
+
     rush_comment_timeline: list[dict[str, Any]] = []
     for row in rating_update_comments:
         author = row.get("author") or {}
@@ -13402,6 +13471,17 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
                 "role": row["role"],
                 "lunch_date": row["lunch_date"],
                 "location": row["location"],
+            }
+        )
+    for row in standalone_comment_history:
+        author = row.get("author") or {}
+        rush_comment_timeline.append(
+            {
+                "source": "quick_note",
+                "occurred_at": row["created_at"],
+                "comment": row["comment"],
+                "username": author.get("username") or ("You" if row.get("from_me") else "Member"),
+                "role": author.get("role") or "",
             }
         )
     rush_comment_timeline.sort(key=lambda item: str(item.get("occurred_at") or ""), reverse=True)
@@ -13460,6 +13540,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
         ],
         "rating_update_comments": rating_update_comments,
         "lunch_comment_history": lunch_comment_history,
+        "standalone_comment_history": standalone_comment_history,
         "rush_comment_timeline": rush_comment_timeline,
         "matches": matches[:10],
         "linked_pnms": [
@@ -13889,6 +13970,69 @@ def pnm_ratings(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[
     return {
         "can_view_rater_identity": can_view_identity,
         "ratings": response_rows,
+    }
+
+
+@app.post("/api/pnms/{pnm_id}/comments")
+def create_pnm_comment(
+    pnm_id: int,
+    payload: PNMCommentCreateRequest,
+    user: sqlite3.Row = Depends(require_officer),
+) -> dict[str, Any]:
+    comment = re.sub(r"\s+", " ", (payload.comment or "").strip())
+    if len(comment) < 2:
+        raise HTTPException(status_code=400, detail="Comment cannot be empty.")
+
+    with db_session() as conn:
+        pnm = conn.execute(
+            "SELECT id, pnm_code, first_name, last_name FROM pnms WHERE id = ?",
+            (pnm_id,),
+        ).fetchone()
+        if not pnm:
+            raise HTTPException(status_code=404, detail="PNM not found.")
+
+        created_at = now_iso()
+        cursor = conn.execute(
+            """
+            INSERT INTO pnm_comments (
+                pnm_id,
+                user_id,
+                comment,
+                created_at
+            )
+            VALUES (?, ?, ?, ?)
+            """,
+            (int(pnm_id), int(user["id"]), comment, created_at),
+        )
+        comment_id = int(cursor.lastrowid or 0)
+        append_audit_entry(
+            conn,
+            actor_user_id=int(user["id"]),
+            action_type="pnm_comment_create",
+            entity_type="pnm_comment",
+            entity_id=comment_id,
+            payload={
+                "pnm_id": int(pnm_id),
+                "pnm_code": pnm["pnm_code"],
+                "comment": comment,
+            },
+        )
+
+    return {
+        "comment": {
+            "id": comment_id,
+            "pnm_id": int(pnm_id),
+            "pnm_code": pnm["pnm_code"],
+            "pnm_name": f"{pnm['first_name']} {pnm['last_name']}".strip(),
+            "comment": comment,
+            "created_at": created_at,
+            "author": {
+                "user_id": int(user["id"]),
+                "username": user["username"],
+                "role": user["role"],
+                "emoji": user["emoji"] if "emoji" in user.keys() else None,
+            },
+        }
     }
 
 

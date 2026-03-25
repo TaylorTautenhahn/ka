@@ -125,12 +125,13 @@
                     <label><span id="commandRateIgLabel">IG (0-5)</span><input id="commandRateIg" type="number" min="0" max="5" required /></label>
                   </div>
                   <label>
-                    Comment (required on updates; must exceed 5 words)
-                    <textarea id="commandRateComment" rows="3" placeholder="Explain what changed after the latest touchpoint"></textarea>
+                    Comment or quick note (required on rating updates; also used for comment-only notes)
+                    <textarea id="commandRateComment" rows="3" placeholder="Explain what changed, or add a quick note for the meeting packet."></textarea>
                   </label>
                   <div class="action-row">
                     <button id="commandSaveBtn" type="submit">Save Rating</button>
                     <button id="commandSaveNextBtn" type="button" class="secondary">Save &amp; Next</button>
+                    <button id="commandCommentOnlyBtn" type="button" class="secondary">Add Comment Only</button>
                   </div>
                 </form>
               </div>

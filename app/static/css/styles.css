@@ -1425,6 +1425,11 @@ td strong {
   color: rgba(var(--accent-deep-rgb), 0.96);
 }
 
+.comment-chip.note {
+  background: rgba(111, 182, 245, 0.18);
+  color: rgba(var(--accent-deep-rgb), 0.96);
+}
+
 @keyframes meetingBarGrow {
   from {
     width: 0;
@@ -4064,7 +4069,7 @@ body[data-mobile-page] .mobile-home-pnm-photo.empty {
   font-size: 0.7rem;
   font-weight: 800;
   letter-spacing: 0.04em;
-  background: linear-gradient(135deg, rgba(53, 200, 255, 0.18), rgba(99, 242, 210, 0.14));
+  background: linear-gradient(135deg, rgba(27, 59, 95, 0.94), rgba(18, 41, 67, 0.96));
 }
 
 body[data-mobile-page] .mobile-home-pnm-copy {
@@ -4101,12 +4106,13 @@ body[data-mobile-page] .mobile-home-pnm-score strong {
 }
 
 body[data-mobile-page] .mobile-home-pnm-btn.is-selected,
-body[data-mobile-page] .mobile-command-queue-btn.is-selected {
-  border-color: var(--mobile-stroke-strong);
+body[data-mobile-page] .mobile-command-queue-btn.is-selected,
+body[data-mobile-page] .entry.mobile-card.is-selected {
+  border-color: rgba(111, 182, 245, 0.34);
   background:
-    linear-gradient(180deg, rgba(53, 200, 255, 0.08), transparent 55%),
-    var(--mobile-surface-soft);
-  box-shadow: 0 18px 36px rgba(53, 200, 255, 0.1);
+    linear-gradient(180deg, rgba(76, 134, 201, 0.12), rgba(14, 27, 43, 0) 58%),
+    rgba(12, 24, 39, 0.96);
+  box-shadow: 0 16px 28px rgba(6, 14, 24, 0.38);
 }
 
 body[data-mobile-page] .mobile-command-selected-card {
@@ -4117,8 +4123,8 @@ body[data-mobile-page] .mobile-command-selected-card {
   border: 1px solid var(--mobile-stroke);
   border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 46%),
-    var(--mobile-surface-soft);
+    linear-gradient(180deg, rgba(82, 140, 201, 0.1), rgba(16, 30, 47, 0) 48%),
+    rgba(11, 23, 37, 0.96);
 }
 
 body[data-mobile-page] .mobile-command-selected-head {
@@ -4141,7 +4147,7 @@ body[data-mobile-page] .mobile-command-selected-photo.empty {
   place-items: center;
   font-weight: 800;
   color: #d7ecff;
-  background: linear-gradient(135deg, rgba(53, 200, 255, 0.18), rgba(99, 242, 210, 0.12));
+  background: linear-gradient(135deg, rgba(28, 58, 93, 0.94), rgba(18, 40, 65, 0.96));
 }
 
 body[data-mobile-page] .mobile-command-selected-title {
@@ -4178,6 +4184,11 @@ body[data-mobile-page] .mobile-command-inline-actions .quick-nav-link.disabled {
   pointer-events: none;
 }
 
+body[data-mobile-page] .mobile-comment-only-btn {
+  width: 100%;
+  min-height: 2.8rem;
+}
+
 body[data-mobile-page] .mobile-secondary-details,
 body[data-mobile-page] .mobile-subsection-details {
   background:
@@ -4202,9 +4213,12 @@ body[data-mobile-page] .mobile-tab {
 }
 
 body[data-mobile-page] .mobile-tab.is-active {
-  color: #05111a;
-  background: linear-gradient(135deg, #35c8ff 0%, #77e4ff 50%, #63f2d2 100%);
-  border-color: rgba(83, 216, 255, 0.36);
+  color: #eff7ff;
+  background:
+    linear-gradient(180deg, rgba(84, 141, 203, 0.18), rgba(17, 32, 49, 0.92)),
+    rgba(12, 25, 40, 0.96);
+  border-color: rgba(112, 179, 242, 0.3);
+  box-shadow: inset 0 1px 0 rgba(201, 231, 255, 0.06), 0 8px 18px rgba(0, 0, 0, 0.28);
 }
 
 @media (max-width: 560px) {

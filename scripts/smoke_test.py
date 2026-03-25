@@ -712,6 +712,15 @@ def main() -> None:
             checks.append("Officer lunch history remains available")
 
             response = client.post(
+                f"/kappaalphaorder/api/pnms/{pnm_id}/comments",
+                json={"comment": "Quick note from chapter dinner: strong table presence and better follow-up energy."},
+            )
+            expect_status(response, 200, "Create standalone rushee comment")
+            if "comment" not in response.json():
+                raise AssertionError("Standalone rushee comment API should return the saved comment payload.")
+            checks.append("Standalone rushee comments can be created without rating changes")
+
+            response = client.post(
                 "/kappaalphaorder/api/lunches",
                 json={
                     "pnm_id": pnm_id,
@@ -793,13 +802,18 @@ def main() -> None:
             lunch_comment_history = meeting_payload.get("lunch_comment_history", [])
             if not isinstance(lunch_comment_history, list):
                 raise AssertionError("Meeting view lunch_comment_history should be a list.")
+            standalone_comment_history = meeting_payload.get("standalone_comment_history", [])
+            if not isinstance(standalone_comment_history, list):
+                raise AssertionError("Meeting view standalone_comment_history should be a list.")
             rush_comment_timeline = meeting_payload.get("rush_comment_timeline", [])
             if not isinstance(rush_comment_timeline, list):
                 raise AssertionError("Meeting view rush_comment_timeline should be a list.")
+            if not any(item.get("source") == "quick_note" for item in rush_comment_timeline):
+                raise AssertionError("Meeting view should include standalone rushee comments in the rush comment timeline.")
             meeting_pin = meeting_payload.get("meeting_pin", {})
             if not meeting_pin.get("is_pinned"):
                 raise AssertionError("Meeting packet payload should expose persisted meeting pin state.")
-            checks.append("Meeting view API works")
+            checks.append("Meeting view API includes standalone rushee comments")
 
             response = client.delete(f"/kappaalphaorder/api/meetings/pins/{pnm_id}")
             expect_status(response, 200, "Officer remove meeting pin")

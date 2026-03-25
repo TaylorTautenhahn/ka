@@ -3343,6 +3343,23 @@ body[data-mobile-page] .mobile-command-sticky a {
   box-shadow: none;
 }
 
+body[data-mobile-page] .inline-confirm-bar {
+  border-color: rgba(119, 183, 245, 0.18);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 42%),
+    rgba(11, 22, 36, 0.82);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+}
+
+body[data-mobile-page] .inline-confirm-copy strong {
+  color: #f4f8fc;
+}
+
+body[data-mobile-page] .inline-confirm-copy .muted,
+body[data-mobile-page] .inline-confirm-copy p {
+  color: #9fb2ca;
+}
+
 body[data-mobile-page] button.secondary:hover,
 body[data-mobile-page] .quick-nav-link:hover,
 body[data-mobile-page] .mobile-home-pnm-btn:hover,

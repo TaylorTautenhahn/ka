@@ -1251,11 +1251,29 @@ function mobileHomeAssignedLabel(pnm) {
     .join(", ");
 }
 
+function mobileHomeDisplayName(pnm) {
+  if (!pnm) {
+    return "Unknown Rushee";
+  }
+  if (pnm.name) {
+    return String(pnm.name);
+  }
+  return `${String(pnm.first_name || "").trim()} ${String(pnm.last_name || "").trim()}`.trim() || String(pnm.pnm_code || "Unknown Rushee");
+}
+
+function mobileHomePhotoMarkup(pnm, className = "mobile-home-pnm-photo") {
+  if (pnm && pnm.photo_url) {
+    return `<img src="${escapeHtml(pnm.photo_url)}" class="${escapeHtml(className)}" alt="${escapeHtml(mobileHomeDisplayName(pnm))}" loading="lazy" />`;
+  }
+  const initials = String((pnm && (pnm.first_name || pnm.name || pnm.pnm_code) || "P").trim()).charAt(0).toUpperCase() || "P";
+  return `<div class="${escapeHtml(className)} empty">${escapeHtml(initials)}</div>`;
+}
+
 function mobileHomeSearchRows() {
   const input = document.getElementById("mobileHomeSearchInput");
   const query = String(input && input.value ? input.value : "").trim().toLowerCase();
   if (!query) {
-    return mobileHomePnmRows.slice(0, 8);
+    return mobileHomePnmRows.slice(0, 12);
   }
   return mobileHomePnmRows.filter((pnm) => {
     const haystack = [
@@ -1295,18 +1313,22 @@ function renderMobileHomeSearchResults() {
     .map((pnm) => {
       const selectedClass = Number(mobileHomeSelectedPnmId) === Number(pnm.pnm_id) ? " is-selected" : "";
       const ownRating = pnm.own_rating && Number.isFinite(Number(pnm.own_rating.total_score))
-        ? `${Number(pnm.own_rating.total_score).toFixed(0)}/${RATING_TOTAL_MAX}`
+        ? `Mine ${Number(pnm.own_rating.total_score).toFixed(0)}/${RATING_TOTAL_MAX}`
         : "Not rated";
+      const touchpointCount = Number(pnm.total_lunches || 0);
+      const touchpointLabel = touchpointCount === 1 ? "1 touchpoint" : `${touchpointCount} touchpoints`;
       return `
         <article class="entry mobile-card${selectedClass}">
           <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(pnm.pnm_id)}">
-            <div class="entry-title">
-              <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
-              <span>${formatWeightedScore(pnm.weighted_total)}</span>
+            ${mobileHomePhotoMarkup(pnm)}
+            <div class="mobile-home-pnm-copy">
+              <strong class="mobile-home-pnm-name">${escapeHtml(mobileHomeDisplayName(pnm))}</strong>
+              <div class="mobile-home-pnm-meta">${escapeHtml(pnm.pnm_code)} • ${escapeHtml(ownRating)} • ${escapeHtml(touchpointLabel)}</div>
             </div>
-            <div class="command-chip-row">${ratingTierBadgeMarkup(pnm.weighted_total)}</div>
-            <div class="muted">Assigned: ${escapeHtml(mobileHomeAssignedLabel(pnm))}</div>
-            <div class="muted">My Rating: ${escapeHtml(ownRating)} | Touchpoints: ${Number(pnm.total_lunches || 0)}</div>
+            <div class="mobile-home-pnm-score">
+              <strong>${formatWeightedScore(pnm.weighted_total)}</strong>
+              ${ratingTierBadgeMarkup(pnm.weighted_total)}
+            </div>
           </button>
         </article>
       `;
@@ -1328,17 +1350,19 @@ function renderMobileHomeRecentLunches() {
   listEl.innerHTML = mobileHomeRecentLunchRows
     .map((row) => {
       const selectedClass = Number(mobileHomeSelectedPnmId) === Number(row.pnm_id) ? " is-selected" : "";
-      const timing = [row.last_lunch_date, row.start_time || "", row.location || ""].filter(Boolean).join(" | ");
+      const timing = [row.last_lunch_date, row.start_time || "", row.location || ""].filter(Boolean).join(" • ");
       return `
         <article class="entry mobile-card${selectedClass}">
           <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(row.pnm_id)}">
-            <div class="entry-title">
-              <strong>${escapeHtml(row.pnm_code)} | ${escapeHtml(row.name)}</strong>
-              <span>${formatWeightedScore(row.weighted_total)}</span>
+            ${mobileHomePhotoMarkup(row)}
+            <div class="mobile-home-pnm-copy">
+              <strong class="mobile-home-pnm-name">${escapeHtml(row.name)}</strong>
+              <div class="mobile-home-pnm-meta">${escapeHtml(row.pnm_code)} • ${escapeHtml(timing || "Recent touchpoint")}</div>
             </div>
-            <div class="command-chip-row">${ratingTierBadgeMarkup(row.weighted_total)}</div>
-            <div class="muted">${escapeHtml(timing || "Recent lunch")}</div>
-            <div class="muted">${escapeHtml(row.notes || "Tap to add a post-lunch rating update.")}</div>
+            <div class="mobile-home-pnm-score">
+              <strong>${formatWeightedScore(row.weighted_total)}</strong>
+              ${ratingTierBadgeMarkup(row.weighted_total)}
+            </div>
           </button>
         </article>
       `;
@@ -1433,13 +1457,9 @@ function applyMobileCommandRatingCriteriaUi() {
 function renderMobileCommandCenterVisibility() {
   const officerSection = document.getElementById("mobileOfficerCommandCenter");
   const noticeSection = document.getElementById("mobileNonOfficerNotice");
-  const stickyActions = document.getElementById("mobileCommandStickyActions");
   const canUse = mobileCanUseCommandCenter();
   if (officerSection) {
     officerSection.classList.toggle("hidden", !canUse);
-  }
-  if (stickyActions) {
-    stickyActions.classList.toggle("hidden", !canUse || !mobileCommandSelectedItem());
   }
   if (noticeSection) {
     noticeSection.classList.toggle("hidden", canUse);
@@ -1448,22 +1468,20 @@ function renderMobileCommandCenterVisibility() {
 
 function renderMobileCommandSelection() {
   const metaEl = document.getElementById("mobileCommandSelectedMeta");
-  const stickyMeetingLink = document.getElementById("mobileCommandStickyMeetingLink");
-  const stickyMeetingShortcut = document.getElementById("mobileCommandStickyMeetingShortcut");
-  const stickyActions = document.getElementById("mobileCommandStickyActions");
+  const meetingShortcut = document.getElementById("mobileCommandMeetingShortcut");
+  const selectedCard = document.getElementById("mobileCommandSelectedCard");
   const selected = mobileCommandSelectedItem();
-  if (stickyActions) {
-    stickyActions.classList.toggle("hidden", !mobileCanUseCommandCenter() || !selected);
-  }
   if (!selected) {
     if (metaEl) {
       metaEl.textContent = "Select a rushee from search results or lunch follow-up to start rating.";
     }
-    if (stickyMeetingLink) {
-      stickyMeetingLink.href = MOBILE_ROUTES.meeting;
+    if (meetingShortcut) {
+      meetingShortcut.href = MOBILE_ROUTES.meeting;
+      meetingShortcut.classList.add("disabled");
+      meetingShortcut.setAttribute("aria-disabled", "true");
     }
-    if (stickyMeetingShortcut) {
-      stickyMeetingShortcut.href = MOBILE_ROUTES.meeting;
+    if (selectedCard) {
+      selectedCard.innerHTML = '<p class="muted">Choose a rushee above to load their photo, score, and rating details here.</p>';
     }
     const ratingForm = document.getElementById("mobileCommandRatingForm");
     if (ratingForm) {
@@ -1493,11 +1511,25 @@ function renderMobileCommandSelection() {
     metaEl.textContent =
       `${selected.pnm_code} | ${selected.name || `${selected.first_name} ${selected.last_name}`} | Score ${formatWeightedScore(selected.weighted_total)} (${ratingTierMeta(selected.weighted_total).label}) | Assigned: ${assigned} | Last lunch: ${touchpoint}${lunchContext ? ` (${lunchContext})` : ""} | My Rating: ${mine} | ${stale}`;
   }
-  if (stickyMeetingLink) {
-    stickyMeetingLink.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
+  if (meetingShortcut) {
+    meetingShortcut.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
+    meetingShortcut.classList.remove("disabled");
+    meetingShortcut.removeAttribute("aria-disabled");
   }
-  if (stickyMeetingShortcut) {
-    stickyMeetingShortcut.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
+  if (selectedCard) {
+    selectedCard.innerHTML = `
+      <div class="mobile-command-selected-head">
+        ${mobileHomePhotoMarkup(selected, "mobile-command-selected-photo")}
+        <div>
+          <div class="mobile-command-selected-title">
+            <strong>${escapeHtml(mobileHomeDisplayName(selected))}</strong>
+            ${ratingTierBadgeMarkup(selected.weighted_total)}
+          </div>
+          <div class="mobile-command-selected-note">Weighted ${formatWeightedScore(selected.weighted_total)} • Assigned: ${escapeHtml(assigned)}</div>
+        </div>
+      </div>
+      <div class="mobile-command-selected-note">Last touchpoint: ${escapeHtml(touchpoint)}${lunchContext ? ` • ${escapeHtml(lunchContext)}` : ""} • My rating: ${escapeHtml(mine)} • ${escapeHtml(stale)}</div>
+    `;
   }
 
   const own = selected.own_rating || null;
@@ -1677,6 +1709,23 @@ async function loadHomeSnapshot() {
   renderHomeLeaderboard(payload.leaderboard || []);
   mobileHomePnmRows = Array.isArray(payload.pnms) ? payload.pnms : [];
   mobileHomeRecentLunchRows = Array.isArray(payload.recent_lunches) ? payload.recent_lunches : [];
+  const pnmById = new Map();
+  mobileHomePnmRows.forEach((pnm) => {
+    const pnmId = Number(pnm && pnm.pnm_id ? pnm.pnm_id : 0);
+    if (pnmId) {
+      pnmById.set(pnmId, pnm);
+    }
+  });
+  mobileHomeRecentLunchRows = mobileHomeRecentLunchRows.map((row) => {
+    const match = pnmById.get(Number(row && row.pnm_id ? row.pnm_id : 0));
+    if (!match) {
+      return row;
+    }
+    return {
+      ...row,
+      photo_url: row.photo_url || match.photo_url || "",
+    };
+  });
   const lunchByPnm = new Map();
   mobileHomeRecentLunchRows.forEach((row) => {
     const pnmId = Number(row && row.pnm_id ? row.pnm_id : 0);
@@ -1902,7 +1951,7 @@ async function handleMobileCommandSaveRating() {
     return;
   }
 
-  const saveBtn = document.getElementById("mobileCommandStickySaveBtn");
+  const saveBtn = document.getElementById("mobileCommandSaveBtn");
   if (saveBtn) {
     saveBtn.disabled = true;
     saveBtn.textContent = "Saving...";
@@ -2416,7 +2465,6 @@ function attachPageEvents() {
     const recentLunches = document.getElementById("mobileHomeRecentLunches");
     const queueList = document.getElementById("mobileCommandQueueList");
     const ratingForm = document.getElementById("mobileCommandRatingForm");
-    const stickySaveBtn = document.getElementById("mobileCommandStickySaveBtn");
     if (copyBtn) {
       copyBtn.addEventListener("click", handleMobileCopyCalendar);
     }
@@ -2446,11 +2494,6 @@ function attachPageEvents() {
       ratingForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         await handleMobileCommandSaveRating();
-      });
-    }
-    if (stickySaveBtn) {
-      stickySaveBtn.addEventListener("click", () => {
-        handleMobileCommandSaveRating();
       });
     }
   }

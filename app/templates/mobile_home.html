@@ -36,17 +36,6 @@
           <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add Rushee</a>
         </div>
       </div>
-      <header class="hero mobile-hero mobile-hero-compact">
-        <div class="mobile-hero-copy">
-          <p class="eyebrow">{{ app_config.chapter_name }}</p>
-          <h1>Command</h1>
-          <p>Search, rate, and follow up from one fast mobile workspace.</p>
-        </div>
-        <div class="mobile-hero-badges">
-          <span class="mobile-inline-pill">Search-first</span>
-          <span class="mobile-inline-pill mobile-inline-pill-soft">Touchpoint-ready</span>
-        </div>
-      </header>
 
       {% if app_config.is_demo_tenant %}
       <details class="panel mobile-panel demo-banner demo-guide-panel" open>
@@ -69,11 +58,11 @@
       {% endif %}
 
       <section id="mobileOfficerCommandCenter" class="hidden mobile-command-stack">
-        <section id="mobileHomeSearchPanel" class="panel mobile-panel mobile-command-well">
+        <section id="mobileHomeSearchPanel" class="panel mobile-panel mobile-command-well mobile-roster-panel">
           <div class="section-head section-head-compact">
             <div>
-              <h2>Find a Rushee</h2>
-              <p class="muted">Search by name, code, hometown, or Instagram and jump straight into rating.</p>
+              <h2>Rushee Roster</h2>
+              <p class="muted">Search fast, tap a face, and rate without bouncing around the app.</p>
             </div>
           </div>
           <div class="mobile-search-shell">
@@ -85,7 +74,7 @@
           </div>
           <p id="mobileHomeSearchMeta" class="muted mobile-search-meta">Loading rushees...</p>
           <div id="mobileHomeSearchResults" class="mobile-list mobile-command-results"></div>
-          <details id="mobileHomeRecentLunchesPanel" class="mobile-subsection-details" open>
+          <details id="mobileHomeRecentLunchesPanel" class="mobile-subsection-details">
             <summary>
               <span>Touchpoint Follow-Up</span>
               <strong id="mobileHomeRecentLunchCount">0</strong>
@@ -101,7 +90,9 @@
               <h2>Quick Rating</h2>
               <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or touchpoint follow-up to start rating.</p>
             </div>
-            <a href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Meeting Packet</a>
+          </div>
+          <div id="mobileCommandSelectedCard" class="mobile-command-selected-card">
+            <p class="muted">Choose a rushee above to load their photo, score, and rating details here.</p>
           </div>
           <form id="mobileCommandRatingForm" class="stack">
             <div class="inline-grid compact-inputs mobile-command-score-grid">
@@ -115,6 +106,10 @@
               Comment
               <textarea id="mobileCommandRateComment" rows="3" placeholder="What changed after the event or touchpoint?"></textarea>
             </label>
+            <div class="mobile-command-inline-actions">
+              <button id="mobileCommandSaveBtn" type="submit">Save Rating</button>
+              <a id="mobileCommandMeetingShortcut" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
+            </div>
           </form>
         </section>
 
@@ -164,11 +159,6 @@
         </div>
         <p id="mobileCalendarFeedPreview" class="muted breakable">Loading shared calendar link...</p>
       </details>
-
-      <div id="mobileCommandStickyActions" class="mobile-command-sticky hidden">
-        <button id="mobileCommandStickySaveBtn" type="button">Save Rating</button>
-        <a id="mobileCommandStickyMeetingShortcut" class="quick-nav-link" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}">Open Meeting Packet</a>
-      </div>
     </main>
 
     <datalist id="mobileStateHints"></datalist>

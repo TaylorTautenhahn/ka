@@ -164,6 +164,18 @@ const teamPulseCards = document.getElementById("teamPulseCards");
 const teamOfficerLoads = document.getElementById("teamOfficerLoads");
 const sameStatePnmsHeader = document.getElementById("sameStatePnmsHeader");
 const sameStatePnmsList = document.getElementById("sameStatePnmsList");
+const myProfileForm = document.getElementById("myProfileForm");
+const myProfileUsername = document.getElementById("myProfileUsername");
+const myProfileEmojiField = document.getElementById("myProfileEmojiField");
+const myProfileEmoji = document.getElementById("myProfileEmoji");
+const myProfileCity = document.getElementById("myProfileCity");
+const myProfileState = document.getElementById("myProfileState");
+const myProfileInterests = document.getElementById("myProfileInterests");
+const myProfileInterestTags = document.getElementById("myProfileInterestTags");
+const myProfileStereotype = document.getElementById("myProfileStereotype");
+const myProfileStereotypeTags = document.getElementById("myProfileStereotypeTags");
+const myProfileSaveBtn = document.getElementById("myProfileSaveBtn");
+const myProfileStatus = document.getElementById("myProfileStatus");
 const ratingList = document.getElementById("ratingList");
 const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
@@ -1017,8 +1029,10 @@ function bindStereotypePicker(inputId, pickerId) {
 function initializePresetTagPickers() {
   bindInterestPicker("pnmInterests", "pnmInterestTags");
   bindInterestPicker("adminEditInterests", "adminEditInterestTags");
+  bindInterestPicker("myProfileInterests", "myProfileInterestTags");
   bindStereotypePicker("pnmStereotype", "pnmStereotypeTags");
   bindStereotypePicker("adminEditStereotype", "adminEditStereotypeTags");
+  bindStereotypePicker("myProfileStereotype", "myProfileStereotypeTags");
 }
 
 function escapeHtml(input) {
@@ -1508,6 +1522,40 @@ function updateTopbarActions() {
   }
 }
 
+function renderMyProfileForm() {
+  if (!myProfileForm || !state.user) {
+    return;
+  }
+  if (myProfileUsername) {
+    myProfileUsername.value = String(state.user.username || "");
+  }
+  if (myProfileCity) {
+    myProfileCity.value = String(state.user.city || "");
+  }
+  if (myProfileState) {
+    myProfileState.value = String(state.user.state_code || "");
+  }
+  if (myProfileInterests) {
+    myProfileInterests.value = Array.isArray(state.user.interests) ? state.user.interests.join(",") : "";
+    syncInterestPickerFromInput("myProfileInterests", "myProfileInterestTags");
+  }
+  if (myProfileStereotype) {
+    myProfileStereotype.value = String(state.user.stereotype || "");
+    syncStereotypePickerFromInput("myProfileStereotype", "myProfileStereotypeTags");
+  }
+  const isRushOfficer = state.user.role === "Rush Officer";
+  if (myProfileEmojiField) {
+    myProfileEmojiField.classList.toggle("hidden", !isRushOfficer);
+  }
+  if (myProfileEmoji) {
+    myProfileEmoji.disabled = !isRushOfficer;
+    myProfileEmoji.value = isRushOfficer ? String(state.user.emoji || "") : "";
+  }
+  if (myProfileStatus) {
+    myProfileStatus.textContent = "Changes update your active chapter profile immediately.";
+  }
+}
+
 function workspaceMetaForPage(page) {
   if (page === "rushees") {
     return { eyebrow: "Workspace", title: "Rushees", subtitle: "Roster, inspector, ownership, and packet readiness." };
@@ -1605,6 +1653,7 @@ function setSessionHeading() {
   sessionTitle.textContent = state.user.username;
   const emoji = state.user.emoji ? `${state.user.emoji} ` : "";
   sessionSubtitle.textContent = `${emoji}${state.user.role} | Stereotype: ${state.user.stereotype}`;
+  renderMyProfileForm();
 }
 
 function closeAppMenus() {
@@ -4371,6 +4420,7 @@ function localCommandResults(query, existing = []) {
     base.push({ action: "add_rushee", label: "Add Rushee", command_id: "create new PNM record" });
   }
   if (state.user) {
+    base.push({ action: "edit_profile", label: "Edit My Profile", command_id: "update your team profile" });
     base.push({ action: "schedule_touchpoint", label: "Schedule Touchpoint", command_id: "open shared touchpoint drawer" });
     base.push({ action: "open_tutorial", label: "Open Tutorial", command_id: "relaunch role walkthrough" });
   }
@@ -4388,6 +4438,18 @@ function localCommandResults(query, existing = []) {
 function performCommandAction(action, context = null) {
   const resolvedAction = action === "create_lunch" ? "schedule_touchpoint" : action;
   closeAppMenus();
+  if (resolvedAction === "edit_profile") {
+    if (!state.user) {
+      return;
+    }
+    navigateDesktopPage("team");
+    const section = document.getElementById("myProfileSection");
+    if (section) {
+      section.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    focusSoon(myProfileUsername);
+    return;
+  }
   if (resolvedAction === "add_rushee") {
     if (!roleCanApproveUsers()) {
       showToast("Only rush officers can add rushees.");
@@ -7506,6 +7568,61 @@ async function handleSeasonKickoffSave(event) {
   }
 }
 
+async function handleMyProfileSave(event) {
+  event.preventDefault();
+  if (!state.user) {
+    showToast("Sign in to update your profile.");
+    return;
+  }
+  const payload = {
+    username: myProfileUsername ? myProfileUsername.value.trim() : undefined,
+    city: myProfileCity ? myProfileCity.value.trim() : undefined,
+    state: myProfileState ? myProfileState.value.trim() : undefined,
+    stereotype: myProfileStereotype ? myProfileStereotype.value.trim() : undefined,
+    interests: myProfileInterests ? parseTagInput(myProfileInterests.value) : undefined,
+  };
+  if (state.user.role === "Rush Officer" && myProfileEmoji) {
+    const emoji = myProfileEmoji.value.trim();
+    if (emoji) {
+      payload.emoji = emoji;
+    }
+  }
+  if (myProfileSaveBtn) {
+    myProfileSaveBtn.disabled = true;
+    myProfileSaveBtn.textContent = "Saving...";
+  }
+  if (myProfileStatus) {
+    myProfileStatus.textContent = "Saving profile changes...";
+  }
+  try {
+    const response = await api("/api/users/me", {
+      method: "PATCH",
+      body: payload,
+    });
+    state.user = response.user || state.user;
+    setSessionHeading();
+    updateTopbarActions();
+    renderMyProfileForm();
+    if (state.activeDesktopPage === "team") {
+      loadTeamWorkspace().catch(() => {});
+    }
+    showToast("Profile updated.");
+  } catch (error) {
+    if (myProfileStatus) {
+      myProfileStatus.textContent = error.message || "Unable to save profile changes.";
+    }
+    showToast(error.message || "Unable to save profile changes.");
+  } finally {
+    if (myProfileSaveBtn) {
+      myProfileSaveBtn.disabled = false;
+      myProfileSaveBtn.textContent = "Save Profile";
+    }
+    if (myProfileStatus && myProfileStatus.textContent === "Saving profile changes...") {
+      myProfileStatus.textContent = "Changes update your active chapter profile immediately.";
+    }
+  }
+}
+
 async function handleSeasonArchiveDownload() {
   if (!roleCanUseAdminPanel()) {
     showToast("Head Rush Officer access required.");
@@ -8106,6 +8223,9 @@ function attachEvents() {
   }
   if (seasonKickoffForm) {
     seasonKickoffForm.addEventListener("submit", handleSeasonKickoffSave);
+  }
+  if (myProfileForm) {
+    myProfileForm.addEventListener("submit", handleMyProfileSave);
   }
   if (seasonArchiveDownloadBtn) {
     seasonArchiveDownloadBtn.addEventListener("click", handleSeasonArchiveDownload);

@@ -7412,11 +7412,22 @@ class TutorialCompleteRequest(BaseModel):
 
 
 class SelfUpdateRequest(BaseModel):
+    username: str | None = Field(default=None, min_length=3, max_length=64)
     stereotype: str | None = Field(default=None, min_length=1, max_length=48)
     interests: str | list[str] | None = None
     emoji: str | None = None
     city: str | None = Field(default=None, max_length=80)
     state: str | None = Field(default=None, max_length=64)
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        username = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9._-]{3,64}", username):
+            raise ValueError("Username may only include letters, numbers, dots, underscores, and hyphens.")
+        return username
 
     @field_validator("city")
     @classmethod
@@ -10740,6 +10751,8 @@ def list_users(
 @app.patch("/api/users/me")
 def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     if (
+        payload.username is None
+        and
         payload.stereotype is None
         and payload.interests is None
         and payload.emoji is None
@@ -10753,12 +10766,24 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
         if not existing:
             raise HTTPException(status_code=404, detail="User not found.")
 
+        username_value = existing["username"]
         stereotype_value = existing["stereotype"]
         interests_csv = existing["interests"]
         interests_norm = existing["interests_norm"]
         emoji_value = existing["emoji"]
         city_value = normalize_city_value(existing["city"]) if "city" in existing.keys() else ""
         state_code_value = normalize_state_code(existing["state_code"]) if "state_code" in existing.keys() else ""
+
+        if payload.username is not None:
+            next_username = payload.username.strip()
+            if next_username != str(existing["username"]).strip():
+                duplicate = conn.execute(
+                    "SELECT id FROM users WHERE lower(username) = lower(?) AND id != ?",
+                    (next_username, user["id"]),
+                ).fetchone()
+                if duplicate:
+                    raise HTTPException(status_code=400, detail="Username is already in use.")
+                username_value = next_username
 
         if payload.stereotype is not None:
             try:
@@ -10788,10 +10813,11 @@ def update_self(payload: SelfUpdateRequest, user: sqlite3.Row = Depends(current_
         conn.execute(
             """
             UPDATE users
-            SET stereotype = ?, interests = ?, interests_norm = ?, emoji = ?, city = ?, state_code = ?, updated_at = ?
+            SET username = ?, stereotype = ?, interests = ?, interests_norm = ?, emoji = ?, city = ?, state_code = ?, updated_at = ?
             WHERE id = ?
             """,
             (
+                username_value,
                 stereotype_value,
                 interests_csv,
                 interests_norm,

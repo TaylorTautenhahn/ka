@@ -39,6 +39,54 @@
           </div>
         </section>
 
+        <section id="myProfileSection" class="panel reveal delay-4 profile-panel">
+          <div class="section-head">
+            <div>
+              <h2>My Profile</h2>
+              <p class="muted">Keep your identity, hometown details, and rush context current across the chapter workspace.</p>
+            </div>
+            <span class="muted">Used in Team, search, and assignment context</span>
+          </div>
+          <form id="myProfileForm" class="stack">
+            <div class="inline-grid two-cols">
+              <label>
+                Username
+                <input id="myProfileUsername" type="text" maxlength="64" placeholder="taylort" />
+              </label>
+              <label id="myProfileEmojiField">
+                Emoji identifier (optional)
+                <input id="myProfileEmoji" type="text" maxlength="8" placeholder="🔥" />
+              </label>
+            </div>
+            <div class="inline-grid two-cols">
+              <label>
+                Hometown / city
+                <input id="myProfileCity" type="text" maxlength="80" placeholder="Austin" />
+              </label>
+              <label>
+                State
+                <input id="myProfileState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
+              </label>
+            </div>
+            <label>
+              Interests
+              <div id="myProfileInterestTags" class="tag-picker" aria-label="My interest tags"></div>
+              <input id="myProfileInterests" type="hidden" value="" />
+              <p class="muted">Choose the approved interest tags that best reflect you.</p>
+            </label>
+            <label>
+              Stereotype
+              <div id="myProfileStereotypeTags" class="tag-picker" aria-label="My stereotype tag"></div>
+              <input id="myProfileStereotype" type="hidden" value="" />
+              <p class="muted">Choose one approved stereotype tag for quick team context.</p>
+            </label>
+            <div class="action-row">
+              <button id="myProfileSaveBtn" type="submit">Save Profile</button>
+              <span id="myProfileStatus" class="muted">Changes update your active chapter profile immediately.</span>
+            </div>
+          </form>
+        </section>
+
         <div class="grid-two reveal delay-4 team-workspace-grid">
           <section id="membersSection" class="panel">
             <div class="section-head">

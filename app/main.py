@@ -11040,7 +11040,38 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
 
         base = pnm_code_base(first_name, last_name, payload.first_event_date)
         code = ensure_unique_pnm_code(conn, pnm_id, base)
-        conn.execute("UPDATE pnms SET pnm_code = ?, updated_at = ? WHERE id = ?", (code, now_iso(), pnm_id))
+        conn.execute(
+            """
+            UPDATE pnms
+            SET
+                pnm_code = ?,
+                assigned_officer_id = ?,
+                assigned_by = ?,
+                assigned_at = ?,
+                assignment_status = 'assigned',
+                assignment_updated_at = ?,
+                updated_at = ?
+            WHERE id = ?
+            """,
+            (
+                code,
+                user["id"],
+                user["id"],
+                created_at,
+                created_at,
+                created_at,
+                pnm_id,
+            ),
+        )
+        sync_primary_assignment_links_for_pnm(
+            conn,
+            pnm_id=pnm_id,
+            primary_officer_user_id=int(user["id"]),
+            assigned_by=int(user["id"]),
+            assigned_at=created_at,
+            updated_at=created_at,
+            clear_all_if_unassigned=True,
+        )
 
         if payload.auto_photo_from_instagram:
             fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)

@@ -386,6 +386,11 @@ def main() -> None:
             expect_status(response, 200, "Create PNM")
             pnm = response.json().get("pnm", {})
             pnm_id = int(pnm.get("pnm_id"))
+            if int(pnm.get("assigned_officer_id") or 0) != int(head_user_id):
+                raise AssertionError("Head-created PNM should auto-assign to the creator.")
+            assigned_officers = pnm.get("assigned_officers") or []
+            if not assigned_officers or int(assigned_officers[0].get("user_id") or 0) != int(head_user_id):
+                raise AssertionError("Head-created PNM should create a primary assignment link for the creator.")
             checks.append("PNM create works")
 
             tiny_png = base64.b64decode(
@@ -518,6 +523,11 @@ def main() -> None:
                 raise AssertionError("Creator should be able to manage the rushee they created.")
             if officer_owned_pnm.get("created_by_username") != officer_username:
                 raise AssertionError("Officer-created PNM should expose the creator username.")
+            if int(officer_owned_pnm.get("assigned_officer_id") or 0) != int(officer_user_id):
+                raise AssertionError("Officer-created PNM should auto-assign to the creator.")
+            assigned_officers = officer_owned_pnm.get("assigned_officers") or []
+            if not assigned_officers or int(assigned_officers[0].get("user_id") or 0) != int(officer_user_id):
+                raise AssertionError("Officer-created PNM should create a primary assignment link for the creator.")
             checks.append("Officer-created PNM exposes ownership metadata")
 
             response = client.patch(

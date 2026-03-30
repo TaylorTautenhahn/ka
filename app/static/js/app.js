@@ -3160,6 +3160,10 @@ function renderPnmTable() {
       const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / RATING_TOTAL_MAX) * 100));
       const barWidth = Math.round((weightedPct / 100) * 58);
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
+      const creator = String(pnm.created_by_username || "").trim();
+      const creatorBadge = creator
+        ? `<div class="table-owner-badge"><span class="pill">Created by ${escapeHtml(creator)}</span></div>`
+        : "";
       const categoryCells = RATING_CRITERIA.map((criterion) => {
         const avgField = PNM_AVG_FIELD_BY_RATING_FIELD[criterion.field];
         const value = Number(pnm[avgField] || 0);
@@ -3169,7 +3173,10 @@ function renderPnmTable() {
         <tr class="${selectedClass}">
           <td>${smallPhotoCell(pnm)}</td>
           <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
-          <td>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</td>
+          <td>
+            <strong>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+            ${creatorBadge}
+          </td>
           <td>${escapeHtml(linkedDisplay)}</td>
           <td>${escapeHtml(pnm.phone_number || "-")}</td>
           <td>${escapeHtml(pnm.class_year)}</td>

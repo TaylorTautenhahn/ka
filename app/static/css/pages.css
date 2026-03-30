@@ -1505,6 +1505,18 @@ body.desktop-product-auth .table-wrap td strong {
   color: var(--ink);
 }
 
+body.desktop-product-auth .table-owner-badge {
+  margin-top: 0.28rem;
+}
+
+body.desktop-product-auth .table-owner-badge .pill {
+  font-size: 0.72rem;
+  padding: 0.2rem 0.48rem;
+  background: rgba(112, 179, 242, 0.1);
+  border: 1px solid rgba(112, 179, 242, 0.16);
+  color: #b7d7f3;
+}
+
 body.desktop-product-auth .table-wrap,
 body.desktop-product-auth .list-box,
 body.desktop-product-auth .criteria-builder,

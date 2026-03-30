@@ -600,6 +600,19 @@ body.desktop-product-auth .app-menu > summary.secondary:hover {
   gap: 1.15rem;
 }
 
+.team-primary-stack {
+  display: grid;
+  gap: 1.15rem;
+}
+
+#membersSection .table-wrap {
+  width: 100%;
+}
+
+.team-officer-load-panel {
+  max-width: none;
+}
+
 .rushee-quick-actions-grid {
   grid-template-columns: 1fr;
   align-items: start;

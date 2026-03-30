@@ -223,6 +223,11 @@ const currentHeadsList = document.getElementById("currentHeadsList");
 const promoteOfficerSelect = document.getElementById("promoteOfficerSelect");
 const demoteExistingHeads = document.getElementById("demoteExistingHeads");
 const promoteOfficerBtn = document.getElementById("promoteOfficerBtn");
+const resetUserAccessCodeForm = document.getElementById("resetUserAccessCodeForm");
+const resetUserAccessCodeSelect = document.getElementById("resetUserAccessCodeSelect");
+const resetUserAccessCodeInput = document.getElementById("resetUserAccessCode");
+const resetUserAccessCodeConfirmInput = document.getElementById("resetUserAccessCodeConfirm");
+const resetUserAccessCodeBtn = document.getElementById("resetUserAccessCodeBtn");
 const adminPnmEditorForm = document.getElementById("adminPnmEditorForm");
 const adminEditPnmSelect = document.getElementById("adminEditPnmSelect");
 const googleImportForm = document.getElementById("googleImportForm");
@@ -4790,6 +4795,34 @@ function renderPromotionControls() {
   promoteOfficerBtn.disabled = false;
 }
 
+function resettableRushTeamMembers() {
+  return (state.members || [])
+    .filter((member) => member && member.role !== ROLE_HEAD)
+    .sort((a, b) => String(a.username || "").localeCompare(String(b.username || "")));
+}
+
+function renderPasswordResetControls() {
+  if (!resetUserAccessCodeSelect || !resetUserAccessCodeBtn) {
+    return;
+  }
+  const members = resettableRushTeamMembers();
+  if (!members.length) {
+    resetUserAccessCodeSelect.innerHTML = '<option value="">No rush team members available</option>';
+    resetUserAccessCodeSelect.disabled = true;
+    resetUserAccessCodeBtn.disabled = true;
+    return;
+  }
+  const options = members
+    .map((member) => {
+      const emoji = member.emoji ? `${member.emoji} ` : "";
+      return `<option value="${member.user_id}">${escapeHtml(`${emoji}${member.username} (${member.role})`)}</option>`;
+    })
+    .join("");
+  resetUserAccessCodeSelect.innerHTML = `<option value="">Select a rush team member</option>${options}`;
+  resetUserAccessCodeSelect.disabled = false;
+  resetUserAccessCodeBtn.disabled = false;
+}
+
 function renderOfficerMetrics() {
   if (!officerMetricsTable) {
     return;
@@ -5276,6 +5309,7 @@ function renderAdminPanel() {
   renderHeadAdminSummary();
   renderCurrentHeadsList();
   renderPromotionControls();
+  renderPasswordResetControls();
   renderSeasonArchiveStatusPanel();
   renderHeadAssignmentManager();
   renderOfficerMetrics();
@@ -7558,6 +7592,64 @@ async function handlePromoteOfficer() {
   }
 }
 
+async function handleResetUserAccessCodeSubmit(event) {
+  event.preventDefault();
+  if (!roleCanUseAdminPanel()) {
+    showToast("Head Rush Officer access required.");
+    return;
+  }
+  const userId = Number(resetUserAccessCodeSelect && resetUserAccessCodeSelect.value ? resetUserAccessCodeSelect.value : 0);
+  if (!userId) {
+    showToast("Select a rush team member.");
+    return;
+  }
+  const nextPassword = String(resetUserAccessCodeInput && resetUserAccessCodeInput.value ? resetUserAccessCodeInput.value : "").trim();
+  const confirmPassword = String(
+    resetUserAccessCodeConfirmInput && resetUserAccessCodeConfirmInput.value ? resetUserAccessCodeConfirmInput.value : ""
+  ).trim();
+  if (!nextPassword) {
+    showToast("Enter a new password.");
+    return;
+  }
+  if (nextPassword !== confirmPassword) {
+    showToast("Passwords do not match.");
+    return;
+  }
+
+  const member = resettableRushTeamMembers().find((entry) => Number(entry.user_id) === userId);
+  const targetName = member ? member.username : "this rush team member";
+  const confirmed = window.confirm(`Reset the password for ${targetName}? They will be signed out immediately.`);
+  if (!confirmed) {
+    return;
+  }
+
+  const originalLabel = resetUserAccessCodeBtn ? resetUserAccessCodeBtn.textContent : "Reset Password";
+  if (resetUserAccessCodeBtn) {
+    resetUserAccessCodeBtn.disabled = true;
+    resetUserAccessCodeBtn.textContent = "Resetting...";
+  }
+  try {
+    const payload = await api(`/api/users/${userId}/reset-access-code`, {
+      method: "POST",
+      body: {
+        access_code: nextPassword,
+      },
+    });
+    showToast(payload.message || "Password reset.");
+    if (resetUserAccessCodeForm) {
+      resetUserAccessCodeForm.reset();
+    }
+    renderPasswordResetControls();
+  } catch (error) {
+    showToast(error.message || "Unable to reset password.");
+  } finally {
+    if (resetUserAccessCodeBtn) {
+      resetUserAccessCodeBtn.disabled = false;
+      resetUserAccessCodeBtn.textContent = originalLabel;
+    }
+  }
+}
+
 async function handleSameStatePnmsClick(event) {
   const button = event.target.closest("button.open-same-state-pnm");
   if (!button) {
@@ -8758,6 +8850,9 @@ function attachEvents() {
   adminPnmTable.addEventListener("click", handleAdminPanelClick);
   if (promoteOfficerBtn) {
     promoteOfficerBtn.addEventListener("click", handlePromoteOfficer);
+  }
+  if (resetUserAccessCodeForm) {
+    resetUserAccessCodeForm.addEventListener("submit", handleResetUserAccessCodeSubmit);
   }
   if (adminPnmEditorForm) {
     adminPnmEditorForm.addEventListener("submit", handleAdminPnmEditorSubmit);

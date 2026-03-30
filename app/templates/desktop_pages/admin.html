@@ -55,6 +55,29 @@
             </section>
 
             <section class="panel">
+              <h3>Password Reset</h3>
+              <p class="muted">Head Rush Officers can reset approved rush team passwords when someone gets locked out.</p>
+              <form id="resetUserAccessCodeForm" class="stack">
+                <label>
+                  Rush team member
+                  <select id="resetUserAccessCodeSelect"></select>
+                </label>
+                <div class="inline-grid">
+                  <label>
+                    New password
+                    <input id="resetUserAccessCode" type="password" autocomplete="new-password" minlength="8" required />
+                  </label>
+                  <label>
+                    Confirm password
+                    <input id="resetUserAccessCodeConfirm" type="password" autocomplete="new-password" minlength="8" required />
+                  </label>
+                </div>
+                <p class="muted">This signs the teammate out immediately and requires them to use the new password next login.</p>
+                <div class="action-row">
+                  <button id="resetUserAccessCodeBtn" type="submit">Reset Password</button>
+                </div>
+              </form>
+              <div class="divider"></div>
               <h3>Rush Officer Metrics</h3>
               <p class="muted">Head Rush Officers can remove Rush Officers here if they need to clean up the active rush team.</p>
               <div id="officerMetricsTable" class="table-wrap"></div>

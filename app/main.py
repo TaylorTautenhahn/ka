@@ -7442,6 +7442,19 @@ class LoginRequest(BaseModel):
         return data
 
 
+class ResetUserAccessCodeRequest(BaseModel):
+    access_code: str = Field(..., min_length=8, max_length=128)
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_password_alias(cls, data: Any) -> Any:
+        if isinstance(data, dict) and "access_code" not in data and "password" in data:
+            merged = dict(data)
+            merged["access_code"] = merged.get("password")
+            return merged
+        return data
+
+
 class TutorialCompleteRequest(BaseModel):
     mode: str = Field(default=ONBOARDING_DEFAULT_MODE, min_length=1, max_length=24)
     version: int = Field(default=ONBOARDING_TUTORIAL_VERSION, ge=1, le=25)
@@ -10581,6 +10594,57 @@ def delete_user(user_id: int, actor: sqlite3.Row = Depends(require_head)) -> dic
     return {
         "message": f"{deleted['username']} has been deleted from the rush team.",
         "deleted_user": deleted,
+    }
+
+
+@app.post("/api/users/{user_id}/reset-access-code")
+def reset_user_access_code(
+    user_id: int,
+    payload: ResetUserAccessCodeRequest,
+    actor: sqlite3.Row = Depends(require_head),
+) -> dict[str, Any]:
+    validate_access_code_strength(payload.access_code)
+    with db_session() as conn:
+        target = conn.execute(
+            "SELECT id, username, role, is_approved FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+        if not target:
+            raise HTTPException(status_code=404, detail="User not found.")
+        if int(target["id"]) == int(actor["id"]):
+            raise HTTPException(status_code=400, detail="Use your own profile settings to update your password.")
+        if target["role"] == ROLE_HEAD:
+            raise HTTPException(status_code=400, detail="Head Rush Officer passwords cannot be reset from this panel.")
+        if target["role"] not in {ROLE_RUSH_OFFICER, ROLE_RUSHER}:
+            raise HTTPException(status_code=400, detail="Only rush team member accounts can be reset here.")
+        if not bool(target["is_approved"]):
+            raise HTTPException(status_code=400, detail="Approve this user before resetting their password.")
+
+        changed_at = now_iso()
+        conn.execute(
+            "UPDATE users SET access_code_hash = ?, updated_at = ? WHERE id = ?",
+            (hash_access_code(payload.access_code), changed_at, user_id),
+        )
+        conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        append_audit_entry(
+            conn,
+            actor_user_id=int(actor["id"]),
+            action_type="user_reset_access_code",
+            entity_type="user",
+            entity_id=int(user_id),
+            payload={
+                "username": target["username"],
+                "role": target["role"],
+            },
+        )
+
+    return {
+        "message": f"Password reset for {target['username']}. They will need to sign in again.",
+        "user": {
+            "user_id": int(target["id"]),
+            "username": str(target["username"]),
+            "role": str(target["role"]),
+        },
     }
 
 

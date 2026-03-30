@@ -556,10 +556,26 @@ def main() -> None:
             expect_status(response, 200, "Head edits officer-owned PNM")
             checks.append("Head can edit rushees created by other users")
 
+            reset_officer_password = "OfficerReset456!"
+            response = client.post(
+                f"/kappaalphaorder/api/users/{officer_user_id}/reset-access-code",
+                json={"access_code": reset_officer_password},
+            )
+            expect_status(response, 200, "Head resets officer password")
+            checks.append("Head can reset rush team passwords")
+
             response = client.post("/kappaalphaorder/api/auth/logout")
             expect_status(response, 200, "Head logout after owner override test")
             sync_csrf_header()
 
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": officer_username, "access_code": officer_password},
+            )
+            expect_status(response, 401, "Old officer password rejected after reset")
+            checks.append("Old rush team password stops working after reset")
+
+            officer_password = reset_officer_password
             response = client.post(
                 "/kappaalphaorder/api/auth/login",
                 json={"username": officer_username, "access_code": officer_password},

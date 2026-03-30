@@ -1333,6 +1333,12 @@ function renderMobileHomeSearchResults() {
               ${ratingTierBadgeMarkup(pnm.weighted_total)}
             </div>
           </button>
+          <div class="mobile-rushee-action-strip mobile-rushee-card-actions">
+            <button type="button" class="secondary" data-mobile-home-rate-pnm-id="${Number(pnm.pnm_id)}">Rate</button>
+            <button type="button" class="secondary" data-mobile-home-comment-pnm-id="${Number(pnm.pnm_id)}">Add Comment</button>
+            <button type="button" class="secondary" data-mobile-home-touchpoint-pnm-id="${Number(pnm.pnm_id)}">Schedule Touchpoint</button>
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Meeting Packet</a>
+          </div>
         </article>
       `;
     })
@@ -1367,6 +1373,12 @@ function renderMobileHomeRecentLunches() {
               ${ratingTierBadgeMarkup(row.weighted_total)}
             </div>
           </button>
+          <div class="mobile-rushee-action-strip mobile-rushee-card-actions">
+            <button type="button" class="secondary" data-mobile-home-rate-pnm-id="${Number(row.pnm_id)}">Rate</button>
+            <button type="button" class="secondary" data-mobile-home-comment-pnm-id="${Number(row.pnm_id)}">Add Comment</button>
+            <button type="button" class="secondary" data-mobile-home-touchpoint-pnm-id="${Number(row.pnm_id)}">Schedule Touchpoint</button>
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${row.pnm_id}`)}">Open Meeting Packet</a>
+          </div>
         </article>
       `;
     })
@@ -1380,6 +1392,7 @@ function selectMobileHomePnm(pnmId, options = {}) {
   }
   mobileHomeSelectedPnmId = targetId;
   mobileCommandCenter.selectedPnmId = targetId;
+  toggleMobileTouchpointComposer(false);
   renderMobileHomeSearchResults();
   renderMobileHomeRecentLunches();
   renderMobileCommandSelection();
@@ -1389,6 +1402,61 @@ function selectMobileHomePnm(pnmId, options = {}) {
       panel.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   }
+}
+
+function focusElementSoon(element) {
+  if (!element) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    element.focus();
+    if (typeof element.select === "function" && (element.tagName === "TEXTAREA" || element.tagName === "INPUT")) {
+      element.select();
+    }
+  });
+}
+
+function toggleMobileTouchpointComposer(forceOpen) {
+  const composer = document.getElementById("mobileCommandTouchpointComposer");
+  const toggleBtn = document.getElementById("mobileCommandTouchpointToggleBtn");
+  if (!composer) {
+    return;
+  }
+  const next = forceOpen !== undefined ? Boolean(forceOpen) : composer.classList.contains("hidden");
+  composer.classList.toggle("hidden", !next);
+  if (toggleBtn) {
+    toggleBtn.textContent = next ? "Hide Touchpoint" : "Schedule Touchpoint";
+  }
+}
+
+function focusMobileCommandComposer(mode = "rate", options = {}) {
+  const targetId = Number(options.pnmId || mobileHomeSelectedPnmId || 0);
+  if (!targetId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  if (Number(mobileHomeSelectedPnmId || 0) !== targetId) {
+    selectMobileHomePnm(targetId, { scrollToForm: false });
+  }
+  const panel = document.getElementById("mobileHomeQuickRatePanel");
+  if (panel) {
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  if (mode === "comment") {
+    toggleMobileTouchpointComposer(false);
+    const commentInput = document.getElementById("mobileCommandRateComment");
+    focusElementSoon(commentInput);
+    return;
+  }
+  if (mode === "touchpoint") {
+    toggleMobileTouchpointComposer(true);
+    const dateInput = document.getElementById("mobileCommandLunchDate");
+    focusElementSoon(dateInput);
+    return;
+  }
+  toggleMobileTouchpointComposer(false);
+  const rateInput = document.getElementById("mobileCommandRateGirls");
+  focusElementSoon(rateInput);
 }
 
 function renderHomeLeaderboard(rows) {
@@ -1473,6 +1541,9 @@ function renderMobileCommandSelection() {
   const metaEl = document.getElementById("mobileCommandSelectedMeta");
   const meetingShortcut = document.getElementById("mobileCommandMeetingShortcut");
   const selectedCard = document.getElementById("mobileCommandSelectedCard");
+  const rateFocusBtn = document.getElementById("mobileCommandRateFocusBtn");
+  const commentFocusBtn = document.getElementById("mobileCommandCommentFocusBtn");
+  const touchpointBtn = document.getElementById("mobileCommandTouchpointToggleBtn");
   const selected = mobileCommandSelectedItem();
   if (!selected) {
     if (metaEl) {
@@ -1483,6 +1554,12 @@ function renderMobileCommandSelection() {
       meetingShortcut.classList.add("disabled");
       meetingShortcut.setAttribute("aria-disabled", "true");
     }
+    [rateFocusBtn, commentFocusBtn, touchpointBtn].forEach((button) => {
+      if (button) {
+        button.disabled = true;
+      }
+    });
+    toggleMobileTouchpointComposer(false);
     if (selectedCard) {
       selectedCard.innerHTML = '<p class="muted">Choose a rushee above to load their photo, score, and rating details here.</p>';
     }
@@ -1521,6 +1598,11 @@ function renderMobileCommandSelection() {
     meetingShortcut.classList.remove("disabled");
     meetingShortcut.removeAttribute("aria-disabled");
   }
+  [rateFocusBtn, commentFocusBtn, touchpointBtn].forEach((button) => {
+    if (button) {
+      button.disabled = false;
+    }
+  });
   if (selectedCard) {
     selectedCard.innerHTML = `
       <div class="mobile-command-selected-head">
@@ -2057,7 +2139,7 @@ async function handleMobileCommandAddComment() {
       } finally {
         if (commentBtn) {
           commentBtn.disabled = false;
-          commentBtn.textContent = "Add Comment Only";
+          commentBtn.textContent = "Add Comment";
         }
       }
     },
@@ -2065,7 +2147,7 @@ async function handleMobileCommandAddComment() {
 
   if (commentBtn) {
     commentBtn.disabled = false;
-    commentBtn.textContent = "Add Comment Only";
+    commentBtn.textContent = "Add Comment";
   }
   showToast("Confirm the note below so we don't post it by accident.");
 }
@@ -2082,19 +2164,18 @@ async function handleMobileCommandScheduleLunch() {
   }
   const dateInput = document.getElementById("mobileCommandLunchDate");
   const startInput = document.getElementById("mobileCommandLunchStartTime");
-  const endInput = document.getElementById("mobileCommandLunchEndTime");
   const locationInput = document.getElementById("mobileCommandLunchLocation");
   const notesInput = document.getElementById("mobileCommandLunchNotes");
-  if (!dateInput || !startInput || !endInput || !locationInput || !notesInput) {
-    showToast("Lunch controls are unavailable.");
+  if (!dateInput || !startInput || !locationInput || !notesInput) {
+    showToast("Touchpoint controls are unavailable.");
     return;
   }
   if (!String(dateInput.value || "").trim()) {
-    showToast("Lunch date is required.");
+    showToast("Touchpoint date is required.");
     return;
   }
 
-  const lunchBtn = document.getElementById("mobileCommandStickyLunchBtn");
+  const lunchBtn = document.getElementById("mobileCommandTouchpointSaveBtn");
   if (lunchBtn) {
     lunchBtn.disabled = true;
     lunchBtn.textContent = "Scheduling...";
@@ -2106,23 +2187,23 @@ async function handleMobileCommandScheduleLunch() {
         pnm_id: Number(selected.pnm_id),
         lunch_date: dateInput.value,
         start_time: startInput.value ? startInput.value : null,
-        end_time: endInput.value ? endInput.value : null,
+        end_time: null,
         location: locationInput.value.trim(),
         notes: notesInput.value.trim(),
       },
     });
     startInput.value = "";
-    endInput.value = "";
     locationInput.value = "";
     notesInput.value = "";
     await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
-    showToast("Lunch scheduled.");
+    toggleMobileTouchpointComposer(false);
+    showToast("Touchpoint scheduled.");
   } catch (error) {
-    showToast(error.message || "Unable to schedule lunch.");
+    showToast(error.message || "Unable to schedule touchpoint.");
   } finally {
     if (lunchBtn) {
       lunchBtn.disabled = false;
-      lunchBtn.textContent = "Schedule Lunch";
+      lunchBtn.textContent = "Schedule Touchpoint";
     }
   }
 }
@@ -2230,6 +2311,33 @@ function renderMobilePnmManagement() {
 }
 
 function handleMobileHomeSearchClick(event) {
+  const rateTrigger = event.target.closest("[data-mobile-home-rate-pnm-id]");
+  if (rateTrigger) {
+    const pnmId = Number(rateTrigger.dataset.mobileHomeRatePnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    focusMobileCommandComposer("rate", { pnmId });
+    return;
+  }
+  const commentTrigger = event.target.closest("[data-mobile-home-comment-pnm-id]");
+  if (commentTrigger) {
+    const pnmId = Number(commentTrigger.dataset.mobileHomeCommentPnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    focusMobileCommandComposer("comment", { pnmId });
+    return;
+  }
+  const touchpointTrigger = event.target.closest("[data-mobile-home-touchpoint-pnm-id]");
+  if (touchpointTrigger) {
+    const pnmId = Number(touchpointTrigger.dataset.mobileHomeTouchpointPnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    focusMobileCommandComposer("touchpoint", { pnmId });
+    return;
+  }
   const trigger = event.target.closest("[data-mobile-home-pnm-id]");
   if (!trigger) {
     return;
@@ -2733,9 +2841,38 @@ function attachPageEvents() {
         await handleMobileCommandSaveRating();
       });
     }
+    const rateFocusBtn = document.getElementById("mobileCommandRateFocusBtn");
+    if (rateFocusBtn) {
+      rateFocusBtn.addEventListener("click", () => {
+        focusMobileCommandComposer("rate");
+      });
+    }
     const mobileCommentBtn = document.getElementById("mobileCommandCommentBtn");
     if (mobileCommentBtn) {
       mobileCommentBtn.addEventListener("click", handleMobileCommandAddComment);
+    }
+    const commentFocusBtn = document.getElementById("mobileCommandCommentFocusBtn");
+    if (commentFocusBtn) {
+      commentFocusBtn.addEventListener("click", () => {
+        focusMobileCommandComposer("comment");
+      });
+    }
+    const touchpointToggleBtn = document.getElementById("mobileCommandTouchpointToggleBtn");
+    if (touchpointToggleBtn) {
+      touchpointToggleBtn.addEventListener("click", () => {
+        focusMobileCommandComposer("touchpoint");
+      });
+    }
+    const touchpointForm = document.getElementById("mobileCommandTouchpointForm");
+    if (touchpointForm) {
+      const touchpointDate = document.getElementById("mobileCommandLunchDate");
+      if (touchpointDate && !touchpointDate.value) {
+        touchpointDate.value = new Date().toISOString().slice(0, 10);
+      }
+      touchpointForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        await handleMobileCommandScheduleLunch();
+      });
     }
   }
 

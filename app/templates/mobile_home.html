@@ -87,12 +87,49 @@
         <section id="mobileHomeQuickRatePanel" class="panel mobile-panel mobile-rating-panel">
           <div class="section-head section-head-compact">
             <div>
-              <h2>Quick Rating</h2>
-              <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from search or touchpoint follow-up to start rating.</p>
+              <h2>Selected Rushee</h2>
+              <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from the roster to rate, note, or schedule a touchpoint.</p>
             </div>
           </div>
           <div id="mobileCommandSelectedCard" class="mobile-command-selected-card">
             <p class="muted">Choose a rushee above to load their photo, score, and rating details here.</p>
+          </div>
+          <div class="mobile-rushee-action-strip">
+            <button id="mobileCommandRateFocusBtn" type="button" class="secondary">Rate</button>
+            <button id="mobileCommandCommentFocusBtn" type="button" class="secondary">Add Comment</button>
+            <button id="mobileCommandTouchpointToggleBtn" type="button" class="secondary">Schedule Touchpoint</button>
+            <a id="mobileCommandMeetingShortcut" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
+          </div>
+          <div id="mobileCommandTouchpointComposer" class="mobile-touchpoint-composer hidden">
+            <div class="section-head section-head-compact">
+              <div>
+                <h3>Schedule Touchpoint</h3>
+                <p class="muted">Keep this lightweight so it fits the mobile flow.</p>
+              </div>
+            </div>
+            <form id="mobileCommandTouchpointForm" class="stack">
+              <div class="inline-grid two-cols">
+                <label>
+                  Date
+                  <input id="mobileCommandLunchDate" type="date" required />
+                </label>
+                <label>
+                  Start (optional)
+                  <input id="mobileCommandLunchStartTime" type="time" />
+                </label>
+              </div>
+              <label>
+                Location
+                <input id="mobileCommandLunchLocation" type="text" maxlength="120" placeholder="Main Street Cafe" />
+              </label>
+              <label>
+                Notes
+                <textarea id="mobileCommandLunchNotes" rows="2" placeholder="Quick details for the rush team"></textarea>
+              </label>
+              <div class="action-row">
+                <button id="mobileCommandTouchpointSaveBtn" type="submit">Schedule Touchpoint</button>
+              </div>
+            </form>
           </div>
           <form id="mobileCommandRatingForm" class="stack">
             <div class="inline-grid compact-inputs mobile-command-score-grid">
@@ -108,48 +145,15 @@
             </label>
             <div class="mobile-command-inline-actions">
               <button id="mobileCommandSaveBtn" type="submit">Save Rating</button>
-              <a id="mobileCommandMeetingShortcut" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
+              <button id="mobileCommandCommentBtn" type="button" class="secondary mobile-comment-only-btn">Add Comment</button>
             </div>
-            <button id="mobileCommandCommentBtn" type="button" class="secondary mobile-comment-only-btn">Add Comment Only</button>
           </form>
         </section>
-
-        <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
-          <summary>Needs Rating Queue</summary>
-          <div class="mobile-kpi-grid">
-            <article class="card"><strong id="mobileCommandQueueCount">0</strong><p>Queue</p></article>
-            <article class="card"><strong id="mobileCommandStaleCount">0</strong><p>Stale</p></article>
-            <article class="card"><strong id="mobileCommandRecentCount">0</strong><p>Changes</p></article>
-          </div>
-          <div id="mobileCommandQueueList" class="mobile-list"></div>
-          <div class="divider"></div>
-          <h3>Recent Rating Changes</h3>
-          <div id="mobileCommandRecentChanges" class="mobile-list"></div>
-        </details>
       </section>
 
       <section id="mobileNonOfficerNotice" class="panel mobile-panel hidden">
         <h2>Live Snapshot</h2>
         <p class="muted">Quick mobile rating tools are available to Head Rush Officers and Rush Officers. You still have access to the core team views below.</p>
-      </section>
-
-      <section id="mobileHomeSecondarySection" class="panel mobile-panel">
-        <div class="section-head section-head-compact">
-          <div>
-            <h2>Live Snapshot</h2>
-            <p class="muted">Keep the broader chapter picture close without crowding the command flow.</p>
-          </div>
-        </div>
-        <div class="mobile-kpi-grid">
-          <article class="card"><strong id="mobilePnmCount">0</strong><p>Rushees</p></article>
-          <article class="card"><strong id="mobileRatingCount">0</strong><p>Ratings</p></article>
-          <article class="card"><strong id="mobileLunchCount">0</strong><p>Touchpoints</p></article>
-        </div>
-        <div class="mobile-action-grid">
-          <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="quick-nav-link">Open Rushees</a>
-          <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="quick-nav-link">Open Team</a>
-          <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="quick-nav-link">Open Operations</a>
-        </div>
       </section>
 
       <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">

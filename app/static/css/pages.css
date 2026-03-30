@@ -2102,18 +2102,14 @@ body.desktop-product-auth .command-stat-card strong {
 }
 
 body.desktop-product-auth .shared-rushee-action-strip {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--backend-control-gap);
 }
 
-body.desktop-product-auth .shared-rushee-action-strip > .quick-nav-link {
-  flex: 1 1 220px;
-}
-
-body.desktop-product-auth .shared-rushee-action-strip > button,
-body.desktop-product-auth .shared-rushee-action-strip > .secondary {
-  flex: 0 1 auto;
+body.desktop-product-auth .shared-rushee-action-strip > * {
+  width: 100%;
+  min-width: 0;
 }
 
 body.desktop-product-auth .command-form-head {
@@ -2386,8 +2382,13 @@ body.desktop-product-auth .rushee-inspector-panel .shared-rushee-action-strip {
 }
 
 body.desktop-product-auth .rushee-inspector-panel .shared-rushee-action-strip > * {
-  flex: 1 1 220px;
   min-width: 0;
+}
+
+@media (max-width: 1260px) {
+  body.desktop-product-auth .shared-rushee-action-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 body.desktop-product-auth #rusheeManagementLocked {

@@ -146,9 +146,10 @@
                     <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
                   </div>
                   <div class="action-row shared-rushee-action-strip">
-                    <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
-                    <button id="rusheeWatchToggleBtn" type="button" class="secondary">Pin for Meetings</button>
+                    <button id="rusheeRateFocusBtn" type="button" class="secondary">Rate</button>
+                    <button id="rusheeCommentFocusActionBtn" type="button" class="secondary">Add Comment</button>
                     <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
+                    <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
                   </div>
                   <form id="photoForm" class="stack compact-upload">
                     <label>

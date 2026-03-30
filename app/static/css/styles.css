@@ -4180,6 +4180,33 @@ body[data-mobile-page] .mobile-command-selected-note {
   line-height: 1.35;
 }
 
+body[data-mobile-page] .mobile-rushee-action-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.52rem;
+}
+
+body[data-mobile-page] .mobile-rushee-action-strip > * {
+  width: 100%;
+  min-width: 0;
+  min-height: 2.7rem;
+}
+
+body[data-mobile-page] .mobile-rushee-card-actions {
+  margin-top: 0.72rem;
+}
+
+body[data-mobile-page] .mobile-touchpoint-composer {
+  display: grid;
+  gap: 0.78rem;
+  padding: 0.82rem;
+  border: 1px solid rgba(112, 179, 242, 0.14);
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 48%),
+    rgba(9, 18, 31, 0.9);
+}
+
 body[data-mobile-page] .mobile-command-inline-actions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -4321,6 +4348,10 @@ body[data-mobile-page] .mobile-tab.is-active {
   }
 
   body[data-mobile-page] .mobile-command-inline-actions {
+    grid-template-columns: 1fr;
+  }
+
+  body[data-mobile-page] .mobile-rushee-action-strip {
     grid-template-columns: 1fr;
   }
 }

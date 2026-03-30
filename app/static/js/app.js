@@ -180,6 +180,8 @@ const ratingList = document.getElementById("ratingList");
 const lunchHistory = document.getElementById("lunchHistory");
 const selectedPnmLabel = document.getElementById("selectedPnmLabel");
 const openMeetingPageBtn = document.getElementById("openMeetingPageBtn");
+const rusheeRateFocusBtn = document.getElementById("rusheeRateFocusBtn");
+const rusheeCommentFocusActionBtn = document.getElementById("rusheeCommentFocusActionBtn");
 const rusheeWatchToggleBtn = document.getElementById("rusheeWatchToggleBtn");
 const rusheeScheduleTouchpointBtn = document.getElementById("rusheeScheduleTouchpointBtn");
 const ratingPnm = document.getElementById("ratingPnm");
@@ -275,6 +277,8 @@ const commandSelectedMeta = document.getElementById("commandSelectedMeta");
 const commandSelectedSignal = document.getElementById("commandSelectedSignal");
 const commandSelectedStats = document.getElementById("commandSelectedStats");
 const commandOpenMeetingBtn = document.getElementById("commandOpenMeetingBtn");
+const commandRateFocusBtn = document.getElementById("commandRateFocusBtn");
+const commandCommentFocusBtn = document.getElementById("commandCommentFocusBtn");
 const commandWatchToggleBtn = document.getElementById("commandWatchToggleBtn");
 const commandScheduleTouchpointBtn = document.getElementById("commandScheduleTouchpointBtn");
 const commandRatingForm = document.getElementById("commandRatingForm");
@@ -4086,9 +4090,10 @@ function renderPnmBoard() {
               <h3>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</h3>
               <div class="rushee-board-meta">Weighted ${formatWeightedScore(pnm.weighted_total)} | ${ratingTierMeta(pnm.weighted_total).label} | Ratings ${Number(pnm.rating_count || 0)} | Touchpoints ${Number(pnm.total_lunches || 0)}</div>
               <div class="rushee-board-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
-              <div class="action-row">
-                <button type="button" class="secondary select-pnm" data-pnm-id="${Number(pnm.pnm_id)}">Inspect</button>
-                <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
+              <div class="action-row shared-rushee-action-strip">
+                <button type="button" class="secondary quick-rate-pnm" data-rate-pnm-id="${Number(pnm.pnm_id)}">Rate</button>
+                <button type="button" class="secondary quick-comment-pnm" data-comment-pnm-id="${Number(pnm.pnm_id)}">Add Comment</button>
+                <button type="button" class="secondary quick-touchpoint-pnm" data-schedule-touchpoint-pnm-id="${Number(pnm.pnm_id)}">Schedule Touchpoint</button>
                 <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Meeting Packet</a>
               </div>
             </article>
@@ -5389,6 +5394,53 @@ function applyRatingFormForSelected() {
   renderRusheeManagementPanel(selected);
   syncWatchButtons();
   syncOpenMeetingLink();
+}
+
+function focusElementSoon(element) {
+  if (!element) {
+    return;
+  }
+  window.requestAnimationFrame(() => {
+    element.focus();
+    if (typeof element.select === "function" && (element.tagName === "TEXTAREA" || element.tagName === "INPUT")) {
+      element.select();
+    }
+  });
+}
+
+function focusCommandComposer(mode = "rate") {
+  const panel = document.getElementById("commandCenterSection");
+  if (panel) {
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  if (mode === "comment") {
+    focusElementSoon(commandRateComment);
+    return;
+  }
+  focusElementSoon(commandRateGirls);
+}
+
+async function focusRusheeComposerForPnm(pnmId, mode = "rate") {
+  const targetId = Number(pnmId || 0);
+  if (!targetId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  state.selectedPnmId = targetId;
+  state.headAssignmentPnmId = targetId;
+  syncSelectedRusheeRoute("replace");
+  renderPnmTable();
+  applyRatingFormForSelected();
+  await loadPnmDetail(targetId);
+  const panel = document.getElementById("detailSection");
+  if (panel) {
+    panel.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  if (mode === "comment") {
+    focusElementSoon(rateComment);
+    return;
+  }
+  focusElementSoon(rateGirls);
 }
 
 function resetRusheeManagementPanel(message = "Select a rushee to edit identity, contact, and meeting details.") {
@@ -7312,6 +7364,42 @@ async function handlePackageDealUnlink() {
 }
 
 async function handlePnmTableClick(event) {
+  const rateButton = event.target.closest("[data-rate-pnm-id]");
+  if (rateButton) {
+    const pnmId = Number(rateButton.dataset.ratePnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    await focusRusheeComposerForPnm(pnmId, "rate");
+    return;
+  }
+
+  const commentButton = event.target.closest("[data-comment-pnm-id]");
+  if (commentButton) {
+    const pnmId = Number(commentButton.dataset.commentPnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    await focusRusheeComposerForPnm(pnmId, "comment");
+    return;
+  }
+
+  const touchpointButton = event.target.closest("[data-schedule-touchpoint-pnm-id]");
+  if (touchpointButton) {
+    const pnmId = Number(touchpointButton.dataset.scheduleTouchpointPnmId || 0);
+    if (!pnmId) {
+      return;
+    }
+    state.selectedPnmId = pnmId;
+    state.headAssignmentPnmId = pnmId;
+    syncSelectedRusheeRoute("replace");
+    renderPnmTable();
+    applyRatingFormForSelected();
+    await loadPnmDetail(pnmId);
+    openTouchpointDrawer({ source: "rushees", pnmId });
+    return;
+  }
+
   const button = event.target.closest("button.select-pnm");
   if (!button) {
     return;
@@ -8658,6 +8746,26 @@ function attachEvents() {
       }
     });
   }
+  if (commandRateFocusBtn) {
+    commandRateFocusBtn.addEventListener("click", () => {
+      const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
+      if (!selectedId) {
+        showToast("Select a queue item first.");
+        return;
+      }
+      focusCommandComposer("rate");
+    });
+  }
+  if (commandCommentFocusBtn) {
+    commandCommentFocusBtn.addEventListener("click", () => {
+      const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
+      if (!selectedId) {
+        showToast("Select a queue item first.");
+        return;
+      }
+      focusCommandComposer("comment");
+    });
+  }
   if (commandScheduleTouchpointBtn) {
     commandScheduleTouchpointBtn.addEventListener("click", () => {
       const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
@@ -8681,6 +8789,26 @@ function attachEvents() {
       } catch (error) {
         showToast(error.message || "Unable to update Meetings pin.");
       }
+    });
+  }
+  if (rusheeRateFocusBtn) {
+    rusheeRateFocusBtn.addEventListener("click", async () => {
+      const selectedId = Number(state.selectedPnmId || 0);
+      if (!selectedId) {
+        showToast("Select a rushee first.");
+        return;
+      }
+      await focusRusheeComposerForPnm(selectedId, "rate");
+    });
+  }
+  if (rusheeCommentFocusActionBtn) {
+    rusheeCommentFocusActionBtn.addEventListener("click", async () => {
+      const selectedId = Number(state.selectedPnmId || 0);
+      if (!selectedId) {
+        showToast("Select a rushee first.");
+        return;
+      }
+      await focusRusheeComposerForPnm(selectedId, "comment");
     });
   }
   if (rusheeScheduleTouchpointBtn) {

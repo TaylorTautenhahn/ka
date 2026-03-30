@@ -3522,6 +3522,7 @@ def pnm_payload_with_assignment_links(
     row: sqlite3.Row,
     own_rating: dict[str, Any] | None,
     links_by_pnm: dict[int, list[dict[str, Any]]] | None = None,
+    viewer: sqlite3.Row | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     pnm_id = int(row["id"])
     if links_by_pnm is None:
@@ -3531,6 +3532,7 @@ def pnm_payload_with_assignment_links(
         own_rating,
         assigned_officer=assigned_officer_payload_from_row(row),
         assigned_officers=links_by_pnm.get(pnm_id, []),
+        viewer=viewer,
     )
 
 
@@ -7048,11 +7050,22 @@ def user_payload(row: sqlite3.Row, viewer_role: str, viewer_id: int) -> dict[str
     return payload
 
 
+def can_manage_pnm_profile(row: sqlite3.Row, viewer: sqlite3.Row | dict[str, Any] | None) -> bool:
+    if not viewer:
+        return False
+    viewer_role = str(viewer["role"] or "").strip()
+    viewer_id = int(viewer["id"] if "id" in viewer.keys() else viewer["user_id"])
+    if viewer_role == ROLE_HEAD:
+        return True
+    return int(row["created_by"]) == viewer_id
+
+
 def pnm_payload(
     row: sqlite3.Row,
     own_rating: dict[str, Any] | None,
     assigned_officer: dict[str, Any] | None = None,
     assigned_officers: list[dict[str, Any]] | None = None,
+    viewer: sqlite3.Row | dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     days_since_event = (date.today() - date.fromisoformat(row["first_event_date"])).days
     keys = set(row.keys())
@@ -7119,6 +7132,9 @@ def pnm_payload(
         "funnel_stage_updated_at": row["funnel_stage_updated_at"] if "funnel_stage_updated_at" in keys else None,
         "funnel_stage_updated_by": row["funnel_stage_updated_by"] if "funnel_stage_updated_by" in keys else None,
         "own_rating": own_rating,
+        "created_by": int(row["created_by"]) if "created_by" in keys and row["created_by"] is not None else None,
+        "created_by_username": row["created_by_username"] if "created_by_username" in keys else None,
+        "can_manage_profile": can_manage_pnm_profile(row, viewer),
     }
 
 
@@ -7508,7 +7524,7 @@ class PNMCreateRequest(BaseModel):
     last_name: str = Field(..., min_length=1, max_length=48)
     class_year: str
     hometown: str = Field(..., min_length=1, max_length=80)
-    state: str | None = Field(default=None, max_length=64)
+    state: str = Field(..., min_length=1, max_length=64)
     phone_number: str = Field(default="", max_length=32)
     instagram_handle: str = Field(..., min_length=1, max_length=80)
     first_event_date: str
@@ -7533,12 +7549,10 @@ class PNMCreateRequest(BaseModel):
 
     @field_validator("state")
     @classmethod
-    def normalize_optional_state(cls, value: str | None) -> str | None:
-        if value is None:
-            return None
+    def normalize_required_state(cls, value: str) -> str:
         token = value.strip()
         if not token:
-            return ""
+            raise ValueError("State is required.")
         normalized = normalize_state_code(token)
         if not normalized:
             raise ValueError("State must be a valid US state name or 2-letter code.")
@@ -10989,10 +11003,25 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
                         raise
 
         evaluate_weekly_goal_completions(conn)
-        row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+        row = conn.execute(
+            """
+            SELECT
+                p.*,
+                ao.id AS assigned_officer_id,
+                ao.username AS assigned_officer_username,
+                ao.role AS assigned_officer_role,
+                ao.emoji AS assigned_officer_emoji,
+                creator.username AS created_by_username
+            FROM pnms p
+            LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            LEFT JOIN users creator ON creator.id = p.created_by
+            WHERE p.id = ?
+            """,
+            (pnm_id,),
+        ).fetchone()
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
-    return {"pnm": pnm_payload_with_assignment_links(conn, row, own_rating=None, links_by_pnm=links_by_pnm)}
+    return {"pnm": pnm_payload_with_assignment_links(conn, row, own_rating=None, links_by_pnm=links_by_pnm, viewer=user)}
 
 
 @app.get("/api/pnms")
@@ -11024,9 +11053,11 @@ def list_pnms(
                 ao.id AS assigned_officer_id,
                 ao.username AS assigned_officer_username,
                 ao.role AS assigned_officer_role,
-                ao.emoji AS assigned_officer_emoji
+                ao.emoji AS assigned_officer_emoji,
+                creator.username AS created_by_username
             FROM pnms p
             LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            LEFT JOIN users creator ON creator.id = p.created_by
             ORDER BY p.weighted_total DESC, p.last_name ASC, p.first_name ASC
             """
         ).fetchall()
@@ -11050,6 +11081,7 @@ def list_pnms(
                     own_rating_by_pnm.get(row["id"]),
                     assigned_officer=assigned_officer_payload_from_row(row),
                     assigned_officers=links_by_pnm.get(int(row["id"]), []),
+                    viewer=user,
                 )
             )
 
@@ -11066,9 +11098,11 @@ def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str,
                 ao.id AS assigned_officer_id,
                 ao.username AS assigned_officer_username,
                 ao.role AS assigned_officer_role,
-                ao.emoji AS assigned_officer_emoji
+                ao.emoji AS assigned_officer_emoji,
+                creator.username AS created_by_username
             FROM pnms p
             LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            LEFT JOIN users creator ON creator.id = p.created_by
             WHERE p.id = ?
             """,
             (pnm_id,),
@@ -11077,14 +11111,14 @@ def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str,
             raise HTTPException(status_code=404, detail="PNM not found.")
         own = fetch_own_rating(conn, pnm_id, user["id"])
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
-    return {"pnm": pnm_payload_with_assignment_links(conn, row, own, links_by_pnm)}
+    return {"pnm": pnm_payload_with_assignment_links(conn, row, own, links_by_pnm, viewer=user)}
 
 
 @app.patch("/api/pnms/{pnm_id}")
 def update_pnm_details(
     pnm_id: int,
     payload: PNMUpdateRequest,
-    head_user: sqlite3.Row = Depends(require_head),
+    actor: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     if (
         payload.first_name is None
@@ -11106,6 +11140,8 @@ def update_pnm_details(
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="PNM not found.")
+        if not can_manage_pnm_profile(row, actor):
+            raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
 
         first_name = normalize_name(payload.first_name) if payload.first_name is not None else row["first_name"]
         last_name = normalize_name(payload.last_name) if payload.last_name is not None else row["last_name"]
@@ -11221,7 +11257,7 @@ def update_pnm_details(
                             SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
                             WHERE id = ?
                             """,
-                            (public_path, now, head_user["id"], now, pnm_id),
+                            (public_path, now, actor["id"], now, pnm_id),
                         )
                     except Exception:
                         target_path.unlink(missing_ok=True)
@@ -11233,19 +11269,21 @@ def update_pnm_details(
                 ao.id AS assigned_officer_id,
                 ao.username AS assigned_officer_username,
                 ao.role AS assigned_officer_role,
-                ao.emoji AS assigned_officer_emoji
+                ao.emoji AS assigned_officer_emoji,
+                creator.username AS created_by_username
             FROM pnms p
             LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+            LEFT JOIN users creator ON creator.id = p.created_by
             WHERE p.id = ?
             """,
             (pnm_id,),
         ).fetchone()
-        own = fetch_own_rating(conn, pnm_id, head_user["id"])
+        own = fetch_own_rating(conn, pnm_id, actor["id"])
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     return {
         "message": "PNM details updated.",
-        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
+        "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm, viewer=actor),
     }
 
 
@@ -12976,6 +13014,8 @@ async def upload_pnm_photo(
             row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
             if not row:
                 raise HTTPException(status_code=404, detail="PNM not found.")
+            if not can_manage_pnm_profile(row, user):
+                raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
             old_photo_path = row["photo_path"]
 
             now = now_iso()
@@ -12995,16 +13035,18 @@ async def upload_pnm_photo(
                     ao.id AS assigned_officer_id,
                     ao.username AS assigned_officer_username,
                     ao.role AS assigned_officer_role,
-                    ao.emoji AS assigned_officer_emoji
+                    ao.emoji AS assigned_officer_emoji,
+                    creator.username AS created_by_username
                 FROM pnms p
                 LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                LEFT JOIN users creator ON creator.id = p.created_by
                 WHERE p.id = ?
                 """,
                 (pnm_id,),
             ).fetchone()
             own = fetch_own_rating(conn, pnm_id, user["id"])
             links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
-            payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm)
+            payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm, viewer=user)
     except Exception:
         target_path.unlink(missing_ok=True)
         raise
@@ -13031,6 +13073,8 @@ def refresh_pnm_photo_from_instagram(
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="PNM not found.")
+        if not can_manage_pnm_profile(row, user):
+            raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
         instagram_handle = row["instagram_handle"]
         if not instagram_handle:
             raise HTTPException(status_code=400, detail="PNM does not have an Instagram handle.")
@@ -13066,9 +13110,11 @@ def refresh_pnm_photo_from_instagram(
                     ao.id AS assigned_officer_id,
                     ao.username AS assigned_officer_username,
                     ao.role AS assigned_officer_role,
-                    ao.emoji AS assigned_officer_emoji
+                    ao.emoji AS assigned_officer_emoji,
+                    creator.username AS created_by_username
                 FROM pnms p
                 LEFT JOIN users ao ON ao.id = p.assigned_officer_id
+                LEFT JOIN users creator ON creator.id = p.created_by
                 WHERE p.id = ?
             """,
                 (pnm_id,),
@@ -13076,7 +13122,7 @@ def refresh_pnm_photo_from_instagram(
             own = fetch_own_rating(conn, pnm_id, user["id"])
             links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
             refreshed_photo_path = refreshed["photo_path"]
-            payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm)
+            payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm, viewer=user)
         except Exception:
             target_path.unlink(missing_ok=True)
             raise

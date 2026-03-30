@@ -2377,6 +2377,21 @@ body.desktop-product-auth .rushee-inspector-panel .shared-rushee-action-strip > 
   min-width: 0;
 }
 
+body.desktop-product-auth #rusheeManagementLocked {
+  border: 1px solid rgba(119, 183, 245, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.desktop-product-auth #pnmManageForm .action-row {
+  justify-content: flex-end;
+}
+
+body.desktop-product-auth #pnmManageForm input[required],
+body.desktop-product-auth #pnmManageForm select[required] {
+  border-color: rgba(119, 183, 245, 0.2);
+}
+
 body.desktop-product-auth .rushee-inspector-block .inline-grid.five-cols.compact-inputs {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }

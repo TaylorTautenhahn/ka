@@ -193,6 +193,25 @@ const packagePartnerSelect = document.getElementById("packagePartnerSelect");
 const packageLinkBtn = document.getElementById("packageLinkBtn");
 const packageUnlinkBtn = document.getElementById("packageUnlinkBtn");
 const packageDealSummary = document.getElementById("packageDealSummary");
+const rusheeManagementPanel = document.getElementById("rusheeManagementPanel");
+const rusheeManagementHint = document.getElementById("rusheeManagementHint");
+const rusheeManagementLocked = document.getElementById("rusheeManagementLocked");
+const pnmManageForm = document.getElementById("pnmManageForm");
+const pnmManageFirstName = document.getElementById("pnmManageFirstName");
+const pnmManageLastName = document.getElementById("pnmManageLastName");
+const pnmManageClassYear = document.getElementById("pnmManageClassYear");
+const pnmManageEventDate = document.getElementById("pnmManageEventDate");
+const pnmManageHometown = document.getElementById("pnmManageHometown");
+const pnmManageState = document.getElementById("pnmManageState");
+const pnmManagePhone = document.getElementById("pnmManagePhone");
+const pnmManageInstagram = document.getElementById("pnmManageInstagram");
+const pnmManageInterests = document.getElementById("pnmManageInterests");
+const pnmManageInterestTags = document.getElementById("pnmManageInterestTags");
+const pnmManageStereotype = document.getElementById("pnmManageStereotype");
+const pnmManageStereotypeTags = document.getElementById("pnmManageStereotypeTags");
+const pnmManageLunchStats = document.getElementById("pnmManageLunchStats");
+const pnmManageNotes = document.getElementById("pnmManageNotes");
+const pnmManageSaveBtn = document.getElementById("pnmManageSaveBtn");
 
 const approvalsPanel = document.getElementById("approvalsPanel");
 const pendingList = document.getElementById("pendingList");
@@ -1032,9 +1051,11 @@ function initializePresetTagPickers() {
   bindInterestPicker("pnmInterests", "pnmInterestTags");
   bindInterestPicker("adminEditInterests", "adminEditInterestTags");
   bindInterestPicker("myProfileInterests", "myProfileInterestTags");
+  bindInterestPicker("pnmManageInterests", "pnmManageInterestTags");
   bindStereotypePicker("pnmStereotype", "pnmStereotypeTags");
   bindStereotypePicker("adminEditStereotype", "adminEditStereotypeTags");
   bindStereotypePicker("myProfileStereotype", "myProfileStereotypeTags");
+  bindStereotypePicker("pnmManageStereotype", "pnmManageStereotypeTags");
 }
 
 function escapeHtml(input) {
@@ -5273,10 +5294,11 @@ function applyRatingFormForSelected() {
     }
     renderSelectedPnmPhoto(null);
     if (photoForm) {
-      photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+      photoForm.classList.toggle("hidden", true);
     }
     renderAssignmentControls();
     renderPackageDealPanel();
+    renderRusheeManagementPanel(null);
     return;
   }
 
@@ -5286,10 +5308,11 @@ function applyRatingFormForSelected() {
     clearInlineConfirmBar(ratingForm, "rushee-comment");
     renderSelectedPnmPhoto(null);
     if (photoForm) {
-      photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+      photoForm.classList.toggle("hidden", true);
     }
     renderAssignmentControls();
     renderPackageDealPanel();
+    renderRusheeManagementPanel(null);
     return;
   }
   clearInlineConfirmBar(ratingForm, "rushee-rating");
@@ -5325,12 +5348,93 @@ function applyRatingFormForSelected() {
   document.getElementById("rateComment").value = own ? own.comment || "" : "";
   renderSelectedPnmPhoto(selected);
   if (photoForm) {
-    photoForm.classList.toggle("hidden", !roleCanManagePhotos());
+    photoForm.classList.toggle("hidden", !(roleCanManagePhotos() && selected.can_manage_profile));
   }
   renderAssignmentControls();
   renderPackageDealPanel();
+  renderRusheeManagementPanel(selected);
   syncWatchButtons();
   syncOpenMeetingLink();
+}
+
+function resetRusheeManagementPanel(message = "Select a rushee to edit identity, contact, and meeting details.") {
+  if (rusheeManagementHint) {
+    rusheeManagementHint.textContent = message;
+  }
+  if (rusheeManagementLocked) {
+    rusheeManagementLocked.classList.add("hidden");
+    rusheeManagementLocked.innerHTML = "";
+  }
+  if (pnmManageForm) {
+    pnmManageForm.classList.add("hidden");
+    pnmManageForm.reset();
+  }
+  if (pnmManageInterests) {
+    pnmManageInterests.value = "";
+  }
+  if (pnmManageStereotype) {
+    pnmManageStereotype.value = "";
+  }
+  if (pnmManageInterestTags) {
+    syncInterestPickerFromInput("pnmManageInterests", "pnmManageInterestTags");
+  }
+  if (pnmManageStereotypeTags) {
+    syncStereotypePickerFromInput("pnmManageStereotype", "pnmManageStereotypeTags");
+  }
+}
+
+function renderRusheeManagementPanel(pnm) {
+  if (!rusheeManagementPanel) {
+    return;
+  }
+  if (!pnm) {
+    resetRusheeManagementPanel();
+    return;
+  }
+  const creator = String(pnm.created_by_username || "").trim() || "another rush team member";
+  if (rusheeManagementHint) {
+    rusheeManagementHint.textContent = pnm.can_manage_profile
+      ? `Created by ${creator}. You can edit the full rushee profile here.`
+      : `Created by ${creator}. Only the creator or Head Rush Officer can edit this rushee.`;
+  }
+  if (!pnm.can_manage_profile) {
+    if (rusheeManagementLocked) {
+      rusheeManagementLocked.classList.remove("hidden");
+      rusheeManagementLocked.innerHTML = `
+        <div class="entry-title">
+          <strong>Editing locked</strong>
+          <span>${escapeHtml(creator)}</span>
+        </div>
+        <div class="muted">You can still review this rushee, but profile edits are limited to the creator or Head Rush Officer.</div>
+      `;
+    }
+    if (pnmManageForm) {
+      pnmManageForm.classList.add("hidden");
+    }
+    return;
+  }
+  if (rusheeManagementLocked) {
+    rusheeManagementLocked.classList.add("hidden");
+    rusheeManagementLocked.innerHTML = "";
+  }
+  if (!pnmManageForm) {
+    return;
+  }
+  pnmManageForm.classList.remove("hidden");
+  if (pnmManageFirstName) pnmManageFirstName.value = String(pnm.first_name || "");
+  if (pnmManageLastName) pnmManageLastName.value = String(pnm.last_name || "");
+  if (pnmManageClassYear) pnmManageClassYear.value = String(pnm.class_year || "F");
+  if (pnmManageEventDate) pnmManageEventDate.value = String(pnm.first_event_date || "");
+  if (pnmManageHometown) pnmManageHometown.value = String(pnm.hometown || "");
+  if (pnmManageState) pnmManageState.value = String(pnm.hometown_state_code || "");
+  if (pnmManagePhone) pnmManagePhone.value = String(pnm.phone_number || "");
+  if (pnmManageInstagram) pnmManageInstagram.value = String(pnm.instagram_handle || "");
+  if (pnmManageInterests) pnmManageInterests.value = Array.isArray(pnm.interests) ? pnm.interests.join(",") : "";
+  if (pnmManageStereotype) pnmManageStereotype.value = String(pnm.stereotype || "");
+  if (pnmManageLunchStats) pnmManageLunchStats.value = String(pnm.lunch_stats || "");
+  if (pnmManageNotes) pnmManageNotes.value = String(pnm.notes || "");
+  syncInterestPickerFromInput("pnmManageInterests", "pnmManageInterestTags");
+  syncStereotypePickerFromInput("pnmManageStereotype", "pnmManageStereotypeTags");
 }
 
 function renderRatingEntries(data) {
@@ -6321,6 +6425,10 @@ async function handlePnmCreate(event) {
     notes: document.getElementById("pnmNotes").value.trim(),
     auto_photo_from_instagram: !photoFile,
   };
+  if (!body.state) {
+    showToast("State is required.");
+    return;
+  }
 
   try {
     const payload = await api("/api/pnms", {
@@ -6347,6 +6455,71 @@ async function handlePnmCreate(event) {
     await loadPnmDetail(state.selectedPnmId);
   } catch (error) {
     showToast(error.message || "Unable to create rushee.");
+  }
+}
+
+async function handlePnmManageSave(event) {
+  event.preventDefault();
+  const selectedId = Number(state.selectedPnmId || 0);
+  if (!selectedId) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  const selected = state.pnms.find((pnm) => Number(pnm.pnm_id) === selectedId) || null;
+  if (!selected || !selected.can_manage_profile) {
+    showToast("You can only edit rushees you created unless you are Head Rush Officer.");
+    return;
+  }
+  const interestsValue = String(pnmManageInterests && pnmManageInterests.value ? pnmManageInterests.value : "").trim();
+  if (!interestsValue) {
+    showToast("Select at least one approved interest tag.");
+    return;
+  }
+  const stereotypeValue = String(pnmManageStereotype && pnmManageStereotype.value ? pnmManageStereotype.value : "").trim();
+  if (!stereotypeValue) {
+    showToast("Select one approved stereotype tag.");
+    return;
+  }
+  const body = {
+    first_name: String(pnmManageFirstName?.value || "").trim(),
+    last_name: String(pnmManageLastName?.value || "").trim(),
+    class_year: String(pnmManageClassYear?.value || "").trim(),
+    hometown: String(pnmManageHometown?.value || "").trim(),
+    state: String(pnmManageState?.value || "").trim(),
+    phone_number: String(pnmManagePhone?.value || "").trim(),
+    instagram_handle: String(pnmManageInstagram?.value || "").trim(),
+    first_event_date: String(pnmManageEventDate?.value || "").trim(),
+    interests: interestsValue,
+    stereotype: stereotypeValue,
+    lunch_stats: String(pnmManageLunchStats?.value || "").trim(),
+    notes: String(pnmManageNotes?.value || "").trim(),
+  };
+  if (!body.first_name || !body.last_name || !body.hometown || !body.state || !body.instagram_handle || !body.first_event_date) {
+    showToast("First name, last name, hometown, state, Instagram, and first event date are required.");
+    return;
+  }
+  const originalLabel = pnmManageSaveBtn ? pnmManageSaveBtn.textContent : "Save Rushee Details";
+  if (pnmManageSaveBtn) {
+    pnmManageSaveBtn.disabled = true;
+    pnmManageSaveBtn.textContent = "Saving...";
+  }
+  try {
+    await api(`/api/pnms/${selectedId}`, {
+      method: "PATCH",
+      body,
+    });
+    showToast("Rushee details updated.");
+    await refreshAll();
+    state.selectedPnmId = selectedId;
+    applyRatingFormForSelected();
+    await loadPnmDetail(selectedId);
+  } catch (error) {
+    showToast(error.message || "Unable to update rushee.");
+  } finally {
+    if (pnmManageSaveBtn) {
+      pnmManageSaveBtn.disabled = false;
+      pnmManageSaveBtn.textContent = originalLabel;
+    }
   }
 }
 
@@ -8534,6 +8707,9 @@ function attachEvents() {
 
   if (pnmForm) {
     pnmForm.addEventListener("submit", handlePnmCreate);
+  }
+  if (pnmManageForm) {
+    pnmManageForm.addEventListener("submit", handlePnmManageSave);
   }
   if (ratingForm) {
     ratingForm.addEventListener("submit", handleRatingSave);

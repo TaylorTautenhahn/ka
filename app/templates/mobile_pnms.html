@@ -66,10 +66,58 @@
         <div class="section-head section-head-compact">
           <div>
             <h2>Roster</h2>
-            <p class="muted">Tap a rushee to jump into Meeting Packet review.</p>
+            <p class="muted">Choose a rushee to manage their details or open Meeting Packet review.</p>
           </div>
         </div>
         <div id="mobilePnmList" class="mobile-list"></div>
+      </section>
+
+      <section class="panel mobile-panel">
+        <div class="section-head section-head-compact">
+          <div>
+            <h2>Rushee Management</h2>
+            <p id="mobilePnmManageHint" class="muted">Select a rushee from the roster to edit identity, contact, and meeting details.</p>
+          </div>
+        </div>
+        <div id="mobilePnmManageLocked" class="entry mobile-card hidden"></div>
+        <form id="mobilePnmManageForm" class="stack hidden">
+          <div class="inline-grid">
+            <label>First name<input id="mobileManageFirstName" type="text" required /></label>
+            <label>Last name<input id="mobileManageLastName" type="text" required /></label>
+          </div>
+          <div class="inline-grid">
+            <label>
+              Class year
+              <select id="mobileManageClassYear" required>
+                <option>F</option>
+                <option>S</option>
+                <option>J</option>
+              </select>
+            </label>
+            <label>First event date<input id="mobileManageEventDate" type="date" required /></label>
+          </div>
+          <div class="inline-grid two-cols">
+            <label>Hometown<input id="mobileManageHometown" type="text" required /></label>
+            <label>State<input id="mobileManageState" list="mobilePnmStateHints" type="text" maxlength="64" placeholder="TX or Texas" required /></label>
+          </div>
+          <label>Phone number<input id="mobileManagePhone" type="text" placeholder="+1 555 123 4567" /></label>
+          <label>Instagram handle<input id="mobileManageInstagram" type="text" required placeholder="@username" /></label>
+          <label>
+            Interests
+            <div id="mobileManageInterestTags" class="tag-picker" aria-label="Rushee management interest tags"></div>
+            <input id="mobileManageInterests" type="hidden" value="" />
+          </label>
+          <label>
+            Stereotype
+            <div id="mobileManageStereotypeTags" class="tag-picker" aria-label="Rushee management stereotype tags"></div>
+            <input id="mobileManageStereotype" type="hidden" value="" />
+          </label>
+          <label>Touchpoint stats<input id="mobileManageLunchStats" type="text" /></label>
+          <label>Notes<textarea id="mobileManageNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea></label>
+          <div class="action-row">
+            <button id="mobilePnmManageSaveBtn" type="submit">Save Rushee Details</button>
+          </div>
+        </form>
       </section>
 
       <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">

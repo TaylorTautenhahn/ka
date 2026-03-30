@@ -3389,6 +3389,19 @@ body[data-mobile-page] .mobile-command-queue-btn.is-selected {
   box-shadow: 0 16px 34px rgba(53, 200, 255, 0.12);
 }
 
+body[data-mobile-page] #mobilePnmManageLocked {
+  border: 1px solid rgba(119, 183, 245, 0.16);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body[data-mobile-page] #mobilePnmManageForm .action-row {
+  justify-content: stretch;
+}
+
+body[data-mobile-page] #mobilePnmManageForm .action-row > * {
+  flex: 1 1 auto;
+}
+
 body[data-mobile-page] .mobile-action-grid,
 body[data-mobile-page] .mobile-kpi-grid {
   gap: 0.6rem;

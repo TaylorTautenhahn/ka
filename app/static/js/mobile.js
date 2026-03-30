@@ -252,6 +252,7 @@ let mobileCalendarShare = null;
 let mobilePnmRows = [];
 let mobileMemberRows = [];
 let mobileCurrentUser = null;
+let mobileSelectedManagePnmId = null;
 const mobileContactDownloads = new Map();
 let mobileSelectedContactPnmId = null;
 let mobilePackagePrimaryPnmId = null;
@@ -712,6 +713,8 @@ function bindStereotypePicker(inputId, pickerId) {
 function initializeMobileTagPickers() {
   bindInterestPicker("mobilePnmInterests", "mobileInterestTags");
   bindStereotypePicker("mobilePnmStereotype", "mobileStereotypeTags");
+  bindInterestPicker("mobileManageInterests", "mobileManageInterestTags");
+  bindStereotypePicker("mobileManageStereotype", "mobileManageStereotypeTags");
 }
 
 function resolveApiPath(path) {
@@ -1785,8 +1788,17 @@ function renderPnmCards(pnms) {
         .filter((item) => Number(item.pnm_id) !== Number(pnm.pnm_id))
         .map((item) => `${item.first_name} ${item.last_name}`);
       const packageText = linkedNames.length ? linkedNames.join(", ") : "None";
+      const selectedClass = Number(mobileSelectedManagePnmId) === Number(pnm.pnm_id) ? " is-selected" : "";
+      const creator = String(pnm.created_by_username || "").trim();
+      const ownershipLabel = pnm.can_manage_profile
+        ? creator
+          ? `Editable by you · Created by ${creator}`
+          : "Editable by you"
+        : creator
+          ? `Created by ${creator}`
+          : "Locked";
       return `
-        <article class="entry mobile-card">
+        <article class="entry mobile-card${selectedClass}">
           <div class="entry-title">
             <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
             <span>${formatWeightedScore(pnm.weighted_total)}</span>
@@ -1801,9 +1813,11 @@ function renderPnmCards(pnms) {
               <div class="muted">Linked With: ${escapeHtml(packageText)}</div>
               <div class="muted">Contact export: ${downloaded ? "✓ Downloaded" : "○ Pending"}</div>
               <div class="muted">Interests: ${pnm.interests.map((x) => escapeHtml(x)).join(", ")}</div>
+              <div class="muted">${escapeHtml(ownershipLabel)}</div>
             </div>
           </div>
           <div class="action-row">
+            <button type="button" class="secondary" data-mobile-manage-pnm-id="${pnm.pnm_id}"${pnm.can_manage_profile ? "" : " disabled"}>${pnm.can_manage_profile ? "Manage" : "Locked"}</button>
             <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Meeting Packet</a>
           </div>
         </article>
@@ -2118,7 +2132,101 @@ async function loadPnmsPage() {
   const query = buildQueryString({ state: stateFilter });
   const [pnmPayload] = await Promise.all([api(`/api/pnms${query}`), loadContactDownloadStatuses()]);
   mobilePnmRows = Array.isArray(pnmPayload.pnms) ? pnmPayload.pnms : [];
+  if (!mobilePnmRows.some((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId))) {
+    mobileSelectedManagePnmId = null;
+  }
   updateContactsUi();
+  renderMobilePnmManagement();
+}
+
+function mobileSelectedManagePnm() {
+  return mobilePnmRows.find((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId)) || null;
+}
+
+function resetMobilePnmManagement(message = "Select a rushee from the roster to edit identity, contact, and meeting details.") {
+  const hint = document.getElementById("mobilePnmManageHint");
+  const locked = document.getElementById("mobilePnmManageLocked");
+  const form = document.getElementById("mobilePnmManageForm");
+  if (hint) {
+    hint.textContent = message;
+  }
+  if (locked) {
+    locked.classList.add("hidden");
+    locked.innerHTML = "";
+  }
+  if (form) {
+    form.classList.add("hidden");
+    form.reset();
+  }
+  const interests = document.getElementById("mobileManageInterests");
+  const stereotype = document.getElementById("mobileManageStereotype");
+  if (interests) {
+    interests.value = "";
+  }
+  if (stereotype) {
+    stereotype.value = "";
+  }
+  syncInterestPickerFromInput("mobileManageInterests", "mobileManageInterestTags");
+  syncStereotypePickerFromInput("mobileManageStereotype", "mobileManageStereotypeTags");
+}
+
+function renderMobilePnmManagement() {
+  const selected = mobileSelectedManagePnm();
+  const hint = document.getElementById("mobilePnmManageHint");
+  const locked = document.getElementById("mobilePnmManageLocked");
+  const form = document.getElementById("mobilePnmManageForm");
+  if (!form) {
+    return;
+  }
+  if (!selected) {
+    resetMobilePnmManagement();
+    return;
+  }
+  const creator = String(selected.created_by_username || "").trim() || "another rush team member";
+  if (hint) {
+    hint.textContent = selected.can_manage_profile
+      ? `Created by ${creator}. You can update this rushee here.`
+      : `Created by ${creator}. Only the creator or Head Rush Officer can edit this rushee.`;
+  }
+  if (!selected.can_manage_profile) {
+    form.classList.add("hidden");
+    if (locked) {
+      locked.classList.remove("hidden");
+      locked.innerHTML = `
+        <div class="entry-title">
+          <strong>Editing locked</strong>
+          <span>${escapeHtml(creator)}</span>
+        </div>
+        <div class="muted">You can still open Meeting Packet, but only the creator or Head Rush Officer can change profile details.</div>
+      `;
+    }
+    return;
+  }
+  if (locked) {
+    locked.classList.add("hidden");
+    locked.innerHTML = "";
+  }
+  form.classList.remove("hidden");
+  const setValue = (id, value) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.value = String(value ?? "");
+    }
+  };
+  setValue("mobileManageFirstName", selected.first_name);
+  setValue("mobileManageLastName", selected.last_name);
+  setValue("mobileManageClassYear", selected.class_year || "F");
+  setValue("mobileManageEventDate", selected.first_event_date);
+  setValue("mobileManageHometown", selected.hometown);
+  setValue("mobileManageState", selected.hometown_state_code);
+  setValue("mobileManagePhone", selected.phone_number);
+  setValue("mobileManageInstagram", selected.instagram_handle);
+  setValue("mobileManageInterests", Array.isArray(selected.interests) ? selected.interests.join(",") : "");
+  setValue("mobileManageStereotype", selected.stereotype);
+  setValue("mobileManageLunchStats", selected.lunch_stats);
+  setValue("mobileManageNotes", selected.notes);
+  syncInterestPickerFromInput("mobileManageInterests", "mobileManageInterestTags");
+  syncStereotypePickerFromInput("mobileManageStereotype", "mobileManageStereotypeTags");
 }
 
 function handleMobileHomeSearchClick(event) {
@@ -2480,6 +2588,10 @@ async function handleCreateSubmit(event) {
     lunch_stats: document.getElementById("mobilePnmLunchStats").value.trim(),
     notes: document.getElementById("mobilePnmNotes").value.trim(),
   };
+  if (!body.state) {
+    showToast("State is required.");
+    return;
+  }
 
   const form = document.getElementById("mobileCreatePnmForm");
   const submitButton = form.querySelector("button[type='submit']");
@@ -2513,6 +2625,71 @@ async function handleCreateSubmit(event) {
   } finally {
     submitButton.disabled = false;
     submitButton.textContent = "Create Rushee";
+  }
+}
+
+async function handleMobilePnmManageSubmit(event) {
+  event.preventDefault();
+  const selected = mobileSelectedManagePnm();
+  if (!selected) {
+    showToast("Select a rushee first.");
+    return;
+  }
+  if (!selected.can_manage_profile) {
+    showToast("You can only edit rushees you created unless you are Head Rush Officer.");
+    return;
+  }
+  const interestsValue = String(document.getElementById("mobileManageInterests")?.value || "").trim();
+  const stereotypeValue = String(document.getElementById("mobileManageStereotype")?.value || "").trim();
+  if (!interestsValue) {
+    showToast("Select at least one approved interest tag.");
+    return;
+  }
+  if (!stereotypeValue) {
+    showToast("Select one approved stereotype tag.");
+    return;
+  }
+  const body = {
+    first_name: String(document.getElementById("mobileManageFirstName")?.value || "").trim(),
+    last_name: String(document.getElementById("mobileManageLastName")?.value || "").trim(),
+    class_year: String(document.getElementById("mobileManageClassYear")?.value || "").trim(),
+    hometown: String(document.getElementById("mobileManageHometown")?.value || "").trim(),
+    state: String(document.getElementById("mobileManageState")?.value || "").trim(),
+    phone_number: String(document.getElementById("mobileManagePhone")?.value || "").trim(),
+    instagram_handle: String(document.getElementById("mobileManageInstagram")?.value || "").trim(),
+    first_event_date: String(document.getElementById("mobileManageEventDate")?.value || "").trim(),
+    interests: interestsValue,
+    stereotype: stereotypeValue,
+    lunch_stats: String(document.getElementById("mobileManageLunchStats")?.value || "").trim(),
+    notes: String(document.getElementById("mobileManageNotes")?.value || "").trim(),
+  };
+  if (!body.first_name || !body.last_name || !body.hometown || !body.state || !body.instagram_handle || !body.first_event_date) {
+    showToast("First name, last name, hometown, state, Instagram, and first event date are required.");
+    return;
+  }
+  const submitButton = document.getElementById("mobilePnmManageSaveBtn");
+  const originalLabel = submitButton ? submitButton.textContent : "Save Rushee Details";
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "Saving...";
+  }
+  try {
+    await api(`/api/pnms/${Number(selected.pnm_id)}`, {
+      method: "PATCH",
+      body,
+    });
+    showToast("Rushee details updated.");
+    await loadPnmsPage();
+    mobileSelectedManagePnmId = Number(selected.pnm_id);
+    renderPnmCards(mobilePnmRows);
+    renderMobilePnmManagement();
+  } catch (error) {
+    showToast(error.message || "Unable to update rushee.");
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalLabel;
+    }
   }
 }
 
@@ -2573,6 +2750,9 @@ function attachPageEvents() {
     const packagePartnerSelect = document.getElementById("mobilePackagePartnerSelect");
     const packageLinkBtn = document.getElementById("mobilePackageLinkBtn");
     const packageUnlinkBtn = document.getElementById("mobilePackageUnlinkBtn");
+    const manageForm = document.getElementById("mobilePnmManageForm");
+    const list = document.getElementById("mobilePnmList");
+    initializeMobileTagPickers();
     if (refreshBtn) {
       refreshBtn.addEventListener("click", async () => {
         try {
@@ -2624,6 +2804,25 @@ function attachPageEvents() {
           showToast(error.message || "Unable to apply filters.");
         }
       });
+    }
+    if (list) {
+      list.addEventListener("click", (event) => {
+        const manageBtn = event.target.closest("[data-mobile-manage-pnm-id]");
+        if (!manageBtn) {
+          return;
+        }
+        const pnmId = Number(manageBtn.dataset.mobileManagePnmId || 0);
+        if (!pnmId) {
+          return;
+        }
+        mobileSelectedManagePnmId = pnmId;
+        renderPnmCards(mobilePnmRows);
+        renderMobilePnmManagement();
+        document.getElementById("mobilePnmManageForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
+    if (manageForm) {
+      manageForm.addEventListener("submit", handleMobilePnmManageSubmit);
     }
     if (downloadBtn) {
       downloadBtn.addEventListener("click", () => {

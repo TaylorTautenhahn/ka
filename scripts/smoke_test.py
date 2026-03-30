@@ -408,6 +408,7 @@ def main() -> None:
                     "last_name": "Donovan",
                     "class_year": "F",
                     "hometown": "Dallas, TX",
+                    "state": "TX",
                     "phone_number": "+1 555 000 1111",
                     "instagram_handle": "@blaked",
                     "first_event_date": today,
@@ -485,6 +486,87 @@ def main() -> None:
             if response.headers.get("location") != "/kappaalphaorder/mobile?notice=admin-access-denied":
                 raise AssertionError("Non-head mobile admin route access should redirect to mobile dashboard with notice.")
             checks.append("Mobile admin route guard redirects non-head users")
+
+            response = client.patch(
+                f"/kappaalphaorder/api/pnms/{pnm_id}",
+                json={"notes": "Officer should not be able to edit head-created rushee."},
+            )
+            expect_status(response, 403, "Officer blocked from editing head-created PNM")
+            checks.append("Officers cannot edit rushees created by other users")
+
+            response = client.post(
+                "/kappaalphaorder/api/pnms",
+                json={
+                    "first_name": "Bob",
+                    "last_name": "Harper",
+                    "class_year": "F",
+                    "hometown": "Plano",
+                    "state": "TX",
+                    "phone_number": "+1 555 999 2222",
+                    "instagram_handle": "@bobharper",
+                    "first_event_date": today,
+                    "interests": ["Leadership", "Business"],
+                    "stereotype": "Connector",
+                    "notes": "Officer-owned rushee for ownership tests.",
+                    "auto_photo_from_instagram": False,
+                },
+            )
+            expect_status(response, 200, "Officer-owned PNM create")
+            officer_owned_pnm = response.json().get("pnm", {})
+            officer_owned_pnm_id = int(officer_owned_pnm.get("pnm_id") or 0)
+            if not officer_owned_pnm.get("can_manage_profile"):
+                raise AssertionError("Creator should be able to manage the rushee they created.")
+            if officer_owned_pnm.get("created_by_username") != officer_username:
+                raise AssertionError("Officer-created PNM should expose the creator username.")
+            checks.append("Officer-created PNM exposes ownership metadata")
+
+            response = client.patch(
+                f"/kappaalphaorder/api/pnms/{officer_owned_pnm_id}",
+                json={"hometown": "Plano, TX", "state": "TX", "notes": "Officer updated this rushee profile."},
+            )
+            expect_status(response, 200, "Officer edits owned PNM")
+            if (response.json().get("pnm") or {}).get("hometown") != "Plano, TX":
+                raise AssertionError("Officer-owned PNM update did not persist.")
+            checks.append("Officers can edit rushees they created")
+
+            response = client.get("/kappaalphaorder/api/pnms")
+            expect_status(response, 200, "PNM ownership metadata list API")
+            pnm_rows = {int(item.get("pnm_id") or 0): item for item in response.json().get("pnms", []) if item.get("pnm_id")}
+            if pnm_rows.get(pnm_id, {}).get("can_manage_profile"):
+                raise AssertionError("Officer should not see head-created PNM as editable.")
+            if not pnm_rows.get(officer_owned_pnm_id, {}).get("can_manage_profile"):
+                raise AssertionError("Officer should see their own created PNM as editable.")
+            checks.append("PNM list exposes owner-aware edit permissions")
+
+            response = client.post("/kappaalphaorder/api/auth/logout")
+            expect_status(response, 200, "Officer logout for head ownership check")
+            sync_csrf_header()
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": "headseed", "access_code": "HeadSeed123!"},
+            )
+            expect_status(response, 200, "Head relogin for owner override test")
+            sync_csrf_header()
+
+            response = client.patch(
+                f"/kappaalphaorder/api/pnms/{officer_owned_pnm_id}",
+                json={"notes": "Head can edit any rushee profile.", "state": "TX"},
+            )
+            expect_status(response, 200, "Head edits officer-owned PNM")
+            checks.append("Head can edit rushees created by other users")
+
+            response = client.post("/kappaalphaorder/api/auth/logout")
+            expect_status(response, 200, "Head logout after owner override test")
+            sync_csrf_header()
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": officer_username, "access_code": officer_password},
+            )
+            expect_status(response, 200, "Officer relogin after head ownership check")
+            sync_csrf_header()
+            checks.append("Officer relogin after ownership checks works")
 
             response = client.get("/kappaalphaorder/api/dashboard/command-center?window_hours=72&limit=25")
             expect_status(response, 200, "Officer command center API")

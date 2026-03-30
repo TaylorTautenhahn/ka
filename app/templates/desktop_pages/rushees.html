@@ -51,8 +51,8 @@
                       <input id="pnmHometown" type="text" required />
                     </label>
                     <label>
-                      State (optional)
-                      <input id="pnmState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" />
+                      State
+                      <input id="pnmState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" required />
                     </label>
                   </div>
                   <label>
@@ -210,6 +210,84 @@
               </article>
 
               <article class="rushee-inspector-column rushee-inspector-column-secondary">
+                <details class="rushee-inspector-disclosure" open>
+                  <summary>Rushee Management</summary>
+                  <section id="rusheeManagementPanel" class="stack rushee-inspector-block">
+                    <div class="section-head section-head-compact">
+                      <div>
+                        <h3>Rushee Management</h3>
+                        <p id="rusheeManagementHint" class="muted">Select a rushee to edit identity, contact, and packet details.</p>
+                      </div>
+                    </div>
+                    <div id="rusheeManagementLocked" class="entry hidden"></div>
+                    <form id="pnmManageForm" class="stack hidden">
+                      <div class="inline-grid">
+                        <label>
+                          First name
+                          <input id="pnmManageFirstName" type="text" required />
+                        </label>
+                        <label>
+                          Last name
+                          <input id="pnmManageLastName" type="text" required />
+                        </label>
+                      </div>
+                      <div class="inline-grid">
+                        <label>
+                          Class year
+                          <select id="pnmManageClassYear" required>
+                            <option>F</option>
+                            <option>S</option>
+                            <option>J</option>
+                          </select>
+                        </label>
+                        <label>
+                          First event date
+                          <input id="pnmManageEventDate" type="date" required />
+                        </label>
+                      </div>
+                      <div class="inline-grid two-cols">
+                        <label>
+                          Hometown
+                          <input id="pnmManageHometown" type="text" required />
+                        </label>
+                        <label>
+                          State
+                          <input id="pnmManageState" list="stateFilterHints" type="text" maxlength="64" placeholder="TX or Texas" required />
+                        </label>
+                      </div>
+                      <label>
+                        Phone number
+                        <input id="pnmManagePhone" type="text" placeholder="+1 555 123 4567" />
+                      </label>
+                      <label>
+                        Instagram handle
+                        <input id="pnmManageInstagram" type="text" required placeholder="@username" />
+                      </label>
+                      <label>
+                        Interests
+                        <div id="pnmManageInterestTags" class="tag-picker" aria-label="Rushee management interest tags"></div>
+                        <input id="pnmManageInterests" type="hidden" value="" />
+                      </label>
+                      <label>
+                        Stereotype
+                        <div id="pnmManageStereotypeTags" class="tag-picker" aria-label="Rushee management stereotype tags"></div>
+                        <input id="pnmManageStereotype" type="hidden" value="" />
+                      </label>
+                      <label>
+                        Touchpoint stats
+                        <input id="pnmManageLunchStats" type="text" placeholder="3 lunches this week" />
+                      </label>
+                      <label>
+                        Notes
+                        <textarea id="pnmManageNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea>
+                      </label>
+                      <div class="action-row">
+                        <button id="pnmManageSaveBtn" type="submit">Save Rushee Details</button>
+                      </div>
+                    </form>
+                  </section>
+                </details>
+
                 <details class="rushee-inspector-disclosure" open>
                   <summary>Assignment Ownership</summary>
                   <section id="assignPanel" class="stack hidden rushee-inspector-block">

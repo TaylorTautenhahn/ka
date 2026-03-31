@@ -378,6 +378,21 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-shell .quick-nav-link
   overflow: visible;
 }
 
+.app-topbar {
+  z-index: 30;
+}
+
+.app-toolbar {
+  z-index: 20;
+}
+
+.app-workspace-pages,
+.desktop-page,
+.desktop-page > .panel {
+  position: relative;
+  z-index: 1;
+}
+
 .app-sidebar {
   display: grid;
   gap: 1.1rem;
@@ -454,6 +469,8 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-shell .quick-nav-link
   gap: 0.55rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+  position: relative;
+  z-index: 31;
 }
 
 .app-session-card {

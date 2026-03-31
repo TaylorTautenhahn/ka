@@ -224,6 +224,10 @@ RATING_FIELD_LIMITS: dict[str, int] = {
     "alcohol_control": 10,
     "instagram_marketability": 5,
 }
+RATING_FIELD_RATED_COLUMNS: dict[str, str] = {
+    field: f"{field}_rated"
+    for field in RATING_FIELDS
+}
 PNM_AVERAGE_COLUMN_BY_FIELD: dict[str, str] = {
     "good_with_girls": "avg_good_with_girls",
     "will_make_it": "avg_will_make_it",
@@ -2357,20 +2361,22 @@ def role_weight(role: str, tenant: TenantContext | None = None) -> float:
     return float(rusher_weight)
 
 
-def score_total(payload: dict[str, int]) -> int:
-    return (
-        payload["good_with_girls"]
-        + payload["will_make_it"]
-        + payload["personable"]
-        + payload["alcohol_control"]
-        + payload["instagram_marketability"]
-    )
-
-
-def validate_score_data_against_criteria(score_data: dict[str, int], criteria: list[dict[str, Any]]) -> None:
+def validate_score_data_against_criteria(
+    score_data: dict[str, int | None],
+    criteria: list[dict[str, Any]],
+) -> tuple[dict[str, int], dict[str, bool], int]:
     criteria_map = rating_criteria_by_field(criteria)
+    normalized_scores: dict[str, int] = {}
+    rated_flags: dict[str, bool] = {}
+    rated_total = 0
+    rated_max_total = 0
     for field in RATING_FIELDS:
-        value = int(score_data.get(field, 0))
+        raw_value = score_data.get(field, None)
+        if raw_value is None:
+            normalized_scores[field] = 0
+            rated_flags[field] = False
+            continue
+        value = int(raw_value)
         field_limit = int(RATING_FIELD_LIMITS[field])
         configured = criteria_map.get(field)
         configured_max = int(configured["max"]) if configured and "max" in configured else field_limit
@@ -2378,6 +2384,31 @@ def validate_score_data_against_criteria(score_data: dict[str, int], criteria: l
         if value < 0 or value > max_allowed:
             label = configured["label"] if configured and "label" in configured else field
             raise HTTPException(status_code=400, detail=f"{label} must be between 0 and {max_allowed}.")
+        normalized_scores[field] = value
+        rated_flags[field] = True
+        rated_total += value
+        rated_max_total += max_allowed
+    if not any(rated_flags.values()):
+        raise HTTPException(status_code=400, detail="Rate at least one category or use Add Comment.")
+    total_max = rating_total_max(criteria)
+    normalized_total = int(round((rated_total / rated_max_total) * total_max)) if rated_max_total else 0
+    normalized_total = max(0, min(total_max, normalized_total))
+    return normalized_scores, rated_flags, normalized_total
+
+
+def rating_field_is_rated(row: sqlite3.Row | dict[str, Any], field: str) -> bool:
+    rated_column = RATING_FIELD_RATED_COLUMNS[field]
+    keys = row.keys()
+    if rated_column not in keys:
+        return True
+    return bool(row[rated_column])
+
+
+def rating_value_from_row(row: sqlite3.Row | dict[str, Any], field: str) -> int | None:
+    if not rating_field_is_rated(row, field):
+        return None
+    raw_value = row[field]
+    return int(raw_value) if raw_value is not None else None
 
 
 def count_words(text: str) -> int:
@@ -4003,34 +4034,27 @@ def recalc_pnm_rating_stats(conn: sqlite3.Connection, pnm_id: int) -> None:
         )
         return
 
-    weighted_totals = {
-        "good_with_girls": 0.0,
-        "will_make_it": 0.0,
-        "personable": 0.0,
-        "alcohol_control": 0.0,
-        "instagram_marketability": 0.0,
-        "total_score": 0.0,
-    }
+    weighted_totals = {field: 0.0 for field in (*RATING_FIELDS, "total_score")}
+    category_weights = {field: 0.0 for field in RATING_FIELDS}
     total_weight = 0.0
 
     for row in rows:
         weight = role_weight(row["role"])
         total_weight += weight
-        weighted_totals["good_with_girls"] += row["good_with_girls"] * weight
-        weighted_totals["will_make_it"] += row["will_make_it"] * weight
-        weighted_totals["personable"] += row["personable"] * weight
-        weighted_totals["alcohol_control"] += row["alcohol_control"] * weight
-        weighted_totals["instagram_marketability"] += row["instagram_marketability"] * weight
+        for field in RATING_FIELDS:
+            if rating_field_is_rated(row, field):
+                weighted_totals[field] += float(row[field]) * weight
+                category_weights[field] += weight
         weighted_totals["total_score"] += row["total_score"] * weight
 
     if total_weight == 0:
         avg_good = avg_will = avg_personable = avg_alcohol = avg_ig = avg_total = 0.0
     else:
-        avg_good = weighted_totals["good_with_girls"] / total_weight
-        avg_will = weighted_totals["will_make_it"] / total_weight
-        avg_personable = weighted_totals["personable"] / total_weight
-        avg_alcohol = weighted_totals["alcohol_control"] / total_weight
-        avg_ig = weighted_totals["instagram_marketability"] / total_weight
+        avg_good = weighted_totals["good_with_girls"] / category_weights["good_with_girls"] if category_weights["good_with_girls"] else 0.0
+        avg_will = weighted_totals["will_make_it"] / category_weights["will_make_it"] if category_weights["will_make_it"] else 0.0
+        avg_personable = weighted_totals["personable"] / category_weights["personable"] if category_weights["personable"] else 0.0
+        avg_alcohol = weighted_totals["alcohol_control"] / category_weights["alcohol_control"] if category_weights["alcohol_control"] else 0.0
+        avg_ig = weighted_totals["instagram_marketability"] / category_weights["instagram_marketability"] if category_weights["instagram_marketability"] else 0.0
         avg_total = weighted_totals["total_score"] / total_weight
 
     conn.execute(
@@ -4068,7 +4092,8 @@ def write_rating_history_event(
     pnm_id: int,
     user_id: int,
     event_type: str,
-    scores: dict[str, int],
+    scores: dict[str, int | None],
+    rated_flags: dict[str, bool] | None,
     changed_at: str,
 ) -> None:
     conn.execute(
@@ -4080,13 +4105,18 @@ def write_rating_history_event(
             event_type,
             total_score,
             good_with_girls,
+            good_with_girls_rated,
             will_make_it,
+            will_make_it_rated,
             personable,
+            personable_rated,
             alcohol_control,
+            alcohol_control_rated,
             instagram_marketability,
+            instagram_marketability_rated,
             changed_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             rating_id,
@@ -4094,11 +4124,16 @@ def write_rating_history_event(
             user_id,
             event_type,
             scores["total_score"],
-            scores["good_with_girls"],
-            scores["will_make_it"],
-            scores["personable"],
-            scores["alcohol_control"],
-            scores["instagram_marketability"],
+            int(scores["good_with_girls"] or 0),
+            1 if (rated_flags or {}).get("good_with_girls", True) else 0,
+            int(scores["will_make_it"] or 0),
+            1 if (rated_flags or {}).get("will_make_it", True) else 0,
+            int(scores["personable"] or 0),
+            1 if (rated_flags or {}).get("personable", True) else 0,
+            int(scores["alcohol_control"] or 0),
+            1 if (rated_flags or {}).get("alcohol_control", True) else 0,
+            int(scores["instagram_marketability"] or 0),
+            1 if (rated_flags or {}).get("instagram_marketability", True) else 0,
             changed_at,
         ),
     )
@@ -4293,10 +4328,15 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             pnm_id INTEGER NOT NULL REFERENCES pnms(id) ON DELETE CASCADE,
             user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
             good_with_girls INTEGER NOT NULL CHECK (good_with_girls BETWEEN 0 AND 10),
+            good_with_girls_rated INTEGER NOT NULL DEFAULT 1 CHECK (good_with_girls_rated IN (0, 1)),
             will_make_it INTEGER NOT NULL CHECK (will_make_it BETWEEN 0 AND 10),
+            will_make_it_rated INTEGER NOT NULL DEFAULT 1 CHECK (will_make_it_rated IN (0, 1)),
             personable INTEGER NOT NULL CHECK (personable BETWEEN 0 AND 10),
+            personable_rated INTEGER NOT NULL DEFAULT 1 CHECK (personable_rated IN (0, 1)),
             alcohol_control INTEGER NOT NULL CHECK (alcohol_control BETWEEN 0 AND 10),
+            alcohol_control_rated INTEGER NOT NULL DEFAULT 1 CHECK (alcohol_control_rated IN (0, 1)),
             instagram_marketability INTEGER NOT NULL CHECK (instagram_marketability BETWEEN 0 AND 5),
+            instagram_marketability_rated INTEGER NOT NULL DEFAULT 1 CHECK (instagram_marketability_rated IN (0, 1)),
             total_score INTEGER NOT NULL CHECK (total_score BETWEEN 0 AND 45),
             comment TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL,
@@ -4326,10 +4366,15 @@ def setup_schema(conn: sqlite3.Connection) -> None:
             event_type TEXT NOT NULL CHECK (event_type IN ('seed', 'create', 'update')),
             total_score INTEGER NOT NULL CHECK (total_score BETWEEN 0 AND 45),
             good_with_girls INTEGER NOT NULL CHECK (good_with_girls BETWEEN 0 AND 10),
+            good_with_girls_rated INTEGER NOT NULL DEFAULT 1 CHECK (good_with_girls_rated IN (0, 1)),
             will_make_it INTEGER NOT NULL CHECK (will_make_it BETWEEN 0 AND 10),
+            will_make_it_rated INTEGER NOT NULL DEFAULT 1 CHECK (will_make_it_rated IN (0, 1)),
             personable INTEGER NOT NULL CHECK (personable BETWEEN 0 AND 10),
+            personable_rated INTEGER NOT NULL DEFAULT 1 CHECK (personable_rated IN (0, 1)),
             alcohol_control INTEGER NOT NULL CHECK (alcohol_control BETWEEN 0 AND 10),
+            alcohol_control_rated INTEGER NOT NULL DEFAULT 1 CHECK (alcohol_control_rated IN (0, 1)),
             instagram_marketability INTEGER NOT NULL CHECK (instagram_marketability BETWEEN 0 AND 5),
+            instagram_marketability_rated INTEGER NOT NULL DEFAULT 1 CHECK (instagram_marketability_rated IN (0, 1)),
             changed_at TEXT NOT NULL
         );
 
@@ -4865,6 +4910,13 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         "UPDATE sessions SET max_idle_seconds = ? WHERE max_idle_seconds IS NULL OR max_idle_seconds <= 0",
         (SESSION_TTL_SECONDS,),
     )
+    rating_columns = {row["name"] for row in conn.execute("PRAGMA table_info(ratings)").fetchall()}
+    for rated_column in RATING_FIELD_RATED_COLUMNS.values():
+        if rated_column not in rating_columns:
+            conn.execute(f"ALTER TABLE ratings ADD COLUMN {rated_column} INTEGER NOT NULL DEFAULT 1")
+        conn.execute(
+            f"UPDATE ratings SET {rated_column} = 1 WHERE {rated_column} IS NULL OR {rated_column} NOT IN (0, 1)"
+        )
 
     conn.executescript(
         """
@@ -4926,6 +4978,13 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
         );
         """
     )
+    rating_history_columns = {row["name"] for row in conn.execute("PRAGMA table_info(rating_history)").fetchall()}
+    for rated_column in RATING_FIELD_RATED_COLUMNS.values():
+        if rated_column not in rating_history_columns:
+            conn.execute(f"ALTER TABLE rating_history ADD COLUMN {rated_column} INTEGER NOT NULL DEFAULT 1")
+        conn.execute(
+            f"UPDATE rating_history SET {rated_column} = 1 WHERE {rated_column} IS NULL OR {rated_column} NOT IN (0, 1)"
+        )
     season_columns = {row["name"] for row in conn.execute("PRAGMA table_info(season_archive_state)").fetchall()}
     if "archive_label" not in season_columns:
         conn.execute("ALTER TABLE season_archive_state ADD COLUMN archive_label TEXT NOT NULL DEFAULT ''")
@@ -5176,10 +5235,15 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
             event_type,
             total_score,
             good_with_girls,
+            good_with_girls_rated,
             will_make_it,
+            will_make_it_rated,
             personable,
+            personable_rated,
             alcohol_control,
+            alcohol_control_rated,
             instagram_marketability,
+            instagram_marketability_rated,
             changed_at
         )
         SELECT
@@ -5189,10 +5253,15 @@ def ensure_schema_upgrades(conn: sqlite3.Connection) -> None:
             'seed',
             r.total_score,
             r.good_with_girls,
+            COALESCE(r.good_with_girls_rated, 1),
             r.will_make_it,
+            COALESCE(r.will_make_it_rated, 1),
             r.personable,
+            COALESCE(r.personable_rated, 1),
             r.alcohol_control,
+            COALESCE(r.alcohol_control_rated, 1),
             r.instagram_marketability,
+            COALESCE(r.instagram_marketability_rated, 1),
             COALESCE(r.updated_at, r.created_at, ?)
         FROM ratings r
         WHERE NOT EXISTS (
@@ -5803,7 +5872,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
             "alcohol_control": int(alcohol_control),
             "instagram_marketability": int(instagram),
         }
-        payload["total_score"] = score_total(payload)
+        payload["total_score"] = int(sum(payload.values()))
         return payload
 
     def upsert_demo_user(
@@ -6514,6 +6583,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                 user_id=int(user_id),
                 event_type="create",
                 scores=create_scores,
+                rated_flags={field: True for field in RATING_FIELDS},
                 changed_at=create_stamp,
             )
         has_create_comment_event = conn.execute(
@@ -6547,6 +6617,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
                     user_id=int(user_id),
                     event_type="update",
                     scores=final_scores,
+                    rated_flags={field: True for field in RATING_FIELDS},
                     changed_at=update_stamp,
                 )
             has_update_comment_event = conn.execute(
@@ -7143,15 +7214,16 @@ def rating_payload(row: sqlite3.Row) -> dict[str, Any]:
         "rating_id": row["id"],
         "pnm_id": row["pnm_id"],
         "user_id": row["user_id"],
-        "good_with_girls": row["good_with_girls"],
-        "will_make_it": row["will_make_it"],
-        "personable": row["personable"],
-        "alcohol_control": row["alcohol_control"],
-        "instagram_marketability": row["instagram_marketability"],
+        "good_with_girls": rating_value_from_row(row, "good_with_girls"),
+        "will_make_it": rating_value_from_row(row, "will_make_it"),
+        "personable": rating_value_from_row(row, "personable"),
+        "alcohol_control": rating_value_from_row(row, "alcohol_control"),
+        "instagram_marketability": rating_value_from_row(row, "instagram_marketability"),
         "total_score": row["total_score"],
         "comment": row["comment"],
         "updated_at": row["updated_at"],
         "created_at": row["created_at"],
+        "rated_categories_count": sum(1 for field in RATING_FIELDS if rating_field_is_rated(row, field)),
     }
 
 
@@ -7619,11 +7691,11 @@ class PNMUpdateRequest(BaseModel):
 
 class RatingUpsertRequest(BaseModel):
     pnm_id: int
-    good_with_girls: int = Field(..., ge=0, le=10)
-    will_make_it: int = Field(..., ge=0, le=10)
-    personable: int = Field(..., ge=0, le=10)
-    alcohol_control: int = Field(..., ge=0, le=10)
-    instagram_marketability: int = Field(..., ge=0, le=5)
+    good_with_girls: int | None = Field(default=None, ge=0, le=10)
+    will_make_it: int | None = Field(default=None, ge=0, le=10)
+    personable: int | None = Field(default=None, ge=0, le=10)
+    alcohol_control: int | None = Field(default=None, ge=0, le=10)
+    instagram_marketability: int | None = Field(default=None, ge=0, le=5)
     comment: str | None = Field(default=None, max_length=1000)
 
 
@@ -13413,11 +13485,11 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             "rating_id": row["id"],
             "from_me": row["user_id"] == user["id"],
             "total_score": int(row["total_score"]),
-            "good_with_girls": int(row["good_with_girls"]),
-            "will_make_it": int(row["will_make_it"]),
-            "personable": int(row["personable"]),
-            "alcohol_control": int(row["alcohol_control"]),
-            "instagram_marketability": int(row["instagram_marketability"]),
+            "good_with_girls": rating_value_from_row(row, "good_with_girls"),
+            "will_make_it": rating_value_from_row(row, "will_make_it"),
+            "personable": rating_value_from_row(row, "personable"),
+            "alcohol_control": rating_value_from_row(row, "alcohol_control"),
+            "instagram_marketability": rating_value_from_row(row, "instagram_marketability"),
             "updated_at": row["updated_at"],
             "last_change": (
                 {
@@ -13754,15 +13826,14 @@ def delete_pnm(pnm_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[s
 @app.post("/api/ratings")
 def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
     tenant = current_tenant()
-    score_data = {
+    raw_score_data = {
         "good_with_girls": payload.good_with_girls,
         "will_make_it": payload.will_make_it,
         "personable": payload.personable,
         "alcohol_control": payload.alcohol_control,
         "instagram_marketability": payload.instagram_marketability,
     }
-    validate_score_data_against_criteria(score_data, list(tenant.rating_criteria))
-    new_total = score_total(score_data)
+    score_data, rated_flags, new_total = validate_score_data_against_criteria(raw_score_data, list(tenant.rating_criteria))
 
     with db_session() as conn:
         pnm_row = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
@@ -13779,11 +13850,11 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
 
         if existing:
             old_payload = {
-                "good_with_girls": existing["good_with_girls"],
-                "will_make_it": existing["will_make_it"],
-                "personable": existing["personable"],
-                "alcohol_control": existing["alcohol_control"],
-                "instagram_marketability": existing["instagram_marketability"],
+                "good_with_girls": rating_value_from_row(existing, "good_with_girls"),
+                "will_make_it": rating_value_from_row(existing, "will_make_it"),
+                "personable": rating_value_from_row(existing, "personable"),
+                "alcohol_control": rating_value_from_row(existing, "alcohol_control"),
+                "instagram_marketability": rating_value_from_row(existing, "instagram_marketability"),
                 "total_score": existing["total_score"],
             }
             changed = any(old_payload[field] != score_data[field] for field in RATING_FIELDS)
@@ -13803,21 +13874,31 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                 UPDATE ratings
                 SET
                     good_with_girls = ?,
+                    good_with_girls_rated = ?,
                     will_make_it = ?,
+                    will_make_it_rated = ?,
                     personable = ?,
+                    personable_rated = ?,
                     alcohol_control = ?,
+                    alcohol_control_rated = ?,
                     instagram_marketability = ?,
+                    instagram_marketability_rated = ?,
                     total_score = ?,
                     comment = ?,
                     updated_at = ?
                 WHERE id = ?
                 """,
                 (
-                    payload.good_with_girls,
-                    payload.will_make_it,
-                    payload.personable,
-                    payload.alcohol_control,
-                    payload.instagram_marketability,
+                    score_data["good_with_girls"],
+                    1 if rated_flags["good_with_girls"] else 0,
+                    score_data["will_make_it"],
+                    1 if rated_flags["will_make_it"] else 0,
+                    score_data["personable"],
+                    1 if rated_flags["personable"] else 0,
+                    score_data["alcohol_control"],
+                    1 if rated_flags["alcohol_control"] else 0,
+                    score_data["instagram_marketability"],
+                    1 if rated_flags["instagram_marketability"] else 0,
                     new_total,
                     comment,
                     now,
@@ -13888,6 +13969,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                     user_id=int(user["id"]),
                     event_type="update",
                     scores=new_payload,
+                    rated_flags=rated_flags,
                     changed_at=now,
                 )
                 write_rating_comment_event(
@@ -13923,25 +14005,35 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                     pnm_id,
                     user_id,
                     good_with_girls,
+                    good_with_girls_rated,
                     will_make_it,
+                    will_make_it_rated,
                     personable,
+                    personable_rated,
                     alcohol_control,
+                    alcohol_control_rated,
                     instagram_marketability,
+                    instagram_marketability_rated,
                     total_score,
                     comment,
                     created_at,
                     updated_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     payload.pnm_id,
                     user["id"],
-                    payload.good_with_girls,
-                    payload.will_make_it,
-                    payload.personable,
-                    payload.alcohol_control,
-                    payload.instagram_marketability,
+                    score_data["good_with_girls"],
+                    1 if rated_flags["good_with_girls"] else 0,
+                    score_data["will_make_it"],
+                    1 if rated_flags["will_make_it"] else 0,
+                    score_data["personable"],
+                    1 if rated_flags["personable"] else 0,
+                    score_data["alcohol_control"],
+                    1 if rated_flags["alcohol_control"] else 0,
+                    score_data["instagram_marketability"],
+                    1 if rated_flags["instagram_marketability"] else 0,
                     new_total,
                     (payload.comment or "").strip(),
                     now,
@@ -13964,6 +14056,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
                 user_id=int(user["id"]),
                 event_type="create",
                 scores=create_payload,
+                rated_flags=rated_flags,
                 changed_at=now,
             )
             write_rating_comment_event(
@@ -14064,11 +14157,11 @@ def pnm_ratings(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[
             "rating_id": row["id"],
             "pnm_id": row["pnm_id"],
             "from_me": row["user_id"] == user["id"],
-            "good_with_girls": row["good_with_girls"],
-            "will_make_it": row["will_make_it"],
-            "personable": row["personable"],
-            "alcohol_control": row["alcohol_control"],
-            "instagram_marketability": row["instagram_marketability"],
+            "good_with_girls": rating_value_from_row(row, "good_with_girls"),
+            "will_make_it": rating_value_from_row(row, "will_make_it"),
+            "personable": rating_value_from_row(row, "personable"),
+            "alcohol_control": rating_value_from_row(row, "alcohol_control"),
+            "instagram_marketability": rating_value_from_row(row, "instagram_marketability"),
             "total_score": row["total_score"],
             "updated_at": row["updated_at"],
         }

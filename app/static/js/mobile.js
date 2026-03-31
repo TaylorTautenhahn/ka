@@ -410,9 +410,31 @@ function ratingCriteriaForField(field) {
 function ratingLabelWithRange(field) {
   const criterion = ratingCriteriaForField(field);
   if (!criterion) {
-    return `${field} (0-10)`;
+    return `${field} (0-10, optional)`;
   }
-  return `${criterion.short_label} (0-${criterion.max})`;
+  return `${criterion.short_label} (0-${criterion.max}, optional)`;
+}
+
+function readOptionalRatingValue(input) {
+  if (!input) {
+    return null;
+  }
+  const rawValue = String(input.value || "").trim();
+  if (!rawValue) {
+    return null;
+  }
+  return Number(rawValue);
+}
+
+function writeOptionalRatingValue(input, rawValue, maxValue) {
+  if (!input) {
+    return;
+  }
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    input.value = "";
+    return;
+  }
+  input.value = Math.min(Number(rawValue), Number(maxValue || input.max || 0));
 }
 
 function mobileCanUseCommandCenter() {
@@ -1518,6 +1540,7 @@ function applyMobileCommandRatingCriteriaUi() {
     if (input && criterion) {
       input.min = "0";
       input.max = String(criterion.max);
+      input.placeholder = "Skip";
     }
     if (label) {
       label.textContent = ratingLabelWithRange(field);
@@ -1632,19 +1655,19 @@ function renderMobileCommandSelection() {
   const igInput = document.getElementById("mobileCommandRateIg");
   const commentInput = document.getElementById("mobileCommandRateComment");
   if (girlsInput) {
-    girlsInput.value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
+    writeOptionalRatingValue(girlsInput, own ? own.good_with_girls : null, girlsMax);
   }
   if (processInput) {
-    processInput.value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
+    writeOptionalRatingValue(processInput, own ? own.will_make_it : null, processMax);
   }
   if (personableInput) {
-    personableInput.value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
+    writeOptionalRatingValue(personableInput, own ? own.personable : null, personableMax);
   }
   if (alcoholInput) {
-    alcoholInput.value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
+    writeOptionalRatingValue(alcoholInput, own ? own.alcohol_control : null, alcoholMax);
   }
   if (igInput) {
-    igInput.value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
+    writeOptionalRatingValue(igInput, own ? own.instagram_marketability : null, igMax);
   }
   if (commentInput) {
     commentInput.value = selected.last_lunch_with_me_notes ? selected.last_lunch_with_me_notes : own && own.comment ? own.comment : "";
@@ -2063,11 +2086,11 @@ async function handleMobileCommandSaveRating() {
           method: "POST",
           body: {
             pnm_id: Number(selected.pnm_id),
-            good_with_girls: Number(girlsInput.value),
-            will_make_it: Number(processInput.value),
-            personable: Number(personableInput.value),
-            alcohol_control: Number(alcoholInput.value),
-            instagram_marketability: Number(igInput.value),
+            good_with_girls: readOptionalRatingValue(girlsInput),
+            will_make_it: readOptionalRatingValue(processInput),
+            personable: readOptionalRatingValue(personableInput),
+            alcohol_control: readOptionalRatingValue(alcoholInput),
+            instagram_marketability: readOptionalRatingValue(igInput),
             comment: String(commentInput.value || "").trim(),
           },
         });

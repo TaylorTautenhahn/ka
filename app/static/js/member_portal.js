@@ -201,9 +201,9 @@ function ratingCriteriaForField(field) {
 function ratingLabelWithRange(field) {
   const criterion = ratingCriteriaForField(field);
   if (!criterion) {
-    return `${field} (0-10)`;
+    return `${field} (0-10, optional)`;
   }
-  return `${criterion.short_label} (0-${criterion.max})`;
+  return `${criterion.short_label} (0-${criterion.max}, optional)`;
 }
 
 function applyRatingCriteriaUi() {
@@ -221,6 +221,7 @@ function applyRatingCriteriaUi() {
     if (input && criterion) {
       input.min = "0";
       input.max = String(criterion.max);
+      input.placeholder = "Skip";
     }
     if (label) {
       label.textContent = ratingLabelWithRange(field);
@@ -230,9 +231,32 @@ function applyRatingCriteriaUi() {
 
 function formatScoreBreakdown(row) {
   return RATING_CRITERIA.map((criterion) => {
-    const value = Number(row[criterion.field] || 0);
+    const rawValue = row[criterion.field];
+    const value = rawValue === null || rawValue === undefined || rawValue === "" ? "—" : Number(rawValue);
     return `${criterion.short_label} ${value}`;
   }).join(" | ");
+}
+
+function readOptionalRatingValue(input) {
+  if (!input) {
+    return null;
+  }
+  const rawValue = String(input.value || "").trim();
+  if (!rawValue) {
+    return null;
+  }
+  return Number(rawValue);
+}
+
+function writeOptionalRatingValue(input, rawValue, maxValue) {
+  if (!input) {
+    return;
+  }
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    input.value = "";
+    return;
+  }
+  input.value = Math.min(Number(rawValue), Number(maxValue || input.max || 0));
 }
 
 function escapeHtml(input) {
@@ -540,11 +564,11 @@ function renderSelectedPnm() {
   const personableMax = ratingCriteriaForField("personable")?.max || 10;
   const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
   const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
-  document.getElementById("memberRateGirls").value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
-  document.getElementById("memberRateProcess").value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
-  document.getElementById("memberRatePersonable").value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
-  document.getElementById("memberRateAlcohol").value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
-  document.getElementById("memberRateIg").value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
+  writeOptionalRatingValue(document.getElementById("memberRateGirls"), own ? own.good_with_girls : null, girlsMax);
+  writeOptionalRatingValue(document.getElementById("memberRateProcess"), own ? own.will_make_it : null, processMax);
+  writeOptionalRatingValue(document.getElementById("memberRatePersonable"), own ? own.personable : null, personableMax);
+  writeOptionalRatingValue(document.getElementById("memberRateAlcohol"), own ? own.alcohol_control : null, alcoholMax);
+  writeOptionalRatingValue(document.getElementById("memberRateIg"), own ? own.instagram_marketability : null, igMax);
   document.getElementById("memberRateComment").value = own ? own.comment || "" : "";
 
   renderRatingHistory();
@@ -806,11 +830,11 @@ async function handleRatingSave(event) {
 
   const body = {
     pnm_id: pnm.pnm_id,
-    good_with_girls: Number(document.getElementById("memberRateGirls").value),
-    will_make_it: Number(document.getElementById("memberRateProcess").value),
-    personable: Number(document.getElementById("memberRatePersonable").value),
-    alcohol_control: Number(document.getElementById("memberRateAlcohol").value),
-    instagram_marketability: Number(document.getElementById("memberRateIg").value),
+    good_with_girls: readOptionalRatingValue(document.getElementById("memberRateGirls")),
+    will_make_it: readOptionalRatingValue(document.getElementById("memberRateProcess")),
+    personable: readOptionalRatingValue(document.getElementById("memberRatePersonable")),
+    alcohol_control: readOptionalRatingValue(document.getElementById("memberRateAlcohol")),
+    instagram_marketability: readOptionalRatingValue(document.getElementById("memberRateIg")),
     comment: document.getElementById("memberRateComment").value.trim(),
   };
   promptInlineConfirm(memberRatingForm, "member-rating", {

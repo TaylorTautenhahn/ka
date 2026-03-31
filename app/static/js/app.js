@@ -737,16 +737,39 @@ function ratingCriteriaForField(field) {
 function ratingLabelWithRange(field) {
   const criterion = ratingCriteriaForField(field);
   if (!criterion) {
-    return `${field} (0-10)`;
+    return `${field} (0-10, optional)`;
   }
-  return `${criterion.short_label} (0-${criterion.max})`;
+  return `${criterion.short_label} (0-${criterion.max}, optional)`;
 }
 
 function formatScoreBreakdown(row) {
   return RATING_CRITERIA.map((criterion) => {
-    const value = Number(row[criterion.field] || 0);
+    const rawValue = row[criterion.field];
+    const value = rawValue === null || rawValue === undefined || rawValue === "" ? "—" : Number(rawValue);
     return `${criterion.short_label} ${value}`;
   }).join(" | ");
+}
+
+function readOptionalRatingValue(input) {
+  if (!input) {
+    return null;
+  }
+  const rawValue = String(input.value || "").trim();
+  if (!rawValue) {
+    return null;
+  }
+  return Number(rawValue);
+}
+
+function writeOptionalRatingValue(input, rawValue, maxValue) {
+  if (!input) {
+    return;
+  }
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    input.value = "";
+    return;
+  }
+  input.value = Math.min(Number(rawValue), Number(maxValue || input.max || 0));
 }
 
 
@@ -892,6 +915,7 @@ function applyRatingCriteriaUi() {
       if (input && criterion) {
         input.min = "0";
         input.max = String(criterion.max);
+        input.placeholder = "Skip";
       }
       if (label) {
         label.textContent = ratingLabelWithRange(field);
@@ -3693,19 +3717,19 @@ function applyCommandRatingFormForSelected() {
   const igInput = document.getElementById("commandRateIg");
   const commentInput = document.getElementById("commandRateComment");
   if (girlsInput) {
-    girlsInput.value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
+    writeOptionalRatingValue(girlsInput, own ? own.good_with_girls : null, girlsMax);
   }
   if (processInput) {
-    processInput.value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
+    writeOptionalRatingValue(processInput, own ? own.will_make_it : null, processMax);
   }
   if (personableInput) {
-    personableInput.value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
+    writeOptionalRatingValue(personableInput, own ? own.personable : null, personableMax);
   }
   if (alcoholInput) {
-    alcoholInput.value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
+    writeOptionalRatingValue(alcoholInput, own ? own.alcohol_control : null, alcoholMax);
   }
   if (igInput) {
-    igInput.value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
+    writeOptionalRatingValue(igInput, own ? own.instagram_marketability : null, igMax);
   }
   if (commentInput) {
     commentInput.value = own && own.comment ? own.comment : "";
@@ -5386,11 +5410,11 @@ function applyRatingFormForSelected() {
   const personableMax = ratingCriteriaForField("personable")?.max || 10;
   const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
   const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
-  document.getElementById("rateGirls").value = own ? Math.min(Number(own.good_with_girls || 0), girlsMax) : 0;
-  document.getElementById("rateProcess").value = own ? Math.min(Number(own.will_make_it || 0), processMax) : 0;
-  document.getElementById("ratePersonable").value = own ? Math.min(Number(own.personable || 0), personableMax) : 0;
-  document.getElementById("rateAlcohol").value = own ? Math.min(Number(own.alcohol_control || 0), alcoholMax) : 0;
-  document.getElementById("rateIg").value = own ? Math.min(Number(own.instagram_marketability || 0), igMax) : 0;
+  writeOptionalRatingValue(document.getElementById("rateGirls"), own ? own.good_with_girls : null, girlsMax);
+  writeOptionalRatingValue(document.getElementById("rateProcess"), own ? own.will_make_it : null, processMax);
+  writeOptionalRatingValue(document.getElementById("ratePersonable"), own ? own.personable : null, personableMax);
+  writeOptionalRatingValue(document.getElementById("rateAlcohol"), own ? own.alcohol_control : null, alcoholMax);
+  writeOptionalRatingValue(document.getElementById("rateIg"), own ? own.instagram_marketability : null, igMax);
   document.getElementById("rateComment").value = own ? own.comment || "" : "";
   renderSelectedPnmPhoto(selected);
   if (photoForm) {
@@ -6772,11 +6796,11 @@ async function handleRatingSave(event) {
 
   const body = {
     pnm_id: selectedId,
-    good_with_girls: Number(document.getElementById("rateGirls").value),
-    will_make_it: Number(document.getElementById("rateProcess").value),
-    personable: Number(document.getElementById("ratePersonable").value),
-    alcohol_control: Number(document.getElementById("rateAlcohol").value),
-    instagram_marketability: Number(document.getElementById("rateIg").value),
+    good_with_girls: readOptionalRatingValue(document.getElementById("rateGirls")),
+    will_make_it: readOptionalRatingValue(document.getElementById("rateProcess")),
+    personable: readOptionalRatingValue(document.getElementById("ratePersonable")),
+    alcohol_control: readOptionalRatingValue(document.getElementById("rateAlcohol")),
+    instagram_marketability: readOptionalRatingValue(document.getElementById("rateIg")),
     comment: document.getElementById("rateComment").value.trim(),
   };
   promptInlineConfirm(ratingForm, "rushee-rating", {
@@ -6882,11 +6906,11 @@ async function submitCommandRating(options = {}) {
           method: "POST",
           body: {
             pnm_id: selectedId,
-            good_with_girls: Number(girlsInput.value),
-            will_make_it: Number(processInput.value),
-            personable: Number(personableInput.value),
-            alcohol_control: Number(alcoholInput.value),
-            instagram_marketability: Number(igInput.value),
+            good_with_girls: readOptionalRatingValue(girlsInput),
+            will_make_it: readOptionalRatingValue(processInput),
+            personable: readOptionalRatingValue(personableInput),
+            alcohol_control: readOptionalRatingValue(alcoholInput),
+            instagram_marketability: readOptionalRatingValue(igInput),
             comment: String(commentInput.value || "").trim(),
           },
         });

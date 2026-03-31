@@ -750,12 +750,16 @@ def main() -> None:
                     "good_with_girls": 7,
                     "will_make_it": 8,
                     "personable": 8,
-                    "alcohol_control": 7,
                     "instagram_marketability": 4,
                     "comment": "Initial rating entry",
                 },
             )
             expect_status(response, 200, "Create rating")
+            created_rating = (response.json() or {}).get("rating", {})
+            if created_rating.get("alcohol_control", "unexpected") is not None:
+                raise AssertionError("Skipped rating categories should be stored as null in the API payload.")
+            if int(created_rating.get("total_score") or 0) != 35:
+                raise AssertionError("Skipped categories should not drag the total score down.")
             checks.append("Rating create works")
 
             response = client.post(
@@ -775,7 +779,6 @@ def main() -> None:
                     "good_with_girls": 8,
                     "will_make_it": 8,
                     "personable": 8,
-                    "alcohol_control": 7,
                     "instagram_marketability": 4,
                     "comment": "Too short update",
                 },
@@ -790,12 +793,16 @@ def main() -> None:
                     "good_with_girls": 8,
                     "will_make_it": 9,
                     "personable": 8,
-                    "alcohol_control": 7,
                     "instagram_marketability": 5,
                     "comment": "Improved this week after multiple strong interactions and better consistency.",
                 },
             )
             expect_status(response, 200, "Rating update with valid comment")
+            updated_rating = (response.json() or {}).get("rating", {})
+            if updated_rating.get("alcohol_control", "unexpected") is not None:
+                raise AssertionError("Skipped rating categories should remain null after updates.")
+            if int(updated_rating.get("total_score") or 0) != 39:
+                raise AssertionError("Updated totals should continue normalizing around rated categories only.")
             checks.append("Rating update with delta tracking works")
 
             response = client.post(

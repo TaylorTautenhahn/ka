@@ -568,6 +568,52 @@ function confirmRusheeRatingSubmission(options = {}) {
     ? "Are you finished with this Rushee profile and ready to save this rating and move to the next one?"
     : "Are you finished with this Rushee profile and ready to save this rating?";
 }
+
+function ratingDraftFor(kind) {
+  return state.formDrafts && state.formDrafts[kind] ? state.formDrafts[kind] : null;
+}
+
+function clearRatingDraft(kind, pnmId = null) {
+  const draft = ratingDraftFor(kind);
+  if (!draft) {
+    return;
+  }
+  draft.pnmId = pnmId ? Number(pnmId) : null;
+  draft.dirty = false;
+}
+
+function markRatingDraftDirty(kind, pnmId) {
+  const draft = ratingDraftFor(kind);
+  if (!draft) {
+    return;
+  }
+  draft.pnmId = Number(pnmId || 0) || null;
+  draft.dirty = true;
+}
+
+function shouldPreserveRatingDraft(kind, pnmId) {
+  const draft = ratingDraftFor(kind);
+  return Boolean(draft && draft.dirty && Number(draft.pnmId) === Number(pnmId || 0));
+}
+
+function bindRatingDraftInputs(kind, inputIds, resolvePnmId) {
+  inputIds.forEach((id) => {
+    const input = document.getElementById(id);
+    if (!input) {
+      return;
+    }
+    const markDirty = () => {
+      const pnmId = typeof resolvePnmId === "function" ? resolvePnmId() : null;
+      if (!pnmId) {
+        return;
+      }
+      markRatingDraftDirty(kind, pnmId);
+    };
+    input.addEventListener("input", markDirty);
+    input.addEventListener("change", markDirty);
+  });
+}
+
 const DEFAULT_INTEREST_TAGS = parseConfiguredTagList(APP_CONFIG.default_interest_tags, BASE_DEFAULT_INTEREST_TAGS);
 const DEFAULT_STEREOTYPE_TAGS = parseConfiguredTagList(
   APP_CONFIG.default_stereotype_tags,
@@ -685,6 +731,16 @@ const state = {
     notifications: null,
     weeklyRoi: null,
     seasonSetup: null,
+  },
+  formDrafts: {
+    rushee: {
+      pnmId: null,
+      dirty: false,
+    },
+    command: {
+      pnmId: null,
+      dirty: false,
+    },
   },
   teamWorkspace: {
     assignmentOverview: null,
@@ -3652,11 +3708,16 @@ function applyCommandRatingFormForSelected() {
     if (commandSelectedStats) {
       commandSelectedStats.innerHTML = "";
     }
+    clearRatingDraft("command");
     syncCommandMeetingLink();
     return;
   }
-  clearInlineConfirmBar(commandRatingForm, "command-rating");
-  clearInlineConfirmBar(commandRatingForm, "command-comment");
+  const selectedId = Number(selected.pnm_id || 0);
+  const preserveDraft = shouldPreserveRatingDraft("command", selectedId);
+  if (!preserveDraft) {
+    clearInlineConfirmBar(commandRatingForm, "command-rating");
+    clearInlineConfirmBar(commandRatingForm, "command-comment");
+  }
 
   const own = selected.own_rating || null;
   const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
@@ -3716,23 +3777,26 @@ function applyCommandRatingFormForSelected() {
   const alcoholInput = document.getElementById("commandRateAlcohol");
   const igInput = document.getElementById("commandRateIg");
   const commentInput = document.getElementById("commandRateComment");
-  if (girlsInput) {
-    writeOptionalRatingValue(girlsInput, own ? own.good_with_girls : null, girlsMax);
-  }
-  if (processInput) {
-    writeOptionalRatingValue(processInput, own ? own.will_make_it : null, processMax);
-  }
-  if (personableInput) {
-    writeOptionalRatingValue(personableInput, own ? own.personable : null, personableMax);
-  }
-  if (alcoholInput) {
-    writeOptionalRatingValue(alcoholInput, own ? own.alcohol_control : null, alcoholMax);
-  }
-  if (igInput) {
-    writeOptionalRatingValue(igInput, own ? own.instagram_marketability : null, igMax);
-  }
-  if (commentInput) {
-    commentInput.value = own && own.comment ? own.comment : "";
+  if (!preserveDraft) {
+    if (girlsInput) {
+      writeOptionalRatingValue(girlsInput, own ? own.good_with_girls : null, girlsMax);
+    }
+    if (processInput) {
+      writeOptionalRatingValue(processInput, own ? own.will_make_it : null, processMax);
+    }
+    if (personableInput) {
+      writeOptionalRatingValue(personableInput, own ? own.personable : null, personableMax);
+    }
+    if (alcoholInput) {
+      writeOptionalRatingValue(alcoholInput, own ? own.alcohol_control : null, alcoholMax);
+    }
+    if (igInput) {
+      writeOptionalRatingValue(igInput, own ? own.instagram_marketability : null, igMax);
+    }
+    if (commentInput) {
+      commentInput.value = own && own.comment ? own.comment : "";
+    }
+    clearRatingDraft("command", selectedId);
   }
   syncWatchButtons();
   syncCommandMeetingLink();
@@ -5369,6 +5433,7 @@ function applyRatingFormForSelected() {
     renderAssignmentControls();
     renderPackageDealPanel();
     renderRusheeManagementPanel(null);
+    clearRatingDraft("rushee");
     return;
   }
 
@@ -5383,10 +5448,15 @@ function applyRatingFormForSelected() {
     renderAssignmentControls();
     renderPackageDealPanel();
     renderRusheeManagementPanel(null);
+    clearRatingDraft("rushee");
     return;
   }
-  clearInlineConfirmBar(ratingForm, "rushee-rating");
-  clearInlineConfirmBar(ratingForm, "rushee-comment");
+  const selectedId = Number(selected.pnm_id || 0);
+  const preserveDraft = shouldPreserveRatingDraft("rushee", selectedId);
+  if (!preserveDraft) {
+    clearInlineConfirmBar(ratingForm, "rushee-rating");
+    clearInlineConfirmBar(ratingForm, "rushee-comment");
+  }
 
   const assignmentTeam = assignmentTeamForPnm(selected);
   const assigned = primaryAssignmentLabel(selected, assignmentTeam);
@@ -5410,12 +5480,15 @@ function applyRatingFormForSelected() {
   const personableMax = ratingCriteriaForField("personable")?.max || 10;
   const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
   const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
-  writeOptionalRatingValue(document.getElementById("rateGirls"), own ? own.good_with_girls : null, girlsMax);
-  writeOptionalRatingValue(document.getElementById("rateProcess"), own ? own.will_make_it : null, processMax);
-  writeOptionalRatingValue(document.getElementById("ratePersonable"), own ? own.personable : null, personableMax);
-  writeOptionalRatingValue(document.getElementById("rateAlcohol"), own ? own.alcohol_control : null, alcoholMax);
-  writeOptionalRatingValue(document.getElementById("rateIg"), own ? own.instagram_marketability : null, igMax);
-  document.getElementById("rateComment").value = own ? own.comment || "" : "";
+  if (!preserveDraft) {
+    writeOptionalRatingValue(document.getElementById("rateGirls"), own ? own.good_with_girls : null, girlsMax);
+    writeOptionalRatingValue(document.getElementById("rateProcess"), own ? own.will_make_it : null, processMax);
+    writeOptionalRatingValue(document.getElementById("ratePersonable"), own ? own.personable : null, personableMax);
+    writeOptionalRatingValue(document.getElementById("rateAlcohol"), own ? own.alcohol_control : null, alcoholMax);
+    writeOptionalRatingValue(document.getElementById("rateIg"), own ? own.instagram_marketability : null, igMax);
+    document.getElementById("rateComment").value = own ? own.comment || "" : "";
+    clearRatingDraft("rushee", selectedId);
+  }
   renderSelectedPnmPhoto(selected);
   if (photoForm) {
     photoForm.classList.toggle("hidden", !(roleCanManagePhotos() && selected.can_manage_profile));
@@ -6778,6 +6851,7 @@ async function handleRusheeCommentOnly() {
     commentInput,
     actionButton: rusheeCommentOnlyBtn,
     afterSuccess: async () => {
+      clearRatingDraft("rushee", selectedId);
       state.selectedPnmId = selectedId;
       await refreshAll();
       await loadPnmDetail(selectedId);
@@ -6812,6 +6886,7 @@ async function handleRatingSave(event) {
           method: "POST",
           body,
         });
+        clearRatingDraft("rushee", selectedId);
         state.selectedPnmId = selectedId;
         await refreshAll();
         await loadPnmDetail(selectedId);
@@ -6914,6 +6989,7 @@ async function submitCommandRating(options = {}) {
             comment: String(commentInput.value || "").trim(),
           },
         });
+        clearRatingDraft("command", selectedId);
         const currentId = selectedId;
         await refreshCommandCenterDependencies();
         if (advance) {
@@ -6969,6 +7045,7 @@ async function handleCommandCommentOnly() {
     commentInput,
     actionButton: commandCommentOnlyBtn,
     afterSuccess: async () => {
+      clearRatingDraft("command", Number(selected && selected.pnm_id ? selected.pnm_id : 0));
       await refreshCommandCenterDependencies();
       renderCommandCenter();
     },
@@ -8965,6 +9042,11 @@ function attachEvents() {
   if (ratingForm) {
     ratingForm.addEventListener("submit", handleRatingSave);
   }
+  bindRatingDraftInputs(
+    "rushee",
+    ["rateGirls", "rateProcess", "ratePersonable", "rateAlcohol", "rateIg", "rateComment"],
+    () => Number(ratingPnm && ratingPnm.value ? ratingPnm.value : state.selectedPnmId || 0)
+  );
   if (rusheeCommentOnlyBtn) {
     rusheeCommentOnlyBtn.addEventListener("click", handleRusheeCommentOnly);
   }
@@ -8995,6 +9077,11 @@ function attachEvents() {
   if (refreshInstagramPhotoBtn) {
     refreshInstagramPhotoBtn.addEventListener("click", handleRefreshInstagramPhoto);
   }
+  bindRatingDraftInputs(
+    "command",
+    ["commandRateGirls", "commandRateProcess", "commandRatePersonable", "commandRateAlcohol", "commandRateIg", "commandRateComment"],
+    () => Number(state.commandCenter.selectedQueuePnmId || 0)
+  );
 
   pnmTable.addEventListener("click", handlePnmTableClick);
   if (pnmBoard) {

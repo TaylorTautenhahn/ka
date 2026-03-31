@@ -1621,10 +1621,15 @@ body.desktop-product-auth .divider {
 
 body.desktop-product-auth .notifications-tray-scrim,
 body.desktop-product-auth .command-palette-scrim,
-body.desktop-product-auth .touchpoint-drawer-scrim,
-body.desktop-product-auth .tutorial-scrim {
+body.desktop-product-auth .touchpoint-drawer-scrim {
   background: rgba(3, 10, 20, 0.54);
   backdrop-filter: blur(8px);
+}
+
+body.desktop-product-auth .tutorial-scrim {
+  background: rgba(3, 10, 20, 0.42);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 body.desktop-product-auth .command-palette-result-copy .muted,

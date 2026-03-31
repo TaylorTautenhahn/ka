@@ -371,6 +371,13 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-shell .quick-nav-link
   overflow: hidden;
 }
 
+.app-topbar,
+.app-toolbar,
+.app-topbar-actions,
+.app-menu {
+  overflow: visible;
+}
+
 .app-sidebar {
   display: grid;
   gap: 1.1rem;
@@ -464,6 +471,7 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-shell .quick-nav-link
 
 .app-menu {
   position: relative;
+  z-index: 14;
 }
 
 .app-menu summary {
@@ -510,7 +518,7 @@ body.desktop-product-auth .app-menu > summary.secondary:hover {
   box-shadow: 0 22px 44px rgba(4, 10, 26, 0.3);
   display: grid;
   gap: 0.2rem;
-  z-index: 12;
+  z-index: 40;
 }
 
 .app-menu-item {

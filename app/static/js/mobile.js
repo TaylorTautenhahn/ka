@@ -124,6 +124,9 @@ function applyTenantTheme(config) {
   const accentDeep = mixRgb(accentBase, { r: 0, g: 0, b: 0 }, 0.34);
   const accentShadow = mixRgb(accentBase, { r: 0, g: 0, b: 0 }, 0.42);
   const heading = mixRgb(accentBase, { r: 36, g: 24, b: 31 }, 0.32);
+  const mobileBrand = mixRgb(accentBase, { r: 125, g: 177, b: 224 }, 0.22);
+  const mobileBrandSoft = mixRgb(accentBase, { r: 226, g: 241, b: 255 }, 0.16);
+  const mobileBrandMuted = mixRgb(accentBase, { r: 9, g: 18, b: 30 }, 0.68);
 
   root.style.setProperty("--accent", rgbToHex(accentBase));
   root.style.setProperty("--accent-bright", rgbToHex(accentBright));
@@ -135,6 +138,9 @@ function applyTenantTheme(config) {
   root.style.setProperty("--gold-rgb", rgbTriplet(goldBase));
   root.style.setProperty("--heading", rgbToHex(heading));
   root.style.setProperty("--good", rgbToHex(tertiaryBase));
+  root.style.setProperty("--mobile-brand-rgb", rgbTriplet(mobileBrand));
+  root.style.setProperty("--mobile-brand-soft-rgb", rgbTriplet(mobileBrandSoft));
+  root.style.setProperty("--mobile-brand-muted-rgb", rgbTriplet(mobileBrandMuted));
 }
 
 applyTenantTheme(APP_CONFIG);
@@ -1903,7 +1909,7 @@ function renderPnmCards(pnms) {
           ? `Created by ${creator}`
           : "Locked";
       return `
-        <article class="entry mobile-card${selectedClass}">
+        <article class="entry mobile-card mobile-manage-card${selectedClass}" data-mobile-pnm-card-id="${pnm.pnm_id}" role="button" tabindex="0" aria-pressed="${selectedClass ? "true" : "false"}">
           <div class="entry-title">
             <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
             <span>${formatWeightedScore(pnm.weighted_total)}</span>
@@ -1922,7 +1928,7 @@ function renderPnmCards(pnms) {
             </div>
           </div>
           <div class="action-row">
-            <button type="button" class="secondary" data-mobile-manage-pnm-id="${pnm.pnm_id}"${pnm.can_manage_profile ? "" : " disabled"}>${pnm.can_manage_profile ? "Manage" : "Locked"}</button>
+            <button type="button" class="secondary" data-mobile-manage-pnm-id="${pnm.pnm_id}">${pnm.can_manage_profile ? "Edit Details" : "View Lock"}</button>
             <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Meeting Packet</a>
           </div>
         </article>
@@ -2239,7 +2245,12 @@ async function loadPnmsPage() {
   if (!mobilePnmRows.some((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId))) {
     mobileSelectedManagePnmId = null;
   }
+  if (!mobileSelectedManagePnmId && mobilePnmRows.length) {
+    const preferred = mobilePnmRows.find((pnm) => pnm.can_manage_profile) || mobilePnmRows[0];
+    mobileSelectedManagePnmId = Number(preferred.pnm_id);
+  }
   updateContactsUi();
+  renderPnmCards(mobilePnmRows);
   renderMobilePnmManagement();
 }
 
@@ -2249,10 +2260,15 @@ function mobileSelectedManagePnm() {
 
 function resetMobilePnmManagement(message = "Select a rushee from the roster to edit identity, contact, and meeting details.") {
   const hint = document.getElementById("mobilePnmManageHint");
+  const selectedCard = document.getElementById("mobilePnmManageSelectedCard");
   const locked = document.getElementById("mobilePnmManageLocked");
   const form = document.getElementById("mobilePnmManageForm");
   if (hint) {
     hint.textContent = message;
+  }
+  if (selectedCard) {
+    selectedCard.classList.add("hidden");
+    selectedCard.innerHTML = "";
   }
   if (locked) {
     locked.classList.add("hidden");
@@ -2277,6 +2293,7 @@ function resetMobilePnmManagement(message = "Select a rushee from the roster to 
 function renderMobilePnmManagement() {
   const selected = mobileSelectedManagePnm();
   const hint = document.getElementById("mobilePnmManageHint");
+  const selectedCard = document.getElementById("mobilePnmManageSelectedCard");
   const locked = document.getElementById("mobilePnmManageLocked");
   const form = document.getElementById("mobilePnmManageForm");
   if (!form) {
@@ -2287,6 +2304,20 @@ function renderMobilePnmManagement() {
     return;
   }
   const creator = String(selected.created_by_username || "").trim() || "another rush team member";
+  if (selectedCard) {
+    selectedCard.classList.remove("hidden");
+    selectedCard.innerHTML = `
+      <div class="entry-title">
+        <strong>${escapeHtml(selected.first_name)} ${escapeHtml(selected.last_name)}</strong>
+        <span>${formatWeightedScore(selected.weighted_total)}</span>
+      </div>
+      <div class="command-chip-row">
+        ${ratingTierBadgeMarkup(selected.weighted_total)}
+        <span class="mobile-manage-owner-badge">${escapeHtml(selected.can_manage_profile ? "Editable here" : `Created by ${creator}`)}</span>
+      </div>
+      <div class="muted">${escapeHtml(selected.pnm_code)} · ${escapeHtml(selected.hometown || "Unknown hometown")}${selected.hometown_state_code ? `, ${escapeHtml(selected.hometown_state_code)}` : ""}</div>
+    `;
+  }
   if (hint) {
     hint.textContent = selected.can_manage_profile
       ? `Created by ${creator}. You can update this rushee here.`
@@ -2331,6 +2362,19 @@ function renderMobilePnmManagement() {
   setValue("mobileManageNotes", selected.notes);
   syncInterestPickerFromInput("mobileManageInterests", "mobileManageInterestTags");
   syncStereotypePickerFromInput("mobileManageStereotype", "mobileManageStereotypeTags");
+}
+
+function selectMobileManagePnm(pnmId, { scroll = true } = {}) {
+  const numericId = Number(pnmId || 0);
+  if (!numericId) {
+    return;
+  }
+  mobileSelectedManagePnmId = numericId;
+  renderPnmCards(mobilePnmRows);
+  renderMobilePnmManagement();
+  if (scroll) {
+    document.getElementById("mobilePnmManageSelectedCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 }
 
 function handleMobileHomeSearchClick(event) {
@@ -2967,18 +3011,31 @@ function attachPageEvents() {
     }
     if (list) {
       list.addEventListener("click", (event) => {
-        const manageBtn = event.target.closest("[data-mobile-manage-pnm-id]");
-        if (!manageBtn) {
+        if (event.target.closest("a[href]")) {
           return;
         }
-        const pnmId = Number(manageBtn.dataset.mobileManagePnmId || 0);
+        const manageBtn = event.target.closest("[data-mobile-manage-pnm-id]");
+        const card = event.target.closest("[data-mobile-pnm-card-id]");
+        const source = manageBtn || card;
+        if (!source) {
+          return;
+        }
+        const pnmId = Number(source.dataset.mobileManagePnmId || source.dataset.mobilePnmCardId || 0);
         if (!pnmId) {
           return;
         }
-        mobileSelectedManagePnmId = pnmId;
-        renderPnmCards(mobilePnmRows);
-        renderMobilePnmManagement();
-        document.getElementById("mobilePnmManageForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        selectMobileManagePnm(pnmId);
+      });
+      list.addEventListener("keydown", (event) => {
+        const card = event.target.closest("[data-mobile-pnm-card-id]");
+        if (!card || !["Enter", " "].includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        const pnmId = Number(card.dataset.mobilePnmCardId || 0);
+        if (pnmId) {
+          selectMobileManagePnm(pnmId);
+        }
       });
     }
     if (manageForm) {

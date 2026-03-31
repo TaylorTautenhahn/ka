@@ -3972,14 +3972,17 @@ body[data-mobile-page] .mobile-appbar:has(.mobile-appbar-actions:empty) {
 body[data-mobile-page] {
   --mobile-bg: #07111d;
   --mobile-bg-alt: #0d1828;
-  --mobile-surface: rgba(10, 20, 33, 0.94);
-  --mobile-surface-elevated: rgba(15, 28, 44, 0.97);
-  --mobile-surface-soft: rgba(18, 35, 54, 0.9);
-  --mobile-stroke: rgba(112, 179, 242, 0.16);
-  --mobile-stroke-strong: rgba(112, 179, 242, 0.28);
+  --mobile-brand-rgb: 112, 179, 242;
+  --mobile-brand-soft-rgb: 187, 220, 248;
+  --mobile-brand-muted-rgb: 28, 47, 70;
+  --mobile-surface: rgba(8, 17, 29, 0.96);
+  --mobile-surface-elevated: rgba(11, 22, 37, 0.98);
+  --mobile-surface-soft: rgba(15, 28, 44, 0.96);
+  --mobile-stroke: rgba(var(--mobile-brand-rgb), 0.14);
+  --mobile-stroke-strong: rgba(var(--mobile-brand-rgb), 0.28);
   --mobile-text: #f4f8fc;
-  --mobile-text-soft: #9bb0c9;
-  --mobile-shadow: 0 16px 32px rgba(0, 0, 0, 0.26);
+  --mobile-text-soft: #a4b7cc;
+  --mobile-shadow: 0 16px 32px rgba(0, 0, 0, 0.34);
 }
 
 body[data-mobile-page] .mobile-shell {
@@ -3994,7 +3997,8 @@ body[data-mobile-page] .mobile-appbar {
   padding: 0.82rem 0.92rem;
   border-radius: 18px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 44%),
+    radial-gradient(circle at top right, rgba(var(--mobile-brand-rgb), 0.12), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 44%),
     var(--mobile-surface);
   border-color: var(--mobile-stroke);
   box-shadow: var(--mobile-shadow);
@@ -4003,7 +4007,9 @@ body[data-mobile-page] .mobile-appbar {
 body[data-mobile-page] .mobile-appbar-link {
   min-height: 2.2rem;
   padding: 0.5rem 0.72rem;
-  background: var(--mobile-surface-soft);
+  background:
+    linear-gradient(180deg, rgba(var(--mobile-brand-rgb), 0.09), rgba(10, 22, 35, 0.92)),
+    var(--mobile-surface-soft);
   color: var(--mobile-text);
   border-color: var(--mobile-stroke);
 }
@@ -4014,7 +4020,8 @@ body[data-mobile-page] .mobile-command-queue-btn,
 body[data-mobile-page] .mobile-home-pnm-btn,
 body[data-mobile-page] .mobile-kpi-grid .card {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 42%),
+    radial-gradient(circle at top right, rgba(var(--mobile-brand-rgb), 0.08), transparent 48%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 42%),
     var(--mobile-surface);
   border-color: var(--mobile-stroke);
   box-shadow: var(--mobile-shadow);
@@ -4037,10 +4044,36 @@ body[data-mobile-page] .mobile-search-shell {
 body[data-mobile-page] .mobile-search-label input,
 body[data-mobile-page] .mobile-rating-panel input,
 body[data-mobile-page] .mobile-rating-panel textarea,
-body[data-mobile-page] .mobile-rating-panel select {
+body[data-mobile-page] .mobile-rating-panel select,
+body[data-mobile-page] #mobilePnmManageForm input,
+body[data-mobile-page] #mobilePnmManageForm textarea,
+body[data-mobile-page] #mobilePnmManageForm select {
   background: var(--mobile-surface-elevated);
   border-color: var(--mobile-stroke);
   color: var(--mobile-text);
+}
+
+body[data-mobile-page] button,
+body[data-mobile-page] .mobile-panel button:not(.secondary),
+body[data-mobile-page] .mobile-command-inline-actions button:not(.secondary) {
+  background:
+    linear-gradient(180deg, rgba(var(--mobile-brand-rgb), 0.34), rgba(var(--mobile-brand-muted-rgb), 0.9)),
+    var(--mobile-surface-soft);
+  color: #eef6ff;
+  border: 1px solid rgba(var(--mobile-brand-rgb), 0.28);
+  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.26);
+}
+
+body[data-mobile-page] button.secondary,
+body[data-mobile-page] .quick-nav-link,
+body[data-mobile-page] .mobile-command-inline-actions .quick-nav-link,
+body[data-mobile-page] .mobile-appbar-link {
+  background:
+    linear-gradient(180deg, rgba(var(--mobile-brand-rgb), 0.08), rgba(12, 23, 38, 0.94)),
+    var(--mobile-surface-soft);
+  color: var(--mobile-text);
+  border: 1px solid rgba(var(--mobile-brand-rgb), 0.18);
+  box-shadow: none;
 }
 
 body[data-mobile-page] .mobile-search-meta {
@@ -4121,10 +4154,11 @@ body[data-mobile-page] .mobile-home-pnm-score strong {
 body[data-mobile-page] .mobile-home-pnm-btn.is-selected,
 body[data-mobile-page] .mobile-command-queue-btn.is-selected,
 body[data-mobile-page] .entry.mobile-card.is-selected {
-  border-color: rgba(111, 182, 245, 0.34);
+  border-color: rgba(var(--mobile-brand-rgb), 0.34);
   background:
-    linear-gradient(180deg, rgba(76, 134, 201, 0.12), rgba(14, 27, 43, 0) 58%),
-    rgba(12, 24, 39, 0.96);
+    radial-gradient(circle at top right, rgba(var(--mobile-brand-rgb), 0.14), transparent 42%),
+    linear-gradient(180deg, rgba(var(--mobile-brand-rgb), 0.1), rgba(14, 27, 43, 0) 58%),
+    rgba(9, 18, 31, 0.98);
   box-shadow: 0 16px 28px rgba(6, 14, 24, 0.38);
 }
 
@@ -4136,7 +4170,8 @@ body[data-mobile-page] .mobile-command-selected-card {
   border: 1px solid var(--mobile-stroke);
   border-radius: 16px;
   background:
-    linear-gradient(180deg, rgba(82, 140, 201, 0.1), rgba(16, 30, 47, 0) 48%),
+    radial-gradient(circle at top right, rgba(var(--mobile-brand-rgb), 0.14), transparent 45%),
+    linear-gradient(180deg, rgba(var(--mobile-brand-rgb), 0.08), rgba(16, 30, 47, 0) 48%),
     rgba(11, 23, 37, 0.96);
 }
 
@@ -4232,9 +4267,10 @@ body[data-mobile-page] .mobile-comment-only-btn {
 body[data-mobile-page] .mobile-secondary-details,
 body[data-mobile-page] .mobile-subsection-details {
   background:
+    radial-gradient(circle at top right, rgba(var(--mobile-brand-rgb), 0.07), transparent 44%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent 48%),
     rgba(9, 18, 31, 0.88);
-  border: 1px solid rgba(112, 179, 242, 0.12);
+  border: 1px solid rgba(var(--mobile-brand-rgb), 0.12);
 }
 
 body[data-mobile-page="meeting"] .mobile-meeting-controls,
@@ -4323,17 +4359,47 @@ body[data-mobile-page] .mobile-tabs {
 
 body[data-mobile-page] .mobile-tab {
   background: rgba(13, 25, 39, 0.94);
-  border-color: rgba(112, 179, 242, 0.12);
+  border-color: rgba(var(--mobile-brand-rgb), 0.12);
   color: var(--mobile-text-soft);
 }
 
 body[data-mobile-page] .mobile-tab.is-active {
   color: #eff7ff;
   background:
-    linear-gradient(180deg, rgba(84, 141, 203, 0.18), rgba(17, 32, 49, 0.92)),
+    linear-gradient(180deg, rgba(var(--mobile-brand-rgb), 0.24), rgba(17, 32, 49, 0.92)),
     rgba(12, 25, 40, 0.96);
-  border-color: rgba(112, 179, 242, 0.3);
+  border-color: rgba(var(--mobile-brand-rgb), 0.3);
   box-shadow: inset 0 1px 0 rgba(201, 231, 255, 0.06), 0 8px 18px rgba(0, 0, 0, 0.28);
+}
+
+body[data-mobile-page] .mobile-manage-card {
+  cursor: pointer;
+}
+
+body[data-mobile-page] .mobile-manage-selected-card {
+  margin-bottom: 0.78rem;
+  background:
+    radial-gradient(circle at top right, rgba(var(--mobile-brand-rgb), 0.15), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), transparent 36%),
+    var(--mobile-surface-soft);
+}
+
+body[data-mobile-page] .mobile-manage-owner-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.48rem;
+  border-radius: 999px;
+  background: rgba(var(--mobile-brand-rgb), 0.14);
+  color: #e7f2ff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+body[data-mobile-page] #mobilePnmManageLocked {
+  background:
+    linear-gradient(180deg, rgba(255, 196, 120, 0.06), transparent 42%),
+    var(--mobile-surface-soft);
+  border-color: rgba(214, 179, 106, 0.18);
 }
 
 @media (max-width: 560px) {

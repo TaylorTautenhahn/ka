@@ -428,6 +428,30 @@ body.desktop-backend-body:not(.desktop-product-auth) .auth-shell .quick-nav-link
   border: 1px solid rgba(var(--accent-rgb), 0.12);
 }
 
+.app-nav-link-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.72rem;
+  min-width: 0;
+}
+
+.app-nav-icon {
+  width: 1.15rem;
+  height: 1.15rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  color: inherit;
+  opacity: 0.86;
+}
+
+.app-nav-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
 .app-nav-link:hover,
 .app-nav-link.is-active {
   color: var(--heading);
@@ -1881,6 +1905,11 @@ body.desktop-product-auth .app-nav-link {
   padding: 0.88rem 0.95rem 0.88rem 1.05rem;
   border-radius: var(--backend-radius-sm);
   transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+body.desktop-product-auth .app-nav-link:hover .app-nav-icon,
+body.desktop-product-auth .app-nav-link.is-active .app-nav-icon {
+  opacity: 1;
 }
 
 body.desktop-product-auth .app-nav-link::before {

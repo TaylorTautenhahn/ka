@@ -1,3 +1,17 @@
+
+function triggerHaptic(type = "selection") {
+  if (window.haptics) {
+    window.haptics.trigger(type);
+  }
+}
+
+
+
+document.addEventListener("click", () => {
+  if (typeof triggerHaptic !== "undefined") {
+    triggerHaptic("selection");
+  }
+});
 function readAppConfig() {
   const bodyValue = document.body ? document.body.dataset.appConfig : "";
   if (!bodyValue) {
@@ -299,6 +313,7 @@ function escapeHtml(input) {
 }
 
 function showToast(message) {
+  if (typeof triggerHaptic !== "undefined") triggerHaptic("medium");
   if (!toastEl) {
     return;
   }

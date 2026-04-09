@@ -1,0 +1,27 @@
+Assist mode
+Source: auto-window: iPhone Mirroring / iPhone Mirroring
+Visible tray pieces: 1
+
+Play now:
+Slot 1 -> R8C5 | clears 0 | cells: R8C5, R8C6, R8C7, R8C8
+Piece:
+# # # #
+Exact footprint:
+R8C5 R8C6 R8C7 R8C8
+Board guide (# filled, . empty, A place now):
+    1 2 3 4 5 6 7 8
+R1  . . . . . . . .
+R2  . . . . . . . .
+R3  . . . . . . . .
+R4  . . . . . . . .
+R5  . . . . # . . .
+R6  . . . . # # . .
+R7  . . . . # # . .
+R8  . . . . A A A A
+
+Tray pieces:
+Slot 1 (4 cells): ((0, 0), (1, 0), (2, 0), (3, 0))
+# # # #
+
+Sequence:
+1. Slot 1 -> R8C5 | clears 0 | cells: R8C5, R8C6, R8C7, R8C8

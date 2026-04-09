@@ -1,0 +1,28 @@
+Assist mode
+Source: saved calibration region
+Note: this is using the saved capture region, not a live iPhone Mirroring window.
+Visible tray pieces: 1
+
+Play now:
+Slot 1 -> R3C4 | clears 3 | cells: R3C4
+Piece:
+#
+Exact footprint:
+R3C4
+Board guide (# filled, . empty, A place now):
+    1 2 3 4 5 6 7 8
+R1  # # # # # # . .
+R2  # # # # . # # .
+R3  # # # A # # # #
+R4  # # . . # # . .
+R5  # # . . . . . .
+R6  # # . . # # # .
+R7  # # . . . # # #
+R8  # # . . . # # #
+
+Tray pieces:
+Slot 1 (1 cells): ((0, 0),)
+#
+
+Sequence:
+1. Slot 1 -> R3C4 | clears 3 | cells: R3C4

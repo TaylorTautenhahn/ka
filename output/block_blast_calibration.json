@@ -1,0 +1,34 @@
+{
+  "capture_region": {
+    "left": 249.0,
+    "top": 154.0,
+    "right": 582.0,
+    "bottom": 870.0
+  },
+  "board_rect": {
+    "left": 261.0,
+    "top": 432.0,
+    "right": 583.0,
+    "bottom": 754.0
+  },
+  "piece_slot_centers": [
+    {
+      "x": 338.0,
+      "y": 815.0
+    },
+    {
+      "x": 424.0,
+      "y": 821.0
+    },
+    {
+      "x": 500.0,
+      "y": 813.0
+    }
+  ],
+  "tuning": {
+    "empty_cell_threshold": 28.0,
+    "piece_block_scale": 0.35,
+    "slot_crop_width_scale": 8.0,
+    "slot_crop_height_scale": 5.5
+  }
+}

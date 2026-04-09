@@ -1,0 +1,32 @@
+Assist mode
+Source: auto-window: image / analyze-image
+Visible tray pieces: 1
+
+Play now:
+Slot 1 -> R5C7 | clears 0 | cells: R5C8, R5C9, R6C7, R6C8
+Piece:
+. # #
+# # .
+Exact footprint:
+..... R5C8 R5C9
+R6C7 R6C8 .....
+Board guide (# filled, . empty, A place now):
+    1 2 3 4 5 6 7 8 9 10
+R1  . . . . . . . . # .
+R2  . . . . . . . . # .
+R3  . . . . . . . . . .
+R4  . . . . # . # . . .
+R5  . . . . # # # A A .
+R6  . . . . # # A A . .
+R7  . . . # # . # # . .
+R8  # # # # # # # # # .
+R9  # # # # # # # # # .
+R10  # . . . # # # # # .
+
+Tray pieces:
+Slot 1 (4 cells): ((0, 1), (1, 0), (1, 1), (2, 0))
+. # #
+# # .
+
+Sequence:
+1. Slot 1 -> R5C7 | clears 0 | cells: R5C8, R5C9, R6C7, R6C8

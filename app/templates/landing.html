@@ -3,184 +3,123 @@
 
 {% block title %}BidBoard | Recruitment Intelligence{% endblock %}
 {% block description %}BidBoard is the recruitment command layer for fraternities and sororities that need faster, more accountable decisions.{% endblock %}
-{% block body_class %}bb-page-home bb-page-home-redesign bb-page-home-v2{% endblock %}
+{% block body_class %}bb-page-home bb-page-home-redesign bb-page-home-v3{% endblock %}
 
 {% block page_content %}
-<section class="bb-hero bb-hero-home bb-home-hero bb-home-hero-v2 bb-reveal" data-delay="20">
-  <div class="bb-home-hero-copy">
+<section class="bb-hero bb-home-hero-v3 bb-reveal" data-delay="20">
+  <div class="bb-hero-copy bb-home-hero-copy-v3">
     <div class="bb-hero-badge-row">
       <span class="bb-signal-tag">Recruitment Intelligence</span>
-      <span class="bb-signal-tag bb-signal-tag-muted">Live command system</span>
+      <span class="bb-signal-tag bb-signal-tag-muted">Command center for rush week</span>
     </div>
     <p class="bb-kicker">BidBoard Command</p>
-    <h1 class="bb-hero-title">Turn rush week into a live decision engine.</h1>
+    <h1 class="bb-hero-title">Recruitment decisions, finally in one live system.</h1>
     <p class="bb-subtitle">
-      BidBoard gives fraternities and sororities one premium workspace for scoring, ownership, touchpoints, meeting packets, and mobile updates while recruitment is still moving.
+      BidBoard turns scattered ratings, group chats, lunch notes, and packet prep into a premium operating layer for fraternities and sororities moving fast during rush.
     </p>
-    <div class="bb-hero-actions">
+    <div class="bb-home-action-deck" aria-label="Primary actions">
       <a class="bb-cta bb-cta-strong" href="/demo">Try Interactive Demo</a>
       <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
       <a class="bb-link-inline" href="/features">Explore Product</a>
     </div>
-    <div class="bb-home-signal-strip" aria-label="BidBoard operating metrics">
-      <article>
-        <span>01</span>
-        <strong>Capture</strong>
-        <small>Add PNMs quickly from mobile or desktop.</small>
-      </article>
-      <article>
-        <span>02</span>
-        <strong>Coordinate</strong>
-        <small>Assign owners and schedule touchpoints.</small>
-      </article>
-      <article>
-        <span>03</span>
-        <strong>Decide</strong>
-        <small>Open packets with current context.</small>
-      </article>
+    <div class="bb-home-proofline" aria-label="BidBoard operating proof points">
+      <article><strong>Live board</strong><span>Every rating, owner, and touchpoint stays connected.</span></article>
+      <article><strong>Packet ready</strong><span>Meeting context is prepared before discussion starts.</span></article>
+      <article><strong>Mobile fast</strong><span>Officers can update signal while the event is happening.</span></article>
     </div>
   </div>
 
-  <div class="bb-home-visual bb-command-observatory" aria-label="BidBoard command center preview">
-    <div class="bb-orbit-console">
-      <div class="bb-orbit-header">
-        <div>
-          <p class="bb-kicker">Signal Lattice</p>
-          <h2>Live recruitment board</h2>
-        </div>
-        <span>Operational</span>
+  <div class="bb-product-stage-v3" aria-label="BidBoard product preview">
+    <div class="bb-product-window-v3">
+      <div class="bb-product-window-top">
+        <div class="bb-window-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <strong>Command Workspace</strong>
+        <em>Live</em>
       </div>
-      <div class="bb-network-readout" aria-live="polite">
-        <span class="bb-network-pill" id="bbNetworkInterest">Interest Signal: Leadership</span>
-        <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
-      </div>
-      <div class="bb-observatory-stage">
-        <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="540" aria-hidden="true"></canvas>
-        <article class="bb-float-card bb-float-card-primary">
-          <span>Priority Queue</span>
-          <strong>Mason Carter</strong>
-          <small>32.0 score · +3.2 this week</small>
-        </article>
-        <article class="bb-float-card bb-float-card-secondary">
-          <span>Packet Status</span>
-          <strong>Meeting-ready</strong>
-          <small>Comments, touchpoints, owner context</small>
-        </article>
-        <article class="bb-float-card bb-float-card-tertiary">
-          <span>Assignment</span>
-          <strong>Jack M.</strong>
-          <small>Best fit: leadership + Dallas</small>
-        </article>
-      </div>
-      <div class="bb-command-metrics">
-        <article><strong>1</strong><span>shared board</span></article>
-        <article><strong>4</strong><span>rush workflows</span></article>
-        <article><strong data-count="{{ tenant_count }}">{{ tenant_count }}</strong><span>organizations</span></article>
+      <div class="bb-product-grid-v3">
+        <section class="bb-product-panel-v3 bb-product-panel-command">
+          <div class="bb-panel-label-row"><span>My Queue</span><strong>12 active</strong></div>
+          <article class="bb-queue-row is-hot"><span>MC</span><div><strong>Mason Carter</strong><small>Behind touchpoint · owner assigned</small></div><b>32.0</b></article>
+          <article class="bb-queue-row"><span>JP</span><div><strong>James Parker</strong><small>Meeting-ready packet</small></div><b>29.5</b></article>
+          <article class="bb-queue-row"><span>BW</span><div><strong>Ben Walker</strong><small>Needs comment follow-up</small></div><b>27.0</b></article>
+        </section>
+        <section class="bb-product-panel-v3 bb-product-panel-lattice">
+          <div class="bb-panel-label-row"><span>Signal Lattice</span><strong id="bbNetworkInterest">Interest Signal: Leadership</strong></div>
+          <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="540" aria-hidden="true"></canvas>
+          <div class="bb-network-readout" aria-live="polite">
+            <span class="bb-network-pill bb-network-pill-secondary" id="bbNetworkMatch">Matched Rush Officer: Jack M.</span>
+          </div>
+        </section>
+        <section class="bb-product-panel-v3 bb-product-panel-packet">
+          <div class="bb-panel-label-row"><span>Meeting Packet</span><strong>Ready</strong></div>
+          <div class="bb-packet-score"><strong>+3.2</strong><span>weekly movement</span></div>
+          <p>Ratings, comments, owners, package deals, and touchpoints move into the meeting view together.</p>
+        </section>
       </div>
     </div>
+    <div class="bb-floating-signal-card bb-floating-signal-card-a"><span>No owner</span><strong>3 PNMs</strong></div>
+    <div class="bb-floating-signal-card bb-floating-signal-card-b"><span>Touchpoints due</span><strong>8 today</strong></div>
   </div>
 </section>
 
-<section class="bb-section bb-home-operating-system bb-reveal" data-delay="35">
-  <div class="bb-section-head bb-section-head-split">
+<section class="bb-section bb-home-pressure-v3 bb-reveal" data-delay="35">
+  <div class="bb-section-head bb-section-head-split-v3">
+    <div>
+      <p class="bb-kicker">Built Around Rush Pressure</p>
+      <h2>Less admin drag. More useful signal.</h2>
+    </div>
+    <p class="bb-page-subtitle">BidBoard is structured around the moments where recruitment teams usually lose clarity: fast intake, ownership handoff, stale ratings, and meeting prep.</p>
+  </div>
+  <div class="bb-pressure-grid-v3">
+    <article><span>01</span><h3>Command first</h3><p>Each officer gets a queue for ratings, comments, lunches, packet context, and follow-up work.</p></article>
+    <article><span>02</span><h3>Context stays attached</h3><p>Standalone comments, score movement, touchpoints, assignments, and package links stay with the rushee.</p></article>
+    <article><span>03</span><h3>Heads see pressure</h3><p>Leadership sees overloaded officers, missing owners, stale prep, and season risk without hunting.</p></article>
+  </div>
+</section>
+
+<section class="bb-section bb-home-os-v3 bb-reveal" data-delay="45">
+  <div class="bb-section-head bb-section-head-split-v3">
     <div>
       <p class="bb-kicker">One Recruitment OS</p>
-      <h2>Everything the team needs, without rebuilding the story before every meeting.</h2>
+      <h2>Five workspaces, one operating rhythm.</h2>
     </div>
-    <p class="bb-page-subtitle">
-      The product is designed around the way rush actually happens: fast introductions, incomplete context, quick follow-up, and high-stakes decisions in a room full of opinions.
-    </p>
+    <p class="bb-page-subtitle">The public promise matches the logged-in product: Command, Rushees, Meetings, Operations, and Team all share the same data layer.</p>
   </div>
-  <div class="bb-home-bento-v2">
-    <article class="bb-bento-v2 bb-bento-v2-large">
-      <span>Command</span>
-      <h3>See what needs action first.</h3>
-      <p>Heads and officers land in a personal queue with stale ratings, missing owners, due touchpoints, and meeting prep surfaced before lower-value noise.</p>
-      <div class="bb-mini-dashboard" aria-hidden="true">
-        <i style="--w: 86%"></i><i style="--w: 64%"></i><i style="--w: 42%"></i>
-      </div>
-    </article>
-    <article class="bb-bento-v2">
-      <span>Rushees</span>
-      <h3>Roster, owner, packet context.</h3>
-      <p>Profiles stay editable by the right people, with ownership and comments visible where decisions happen.</p>
-    </article>
-    <article class="bb-bento-v2">
-      <span>Meetings</span>
-      <h3>Decision packets stay current.</h3>
-      <p>Trend movement, standalone comments, package deals, and touchpoints travel into the meeting view.</p>
-    </article>
-    <article class="bb-bento-v2 bb-bento-v2-accent">
-      <span>Mobile</span>
-      <h3>Fast enough for the event floor.</h3>
-      <p>Search, rate, comment, and open packets without fighting a desktop dashboard on a phone.</p>
-    </article>
+  <div class="bb-os-grid-v3">
+    <article class="is-large"><span>Command</span><h3>Personal execution console.</h3><p>My Queue, attention signals, quick rating, recent decisions, and team pulse live where users start.</p><div class="bb-mini-dashboard" aria-hidden="true"><i style="--w: 92%"></i><i style="--w: 68%"></i><i style="--w: 46%"></i></div></article>
+    <article><span>Rushees</span><h3>Roster + inspector.</h3><p>Board/table views, ownership, photo context, comments, and packet actions in one flow.</p></article>
+    <article><span>Meetings</span><h3>Packet queue.</h3><p>Pinned prospects, comparison context, decisions, trends, and discussion notes stay ready.</p></article>
+    <article><span>Operations</span><h3>Timeline layer.</h3><p>Events, touchpoints, goals, and chat live together without duplicating every action.</p></article>
+    <article><span>Team</span><h3>Capacity + accountability.</h3><p>Approvals, assignments, participation, same-state matching, and load signals stay visible.</p></article>
   </div>
 </section>
 
-<section class="bb-section bb-journey-section bb-home-flow bb-home-flow-v2 bb-reveal" data-delay="50">
-  <div class="bb-section-head bb-section-head-split">
+<section class="bb-section bb-journey-section bb-home-flow-v3 bb-reveal" data-delay="55">
+  <div class="bb-section-head bb-section-head-split-v3">
     <div>
       <p class="bb-kicker">Operating Flow</p>
       <h2>Capture signal once. Let it move everywhere.</h2>
     </div>
-    <p class="bb-page-subtitle">Click through the core flow: intake, score, coordinate, decide. Each step updates the same shared recruitment context.</p>
+    <p class="bb-page-subtitle">Click through the core loop. Each step updates the same shared recruitment context instead of creating a new side thread.</p>
   </div>
   <div class="bb-journey-layout">
     <div class="bb-journey-steps" id="bbJourneySteps">
-      <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true">
-        <span>01</span>
-        <div>
-          <h3>Capture</h3>
-          <p>Add a rushee quickly from mobile or desktop and put them into the live roster immediately.</p>
-        </div>
-      </button>
-      <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false">
-        <span>02</span>
-        <div>
-          <h3>Score</h3>
-          <p>Rate only the categories you know, add comments, and keep weighted totals current.</p>
-        </div>
-      </button>
-      <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false">
-        <span>03</span>
-        <div>
-          <h3>Coordinate</h3>
-          <p>Assign ownership, schedule the next touchpoint, and prevent promising PNMs from getting stuck.</p>
-        </div>
-      </button>
-      <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false">
-        <span>04</span>
-        <div>
-          <h3>Decide</h3>
-          <p>Open a packet with trend movement, lunch notes, owner context, and decision history already in place.</p>
-        </div>
-      </button>
+      <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true"><span>01</span><div><h3>Capture</h3><p>Add a rushee quickly from mobile or desktop and put them into the live roster immediately.</p></div></button>
+      <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false"><span>02</span><div><h3>Score</h3><p>Rate only the categories you know, add comments, and keep weighted totals current.</p></div></button>
+      <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false"><span>03</span><div><h3>Coordinate</h3><p>Assign ownership, schedule the next touchpoint, and prevent promising PNMs from getting stuck.</p></div></button>
+      <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false"><span>04</span><div><h3>Decide</h3><p>Open a packet with trend movement, lunch notes, owner context, and decision history already in place.</p></div></button>
     </div>
 
-    <aside class="bb-command-shell bb-phone-preview-v2" aria-live="polite">
-      <div class="bb-command-shell-top">
-        <div>
-          <p class="bb-command-shell-label">Product Preview</p>
-          <strong id="bbPhoneTitle">Event Intake</strong>
-        </div>
-        <span id="bbPhoneBadge">Live</span>
-      </div>
-      <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture">
-        <ul class="bb-phone-list" id="bbPhoneList">
-          <li>First Name: Mason</li>
-          <li>Last Name: Carter</li>
-          <li>Class Year: Sophomore</li>
-          <li>Instagram: @masoncarter</li>
-        </ul>
-      </div>
+    <aside class="bb-command-shell bb-phone-preview-v3" aria-live="polite">
+      <div class="bb-command-shell-top"><div><p class="bb-command-shell-label">Product Preview</p><strong id="bbPhoneTitle">Event Intake</strong></div><span id="bbPhoneBadge">Live</span></div>
+      <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture"><ul class="bb-phone-list" id="bbPhoneList"><li>First Name: Mason</li><li>Last Name: Carter</li><li>Class Year: Sophomore</li><li>Instagram: @masoncarter</li></ul></div>
       <div class="bb-phone-footer" id="bbPhoneFooter">Synced to chapter board in 1.2s</div>
     </aside>
   </div>
 </section>
 
-<section class="bb-section bb-live-section bb-home-signal bb-home-signal-v2 bb-reveal" data-delay="65">
-  <div class="bb-section-head bb-section-head-split">
+<section class="bb-section bb-home-signal-v3 bb-reveal" data-delay="65">
+  <div class="bb-section-head bb-section-head-split-v3">
     <div>
       <p class="bb-kicker">Decision Model</p>
       <h2>Make ranking movement easy to understand.</h2>
@@ -190,73 +129,42 @@
   <div class="bb-live-grid">
     <div class="bb-signal-panel" aria-label="Weighted scoring simulator">
       <div class="bb-signal-controls">
-        <label class="bb-signal-field" for="bbOfficerScore">
-          <span>Rush Officer Score</span>
-          <input id="bbOfficerScore" type="range" min="0" max="45" value="34" step="1" />
-        </label>
-        <label class="bb-signal-field" for="bbRusherScore">
-          <span>Member Score</span>
-          <input id="bbRusherScore" type="range" min="0" max="45" value="29" step="1" />
-        </label>
+        <label class="bb-signal-field" for="bbOfficerScore"><span>Rush Officer Score</span><input id="bbOfficerScore" type="range" min="0" max="45" value="34" step="1" /></label>
+        <label class="bb-signal-field" for="bbRusherScore"><span>Member Score</span><input id="bbRusherScore" type="range" min="0" max="45" value="29" step="1" /></label>
         <p class="bb-signal-weight-note">Weighted model: Officer <strong>0.6</strong> + Member <strong>0.4</strong></p>
       </div>
       <div class="bb-signal-output">
-        <div class="bb-signal-score">
-          <p>Weighted Candidate Score</p>
-          <strong id="bbSignalScore">32.0</strong>
-          <span id="bbSignalDelta" class="bb-signal-delta">+0.0 vs baseline</span>
-        </div>
-        <div class="bb-signal-bar" role="img" aria-label="Weighted score progress">
-          <div id="bbSignalBarFill"></div>
-        </div>
-        <div class="bb-signal-meta">
-          <span>Officer: <strong id="bbOfficerScoreValue">34</strong>/45</span>
-          <span>Member: <strong id="bbRusherScoreValue">29</strong>/45</span>
-        </div>
+        <div class="bb-signal-score"><p>Weighted Candidate Score</p><strong id="bbSignalScore">32.0</strong><span id="bbSignalDelta" class="bb-signal-delta">+0.0 vs baseline</span></div>
+        <div class="bb-signal-bar" role="img" aria-label="Weighted score progress"><div id="bbSignalBarFill"></div></div>
+        <div class="bb-signal-meta"><span>Officer: <strong id="bbOfficerScoreValue">34</strong>/45</span><span>Member: <strong id="bbRusherScoreValue">29</strong>/45</span></div>
       </div>
     </div>
 
-    <div class="bb-live-rail">
-      <article class="bb-rail-card bb-rail-card-featured">
-        <p class="bb-rail-label">Meeting clarity</p>
-        <h3>Less reconstruction. Better judgment.</h3>
-        <p>Ratings, comments, recent movement, touchpoints, package context, and ownership stay together so the room can discuss the candidate instead of chasing context.</p>
-      </article>
-      <article class="bb-rail-card bb-rail-card-list">
-        <p class="bb-rail-label">Signals that stay attached</p>
-        <ul class="bb-feature-list">
-          <li>Weighted score movement is visible immediately</li>
-          <li>Comments can be added without changing ratings</li>
-          <li>Mobile updates feed the same desktop command center</li>
-        </ul>
-      </article>
+    <div class="bb-signal-copy-v3">
+      <article><span>Meeting clarity</span><h3>Less reconstruction. Better judgment.</h3><p>Ratings, comments, recent movement, touchpoints, package context, and ownership stay together so the room can discuss the candidate instead of chasing context.</p></article>
+      <article><span>Signals that stay attached</span><ul class="bb-feature-list"><li>Weighted score movement is visible immediately</li><li>Comments can be added without changing ratings</li><li>Mobile updates feed the same desktop command center</li></ul></article>
     </div>
   </div>
 </section>
 
-<section class="bb-section bb-home-trust-v2 bb-reveal" data-delay="75">
-  <div class="bb-trust-v2-copy">
+<section class="bb-section bb-home-trust-v3 bb-reveal" data-delay="75">
+  <div class="bb-trust-v3-copy">
     <p class="bb-kicker">Built For Trust</p>
-    <h2>Private chapter workspaces with clear ownership, safer access, and data that survives turnover.</h2>
+    <h2>Private chapter workspaces with safer access and data that survives turnover.</h2>
   </div>
-  <div class="bb-trust-v2-grid">
+  <div class="bb-trust-v3-grid">
     <article><span>Private Workspace</span><strong>Chapter data stays isolated by organization.</strong></article>
     <article><span>Role-Aware Access</span><strong>Heads, officers, and members see the right surfaces.</strong></article>
     <article><span>Operational Continuity</span><strong>Backups, resets, and season tools reduce rush-week risk.</strong></article>
   </div>
 </section>
 
-<section class="bb-section bb-final-cta bb-home-final bb-home-final-v2 bb-reveal" data-delay="85">
+<section class="bb-section bb-final-cta bb-home-final-v3 bb-reveal" data-delay="85">
   <div>
     <p class="bb-kicker">Ready To Replace The Rush Spreadsheet?</p>
     <h2>Give your rush team a workspace built for live decisions.</h2>
-    <p class="bb-page-subtitle">
-      Start with the interactive demo, then open your organization workspace when you are ready to run recruitment from one connected system.
-    </p>
+    <p class="bb-page-subtitle">Start with the interactive demo, then open your organization workspace when you are ready to run recruitment from one connected system.</p>
   </div>
-  <div class="bb-hero-actions">
-    <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
-    <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
-  </div>
+  <div class="bb-hero-actions"><a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a><a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a></div>
 </section>
 {% endblock %}

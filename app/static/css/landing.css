@@ -2548,3 +2548,21 @@ body.bb-page-home-v4 .bb-reveal {
   align-content: start;
   min-height: 11rem;
 }
+
+/* Keep the compact packet card readable in the hero mockup. */
+.bb-mission-packet {
+  min-width: 0;
+}
+
+.bb-mission-packet p,
+.bb-mission-packet strong,
+.bb-mission-packet span {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.bb-mission-packet p {
+  font-size: 0.94rem;
+  line-height: 1.42;
+}

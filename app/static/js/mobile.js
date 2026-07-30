@@ -1174,6 +1174,9 @@ async function ensureSession() {
       window.location.href = BASE_PATH || "/";
       throw new Error("Not authenticated");
     }
+    document.querySelectorAll("[data-head-only-nav]").forEach((link) => {
+      link.classList.toggle("hidden", mobileCurrentUser.role !== ROLE_HEAD);
+    });
   } catch {
     window.location.href = BASE_PATH || "/";
     throw new Error("Not authenticated");
@@ -1361,12 +1364,6 @@ function renderMobileHomeSearchResults() {
               ${ratingTierBadgeMarkup(pnm.weighted_total)}
             </div>
           </button>
-          <div class="mobile-rushee-action-strip mobile-rushee-card-actions">
-            <button type="button" class="secondary" data-mobile-home-rate-pnm-id="${Number(pnm.pnm_id)}">Rate</button>
-            <button type="button" class="secondary" data-mobile-home-comment-pnm-id="${Number(pnm.pnm_id)}">Add Comment</button>
-            <button type="button" class="secondary" data-mobile-home-touchpoint-pnm-id="${Number(pnm.pnm_id)}">Schedule Touchpoint</button>
-            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Open Meeting Packet</a>
-          </div>
         </article>
       `;
     })
@@ -1401,12 +1398,6 @@ function renderMobileHomeRecentLunches() {
               ${ratingTierBadgeMarkup(row.weighted_total)}
             </div>
           </button>
-          <div class="mobile-rushee-action-strip mobile-rushee-card-actions">
-            <button type="button" class="secondary" data-mobile-home-rate-pnm-id="${Number(row.pnm_id)}">Rate</button>
-            <button type="button" class="secondary" data-mobile-home-comment-pnm-id="${Number(row.pnm_id)}">Add Comment</button>
-            <button type="button" class="secondary" data-mobile-home-touchpoint-pnm-id="${Number(row.pnm_id)}">Schedule Touchpoint</button>
-            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${row.pnm_id}`)}">Open Meeting Packet</a>
-          </div>
         </article>
       `;
     })

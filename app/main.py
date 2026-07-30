@@ -17196,6 +17196,9 @@ def workspace_command(
     assignments_payload = assignments_overview(include_completed=False, user=user)
     mine_payload = assignments_mine(include_completed=False, user=user)
     notifications_payload = notification_digest(period="daily", include_read=False, max_items=30, user=user)
+    notification_list_payload = list_notifications(limit=30, user=user)
+    notifications_payload["notifications"] = notification_list_payload["notifications"]
+    notifications_payload["unread_count"] = notification_list_payload["unread_count"]
     scheduled_payload = scheduled_lunches(request=request, limit=40, _=user)
     calendar_payload = rush_calendar(request=request, include_past=False, limit=80, _=user)
     pnms_payload = list_pnms(user=user)
@@ -17273,11 +17276,15 @@ def workspace_operations(
     request: Request,
     user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
+    notifications_payload = notification_digest(period="daily", include_read=True, max_items=60, user=user)
+    notification_list_payload = list_notifications(limit=60, user=user)
+    notifications_payload["notifications"] = notification_list_payload["notifications"]
+    notifications_payload["unread_count"] = notification_list_payload["unread_count"]
     return {
         "calendar": rush_calendar(request=request, include_past=False, limit=300, _=user),
         "scheduled_lunches": scheduled_lunches(request=request, limit=80, _=user),
         "goals": list_weekly_goals(include_archived=False, _=user),
-        "notifications": notification_digest(period="daily", include_read=True, max_items=60, user=user),
+        "notifications": notifications_payload,
         "chat": list_officer_chat_messages(limit=180, user=user),
         "chat_stats": officer_chat_stats(_=user),
         "calendar_share": calendar_share_payload(request, current_tenant()),

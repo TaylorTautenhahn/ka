@@ -1,6 +1,11 @@
-const CACHE_NAME = "kao-rush-shell-v5";
+const CACHE_NAME = "kao-rush-shell-v6";
 const APP_SHELL = [
   "/static/css/styles.css",
+  "/static/css/tokens.css",
+  "/static/css/layout.css",
+  "/static/css/components.css",
+  "/static/css/pages.css",
+  "/static/css/product.css",
   "/static/css/landing.css",
   "/static/js/app.js",
   "/static/js/pwa_shell.js",

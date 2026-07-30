@@ -1,25 +1,4 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'dashboard' %} is-active{% endif %}" data-page="dashboard">
-        {% if is_demo_mode or (app_config and app_config.is_demo_tenant) %}
-        <details class="panel reveal delay-2 demo-banner demo-guide-panel" open>
-          <summary class="demo-guide-summary">
-            <div>
-              <strong>Demo Quick Start</strong>
-              <span>Simple walkthrough for first-time viewers</span>
-            </div>
-            <span class="demo-guide-summary-action">Collapse</span>
-          </summary>
-          <div class="demo-guide-body">
-            <p class="muted">Use the real BidBoard flow with seeded sample data. Start in the rating queue, then move through rushees, operations, and meeting packets.</p>
-            <div class="action-row">
-              <a class="quick-nav-link" href="#commandCenterSection">Jump to Queue</a>
-              <a class="quick-nav-link" href="{{ app_config.desktop_routes.rushees if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/rushees') }}">Open Rushees</a>
-              <a class="quick-nav-link" href="{{ app_config.desktop_routes.calendar if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/calendar') }}">Open Operations</a>
-              <a class="quick-nav-link" href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}">Open Meetings</a>
-            </div>
-          </div>
-        </details>
-        {% endif %}
-
         <section class="panel reveal delay-2 command-summary-shell command-summary-shell-primary">
           <div class="section-head">
             <div>

@@ -2,131 +2,54 @@
 {% set nav_key = 'organizations' %}
 
 {% block title %}BidBoard | Organization Login{% endblock %}
-{% block description %}Choose your BidBoard organization workspace and open the recruitment command console.{% endblock %}
+{% block description %}Choose your BidBoard organization and open its private recruitment workspace.{% endblock %}
 {% block body_class %}bb-page-organizations{% endblock %}
 
 {% block page_content %}
-<section class="bb-page-hero bb-page-hero-org bb-reveal" data-delay="20">
-  <div class="bb-org-hero-layout">
-    <div class="bb-org-hero-copy">
+<section class="bb-org-entry-v2 bb-reveal" data-delay="20">
+  <header class="bb-org-entry-head-v2">
+    <div>
       <p class="bb-kicker">Organization Login</p>
-      <h1 class="bb-page-title">Choose your chapter workspace and continue into Command.</h1>
-      <p class="bb-page-subtitle">
-        Every organization gets isolated data, independent approvals, custom branding, and one connected Command workspace for touchpoints, meetings, and decisions.
-      </p>
-      <div class="bb-hero-actions">
-        <a class="bb-cta bb-cta-ghost" href="/">Back Home</a>
-        <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
-      </div>
+      <h1>Open your chapter workspace.</h1>
+      <p>Choose the organization tied to your approved account. Each workspace keeps its own people, ratings, meetings, and access.</p>
     </div>
-    <aside class="bb-org-hero-aside" aria-label="How organization access works">
-      <p class="bb-bento-label">How Access Works</p>
-      <div class="bb-org-hero-flow">
-        <article>
-          <strong>1. Choose Chapter</strong>
-          <span>Open the correct workspace without crossing organization data.</span>
-        </article>
-        <article>
-          <strong>2. Sign In</strong>
-          <span>Use approved officer access tied to that chapter only.</span>
-        </article>
-        <article>
-          <strong>3. Continue Into Command</strong>
-          <span>Keep Meetings, Team, and Admin in the same shared operating flow.</span>
-        </article>
-      </div>
-    </aside>
-  </div>
-  <div class="bb-org-hero-metrics" aria-hidden="true">
-    <article>
-      <strong>{{ tenants|length }}</strong>
-      <span>Configured chapter workspace{{ '' if tenants|length == 1 else 's' }}</span>
-    </article>
-    <article>
-      <strong>Private</strong>
-      <span>Every login path stays scoped to one organization</span>
-    </article>
-    <article>
-      <strong>Connected</strong>
-      <span>Command, Meetings, Team, and Admin use the same operating flow</span>
-    </article>
-  </div>
-</section>
+    <div class="bb-org-entry-actions-v2">
+      <a class="bb-link-inline" href="/">Home</a>
+      <a class="bb-link-inline" href="/demo">Try Demo</a>
+    </div>
+  </header>
 
-<section class="bb-section bb-org-directory-section bb-reveal" data-delay="35">
-  <div class="bb-section-head">
-    <p class="bb-kicker">Available Workspaces</p>
-  </div>
-  <div class="bb-org-search-row bb-org-search-shell">
-    <label class="bb-org-search-field">
-      <span>Search organizations</span>
-      <input id="bbOrgSearchInput" type="search" placeholder="Search by chapter name, display name, or slug" autocomplete="off" />
+  <div class="bb-org-search-shell-v2">
+    <label>
+      <span>Find your organization</span>
+      <input id="bbOrgSearchInput" type="search" placeholder="Search chapter or organization name" autocomplete="off" />
     </label>
-    <div class="bb-org-search-meta">
-      <p id="bbOrgSearchCount" class="bb-page-subtitle">Showing {{ tenants|length }} organization{{ '' if tenants|length == 1 else 's' }}.</p>
-      <div class="bb-org-search-pills" aria-hidden="true">
-        <span>Private workspace paths</span>
-        <span>One Command system</span>
-      </div>
-    </div>
+    <p id="bbOrgSearchCount">Showing {{ tenants|length }} organization{{ '' if tenants|length == 1 else 's' }}</p>
   </div>
-  <div class="bb-org-grid">
+
+  <div class="bb-org-grid-v2">
     {% for tenant in tenants %}
-    <article class="bb-org-card" data-org-search="{{ (tenant.display_name ~ ' ' ~ tenant.chapter_name ~ ' ' ~ tenant.slug ~ ' ' ~ tenant.org_type)|lower }}">
-      <a class="bb-org-card-main" href="/{{ tenant.slug }}" aria-label="Open {{ tenant.display_name }} dashboard">
-        <div class="bb-org-card-top">
-          {% if tenant.logo_path %}
-          <img src="{{ tenant.logo_path }}" alt="{{ tenant.display_name }} logo" class="bb-org-logo" />
-          {% else %}
-          <div class="bb-org-logo bb-org-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</div>
-          {% endif %}
-          <div>
-            <strong>{{ tenant.display_name }}</strong>
-            <p>{{ tenant.chapter_name }}</p>
-          </div>
-        </div>
-        <div class="bb-org-card-status" aria-hidden="true">
-          <span>Private workspace</span>
-          <span>Command + Meetings</span>
-        </div>
-        <div class="bb-chip-row bb-chip-row-org">
-          <span>{{ tenant.org_type }}</span>
-          <span>/{{ tenant.slug }}</span>
-        </div>
-      </a>
-      <div class="bb-org-card-actions">
-        <a class="bb-cta bb-cta-ghost" href="/{{ tenant.slug }}">Open Chapter Login</a>
-      </div>
-    </article>
+    <a class="bb-org-card bb-org-card-v2" href="/{{ tenant.slug }}" data-org-search="{{ (tenant.display_name ~ ' ' ~ tenant.chapter_name ~ ' ' ~ tenant.slug ~ ' ' ~ tenant.org_type)|lower }}">
+      {% if tenant.logo_path %}
+      <img src="{{ tenant.logo_path }}" alt="" class="bb-org-logo" />
+      {% else %}
+      <span class="bb-org-logo bb-org-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</span>
+      {% endif %}
+      <span class="bb-org-card-copy-v2">
+        <strong>{{ tenant.display_name }}</strong>
+        <small>{{ tenant.chapter_name }} · {{ tenant.org_type }}</small>
+      </span>
+      <span class="bb-org-card-open-v2" aria-hidden="true">Open</span>
+    </a>
     {% endfor %}
 
     {% if not tenants %}
-    <article class="bb-org-card bb-org-card-empty">
-      <p class="bb-bento-label">No Organizations Configured</p>
-      <h3>Create your first workspace in Platform Admin.</h3>
-      <p>Set up the organization, upload the logo, and return here to open its dedicated console.</p>
-      <div class="bb-org-card-actions">
-        <a class="bb-cta bb-cta-strong" href="/platform">Open Platform Admin</a>
-      </div>
+    <article class="bb-org-empty-v2">
+      <p class="bb-kicker">No Organizations Configured</p>
+      <h2>Create the first chapter workspace in Platform Admin.</h2>
+      <a class="bb-cta bb-cta-strong" href="/platform">Open Platform Admin</a>
     </article>
     {% endif %}
-  </div>
-</section>
-
-<section class="bb-section bb-section-org-proof bb-reveal" data-delay="28">
-  <div class="bb-trust-card-row bb-org-entry-strip">
-    <article class="bb-bento-card">
-      <p class="bb-bento-label">Private Workspace</p>
-      <h3>Each chapter gets its own isolated data, branding, and approvals.</h3>
-    </article>
-    <article class="bb-bento-card">
-      <p class="bb-bento-label">One Operating Flow</p>
-      <h3>Organization selection, chapter login, Command, Meetings, and Admin all follow the same BidBoard system.</h3>
-    </article>
-    <article class="bb-bento-card">
-      <p class="bb-bento-label">Rush-Ready</p>
-      <h3>Open the workspace you need and continue straight into live recruiting operations.</h3>
-    </article>
   </div>
 </section>
 {% endblock %}

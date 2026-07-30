@@ -17,8 +17,9 @@
     <link rel="stylesheet" href="/static/css/layout.css" />
     <link rel="stylesheet" href="/static/css/components.css" />
     <link rel="stylesheet" href="/static/css/pages.css" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/app.js" defer></script>
+    <script src="/static/js/app.js?v=20260730" defer></script>
   </head>
   <body class="desktop-backend-body{% if initial_authenticated %} desktop-product-auth{% endif %}"{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
@@ -109,11 +110,11 @@
             <form id="loginForm" class="stack">
               <label>
                 Username
-                <input id="loginUsername" type="text" required placeholder="Your approved username" autocomplete="username" />
+                <input id="loginUsername" name="username" type="text" required placeholder="Your approved username" autocomplete="username" />
               </label>
               <label>
                 Password
-                <input id="loginAccessCode" type="password" required placeholder="Enter password" autocomplete="current-password" />
+                <input id="loginAccessCode" name="password" type="password" required placeholder="Enter password" autocomplete="current-password" />
               </label>
               <label class="checkbox-line">
                 <input id="loginRememberMe" type="checkbox" />
@@ -145,7 +146,7 @@
             <form id="registerForm" class="stack">
               <label>
                 Username
-                <input id="regUsername" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" autocomplete="username" />
+                <input id="regUsername" name="username" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" autocomplete="username" />
               </label>
               <label>
                 Emoji (optional)
@@ -153,7 +154,7 @@
               </label>
               <label>
                 Password
-                <input id="regAccessCode" type="password" required placeholder="At least 8 characters with letters and numbers" autocomplete="new-password" />
+                <input id="regAccessCode" name="password" type="password" required placeholder="At least 8 characters with letters and numbers" autocomplete="new-password" />
               </label>
               <div class="inline-grid two-cols">
                 <label>
@@ -312,18 +313,18 @@
                   </div>
                 </details>
                 <details id="appHelpMenu" class="app-menu">
-                  <summary class="secondary">Help</summary>
+                  <summary class="secondary">Account</summary>
                   <div class="app-menu-card">
                     <button type="button" class="app-menu-item" data-command-action="edit_profile">Edit My Profile</button>
                     <button id="openTutorialBtn" type="button" class="app-menu-item hidden">Open Tutorial</button>
                     <button id="installBtn" type="button" class="app-menu-item hidden">Install App</button>
+                    <button id="logoutBtn" type="button" class="app-menu-item">Logout</button>
                   </div>
                 </details>
                 <button id="appNotificationsBtn" type="button" class="secondary app-notification-btn">
                   Notifications
                   <span id="appNotificationsBadge" class="nav-badge hidden">0</span>
                 </button>
-                <button id="logoutBtn" type="button" class="secondary">Logout</button>
               </div>
             </header>
 
@@ -334,7 +335,7 @@
                   <input id="globalSearchInput" type="search" placeholder="Search rushees, team, commands" autocomplete="off" />
                 </label>
               </div>
-              <p class="muted app-toolbar-hint">Use search to jump to rushees, team members, packets, or the commands you need next.</p>
+              <p class="muted app-toolbar-hint" aria-label="Command palette keyboard shortcut">⌘ K</p>
             </section>
 
             <div class="desktop-pages app-workspace-pages">

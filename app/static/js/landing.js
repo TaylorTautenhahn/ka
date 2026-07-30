@@ -40,16 +40,12 @@
     const normalized = theme === "light" ? "light" : "dark";
     doc.setAttribute("data-theme", normalized);
     if (themeMeta) {
-      themeMeta.setAttribute("content", normalized === "light" ? "#eef4ff" : "#090b14");
+      const usesWarmBrand = body.classList.contains("bb-page");
+      themeMeta.setAttribute("content", usesWarmBrand ? "#15120e" : normalized === "light" ? "#eef4ff" : "#090b14");
     }
   }
 
-  const storedTheme = window.localStorage ? window.localStorage.getItem(THEME_KEY) : null;
-  if (storedTheme === "light" || storedTheme === "dark") {
-    applyTheme(storedTheme);
-  } else {
-    applyTheme("dark");
-  }
+  applyTheme("dark");
 
   if (themeToggle) {
     themeToggle.addEventListener("click", () => {
@@ -318,47 +314,47 @@
     function networkPalette() {
       if (isLightTheme()) {
         return {
-          gridLine: "rgba(73, 111, 180, 0.16)",
-          dustRgba: (alpha) => `rgba(82, 121, 192, ${alpha.toFixed(3)})`,
-          labelText: "rgba(18, 44, 88, 0.98)",
-          labelBg: "rgba(255, 255, 255, 0.95)",
-          labelBorder: "rgba(89, 136, 214, 0.58)",
-          labelShadow: "rgba(44, 91, 173, 0.22)",
-          connectionStart: (alpha) => `rgba(19, 174, 131, ${alpha.toFixed(3)})`,
-          connectionMid: (alpha) => `rgba(53, 121, 220, ${alpha.toFixed(3)})`,
-          connectionEnd: (alpha) => `rgba(23, 150, 255, ${alpha.toFixed(3)})`,
-          connectionShadowActive: "rgba(66, 131, 228, 0.58)",
-          connectionShadowIdle: "rgba(86, 122, 186, 0.2)",
-          pulseFill: "rgba(255, 255, 255, 0.98)",
-          pulseShadow: "rgba(82, 132, 214, 0.78)",
-          rusheeNode: "rgba(18, 184, 137, 0.95)",
-          interestNode: "rgba(45, 107, 212, 0.97)",
-          officerNode: "rgba(16, 120, 232, 0.96)",
-          memberNode: "rgba(13, 179, 133, 0.94)",
-          fallbackNode: "rgba(86, 126, 201, 0.9)",
-          pointerNode: "rgba(33, 92, 181, 0.94)",
+          gridLine: "rgba(155, 125, 84, 0.16)",
+          dustRgba: (alpha) => `rgba(205, 168, 112, ${alpha.toFixed(3)})`,
+          labelText: "rgba(41, 28, 15, 0.98)",
+          labelBg: "rgba(255, 248, 236, 0.95)",
+          labelBorder: "rgba(207, 158, 86, 0.58)",
+          labelShadow: "rgba(135, 84, 28, 0.2)",
+          connectionStart: (alpha) => `rgba(219, 169, 91, ${alpha.toFixed(3)})`,
+          connectionMid: (alpha) => `rgba(238, 215, 172, ${alpha.toFixed(3)})`,
+          connectionEnd: (alpha) => `rgba(146, 178, 129, ${alpha.toFixed(3)})`,
+          connectionShadowActive: "rgba(230, 186, 114, 0.56)",
+          connectionShadowIdle: "rgba(156, 124, 80, 0.24)",
+          pulseFill: "rgba(255, 246, 232, 0.98)",
+          pulseShadow: "rgba(230, 186, 114, 0.72)",
+          rusheeNode: "rgba(230, 186, 114, 0.95)",
+          interestNode: "rgba(159, 187, 143, 0.96)",
+          officerNode: "rgba(205, 130, 64, 0.96)",
+          memberNode: "rgba(216, 200, 148, 0.94)",
+          fallbackNode: "rgba(181, 145, 96, 0.9)",
+          pointerNode: "rgba(255, 236, 196, 0.94)",
         };
       }
       return {
-        gridLine: "rgba(94, 132, 194, 0.08)",
-        dustRgba: (alpha) => `rgba(154, 188, 243, ${alpha.toFixed(3)})`,
-        labelText: "rgba(223, 236, 255, 0.94)",
-        labelBg: "rgba(15, 27, 48, 0.78)",
-        labelBorder: "rgba(123, 171, 247, 0.36)",
-        labelShadow: "rgba(117, 166, 244, 0.2)",
-        connectionStart: (alpha) => `rgba(69, 230, 184, ${alpha.toFixed(3)})`,
-        connectionMid: (alpha) => `rgba(184, 214, 255, ${alpha.toFixed(3)})`,
-        connectionEnd: (alpha) => `rgba(116, 255, 191, ${alpha.toFixed(3)})`,
-        connectionShadowActive: "rgba(72, 190, 255, 0.66)",
-        connectionShadowIdle: "rgba(122, 167, 236, 0.24)",
-        pulseFill: "rgba(213, 233, 255, 0.95)",
-        pulseShadow: "rgba(125, 185, 255, 0.76)",
-        rusheeNode: "rgba(69, 230, 184, 0.95)",
-        interestNode: "rgba(195, 240, 255, 0.95)",
-        officerNode: "rgba(53, 203, 255, 0.95)",
-        memberNode: "rgba(116, 255, 191, 0.94)",
-        fallbackNode: "rgba(153, 183, 238, 0.9)",
-        pointerNode: "rgba(214, 230, 255, 0.94)",
+        gridLine: "rgba(175, 138, 91, 0.09)",
+        dustRgba: (alpha) => `rgba(218, 182, 126, ${alpha.toFixed(3)})`,
+        labelText: "rgba(255, 246, 232, 0.94)",
+        labelBg: "rgba(30, 22, 14, 0.8)",
+        labelBorder: "rgba(230, 186, 114, 0.36)",
+        labelShadow: "rgba(230, 186, 114, 0.18)",
+        connectionStart: (alpha) => `rgba(230, 186, 114, ${alpha.toFixed(3)})`,
+        connectionMid: (alpha) => `rgba(255, 236, 196, ${alpha.toFixed(3)})`,
+        connectionEnd: (alpha) => `rgba(159, 187, 143, ${alpha.toFixed(3)})`,
+        connectionShadowActive: "rgba(230, 186, 114, 0.62)",
+        connectionShadowIdle: "rgba(168, 130, 82, 0.25)",
+        pulseFill: "rgba(255, 246, 232, 0.96)",
+        pulseShadow: "rgba(230, 186, 114, 0.74)",
+        rusheeNode: "rgba(230, 186, 114, 0.95)",
+        interestNode: "rgba(255, 236, 196, 0.95)",
+        officerNode: "rgba(205, 130, 64, 0.95)",
+        memberNode: "rgba(159, 187, 143, 0.94)",
+        fallbackNode: "rgba(181, 145, 96, 0.9)",
+        pointerNode: "rgba(255, 236, 196, 0.94)",
       };
     }
 
@@ -715,13 +711,13 @@
 
       if (change > 0) {
         delta.textContent = `+${change.toFixed(1)} vs baseline`;
-        delta.style.color = "#6de9bd";
+        delta.style.color = "#a9c397";
       } else if (change < 0) {
         delta.textContent = `${change.toFixed(1)} vs baseline`;
-        delta.style.color = "#ff98bc";
+        delta.style.color = "#e59b73";
       } else {
         delta.textContent = "+0.0 vs baseline";
-        delta.style.color = "#92b6e8";
+        delta.style.color = "#dec894";
       }
     }
 

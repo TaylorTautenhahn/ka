@@ -12,8 +12,9 @@
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/mobile.js" defer></script>
+    <script src="/static/js/mobile.js?v=20260730" defer></script>
   </head>
   <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="admin">
     <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
@@ -32,6 +33,9 @@
             <strong>BidBoard</strong>
           </div>
         </a>
+        <div class="mobile-appbar-actions">
+          <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-appbar-link">Team</a>
+        </div>
       </div>
       <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
@@ -89,9 +93,9 @@
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
       <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Command</a>
       <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
+      <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
       <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
       <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
-      <a href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-tab is-active">Admin</a>
     </nav>
 
     <div id="mobileToast" class="toast hidden"></div>

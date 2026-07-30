@@ -16,8 +16,9 @@
     <link rel="stylesheet" href="/static/css/layout.css" />
     <link rel="stylesheet" href="/static/css/components.css" />
     <link rel="stylesheet" href="/static/css/pages.css" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/meeting.js" defer></script>
+    <script src="/static/js/meeting.js?v=20260730" defer></script>
   </head>
   <body class="desktop-backend-body desktop-product-auth meeting-route-body meeting-packet-page" data-app-config='{{ app_config | tojson | forceescape }}'>
     <div class="aura aura-one"></div>
@@ -53,11 +54,6 @@
                   <p class="muted">Discussion-ready packet detail inside Meetings.</p>
                 </div>
               </div>
-              <div class="app-sidebar-meta">
-                <span>Packet Detail</span>
-                <span>Touchpoint History</span>
-                <span>PDF Export</span>
-              </div>
             </div>
 
             <nav class="app-nav" aria-label="Packet navigation">
@@ -76,11 +72,6 @@
                 <p class="eyebrow">Meetings</p>
                 <h2>Meeting Packet</h2>
                 <p class="muted">A packet drill-down inside Meetings with trend-backed review, touchpoint context, and PDF export.</p>
-                <div class="app-topbar-pills">
-                  <span>Trend-backed review</span>
-                  <span>Comment timeline</span>
-                  <span>Shortlist aware</span>
-                </div>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
@@ -101,13 +92,7 @@
                 </label>
               </div>
               <div class="action-row app-toolbar-actions">
-                <div class="app-toolbar-status" aria-hidden="true">
-                  <span>Live pin state</span>
-                  <span>Touchpoint context</span>
-                  <span>Ready for export</span>
-                </div>
                 <button id="meetingLoadBtn" type="button">Load Packet</button>
-                <a href="{{ app_config.desktop_routes.meetings if app_config and app_config.desktop_routes else ((app_config.base_path if app_config else '') ~ '/meetings') }}" class="quick-nav-link">Back to Meetings Queue</a>
               </div>
             </section>
 

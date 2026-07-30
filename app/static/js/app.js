@@ -6239,12 +6239,11 @@ async function ensureSession() {
       return;
     }
     state.user = payload.user;
-    const onboarding = state.user && state.user.onboarding ? state.user.onboarding : null;
     if (shouldRedirectToMemberPortal(state.user)) {
       window.location.replace(APP_CONFIG.member_base);
       return;
     }
-    if (shouldRedirectToMobileNow() && !(onboarding && onboarding.required)) {
+    if (shouldRedirectToMobileNow()) {
       window.location.replace(APP_CONFIG.mobile_base);
       return;
     }
@@ -6283,14 +6282,12 @@ async function handleLogin(event) {
         remember_me: rememberMe,
       },
     });
-    const onboarding = payload.user && payload.user.onboarding ? payload.user.onboarding : null;
-
     if (shouldRedirectToMemberPortal(payload.user)) {
       window.location.href = APP_CONFIG.member_base;
       return;
     }
 
-    if (APP_CONFIG.mobile_base && shouldPreferMobileUi() && !(onboarding && onboarding.required)) {
+    if (APP_CONFIG.mobile_base && shouldPreferMobileUi()) {
       window.location.href = APP_CONFIG.mobile_base;
       return;
     }
@@ -9186,6 +9183,7 @@ function attachEvents() {
       if (!link) {
         return;
       }
+      event.preventDefault();
       navigateDesktopPage((link.dataset.page || DEFAULT_DESKTOP_PAGE).toLowerCase());
     });
   }

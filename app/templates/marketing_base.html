@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#07111d" />
+    <meta name="theme-color" content="#15120e" />
     <title>{% block title %}BidBoard{% endblock %}</title>
     <meta name="description" content="{% block description %}BidBoard is the recruitment command layer for fraternities and sororities.{% endblock %}" />
-    <link rel="stylesheet" href="/static/css/landing.css" />
+    <link rel="stylesheet" href="/static/css/landing.css?v=20260730" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/landing.js" defer></script>
+    <script src="/static/js/landing.js?v=20260730" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   {% set marketing_tenant_count = tenant_count if tenant_count is defined else (tenants|length if tenants is defined else 0) %}
@@ -40,11 +40,6 @@
         </nav>
 
         <div class="bb-topbar-utilities">
-          <span class="bb-topbar-pill">Live workspace ready</span>
-          <button class="bb-theme-toggle" id="bbThemeToggle" type="button" aria-label="Toggle dark and light mode">
-            <span class="bb-theme-toggle-sun" aria-hidden="true">☀</span>
-            <span class="bb-theme-toggle-moon" aria-hidden="true">◐</span>
-          </button>
           <a class="bb-login-btn{% if nav_key == 'organizations' %} is-active{% endif %}" href="/organizations">Organization Login</a>
         </div>
       </header>
@@ -63,20 +58,7 @@
           <p>
             Built for fraternities and sororities that need faster scoring, cleaner coordination, and meeting-ready decisions without spreadsheet drift.
           </p>
-          <div class="bb-footer-stats">
-            <article>
-              <strong data-count="{{ marketing_tenant_count }}">{{ marketing_tenant_count }}</strong>
-              <span>Organizations Configured</span>
-            </article>
-            <article>
-              <strong data-count="4">4</strong>
-              <span>Operational Pillars</span>
-            </article>
-            <article>
-              <strong data-count="1">1</strong>
-              <span>Connected System</span>
-            </article>
-          </div>
+          <p class="bb-footer-trust">Private by organization. Role-aware by default. Built for the pace of recruitment week.</p>
         </div>
 
         <div class="bb-footer-links">

@@ -12,10 +12,11 @@
     <link rel="manifest" href="{{ app_config.base_path if app_config else '' }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
     <script src="/static/js/pwa_shell.js" defer></script>
     <script src="/static/js/member_portal.js" defer></script>
   </head>
-  <body{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
+  <body class="member-portal-body"{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
     <div class="aura aura-two"></div>
     <div class="noise"></div>

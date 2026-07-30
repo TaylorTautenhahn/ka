@@ -2,137 +2,167 @@
 {% set nav_key = 'home' %}
 
 {% block title %}BidBoard | Recruitment Intelligence{% endblock %}
-{% block description %}BidBoard is the recruitment command layer for fraternities and sororities that need faster, more accountable decisions.{% endblock %}
-{% block body_class %}bb-page-home bb-page-home-redesign bb-page-home-v4{% endblock %}
+{% block description %}BidBoard keeps fraternity and sorority rush teams aligned from first contact through the final meeting.{% endblock %}
+{% block body_class %}bb-page-home bb-page-home-v5{% endblock %}
 
 {% block page_content %}
-<section class="bb-home-hero-v4 bb-reveal" data-delay="20">
-  <div class="bb-hero-copy bb-home-hero-copy-v4">
-    <div class="bb-hero-badge-row">
-      <span class="bb-signal-tag">Recruitment Intelligence</span>
-      <span class="bb-signal-tag bb-signal-tag-muted">For live rush operations</span>
-    </div>
-    <p class="bb-kicker">BidBoard Command</p>
-    <h1 class="bb-hero-title">Run rush from one live board.</h1>
-    <p class="bb-subtitle">
-      BidBoard gives fraternities and sororities a live command layer for scoring, ownership, touchpoints, packets, and meeting context while recruitment is still moving.
+<section class="bb-home-hero-v5 bb-reveal" data-delay="20">
+  <div class="bb-home-hero-copy-v5">
+    <p class="bb-kicker">Recruitment Operations, Without The Sprawl</p>
+    <h1>Rush moves fast. Keep the whole story intact.</h1>
+    <p class="bb-home-lede-v5">
+      One working surface for the roster, ratings, comments, ownership, touchpoints, and meeting decisions. Your team sees what changed and what needs action next.
     </p>
     <div class="bb-home-action-deck" aria-label="Primary actions">
-      <a class="bb-cta bb-cta-strong" href="/demo">Try Interactive Demo</a>
-      <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+      <a class="bb-cta bb-cta-strong" href="/demo">Explore The Live Demo</a>
+      <a class="bb-cta bb-cta-ghost" href="/organizations">Open Your Chapter</a>
     </div>
-    <div class="bb-home-quiet-proof" aria-label="BidBoard operating proof points">
-      <span><strong>{{ tenant_count }}</strong> organizations configured</span>
-      <span><strong>1</strong> connected recruitment system</span>
-      <span><strong>4</strong> rush workflows unified</span>
+    <div class="bb-home-proof-v5" aria-label="BidBoard product summary">
+      <span><strong>{{ tenant_count }}</strong> chapter workspace{{ '' if tenant_count == 1 else 's' }}</span>
+      <span>Role-aware access</span>
+      <span>Meeting-ready history</span>
     </div>
   </div>
 
-  <div class="bb-mission-control-v4" aria-label="BidBoard mission control preview">
-    <div class="bb-mission-topline">
-      <div><span>Live Board</span><strong>Command center</strong></div>
-      <em>Synced</em>
+  <div class="bb-live-board-v5" aria-label="BidBoard live command preview">
+    <div class="bb-live-board-top-v5">
+      <div>
+        <span>Tuesday, 8:42 PM</span>
+        <strong>Rush Command</strong>
+      </div>
+      <em><i></i> Live</em>
     </div>
-    <div class="bb-mission-grid-v4">
-      <section class="bb-mission-queue">
-        <span>Priority Queue</span>
-        <article><b>MC</b><div><strong>Mason Carter</strong><small>Behind touchpoint</small></div><em>32.0</em></article>
-        <article><b>JP</b><div><strong>James Parker</strong><small>Meeting-ready</small></div><em>29.5</em></article>
-        <article><b>BW</b><div><strong>Ben Walker</strong><small>Needs comment</small></div><em>27.0</em></article>
+    <div class="bb-live-board-body-v5">
+      <section class="bb-live-queue-v5">
+        <header><span>My Queue</span><small>3 need action</small></header>
+        <article class="is-active">
+          <b>MC</b>
+          <div><strong>Mason Carter</strong><small>Touchpoint logged, score stale</small></div>
+          <span>32.0</span>
+        </article>
+        <article>
+          <b>JP</b>
+          <div><strong>James Parker</strong><small>Packet ready for review</small></div>
+          <span>29.5</span>
+        </article>
+        <article>
+          <b>BW</b>
+          <div><strong>Ben Walker</strong><small>Owner needed</small></div>
+          <span>27.0</span>
+        </article>
       </section>
-      <section class="bb-mission-lattice">
-        <div class="bb-panel-label-row"><span id="bbNetworkInterest">Interest Signal: Leadership</span><strong id="bbNetworkMatch">Matched Rush Officer: Jack M.</strong></div>
-        <canvas id="bbNetworkCanvas" class="bb-network-canvas" width="920" height="540" aria-hidden="true"></canvas>
-      </section>
-      <section class="bb-mission-packet">
-        <span>Meeting Packet</span>
-        <strong>Ready</strong>
-        <p>Notes, ratings, owners, and deltas stay attached.</p>
+
+      <section class="bb-live-profile-v5">
+        <div class="bb-live-profile-head-v5">
+          <div class="bb-live-avatar-v5">MC</div>
+          <div>
+            <span>Selected Rushee</span>
+            <strong>Mason Carter</strong>
+            <small>Austin, Texas · @masoncarter</small>
+          </div>
+          <em>B Tier</em>
+        </div>
+        <div class="bb-live-signal-v5">
+          <article><span>Weighted score</span><strong>32.0</strong><small>+3.2 this week</small></article>
+          <article><span>Touchpoints</span><strong>4</strong><small>Last: today</small></article>
+          <article><span>Owner</span><strong>Jack M.</strong><small>Available</small></article>
+        </div>
+        <div class="bb-live-note-v5">
+          <span>Latest context</span>
+          <p>Strong conversation at dinner. Follow up on leadership interest before Thursday.</p>
+        </div>
+        <div class="bb-live-actions-v5">
+          <button type="button">Rate</button>
+          <button type="button">Add Comment</button>
+          <button type="button">Schedule</button>
+          <button type="button">Open Packet</button>
+        </div>
       </section>
     </div>
   </div>
 </section>
 
-<section class="bb-editorial-break-v4 bb-reveal" data-delay="35">
-  <div>
-    <p class="bb-kicker">The Real Problem</p>
-    <h2>Rush week creates signal faster than teams can organize it.</h2>
+<section class="bb-operating-rail-v5 bb-reveal" data-delay="35" aria-label="BidBoard operating flow">
+  <article><span>01</span><div><strong>Capture</strong><p>Add the person and the context while it is fresh.</p></div></article>
+  <article><span>02</span><div><strong>Coordinate</strong><p>Make ownership and the next touchpoint obvious.</p></div></article>
+  <article><span>03</span><div><strong>Decide</strong><p>Bring current signal into the room, not scattered memory.</p></div></article>
+  <article><span>04</span><div><strong>Preserve</strong><p>Keep the season usable for the next leadership team.</p></div></article>
+</section>
+
+<section class="bb-workspace-story-v5 bb-reveal" data-delay="45">
+  <div class="bb-workspace-copy-v5">
+    <p class="bb-kicker">A Clear Home For Every Job</p>
+    <h2>Less hunting. Fewer repeated controls. Faster handoffs.</h2>
+    <p>Each workspace owns one part of the operating flow. The same rushee record moves with the team, so updates never need to be reconstructed.</p>
+    <a class="bb-link-inline" href="/features">See the complete product</a>
   </div>
-  <div class="bb-break-list-v4">
-    <article><span>01</span><p>Ratings get submitted, but the reason behind the movement disappears into memory.</p></article>
-    <article><span>02</span><p>Ownership is obvious in the group chat until everyone is busy and follow-up slips.</p></article>
-    <article><span>03</span><p>Meetings start with people reconstructing context instead of making decisions.</p></article>
+  <div class="bb-workspace-grid-v5">
+    <article class="is-featured">
+      <span>Command</span>
+      <strong>Start with the work that needs you.</strong>
+      <p>Personal queue, exceptions, recent decisions, and weekly team momentum.</p>
+      <div class="bb-mini-queue-v5"><i></i><i></i><i></i></div>
+    </article>
+    <article><span>Rushees</span><strong>Roster and detail</strong><p>Search, edit, assign, comment, and keep profile context clean.</p></article>
+    <article><span>Meetings</span><strong>Decision room</strong><p>Shortlist, compare, packet history, and recent deltas.</p></article>
+    <article><span>Operations</span><strong>Shared timeline</strong><p>Events, touchpoints, goals, and officer coordination.</p></article>
+    <article><span>Team</span><strong>Visible ownership</strong><p>Approvals, load, assignments, and participation.</p></article>
   </div>
 </section>
 
-<section class="bb-workspace-atlas-v4 bb-reveal" data-delay="45">
-  <div class="bb-atlas-copy-v4">
-    <p class="bb-kicker">Workspace Atlas</p>
-    <h2>One operating rhythm across every role.</h2>
-    <p>BidBoard is not a dashboard pile. Each workspace has a specific job, and the same rushee context moves through all of them.</p>
-  </div>
-  <div class="bb-atlas-map-v4" aria-label="BidBoard workspace map">
-    <article class="is-command"><span>Command</span><strong>Start with what needs action.</strong><p>Queues, attention signals, quick rating, and recent decision movement.</p></article>
-    <article><span>Rushees</span><strong>Roster and detail.</strong><p>Profiles, ownership, comments, photos, and packet actions.</p></article>
-    <article><span>Meetings</span><strong>Decision room.</strong><p>Packets, pinned prospects, deltas, notes, and package context.</p></article>
-    <article><span>Operations</span><strong>Timeline.</strong><p>Events, touchpoints, goals, and officer coordination.</p></article>
-    <article><span>Team</span><strong>Accountability.</strong><p>Approvals, load, assignments, and participation pressure.</p></article>
-  </div>
-</section>
-
-<section class="bb-flow-lab-v4 bb-reveal" data-delay="55">
-  <div class="bb-section-head bb-section-head-split-v4">
+<section class="bb-flow-lab-v5 bb-reveal" data-delay="55">
+  <div class="bb-section-head bb-section-head-v5">
     <div>
-      <p class="bb-kicker">Live Flow</p>
-      <h2>Capture once. Move everywhere.</h2>
+      <p class="bb-kicker">One Record, All The Way Through</p>
+      <h2>See how a rushee moves from first contact to chapter discussion.</h2>
     </div>
-    <p class="bb-page-subtitle">Click the steps to see how intake, scoring, coordination, and packet prep stay connected instead of becoming four separate tools.</p>
+    <p>Choose a step. The preview shows the exact context the next person receives.</p>
   </div>
   <div class="bb-journey-layout">
     <div class="bb-journey-steps" id="bbJourneySteps">
-      <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true"><span>01</span><div><h3>Capture</h3><p>Add a rushee from the event floor and put them into the live roster immediately.</p></div></button>
-      <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false"><span>02</span><div><h3>Score</h3><p>Rate what you know, skip what you do not, and preserve comments without forcing a score.</p></div></button>
-      <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false"><span>03</span><div><h3>Coordinate</h3><p>Assign ownership, schedule the next touchpoint, and keep follow-up visible.</p></div></button>
-      <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false"><span>04</span><div><h3>Decide</h3><p>Open the packet with trend movement, notes, owner context, and history already in place.</p></div></button>
+      <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true"><span>01</span><div><h3>Capture</h3><p>Add a rushee on the event floor and make the record immediately visible.</p></div></button>
+      <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false"><span>02</span><div><h3>Score</h3><p>Rate only what you know, or leave a comment without changing the score.</p></div></button>
+      <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false"><span>03</span><div><h3>Coordinate</h3><p>Assign an owner and put the next touchpoint on the shared timeline.</p></div></button>
+      <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false"><span>04</span><div><h3>Decide</h3><p>Open a complete packet with history, comments, ownership, and movement.</p></div></button>
     </div>
-    <aside class="bb-command-shell bb-phone-preview-v4" aria-live="polite">
-      <div class="bb-command-shell-top"><div><p class="bb-command-shell-label">Product Preview</p><strong id="bbPhoneTitle">Event Intake</strong></div><span id="bbPhoneBadge">Live</span></div>
-      <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture"><ul class="bb-phone-list" id="bbPhoneList"><li>First Name: Mason</li><li>Last Name: Carter</li><li>Class Year: Sophomore</li><li>Instagram: @masoncarter</li></ul></div>
-      <div class="bb-phone-footer" id="bbPhoneFooter">Synced to chapter board in 1.2s</div>
+    <aside class="bb-command-shell bb-flow-preview-v5" aria-live="polite">
+      <div class="bb-command-shell-top">
+        <div><p class="bb-command-shell-label">Current Context</p><strong id="bbPhoneTitle">Capture Queue</strong></div>
+        <span id="bbPhoneBadge">Live</span>
+      </div>
+      <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture">
+        <ul class="bb-phone-list" id="bbPhoneList">
+          <li>Rushee: Mason Carter</li>
+          <li>Source: Brotherhood event</li>
+          <li>Profile sync: 1.2s</li>
+          <li>Owner requested: Jack M.</li>
+        </ul>
+      </div>
+      <div class="bb-phone-footer" id="bbPhoneFooter">Profile is visible to the team immediately after first contact.</div>
     </aside>
   </div>
 </section>
 
-<section class="bb-score-room-v4 bb-reveal" data-delay="65">
-  <div class="bb-score-copy-v4">
-    <p class="bb-kicker">Decision Model</p>
-    <h2>Make the room smarter without pretending the score is the whole story.</h2>
-    <p>Weighted totals show movement. Comments, touchpoints, and owner context explain why the movement matters.</p>
+<section class="bb-trust-story-v5 bb-reveal" data-delay="65">
+  <div>
+    <p class="bb-kicker">Built For Real Chapter Operations</p>
+    <h2>Private by chapter. Clear by role. Useful after leadership changes.</h2>
   </div>
-  <div class="bb-signal-panel" aria-label="Weighted scoring simulator">
-    <div class="bb-signal-controls">
-      <label class="bb-signal-field" for="bbOfficerScore"><span>Rush Officer Score</span><input id="bbOfficerScore" type="range" min="0" max="45" value="34" step="1" /></label>
-      <label class="bb-signal-field" for="bbRusherScore"><span>Member Score</span><input id="bbRusherScore" type="range" min="0" max="45" value="29" step="1" /></label>
-      <p class="bb-signal-weight-note">Weighted model: Officer <strong>0.6</strong> + Member <strong>0.4</strong></p>
-    </div>
-    <div class="bb-signal-output">
-      <div class="bb-signal-score"><p>Weighted Candidate Score</p><strong id="bbSignalScore">32.0</strong><span id="bbSignalDelta" class="bb-signal-delta">+0.0 vs baseline</span></div>
-      <div class="bb-signal-bar" role="img" aria-label="Weighted score progress"><div id="bbSignalBarFill"></div></div>
-      <div class="bb-signal-meta"><span>Officer: <strong id="bbOfficerScoreValue">34</strong>/45</span><span>Member: <strong id="bbRusherScoreValue">29</strong>/45</span></div>
-    </div>
+  <div class="bb-trust-points-v5">
+    <article><span>01</span><strong>Isolated workspaces</strong><p>Chapter data, branding, access, and approvals stay scoped to one organization.</p></article>
+    <article><span>02</span><strong>Practical permissions</strong><p>Heads, officers, and members see the tools their role actually needs.</p></article>
+    <article><span>03</span><strong>Season continuity</strong><p>Exports, backups, ownership, and reset tools reduce knowledge loss.</p></article>
   </div>
 </section>
 
-<section class="bb-trust-band-v4 bb-reveal" data-delay="75">
-  <article><span>Private workspaces</span><strong>Each chapter gets isolated data and approvals.</strong></article>
-  <article><span>Role-aware access</span><strong>Heads, officers, and members see the right layer.</strong></article>
-  <article><span>Season continuity</span><strong>Exports, backups, and reset tools protect turnover.</strong></article>
-</section>
-
-<section class="bb-final-cta-v4 bb-reveal" data-delay="85">
-  <p class="bb-kicker">Ready To Replace The Rush Spreadsheet?</p>
-  <h2>Give your rush team a workspace built for live decisions.</h2>
-  <p>Start with the interactive demo, then open your organization workspace when you are ready to run recruitment from one connected system.</p>
-  <div class="bb-hero-actions"><a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a><a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a></div>
+<section class="bb-final-cta-v5 bb-reveal" data-delay="75">
+  <div>
+    <p class="bb-kicker">See The Working Product</p>
+    <h2>Give the team one place to know what happens next.</h2>
+  </div>
+  <div class="bb-final-cta-actions-v5">
+    <a class="bb-cta bb-cta-strong" href="/demo">Explore The Demo</a>
+    <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+  </div>
 </section>
 {% endblock %}

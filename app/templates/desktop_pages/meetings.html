@@ -1,19 +1,13 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'meetings' %} is-active{% endif %}" data-page="meetings">
-        <section class="panel reveal delay-2 meetings-overview-panel">
-          <div class="section-head">
-            <div>
-              <h2>Meetings</h2>
-              <p class="muted">Run shortlist prep, compare candidates, and launch meeting packets from one decision-ready workspace.</p>
-            </div>
-          </div>
-          <div class="meetings-overview-grid">
-            <section class="meetings-pinned-panel">
-              <div class="section-head section-head-compact">
-                <div>
-                  <h3>Pinned for Meetings</h3>
-                  <p class="muted">Canonical shortlist pins for packet prep and compare review.</p>
-                </div>
-              </div>
+	        <section class="panel reveal delay-2 meetings-overview-panel">
+	          <div class="meetings-overview-grid">
+	            <section class="meetings-pinned-panel">
+	              <div class="section-head section-head-compact">
+	                <div>
+	                  <h2>Pinned for Meetings</h2>
+	                  <p class="muted">Your focused shortlist for packet prep.</p>
+	                </div>
+	              </div>
               <div id="meetingsWatchlist" class="list-box muted">No pinned rushees yet.</div>
             </section>
           </div>
@@ -37,23 +31,23 @@
             </section>
         </div>
 
-        <section class="panel reveal delay-4 meetings-compare-panel">
-          <div class="section-head">
-            <div>
-              <h2>Compare Candidates</h2>
-              <p class="muted">Select two rushees to compare meeting readiness and launch either packet.</p>
+        <details class="panel workspace-disclosure reveal delay-4 meetings-compare-panel">
+          <summary>
+            <span>Compare candidates</span>
+            <small>Open side-by-side review</small>
+          </summary>
+          <div class="workspace-disclosure-body">
+            <div class="inline-grid two-cols meetings-compare-selectors">
+              <label>
+                Candidate A
+                <select id="meetingsCompareSelectA"></select>
+              </label>
+              <label>
+                Candidate B
+                <select id="meetingsCompareSelectB"></select>
+              </label>
             </div>
+            <div id="meetingsCompareSummary" class="grid-two compare-summary-grid"></div>
           </div>
-          <div class="inline-grid two-cols meetings-compare-selectors">
-            <label>
-              Candidate A
-              <select id="meetingsCompareSelectA"></select>
-            </label>
-            <label>
-              Candidate B
-              <select id="meetingsCompareSelectB"></select>
-            </label>
-          </div>
-          <div id="meetingsCompareSummary" class="grid-two compare-summary-grid"></div>
-        </section>
+        </details>
       </div>

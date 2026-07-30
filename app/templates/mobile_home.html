@@ -12,9 +12,9 @@
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730minimal13" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/mobile.js?v=20260730" defer></script>
+    <script src="/static/js/mobile.js?v=20260730minimal13" defer></script>
   </head>
   <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="home">
     <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
@@ -34,7 +34,7 @@
           </div>
         </a>
         <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add Rushee</a>
+          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
         </div>
       </div>
 
@@ -43,7 +43,7 @@
           <div class="section-head section-head-compact">
             <div>
               <h2>Rushee Roster</h2>
-              <p class="muted">Search fast, tap a face, and rate without bouncing around the app.</p>
+              <p class="muted">Search, select, and update.</p>
             </div>
           </div>
           <div class="mobile-search-shell">
@@ -112,23 +112,29 @@
               </div>
             </form>
           </div>
-          <form id="mobileCommandRatingForm" class="stack">
-            <div class="inline-grid compact-inputs mobile-command-score-grid">
-              <label><span id="mobileCommandRateGirlsLabel">Girls (0-10, optional)</span><input id="mobileCommandRateGirls" type="number" min="0" max="10" /></label>
-              <label><span id="mobileCommandRateProcessLabel">Process (0-10, optional)</span><input id="mobileCommandRateProcess" type="number" min="0" max="10" /></label>
-              <label><span id="mobileCommandRatePersonableLabel">Personable (0-10, optional)</span><input id="mobileCommandRatePersonable" type="number" min="0" max="10" /></label>
-              <label><span id="mobileCommandRateAlcoholLabel">Alcohol (0-10, optional)</span><input id="mobileCommandRateAlcohol" type="number" min="0" max="10" /></label>
-              <label><span id="mobileCommandRateIgLabel">IG (0-5, optional)</span><input id="mobileCommandRateIg" type="number" min="0" max="5" /></label>
-            </div>
-            <label>
-              Comment or quick note
-              <textarea id="mobileCommandRateComment" rows="3" placeholder="Add a rating note or a quick standalone comment for Meetings."></textarea>
-            </label>
-            <div class="mobile-command-inline-actions">
-              <button id="mobileCommandSaveBtn" type="submit">Save Rating</button>
-              <button id="mobileCommandCommentBtn" type="button" class="secondary mobile-comment-only-btn">Add Comment</button>
-            </div>
-          </form>
+          <details id="mobileCommandRatingDisclosure" class="mobile-subsection-details mobile-rating-disclosure">
+            <summary>
+              <span>Quick rating or comment</span>
+              <strong>Open</strong>
+            </summary>
+            <form id="mobileCommandRatingForm" class="stack">
+              <div class="inline-grid compact-inputs mobile-command-score-grid">
+                <label><span id="mobileCommandRateGirlsLabel">Girls (0-10, optional)</span><input id="mobileCommandRateGirls" type="number" min="0" max="10" /></label>
+                <label><span id="mobileCommandRateProcessLabel">Process (0-10, optional)</span><input id="mobileCommandRateProcess" type="number" min="0" max="10" /></label>
+                <label><span id="mobileCommandRatePersonableLabel">Personable (0-10, optional)</span><input id="mobileCommandRatePersonable" type="number" min="0" max="10" /></label>
+                <label><span id="mobileCommandRateAlcoholLabel">Alcohol (0-10, optional)</span><input id="mobileCommandRateAlcohol" type="number" min="0" max="10" /></label>
+                <label><span id="mobileCommandRateIgLabel">IG (0-5, optional)</span><input id="mobileCommandRateIg" type="number" min="0" max="5" /></label>
+              </div>
+              <label>
+                Comment or quick note
+                <textarea id="mobileCommandRateComment" rows="3" placeholder="Add context for Meetings."></textarea>
+              </label>
+              <div class="mobile-command-inline-actions">
+                <button id="mobileCommandSaveBtn" type="submit">Save Rating</button>
+                <button id="mobileCommandCommentBtn" type="button" class="secondary mobile-comment-only-btn">Add Comment</button>
+              </div>
+            </form>
+          </details>
         </section>
       </section>
 
@@ -137,14 +143,6 @@
         <p class="muted">Quick mobile rating tools are available to Head Rush Officers and Rush Officers. You still have access to the core team views below.</p>
       </section>
 
-      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
-        <summary>Shared Calendar</summary>
-        <div class="mobile-action-grid">
-          <button id="mobileCopyCalendarBtn" type="button" class="secondary">Copy Calendar URL</button>
-          <a id="mobileGoogleSubscribeLink" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
-        </div>
-        <p id="mobileCalendarFeedPreview" class="muted breakable">Loading shared calendar link...</p>
-      </details>
     </main>
 
     <datalist id="mobileStateHints"></datalist>

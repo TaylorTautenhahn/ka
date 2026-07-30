@@ -1418,20 +1418,21 @@ function selectMobileHomePnm(pnmId, options = {}) {
   if (options.scrollToForm) {
     const panel = document.getElementById("mobileHomeQuickRatePanel");
     if (panel) {
-      panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      panel.scrollIntoView({ behavior: "auto", block: "start" });
     }
   }
 }
 
-function focusElementSoon(element) {
+function focusElementSoon(element, scrollTarget = null) {
   if (!element) {
     return;
   }
   window.requestAnimationFrame(() => {
-    element.focus();
+    element.focus({ preventScroll: Boolean(scrollTarget) });
     if (typeof element.select === "function" && (element.tagName === "TEXTAREA" || element.tagName === "INPUT")) {
       element.select();
     }
+    scrollTarget?.scrollIntoView({ behavior: "auto", block: "start" });
   });
 }
 
@@ -1458,24 +1459,31 @@ function focusMobileCommandComposer(mode = "rate", options = {}) {
     selectMobileHomePnm(targetId, { scrollToForm: false });
   }
   const panel = document.getElementById("mobileHomeQuickRatePanel");
-  if (panel) {
-    panel.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
+  const ratingDisclosure = document.getElementById("mobileCommandRatingDisclosure");
   if (mode === "comment") {
+    if (ratingDisclosure) {
+      ratingDisclosure.open = true;
+    }
     toggleMobileTouchpointComposer(false);
     const commentInput = document.getElementById("mobileCommandRateComment");
-    focusElementSoon(commentInput);
+    focusElementSoon(commentInput, panel);
     return;
   }
   if (mode === "touchpoint") {
+    if (ratingDisclosure) {
+      ratingDisclosure.open = false;
+    }
     toggleMobileTouchpointComposer(true);
     const dateInput = document.getElementById("mobileCommandLunchDate");
-    focusElementSoon(dateInput);
+    focusElementSoon(dateInput, panel);
     return;
+  }
+  if (ratingDisclosure) {
+    ratingDisclosure.open = true;
   }
   toggleMobileTouchpointComposer(false);
   const rateInput = document.getElementById("mobileCommandRateGirls");
-  focusElementSoon(rateInput);
+  focusElementSoon(rateInput, panel);
 }
 
 function renderHomeLeaderboard(rows) {
@@ -1610,8 +1618,7 @@ function renderMobileCommandSelection() {
     .filter(Boolean)
     .join(" | ");
   if (metaEl) {
-    metaEl.textContent =
-      `${selected.pnm_code} | ${selected.name || `${selected.first_name} ${selected.last_name}`} | Score ${formatWeightedScore(selected.weighted_total)} (${ratingTierMeta(selected.weighted_total).label}) | Assigned: ${assigned} | Last lunch: ${touchpoint}${lunchContext ? ` (${lunchContext})` : ""} | My Rating: ${mine} | ${stale}`;
+    metaEl.textContent = `${selected.pnm_code} • Assigned: ${assigned} • ${stale}`;
   }
   if (meetingShortcut) {
     meetingShortcut.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
@@ -1881,46 +1888,29 @@ function renderPnmCards(pnms) {
   listEl.innerHTML = pnms
     .map((pnm) => {
       const photo = pnm.photo_url
-        ? `<img src="${escapeHtml(pnm.photo_url)}" class="mini-photo" alt="${escapeHtml(pnm.first_name)}" loading="lazy" />`
-        : '<div class="mini-photo empty">No photo</div>';
+        ? `<img src="${escapeHtml(pnm.photo_url)}" class="mini-photo" alt="" loading="lazy" />`
+        : '<div class="mini-photo empty" aria-hidden="true">—</div>';
       const assigned = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-      const downloaded = isContactDownloaded(pnm.pnm_id);
-      const packageInfo = mobilePackageInfoForPnm(pnm);
-      const linkedNames = packageInfo.members
-        .filter((item) => Number(item.pnm_id) !== Number(pnm.pnm_id))
-        .map((item) => `${item.first_name} ${item.last_name}`);
-      const packageText = linkedNames.length ? linkedNames.join(", ") : "None";
       const selectedClass = Number(mobileSelectedManagePnmId) === Number(pnm.pnm_id) ? " is-selected" : "";
       const creator = String(pnm.created_by_username || "").trim();
-      const ownershipLabel = pnm.can_manage_profile
-        ? creator
-          ? `Editable by you · Created by ${creator}`
-          : "Editable by you"
-        : creator
-          ? `Created by ${creator}`
-          : "Locked";
+      const ownershipLabel = creator ? `Created by ${creator}` : "Creator unavailable";
       return `
-        <article class="entry mobile-card mobile-manage-card${selectedClass}" data-mobile-pnm-card-id="${pnm.pnm_id}" role="button" tabindex="0" aria-pressed="${selectedClass ? "true" : "false"}">
-          <div class="entry-title">
-            <strong>${escapeHtml(pnm.pnm_code)} | ${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
-            <span>${formatWeightedScore(pnm.weighted_total)}</span>
-          </div>
-          <div class="command-chip-row">${ratingTierBadgeMarkup(pnm.weighted_total)}</div>
-          <div class="mobile-card-row">
+        <article class="entry mobile-card mobile-manage-card${selectedClass}">
+          <button type="button" class="mobile-manage-card-select secondary" data-mobile-pnm-card-id="${pnm.pnm_id}" aria-pressed="${selectedClass ? "true" : "false"}">
             ${photo}
-            <div>
-              <div class="muted">${escapeHtml(pnm.phone_number || "No phone")} | ${escapeHtml(pnm.instagram_handle)}</div>
-              <div class="muted">Hometown: ${escapeHtml(pnm.hometown || "Unknown")} ${escapeHtml(pnm.hometown_state_code || "")}</div>
-              <div class="muted">Assigned: ${escapeHtml(assigned)}</div>
-              <div class="muted">Linked With: ${escapeHtml(packageText)}</div>
-              <div class="muted">Contact export: ${downloaded ? "✓ Downloaded" : "○ Pending"}</div>
-              <div class="muted">Interests: ${pnm.interests.map((x) => escapeHtml(x)).join(", ")}</div>
-              <div class="muted">${escapeHtml(ownershipLabel)}</div>
+            <div class="mobile-manage-card-copy">
+              <strong>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+              <span>${escapeHtml(pnm.pnm_code)} · ${escapeHtml(assigned)}</span>
             </div>
-          </div>
-          <div class="action-row">
+            <div class="mobile-manage-card-score">
+              <strong>${formatWeightedScore(pnm.weighted_total)}</strong>
+              ${ratingTierBadgeMarkup(pnm.weighted_total)}
+            </div>
+          </button>
+          <div class="mobile-manage-card-footer">
+            <span>${escapeHtml(ownershipLabel)}</span>
             <button type="button" class="secondary" data-mobile-manage-pnm-id="${pnm.pnm_id}">${pnm.can_manage_profile ? "Edit Details" : "View Lock"}</button>
-            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Meeting Packet</a>
+            <a class="quick-nav-link" href="${escapeHtml(`${MOBILE_ROUTES.meeting}?pnm_id=${pnm.pnm_id}`)}">Packet</a>
           </div>
         </article>
       `;
@@ -2236,10 +2226,6 @@ async function loadPnmsPage() {
   if (!mobilePnmRows.some((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId))) {
     mobileSelectedManagePnmId = null;
   }
-  if (!mobileSelectedManagePnmId && mobilePnmRows.length) {
-    const preferred = mobilePnmRows.find((pnm) => pnm.can_manage_profile) || mobilePnmRows[0];
-    mobileSelectedManagePnmId = Number(preferred.pnm_id);
-  }
   updateContactsUi();
   renderPnmCards(mobilePnmRows);
   renderMobilePnmManagement();
@@ -2249,7 +2235,7 @@ function mobileSelectedManagePnm() {
   return mobilePnmRows.find((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId)) || null;
 }
 
-function resetMobilePnmManagement(message = "Select a rushee from the roster to edit identity, contact, and meeting details.") {
+function resetMobilePnmManagement(message = "Select a rushee above to edit their profile.") {
   const hint = document.getElementById("mobilePnmManageHint");
   const selectedCard = document.getElementById("mobilePnmManageSelectedCard");
   const locked = document.getElementById("mobilePnmManageLocked");
@@ -2364,7 +2350,7 @@ function selectMobileManagePnm(pnmId, { scroll = true } = {}) {
   renderPnmCards(mobilePnmRows);
   renderMobilePnmManagement();
   if (scroll) {
-    document.getElementById("mobilePnmManageSelectedCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document.getElementById("mobilePnmManageSelectedCard")?.scrollIntoView({ behavior: "auto", block: "start" });
   }
 }
 
@@ -3016,17 +3002,6 @@ function attachPageEvents() {
           return;
         }
         selectMobileManagePnm(pnmId);
-      });
-      list.addEventListener("keydown", (event) => {
-        const card = event.target.closest("[data-mobile-pnm-card-id]");
-        if (!card || !["Enter", " "].includes(event.key)) {
-          return;
-        }
-        event.preventDefault();
-        const pnmId = Number(card.dataset.mobilePnmCardId || 0);
-        if (pnmId) {
-          selectMobileManagePnm(pnmId);
-        }
       });
     }
     if (manageForm) {

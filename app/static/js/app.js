@@ -1670,21 +1670,21 @@ function renderMyProfileForm() {
 
 function workspaceMetaForPage(page) {
   if (page === "rushees") {
-    return { eyebrow: "Workspace", title: "Rushees", subtitle: "Roster, inspector, ownership, and packet readiness." };
+    return { eyebrow: "Workspace", title: "Rushees", subtitle: "Roster, details, ownership, and readiness." };
   }
   if (page === "meetings") {
-    return { eyebrow: "Workspace", title: "Meetings", subtitle: "Shortlist, compare, and packet launch from one queue." };
+    return { eyebrow: "Workspace", title: "Meetings", subtitle: "Shortlist, comparison, and packet launch." };
   }
   if (page === "team") {
-    return { eyebrow: "Workspace", title: "Team", subtitle: "Approvals, workload, assignment coverage, and member alignment." };
+    return { eyebrow: "Workspace", title: "Team", subtitle: "Members, approvals, assignments, and workload." };
   }
   if (page === "calendar") {
-    return { eyebrow: "Workspace", title: "Operations", subtitle: "Timeline, goals, touchpoints, and officer chat." };
+    return { eyebrow: "Workspace", title: "Operations", subtitle: "Timeline, goals, touchpoints, and chat." };
   }
   if (page === "admin") {
-    return { eyebrow: "Workspace", title: "Admin", subtitle: "Leadership, season reset, imports, roster tools, and storage." };
+    return { eyebrow: "Workspace", title: "Admin", subtitle: "Leadership, season, imports, and storage." };
   }
-  return { eyebrow: "Workspace", title: "Command", subtitle: "Personal queue, exceptions, recent decisions, and team pulse." };
+  return { eyebrow: "Workspace", title: "Command", subtitle: "Queue, exceptions, and recent activity." };
 }
 
 function updateWorkspaceHeader() {
@@ -1698,6 +1698,7 @@ function updateWorkspaceHeader() {
   if (workspaceSubtitle) {
     workspaceSubtitle.textContent = meta.subtitle;
   }
+  document.title = `${APP_CONFIG.tenant_name || "BidBoard"} · ${meta.title}`;
 }
 
 function refreshLoadersForActivePage() {
@@ -1768,9 +1769,9 @@ function setSessionHeading() {
   renderMyProfileForm();
 }
 
-function closeAppMenus() {
+function closeAppMenus(exceptMenu = null) {
   [globalAddMenu, appHelpMenu].forEach((menu) => {
-    if (menu && menu.open) {
+    if (menu && menu !== exceptMenu && menu.open) {
       menu.open = false;
     }
   });
@@ -1830,6 +1831,7 @@ function navigateDesktopPage(page, params = {}) {
     refresh: Boolean(state.user),
     pnmId: Number((params && params.pnm_id) || 0) || null,
   });
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
 }
 
 function roleCanSeeRaters() {
@@ -3236,7 +3238,6 @@ function renderPnmTable() {
       const own = pnm.own_rating;
       const ownDisplay = own ? `${own.total_score}/${RATING_TOTAL_MAX}` : "Not rated";
       const assignedOfficer = pnm.assigned_officer ? pnm.assigned_officer.username : "Unassigned";
-      const linkedDisplay = linkedRusheeNamesForPnm(pnm);
       const weightedPct = Math.max(0, Math.min(100, (Number(pnm.weighted_total) / RATING_TOTAL_MAX) * 100));
       const barWidth = Math.round((weightedPct / 100) * 58);
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
@@ -3244,21 +3245,14 @@ function renderPnmTable() {
       const creatorBadge = creator
         ? `<div class="table-owner-badge"><span class="pill">Created by ${escapeHtml(creator)}</span></div>`
         : "";
-      const categoryCells = RATING_CRITERIA.map((criterion) => {
-        const avgField = PNM_AVG_FIELD_BY_RATING_FIELD[criterion.field];
-        const value = Number(pnm[avgField] || 0);
-        return `<td>${value.toFixed(2)}</td>`;
-      }).join("");
       return `
         <tr class="${selectedClass}">
           <td>${smallPhotoCell(pnm)}</td>
-          <td><strong>${escapeHtml(pnm.pnm_code)}</strong></td>
           <td>
             <strong>${escapeHtml(pnm.first_name)} ${escapeHtml(pnm.last_name)}</strong>
+            <div class="muted table-pnm-code">${escapeHtml(pnm.pnm_code)}</div>
             ${creatorBadge}
           </td>
-          <td>${escapeHtml(linkedDisplay)}</td>
-          <td>${escapeHtml(pnm.phone_number || "-")}</td>
           <td>${escapeHtml(pnm.class_year)}</td>
           <td>${pnm.days_since_first_event}</td>
           <td>${pnm.rating_count}</td>
@@ -3272,7 +3266,6 @@ function renderPnmTable() {
               </svg>
             </div>
           </td>
-          ${categoryCells}
           <td>${pnm.total_lunches}</td>
           <td>${escapeHtml(assignedOfficer)}</td>
           <td>${ownDisplay}</td>
@@ -3287,17 +3280,13 @@ function renderPnmTable() {
       <thead>
         <tr>
           <th>Photo</th>
-          <th>Code</th>
           <th>Name</th>
-          <th>Linked With</th>
-          <th>Phone</th>
           <th>Class</th>
-          <th>Days Since Event</th>
+          <th>Days Active</th>
           <th>Ratings</th>
-          <th>Weighted Total</th>
-          ${RATING_CRITERIA.map((criterion) => `<th>${escapeHtml(criterion.short_label)}</th>`).join("")}
+          <th>Score</th>
           <th>Touchpoints</th>
-          <th>Assigned Officer</th>
+          <th>Owner</th>
           <th>My Rating</th>
           <th></th>
         </tr>
@@ -3322,6 +3311,7 @@ function renderMemberTable() {
       const ratingCount = member.rating_count == null ? "Hidden" : member.rating_count;
       const city = String(member.city || "").trim();
       const stateCode = String(member.state_code || "").trim();
+      const location = [city, stateCode].filter(Boolean).join(", ") || "-";
       const selectedClass = Number(state.selectedMemberId) === Number(member.user_id) ? "selected-row" : "";
       const canDisapprove =
         canDisapproveUsers &&
@@ -3343,11 +3333,7 @@ function renderMemberTable() {
         <tr class="${selectedClass}">
           <td>${escapeHtml(member.username)}</td>
           <td>${escapeHtml(member.role)}</td>
-          <td>${member.emoji ? escapeHtml(member.emoji) : "-"}</td>
-          <td>${city ? escapeHtml(city) : "-"}</td>
-          <td>${stateCode ? escapeHtml(stateCode) : "-"}</td>
-          <td>${escapeHtml(member.stereotype)}</td>
-          <td>${member.interests.map((item) => `<span class="pill">${escapeHtml(item)}</span>`).join("")}</td>
+          <td>${escapeHtml(location)}</td>
           <td>${member.total_lunches}</td>
           <td>${member.lunches_per_week.toFixed(2)}</td>
           <td>${ratingCount}</td>
@@ -3370,15 +3356,11 @@ function renderMemberTable() {
         <tr>
           <th>Username</th>
           <th>Role</th>
-          <th>Emoji</th>
-          <th>City</th>
-          <th>State</th>
-          <th>Stereotype</th>
-          <th>Interests</th>
-          <th>Total Touchpoints</th>
-          <th>Touchpoints / Week</th>
-          <th>Ratings Given</th>
-          <th>Avg Rating Given</th>
+          <th>Location</th>
+          <th>Touchpoints</th>
+          <th>This Week</th>
+          <th>Ratings</th>
+          <th>Avg Score</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -4575,6 +4557,7 @@ function performCommandAction(action, context = null) {
     navigateDesktopPage("team");
     const section = document.getElementById("myProfileSection");
     if (section) {
+      section.open = true;
       section.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     focusSoon(myProfileUsername);
@@ -5513,6 +5496,10 @@ function focusElementSoon(element) {
 }
 
 function focusCommandComposer(mode = "rate") {
+  const disclosure = document.getElementById("commandRatingDisclosure");
+  if (disclosure) {
+    disclosure.open = true;
+  }
   const panel = document.getElementById("commandCenterSection");
   if (panel) {
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -5536,6 +5523,10 @@ async function focusRusheeComposerForPnm(pnmId, mode = "rate") {
   renderPnmTable();
   applyRatingFormForSelected();
   await loadPnmDetail(targetId);
+  const disclosure = document.getElementById("rusheeRatingDisclosure");
+  if (disclosure) {
+    disclosure.open = true;
+  }
   const panel = document.getElementById("detailSection");
   if (panel) {
     panel.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -6114,6 +6105,7 @@ async function loadRusheesWorkspace() {
   syncSelectedRusheeRoute("replace");
   renderPnmTable();
   renderPnmBoard();
+  applyRatingFormForSelected();
   renderAssignmentControls();
   renderPackageDealPanel();
   renderScheduledLunches();
@@ -9010,8 +9002,23 @@ function attachEvents() {
       }
     });
   }
+  [globalAddMenu, appHelpMenu].forEach((menu) => {
+    if (!menu) {
+      return;
+    }
+    menu.addEventListener("toggle", () => {
+      if (!menu.open) {
+        return;
+      }
+      closeAppMenus(menu);
+      toggleNotificationsTray(false);
+    });
+  });
   if (appNotificationsBtn) {
-    appNotificationsBtn.addEventListener("click", () => toggleNotificationsTray());
+    appNotificationsBtn.addEventListener("click", () => {
+      closeAppMenus();
+      toggleNotificationsTray();
+    });
   }
   if (appNotificationsCloseBtn) {
     appNotificationsCloseBtn.addEventListener("click", () => toggleNotificationsTray(false));

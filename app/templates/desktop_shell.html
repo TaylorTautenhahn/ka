@@ -17,9 +17,9 @@
     <link rel="stylesheet" href="/static/css/layout.css" />
     <link rel="stylesheet" href="/static/css/components.css" />
     <link rel="stylesheet" href="/static/css/pages.css" />
-    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730minimal13" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/app.js?v=20260730" defer></script>
+    <script src="/static/js/app.js?v=20260730minimal13" defer></script>
   </head>
   <body class="desktop-backend-body{% if initial_authenticated %} desktop-product-auth{% endif %}"{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
@@ -298,6 +298,16 @@
                 <h2 id="workspaceTitle">Command</h2>
                 <p id="workspaceSubtitle" class="muted">Priority actions and live team signal.</p>
               </div>
+              <div class="app-topbar-search">
+                <input
+                  id="globalSearchInput"
+                  type="search"
+                  aria-label="Search BidBoard"
+                  placeholder="Search rushees, team, or commands"
+                  autocomplete="off"
+                />
+                <span aria-hidden="true">⌘ K</span>
+              </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
                   <strong id="sessionTitle">Welcome</strong>
@@ -322,21 +332,11 @@
                   </div>
                 </details>
                 <button id="appNotificationsBtn" type="button" class="secondary app-notification-btn">
-                  Notifications
+                  Alerts
                   <span id="appNotificationsBadge" class="nav-badge hidden">0</span>
                 </button>
               </div>
             </header>
-
-            <section class="panel app-toolbar reveal delay-1">
-              <div class="app-search-field">
-                <label>
-                  Search
-                  <input id="globalSearchInput" type="search" placeholder="Search rushees, team, commands" autocomplete="off" />
-                </label>
-              </div>
-              <p class="muted app-toolbar-hint" aria-label="Command palette keyboard shortcut">⌘ K</p>
-            </section>
 
             <div class="desktop-pages app-workspace-pages">
               {% include "desktop_pages/dashboard.html" %}

@@ -1,4 +1,4 @@
-const CACHE_NAME = "kao-rush-shell-v6";
+const CACHE_NAME = "kao-rush-shell-v7";
 const APP_SHELL = [
   "/static/css/styles.css",
   "/static/css/tokens.css",

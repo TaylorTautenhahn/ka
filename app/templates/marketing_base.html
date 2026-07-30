@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#15120e" />
     <title>{% block title %}BidBoard{% endblock %}</title>
     <meta name="description" content="{% block description %}BidBoard is the recruitment command layer for fraternities and sororities.{% endblock %}" />
-    <link rel="stylesheet" href="/static/css/landing.css?v=20260730" />
+    <link rel="stylesheet" href="/static/css/landing.css?v=20260730minimal13" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/landing.js?v=20260730" defer></script>
+    <script src="/static/js/landing.js?v=20260730minimal13" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   {% set marketing_tenant_count = tenant_count if tenant_count is defined else (tenants|length if tenants is defined else 0) %}

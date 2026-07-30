@@ -8,19 +8,14 @@
 {% block page_content %}
 <section class="bb-home-hero-v5 bb-reveal" data-delay="20">
   <div class="bb-home-hero-copy-v5">
-    <p class="bb-kicker">Recruitment Operations, Without The Sprawl</p>
-    <h1>Rush moves fast. Keep the whole story intact.</h1>
+    <p class="bb-kicker">Recruitment, Without The Sprawl</p>
+    <h1>Run rush from one clear place.</h1>
     <p class="bb-home-lede-v5">
-      One working surface for the roster, ratings, comments, ownership, touchpoints, and meeting decisions. Your team sees what changed and what needs action next.
+      Keep rushees, ratings, comments, touchpoints, and meeting decisions in one shared workspace.
     </p>
     <div class="bb-home-action-deck" aria-label="Primary actions">
       <a class="bb-cta bb-cta-strong" href="/demo">Explore The Live Demo</a>
       <a class="bb-cta bb-cta-ghost" href="/organizations">Open Your Chapter</a>
-    </div>
-    <div class="bb-home-proof-v5" aria-label="BidBoard product summary">
-      <span><strong>{{ tenant_count }}</strong> chapter workspace{{ '' if tenant_count == 1 else 's' }}</span>
-      <span>Role-aware access</span>
-      <span>Meeting-ready history</span>
     </div>
   </div>
 
@@ -71,29 +66,22 @@
           <span>Latest context</span>
           <p>Strong conversation at dinner. Follow up on leadership interest before Thursday.</p>
         </div>
-        <div class="bb-live-actions-v5">
-          <button type="button">Rate</button>
-          <button type="button">Add Comment</button>
-          <button type="button">Schedule</button>
-          <button type="button">Open Packet</button>
+        <div class="bb-live-actions-v5" aria-label="Common rushee actions">
+          <span>Rate</span>
+          <span>Add Comment</span>
+          <span>Schedule</span>
+          <span>Open Packet</span>
         </div>
       </section>
     </div>
   </div>
 </section>
 
-<section class="bb-operating-rail-v5 bb-reveal" data-delay="35" aria-label="BidBoard operating flow">
-  <article><span>01</span><div><strong>Capture</strong><p>Add the person and the context while it is fresh.</p></div></article>
-  <article><span>02</span><div><strong>Coordinate</strong><p>Make ownership and the next touchpoint obvious.</p></div></article>
-  <article><span>03</span><div><strong>Decide</strong><p>Bring current signal into the room, not scattered memory.</p></div></article>
-  <article><span>04</span><div><strong>Preserve</strong><p>Keep the season usable for the next leadership team.</p></div></article>
-</section>
-
 <section class="bb-workspace-story-v5 bb-reveal" data-delay="45">
   <div class="bb-workspace-copy-v5">
     <p class="bb-kicker">A Clear Home For Every Job</p>
     <h2>Less hunting. Fewer repeated controls. Faster handoffs.</h2>
-    <p>Each workspace owns one part of the operating flow. The same rushee record moves with the team, so updates never need to be reconstructed.</p>
+    <p>Each workspace has one clear job. The same rushee record moves with the team, so nobody has to rebuild the story.</p>
     <a class="bb-link-inline" href="/features">See the complete product</a>
   </div>
   <div class="bb-workspace-grid-v5">
@@ -107,39 +95,6 @@
     <article><span>Meetings</span><strong>Decision room</strong><p>Shortlist, compare, packet history, and recent deltas.</p></article>
     <article><span>Operations</span><strong>Shared timeline</strong><p>Events, touchpoints, goals, and officer coordination.</p></article>
     <article><span>Team</span><strong>Visible ownership</strong><p>Approvals, load, assignments, and participation.</p></article>
-  </div>
-</section>
-
-<section class="bb-flow-lab-v5 bb-reveal" data-delay="55">
-  <div class="bb-section-head bb-section-head-v5">
-    <div>
-      <p class="bb-kicker">One Record, All The Way Through</p>
-      <h2>See how a rushee moves from first contact to chapter discussion.</h2>
-    </div>
-    <p>Choose a step. The preview shows the exact context the next person receives.</p>
-  </div>
-  <div class="bb-journey-layout">
-    <div class="bb-journey-steps" id="bbJourneySteps">
-      <button class="bb-journey-step is-active" type="button" data-step="capture" aria-pressed="true"><span>01</span><div><h3>Capture</h3><p>Add a rushee on the event floor and make the record immediately visible.</p></div></button>
-      <button class="bb-journey-step" type="button" data-step="score" aria-pressed="false"><span>02</span><div><h3>Score</h3><p>Rate only what you know, or leave a comment without changing the score.</p></div></button>
-      <button class="bb-journey-step" type="button" data-step="coordinate" aria-pressed="false"><span>03</span><div><h3>Coordinate</h3><p>Assign an owner and put the next touchpoint on the shared timeline.</p></div></button>
-      <button class="bb-journey-step" type="button" data-step="decide" aria-pressed="false"><span>04</span><div><h3>Decide</h3><p>Open a complete packet with history, comments, ownership, and movement.</p></div></button>
-    </div>
-    <aside class="bb-command-shell bb-flow-preview-v5" aria-live="polite">
-      <div class="bb-command-shell-top">
-        <div><p class="bb-command-shell-label">Current Context</p><strong id="bbPhoneTitle">Capture Queue</strong></div>
-        <span id="bbPhoneBadge">Live</span>
-      </div>
-      <div id="bbPhoneScreen" class="bb-command-screen" data-state="capture">
-        <ul class="bb-phone-list" id="bbPhoneList">
-          <li>Rushee: Mason Carter</li>
-          <li>Source: Brotherhood event</li>
-          <li>Profile sync: 1.2s</li>
-          <li>Owner requested: Jack M.</li>
-        </ul>
-      </div>
-      <div class="bb-phone-footer" id="bbPhoneFooter">Profile is visible to the team immediately after first contact.</div>
-    </aside>
   </div>
 </section>
 

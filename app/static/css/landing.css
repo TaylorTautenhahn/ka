@@ -47,7 +47,7 @@
 }
 
 :root {
-  --bb-font-display: "Space Grotesk", sans-serif;
+  --bb-font-display: "Manrope", sans-serif;
   --bb-font-body: "Manrope", sans-serif;
   --bb-bg: #07111d;
   --bb-bg-deep: #0d1828;
@@ -4014,6 +4014,309 @@ body.bb-page .bb-footer-links {
 
   .bb-org-card-v2 {
     grid-template-columns: 48px minmax(0, 1fr) auto;
+  }
+}
+
+/* Minimal public system */
+body.bb-page {
+  --bb-surface: #1c1915;
+  --bb-surface-strong: #171512;
+  --bb-surface-soft: rgba(246, 237, 220, 0.04);
+  --bb-line: rgba(225, 207, 178, 0.12);
+  --bb-line-strong: rgba(225, 207, 178, 0.22);
+  --bb-text: #f3eee5;
+  --bb-muted: #aaa197;
+  --bb-muted-strong: #cec5b9;
+  --bb-shadow: 0 24px 58px rgba(8, 6, 4, 0.34);
+  --bb-shadow-soft: 0 10px 30px rgba(8, 6, 4, 0.2);
+  background:
+    radial-gradient(800px 520px at 10% -5%, rgba(216, 170, 98, 0.07), transparent 68%),
+    linear-gradient(180deg, #13110e 0%, #191612 55%, #1e1913 100%);
+}
+
+body.bb-page .bb-grid-field,
+body.bb-page .bb-atmosphere,
+body.bb-page .bb-noise {
+  opacity: 0.08;
+}
+
+body.bb-page .bb-shell {
+  width: min(1380px, calc(100% - 1.5rem));
+  gap: 0.9rem;
+}
+
+body.bb-page .bb-topbar {
+  min-height: 64px;
+  padding: 0.55rem 0.65rem 0.55rem 0.8rem;
+  border-radius: 16px;
+  background: rgba(25, 23, 19, 0.96);
+  box-shadow: var(--bb-shadow-soft);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+body.bb-page .bb-brand-lockup strong {
+  font-family: var(--bb-font-body);
+  letter-spacing: -0.02em;
+}
+
+body.bb-page .bb-brand-lockup small {
+  font-size: 0.62rem;
+}
+
+body.bb-page .bb-link,
+body.bb-page .bb-login-btn {
+  min-height: 38px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+
+.bb-page-home-v5 .bb-shell {
+  gap: 0.9rem;
+}
+
+.bb-home-hero-v5,
+.bb-workspace-story-v5,
+.bb-trust-story-v5,
+.bb-final-cta-v5 {
+  border-radius: 18px;
+  background: #1c1915;
+  box-shadow: var(--bb-shadow-soft);
+}
+
+.bb-home-hero-v5 {
+  grid-template-columns: minmax(340px, 0.86fr) minmax(520px, 1.14fr);
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  min-height: 620px;
+  padding: clamp(1.5rem, 4vw, 3.5rem);
+  background:
+    radial-gradient(circle at 100% 0%, rgba(148, 170, 131, 0.07), transparent 32%),
+    #1c1915;
+}
+
+.bb-home-hero-v5::before {
+  display: none;
+}
+
+.bb-home-hero-copy-v5 {
+  gap: 1rem;
+}
+
+.bb-home-hero-copy-v5 h1 {
+  max-width: 11ch;
+  font-size: clamp(3.2rem, 5.4vw, 5.6rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.bb-home-lede-v5 {
+  max-width: 36rem;
+  font-size: clamp(0.98rem, 1.2vw, 1.1rem);
+  line-height: 1.58;
+}
+
+.bb-home-action-deck {
+  gap: 0.55rem;
+}
+
+body.bb-page .bb-cta {
+  min-height: 44px;
+  padding: 0.65rem 0.9rem;
+  border-radius: 9px;
+  font-size: 0.82rem;
+}
+
+body.bb-page .bb-cta-strong {
+  color: #17110a;
+  background: #d6ad67;
+  box-shadow: none;
+}
+
+body.bb-page .bb-cta-strong:hover {
+  background: #e1bd79;
+  box-shadow: none;
+}
+
+.bb-live-board-v5 {
+  padding: 0.65rem;
+  border-radius: 16px;
+  background: #141310;
+  box-shadow: 0 18px 42px rgba(7, 5, 3, 0.28);
+  transform: none;
+}
+
+.bb-live-queue-v5,
+.bb-live-profile-v5 {
+  border-radius: 12px;
+}
+
+.bb-live-queue-v5 article,
+.bb-live-signal-v5 article,
+.bb-live-note-v5 {
+  border-radius: 8px;
+}
+
+.bb-live-actions-v5 span {
+  display: grid;
+  min-width: 0;
+  min-height: 34px;
+  place-items: center;
+  padding: 0.35rem;
+  color: var(--bb-muted-strong);
+  border: 1px solid var(--bb-line);
+  border-radius: 8px;
+  background: rgba(255, 246, 229, 0.035);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.bb-workspace-story-v5,
+.bb-trust-story-v5 {
+  gap: clamp(1.5rem, 4vw, 3.5rem);
+  padding: clamp(1.4rem, 3.5vw, 3rem);
+}
+
+.bb-workspace-copy-v5 h2,
+.bb-trust-story-v5 h2,
+.bb-final-cta-v5 h2 {
+  font-size: clamp(2rem, 3.7vw, 3.5rem);
+  line-height: 1.03;
+  letter-spacing: -0.045em;
+}
+
+.bb-workspace-grid-v5 {
+  gap: 0.55rem;
+}
+
+.bb-workspace-grid-v5 article,
+.bb-workspace-grid-v5 article.is-featured {
+  grid-row: auto;
+  min-height: 130px;
+  padding: 0.95rem;
+  border-radius: 10px;
+  background: rgba(255, 246, 229, 0.03);
+}
+
+.bb-workspace-grid-v5 article.is-featured {
+  grid-column: 1 / -1;
+  min-height: 150px;
+  background: rgba(216, 170, 98, 0.07);
+}
+
+.bb-workspace-grid-v5 strong {
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
+}
+
+.bb-workspace-grid-v5 p {
+  font-size: 0.8rem;
+}
+
+.bb-mini-queue-v5 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.bb-mini-queue-v5 i {
+  height: 32px;
+  border-radius: 7px;
+}
+
+.bb-trust-points-v5 article {
+  grid-template-columns: 34px minmax(0, 0.4fr) minmax(0, 1fr);
+  padding: 0.9rem 0;
+}
+
+.bb-final-cta-v5 {
+  padding: clamp(1.4rem, 3.5vw, 2.7rem);
+  background: #1c1915;
+}
+
+body.bb-page .bb-footer {
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: #191713;
+  box-shadow: none;
+}
+
+@media (max-width: 980px) {
+  .bb-home-hero-v5 {
+    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .bb-home-hero-copy-v5 h1 {
+    max-width: 13ch;
+  }
+
+  .bb-workspace-story-v5,
+  .bb-trust-story-v5 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  body.bb-page .bb-shell {
+    width: min(100% - 0.75rem, 1380px);
+    gap: 0.55rem;
+  }
+
+  body.bb-page .bb-topbar {
+    min-height: 58px;
+  }
+
+  .bb-home-hero-v5,
+  .bb-workspace-story-v5,
+  .bb-trust-story-v5,
+  .bb-final-cta-v5 {
+    padding: 1rem;
+    border-radius: 14px;
+  }
+
+  .bb-home-hero-copy-v5 h1 {
+    font-size: clamp(2.65rem, 14vw, 4rem);
+    line-height: 0.98;
+  }
+
+  .bb-live-board-body-v5 {
+    grid-template-columns: 1fr;
+  }
+
+  .bb-live-queue-v5 {
+    display: none;
+  }
+
+  .bb-live-signal-v5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .bb-workspace-grid-v5 {
+    grid-template-columns: 1fr;
+  }
+
+  .bb-workspace-grid-v5 article.is-featured {
+    grid-column: auto;
+  }
+
+  .bb-trust-points-v5 article {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .bb-trust-points-v5 p {
+    grid-column: 2;
+  }
+
+  .bb-final-cta-v5 {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .bb-final-cta-actions-v5 {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  body.bb-page .bb-footer {
+    grid-template-columns: 1fr;
   }
 }
 

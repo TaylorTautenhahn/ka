@@ -12,9 +12,9 @@
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
     <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/product.css?v=20260730" />
+    <link rel="stylesheet" href="/static/css/product.css?v=20260730minimal13" />
     <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/mobile.js?v=20260730" defer></script>
+    <script src="/static/js/mobile.js?v=20260730minimal13" defer></script>
   </head>
   <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="pnms">
     <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
@@ -34,36 +34,34 @@
           </div>
         </a>
         <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add Rushee</a>
+          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
         </div>
       </div>
       <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Rushees</h1>
-        <p>Keep the roster first. Open utilities only when you need them.</p>
+        <p>Select a rushee to manage their profile.</p>
       </header>
 
-      <section class="panel mobile-panel">
-        <div class="section-head section-head-compact">
-          <div>
-            <h2>Roster Filters</h2>
-            <p class="muted">State filter applies automatically as you type.</p>
-          </div>
-          <button id="mobileRefreshPnmsBtn" type="button" class="secondary">Refresh</button>
-        </div>
+      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details mobile-roster-filter">
+        <summary>
+          <span>Filter roster</span>
+          <strong>State</strong>
+        </summary>
         <div class="mobile-filter-grid">
           <label>
             State filter
             <input id="mobilePnmStateFilter" list="mobilePnmStateHints" type="text" placeholder="All states" />
           </label>
         </div>
-      </section>
+        <button id="mobileRefreshPnmsBtn" type="button" class="secondary">Refresh roster</button>
+      </details>
 
       <section class="panel mobile-panel">
         <div class="section-head section-head-compact">
           <div>
             <h2>Roster</h2>
-            <p class="muted">Choose a rushee to manage their details or open Meeting Packet review.</p>
+            <p class="muted">Choose a profile to edit or review.</p>
           </div>
         </div>
         <div id="mobilePnmList" class="mobile-list"></div>
@@ -72,8 +70,8 @@
       <section class="panel mobile-panel">
         <div class="section-head section-head-compact">
           <div>
-            <h2>Rushee Management</h2>
-            <p id="mobilePnmManageHint" class="muted">Select a rushee from the roster to edit identity, contact, and meeting details.</p>
+            <h2>Edit Rushee</h2>
+            <p id="mobilePnmManageHint" class="muted">Select a rushee above to edit their profile.</p>
           </div>
         </div>
         <div id="mobilePnmManageSelectedCard" class="entry mobile-card mobile-manage-selected-card hidden"></div>
@@ -100,18 +98,24 @@
           </div>
           <label>Phone number<input id="mobileManagePhone" type="text" placeholder="+1 555 123 4567" /></label>
           <label>Instagram handle<input id="mobileManageInstagram" type="text" required placeholder="@username" /></label>
-          <label>
-            Interests
-            <div id="mobileManageInterestTags" class="tag-picker" aria-label="Rushee management interest tags"></div>
-            <input id="mobileManageInterests" type="hidden" value="" />
-          </label>
-          <label>
-            Stereotype
-            <div id="mobileManageStereotypeTags" class="tag-picker" aria-label="Rushee management stereotype tags"></div>
-            <input id="mobileManageStereotype" type="hidden" value="" />
-          </label>
-          <label>Touchpoint stats<input id="mobileManageLunchStats" type="text" /></label>
-          <label>Notes<textarea id="mobileManageNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea></label>
+          <details class="mobile-subsection-details mobile-profile-details">
+            <summary>
+              <span>Recruitment profile</span>
+              <strong>Optional</strong>
+            </summary>
+            <label>
+              Interests
+              <div id="mobileManageInterestTags" class="tag-picker" aria-label="Rushee management interest tags"></div>
+              <input id="mobileManageInterests" type="hidden" value="" />
+            </label>
+            <label>
+              Stereotype
+              <div id="mobileManageStereotypeTags" class="tag-picker" aria-label="Rushee management stereotype tags"></div>
+              <input id="mobileManageStereotype" type="hidden" value="" />
+            </label>
+            <label>Touchpoint stats<input id="mobileManageLunchStats" type="text" /></label>
+            <label>Notes<textarea id="mobileManageNotes" rows="3" placeholder="Talking points, strengths, concerns, context"></textarea></label>
+          </details>
           <div class="action-row">
             <button id="mobilePnmManageSaveBtn" type="submit">Save Rushee Details</button>
           </div>

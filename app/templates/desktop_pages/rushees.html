@@ -1,23 +1,20 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'rushees' %} is-active{% endif %}" data-page="rushees">
-        <section class="panel reveal delay-2 rushee-action-shell">
-          <div class="section-head">
-            <div>
-              <h2>Rushee Workspace</h2>
-              <p class="muted">Roster, inspector, quick creation, and packet-ready detail in one workspace.</p>
-            </div>
-            <div class="action-row">
-              <button id="pnmViewToggleTable" type="button" class="secondary">Table View</button>
-              <button id="pnmViewToggleBoard" type="button" class="secondary">Board View</button>
+	        <section class="panel reveal delay-2 rushee-action-shell">
+	          <div class="section-head">
+	            <h2>Roster tools</h2>
+	            <div class="action-row">
+	              <button id="pnmViewToggleTable" type="button" class="secondary">Table View</button>
+	              <button id="pnmViewToggleBoard" type="button" class="secondary">Board View</button>
             </div>
           </div>
           <div class="rushee-quick-actions-grid">
-            <details class="panel rushee-inline-panel rushee-create-panel rushee-inline-drawer">
-              <summary class="rushee-create-summary">
-                <div>
-                  <h3>Create Rushee</h3>
-                  <p class="muted">Open the quick-add form when you need to seed a new rushee into the roster.</p>
-                </div>
-                <span class="rushee-inline-drawer-hint">Open Form</span>
+	            <details class="panel rushee-inline-panel rushee-create-panel rushee-inline-drawer">
+	              <summary class="rushee-create-summary">
+	                <div>
+	                  <h3>Add a rushee</h3>
+	                  <p class="muted">Create a record and assign it to yourself.</p>
+	                </div>
+	                <span class="rushee-inline-drawer-hint">Open</span>
               </summary>
               <div class="rushee-inline-drawer-body">
                 <form id="pnmForm" class="stack">
@@ -94,22 +91,28 @@
           </div>
         </section>
 
-        <section id="rusheeFiltersSection" class="panel filters reveal delay-3 workspace-sticky-filter-bar">
-          <div class="inline-grid filters-grid">
-            <label>
-              Interest (ANY match)
-              <input id="rusheeFilterInterest" list="interestHints" type="text" placeholder="Leadership" />
-            </label>
-            <label>
-              Stereotype
-              <input id="rusheeFilterStereotype" list="stereotypeFilterHints" type="text" placeholder="Connector" />
-            </label>
-            <label>
-              State
-              <input id="rusheeFilterState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
-            </label>
-          </div>
-        </section>
+	        <details id="rusheeFiltersSection" class="panel filters reveal delay-3 workspace-disclosure workspace-filter-disclosure">
+	          <summary>
+	            <span>Filters</span>
+	            <small>Interest, stereotype, and state</small>
+	          </summary>
+	          <div class="workspace-disclosure-body">
+	            <div class="inline-grid filters-grid">
+	              <label>
+	                Interest
+	                <input id="rusheeFilterInterest" list="interestHints" type="text" placeholder="Leadership" />
+	              </label>
+	              <label>
+	                Stereotype
+	                <input id="rusheeFilterStereotype" list="stereotypeFilterHints" type="text" placeholder="Connector" />
+	              </label>
+	              <label>
+	                State
+	                <input id="rusheeFilterState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
+	              </label>
+	            </div>
+	          </div>
+	        </details>
 
         <div class="rushee-workspace-grid reveal delay-4">
           <section id="pnmSection" class="panel rushee-roster-panel">
@@ -134,7 +137,7 @@
 
             <div class="grid-two rushee-inspector-grid">
               <article class="rushee-inspector-column rushee-inspector-column-primary">
-                <section class="rushee-inspector-block rushee-identity-block">
+	                <section class="rushee-inspector-block rushee-identity-block">
                   <div class="section-head section-head-compact">
                     <div>
                       <h3>Identity + Packet Readiness</h3>
@@ -145,73 +148,73 @@
                     <img id="selectedPnmPhoto" class="meeting-photo hidden" alt="Selected rushee" />
                     <div id="selectedPnmPhotoPlaceholder" class="photo-placeholder">No photo uploaded yet.</div>
                   </div>
-                  <div class="action-row shared-rushee-action-strip">
-                    <button id="rusheeRateFocusBtn" type="button" class="secondary">Rate</button>
-                    <button id="rusheeCommentFocusActionBtn" type="button" class="secondary">Add Comment</button>
-                    <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
-                    <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
-                  </div>
-                  <form id="photoForm" class="stack compact-upload">
-                    <label>
-                      Update photo
-                      <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
-                    </label>
-                    <div class="action-row">
-                      <button type="submit" class="secondary">Upload Photo</button>
-                      <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                  <div class="rushee-identity-controls">
+                    <div class="action-row shared-rushee-action-strip">
+                      <button id="rusheeRateFocusBtn" type="button" class="secondary">Rate</button>
+                      <button id="rusheeCommentFocusActionBtn" type="button" class="secondary">Add Comment</button>
+                      <button id="rusheeScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
+                      <a id="openMeetingPageBtn" href="{{ app_config.meeting_base if app_config else '/meeting' }}" class="quick-nav-link">Open Packet</a>
                     </div>
-                  </form>
-                </section>
-
-                <section class="rushee-inspector-block">
-                  <div class="section-head section-head-compact">
-                    <div>
-                      <h3>Quick Rating</h3>
-                      <p class="muted">Update your current read without leaving the roster.</p>
-                    </div>
+                    <details class="inline-tool-disclosure">
+                      <summary>Photo tools</summary>
+                      <form id="photoForm" class="stack compact-upload">
+                        <label>
+                          Update photo
+                          <input id="selectedPnmPhotoFile" type="file" accept="image/png,image/jpeg,image/webp" />
+                        </label>
+                        <div class="action-row">
+                          <button type="submit" class="secondary">Upload Photo</button>
+                          <button id="refreshInstagramPhotoBtn" type="button" class="secondary">Pull From Instagram</button>
+                        </div>
+                      </form>
+                    </details>
                   </div>
-                  <form id="ratingForm" class="stack">
-                    <label>
-                      Rushee
-                      <select id="ratingPnm" required></select>
-                    </label>
-                    <div class="inline-grid five-cols compact-inputs">
-                      <label><span id="rateGirlsLabel">Girls (0-10, optional)</span><input id="rateGirls" type="number" min="0" max="10" /></label>
-                      <label><span id="rateProcessLabel">Process (0-10, optional)</span><input id="rateProcess" type="number" min="0" max="10" /></label>
-                      <label><span id="ratePersonableLabel">Personable (0-10, optional)</span><input id="ratePersonable" type="number" min="0" max="10" /></label>
-                      <label><span id="rateAlcoholLabel">Alcohol (0-10, optional)</span><input id="rateAlcohol" type="number" min="0" max="10" /></label>
-                      <label><span id="rateIgLabel">IG (0-5, optional)</span><input id="rateIg" type="number" min="0" max="5" /></label>
-                    </div>
-                    <label>
-                      Comment or quick note (required on rating updates; also used for comment-only notes)
-                      <textarea id="rateComment" rows="3" placeholder="Explain what changed, or add a quick note for the meeting packet."></textarea>
-                    </label>
-                    <div class="action-row">
-                      <button type="submit">Save Rating</button>
-                      <button id="rusheeCommentOnlyBtn" type="button" class="secondary">Add Comment Only</button>
-                    </div>
-                  </form>
-                </section>
+	                </section>
 
-                <section class="rushee-inspector-block">
-                  <div class="section-head section-head-compact">
-                    <h3>Ratings</h3>
-                    <span class="muted">Latest submitted reads</span>
-                  </div>
-                  <div id="ratingList" class="list-box muted">Select a rushee to view rating entries.</div>
-                </section>
+	                <details id="rusheeRatingDisclosure" class="rushee-inspector-disclosure">
+	                  <summary>Quick rating or comment</summary>
+	                  <section class="rushee-inspector-block">
+	                    <form id="ratingForm" class="stack">
+	                      <label>
+	                        Rushee
+	                        <select id="ratingPnm" required></select>
+	                      </label>
+	                      <div class="inline-grid five-cols compact-inputs">
+	                        <label><span id="rateGirlsLabel">Girls (0-10, optional)</span><input id="rateGirls" type="number" min="0" max="10" /></label>
+	                        <label><span id="rateProcessLabel">Process (0-10, optional)</span><input id="rateProcess" type="number" min="0" max="10" /></label>
+	                        <label><span id="ratePersonableLabel">Personable (0-10, optional)</span><input id="ratePersonable" type="number" min="0" max="10" /></label>
+	                        <label><span id="rateAlcoholLabel">Alcohol (0-10, optional)</span><input id="rateAlcohol" type="number" min="0" max="10" /></label>
+	                        <label><span id="rateIgLabel">IG (0-5, optional)</span><input id="rateIg" type="number" min="0" max="5" /></label>
+	                      </div>
+	                      <label>
+	                        Comment or quick note
+	                        <textarea id="rateComment" rows="3" placeholder="Add context for the next officer or meeting."></textarea>
+	                      </label>
+	                      <div class="action-row">
+	                        <button type="submit">Save Rating</button>
+	                        <button id="rusheeCommentOnlyBtn" type="button" class="secondary">Add Comment Only</button>
+	                      </div>
+	                    </form>
+	                  </section>
+	                </details>
 
-                <section class="rushee-inspector-block">
-                  <div class="section-head section-head-compact">
-                    <h3>Touchpoint History</h3>
-                    <span class="muted">Touchpoints and follow-up context</span>
-                  </div>
-                  <div id="lunchHistory" class="list-box muted">Select a rushee to view touchpoint logs.</div>
-                </section>
-              </article>
+	                <details class="rushee-inspector-disclosure">
+	                  <summary>Rating history</summary>
+	                  <section class="rushee-inspector-block">
+	                    <div id="ratingList" class="list-box muted">Select a rushee to view rating entries.</div>
+	                  </section>
+	                </details>
 
-              <article class="rushee-inspector-column rushee-inspector-column-secondary">
-                <details class="rushee-inspector-disclosure" open>
+	                <details class="rushee-inspector-disclosure">
+	                  <summary>Touchpoint history</summary>
+	                  <section class="rushee-inspector-block">
+	                    <div id="lunchHistory" class="list-box muted">Select a rushee to view touchpoint logs.</div>
+	                  </section>
+	                </details>
+	              </article>
+
+	              <article class="rushee-inspector-column rushee-inspector-column-secondary">
+	                <details class="rushee-inspector-disclosure">
                   <summary>Rushee Management</summary>
                   <section id="rusheeManagementPanel" class="stack rushee-inspector-block">
                     <div class="section-head section-head-compact">

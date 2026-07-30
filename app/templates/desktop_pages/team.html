@@ -1,53 +1,56 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'team' %} is-active{% endif %}" data-page="team">
-        <section class="panel reveal delay-2">
-          <div class="section-head">
-            <div>
-              <h2>Team Workspace</h2>
-              <p class="muted">Approvals, assignment coverage, location matches, and officer workload in one view.</p>
+        <details class="panel workspace-disclosure reveal delay-2">
+          <summary>
+            <span>Team overview</span>
+            <small>Approvals, coverage, and participation</small>
+          </summary>
+          <div class="workspace-disclosure-body">
+            <div id="teamPulseCards" class="cards"></div>
+          </div>
+        </details>
+
+        <details id="memberFiltersSection" class="panel filters reveal delay-3 workspace-disclosure workspace-filter-disclosure">
+          <summary>
+            <span>Member filters</span>
+            <small>Role, location, and sort</small>
+          </summary>
+          <div class="workspace-disclosure-body">
+            <div class="inline-grid filters-grid">
+              <label>
+                Role
+                <select id="memberFilterRole">
+                  <option value="all">All</option>
+                  <option value="Head Rush Officer">Head Rush Officer</option>
+                  <option value="Rush Officer">Rush Officer</option>
+                  <option value="Rusher">Rusher</option>
+                </select>
+              </label>
+              <label>
+                State
+                <input id="memberFilterState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
+              </label>
+              <label>
+                City
+                <input id="memberFilterCity" type="text" maxlength="80" placeholder="Austin" />
+              </label>
+              <label>
+                Sort
+                <select id="memberSortSelectDesktop">
+                  <option value="location">Location (Default)</option>
+                  <option value="username">Username</option>
+                  <option value="role">Role</option>
+                </select>
+              </label>
             </div>
           </div>
-          <div id="teamPulseCards" class="cards"></div>
-        </section>
+        </details>
 
-        <section id="memberFiltersSection" class="panel filters reveal delay-3 workspace-sticky-filter-bar">
-          <div class="inline-grid filters-grid">
-            <label>
-              Role
-              <select id="memberFilterRole">
-                <option value="all">All</option>
-                <option value="Head Rush Officer">Head Rush Officer</option>
-                <option value="Rush Officer">Rush Officer</option>
-                <option value="Rusher">Rusher</option>
-              </select>
-            </label>
-            <label>
-              State
-              <input id="memberFilterState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
-            </label>
-            <label>
-              City
-              <input id="memberFilterCity" type="text" maxlength="80" placeholder="Austin" />
-            </label>
-            <label>
-              Sort
-              <select id="memberSortSelectDesktop">
-                <option value="location">Location (Default)</option>
-                <option value="username">Username</option>
-                <option value="role">Role</option>
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section id="myProfileSection" class="panel reveal delay-4 profile-panel">
-          <div class="section-head">
-            <div>
-              <h2>My Profile</h2>
-              <p class="muted">Keep your identity, hometown details, and rush context current across the chapter workspace.</p>
-            </div>
-            <span class="muted">Used in Team, search, and assignment context</span>
-          </div>
-          <form id="myProfileForm" class="stack">
+        <details id="myProfileSection" class="panel workspace-disclosure reveal delay-4 profile-panel">
+          <summary>
+            <span>My profile</span>
+            <small>Edit name, hometown, and team context</small>
+          </summary>
+          <form id="myProfileForm" class="stack workspace-disclosure-body">
             <div class="inline-grid two-cols">
               <label>
                 Username
@@ -85,7 +88,7 @@
               <span id="myProfileStatus" class="muted">Changes update your active chapter profile immediately.</span>
             </div>
           </form>
-        </section>
+        </details>
 
         <div class="reveal delay-4 team-primary-stack">
           <section id="membersSection" class="panel">

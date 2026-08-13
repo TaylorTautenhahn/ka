@@ -17257,7 +17257,7 @@ def build_today_workspace_items(
     return [
         {
             "item_type": "lunch",
-            "title": f"Lunch with {row.get('pnm_name', 'PNM')}",
+            "title": f"Touchpoint with {row.get('pnm_name', 'PNM')}",
             "event_date": row.get("lunch_date") or "",
             "start_time": row.get("start_time") or "",
             "location": row.get("location") or "",
@@ -17399,7 +17399,11 @@ def workspace_command(
 
     team_pulse = {
         "pending_approvals": len(pending_payload.get("pending", [])),
-        "unassigned_pnms": sum(1 for row in assignments_payload.get("assignments", []) if row.get("assignment_status") == "unassigned"),
+        "unassigned_pnms": sum(
+            1
+            for row in pnms_payload.get("pnms", [])
+            if not row.get("assigned_officers") and not row.get("assigned_officer_id")
+        ),
         "needs_help": sum(1 for row in assignments_payload.get("assignments", []) if row.get("assignment_status") == "needs_help"),
         "over_capacity_officers": sum(1 for row in assignments_payload.get("officer_loads", []) if row.get("is_over_capacity")),
     }
@@ -17503,12 +17507,16 @@ def workspace_meetings(
             flags.append("No Owner")
         if int(pnm.get("total_lunches") or 0) <= 0:
             flags.append("No Touchpoint Context")
-        meeting_ready_score = max(0, 100 - len(flags) * 18 + min(int(pnm.get("rating_count") or 0), 5) * 4)
+        meeting_ready_score = min(
+            100,
+            max(0, 100 - len(flags) * 18 + min(int(pnm.get("rating_count") or 0), 5) * 4),
+        )
         candidates.append(
             {
                 "pnm_id": int(pnm.get("pnm_id") or 0),
                 "pnm_code": pnm.get("pnm_code") or "",
                 "name": f"{pnm.get('first_name', '')} {pnm.get('last_name', '')}".strip(),
+                "photo_url": pnm.get("photo_url") or "",
                 "weighted_total": round(float(pnm.get("weighted_total") or 0.0), 2),
                 "rating_count": int(pnm.get("rating_count") or 0),
                 "total_lunches": int(pnm.get("total_lunches") or 0),

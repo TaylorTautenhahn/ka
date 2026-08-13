@@ -1242,6 +1242,88 @@ body.desktop-product-auth .app-nav-icon svg {
   height: 18px;
 }
 
+body.desktop-product-auth .app-sidebar-recent {
+  display: grid;
+  gap: var(--bb-space-2);
+  margin-top: auto;
+  padding-top: var(--bb-space-3);
+  border-top: 1px solid var(--bb-line);
+}
+
+body.desktop-product-auth .app-sidebar-recent-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+body.desktop-product-auth .app-sidebar-recent-head p,
+body.desktop-product-auth .app-sidebar-recent-head span {
+  margin: 0;
+  font-size: 0.62rem;
+}
+
+body.desktop-product-auth .app-sidebar-recent-list {
+  display: grid;
+  gap: var(--bb-space-1);
+}
+
+body.desktop-product-auth .app-sidebar-recent-item {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: var(--bb-space-2);
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 6px;
+  color: var(--bb-text-soft);
+  border: 1px solid transparent;
+  background: transparent;
+  text-align: left;
+}
+
+body.desktop-product-auth .app-sidebar-recent-item:hover,
+body.desktop-product-auth .app-sidebar-recent-item:focus-visible {
+  border-color: var(--bb-line);
+  background: var(--bb-surface-raised);
+  transform: none;
+}
+
+body.desktop-product-auth .app-sidebar-recent-item img,
+body.desktop-product-auth .app-sidebar-recent-avatar {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--bb-line);
+  border-radius: 7px;
+  background: var(--bb-input);
+  object-fit: cover;
+  font-size: 0.68rem;
+  font-weight: 700;
+}
+
+body.desktop-product-auth .app-sidebar-recent-item span:last-child {
+  display: grid;
+  overflow: hidden;
+}
+
+body.desktop-product-auth .app-sidebar-recent-item strong,
+body.desktop-product-auth .app-sidebar-recent-item small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.desktop-product-auth .app-sidebar-recent-item strong {
+  color: var(--bb-text);
+  font-size: 0.7rem;
+}
+
+body.desktop-product-auth .app-sidebar-recent-item small {
+  color: var(--bb-muted);
+  font-size: 0.6rem;
+}
+
 body.desktop-product-auth .app-main,
 body.meeting-route-body .app-main {
   display: grid;
@@ -1482,6 +1564,70 @@ body.desktop-product-auth .command-center-grid {
   align-items: stretch;
 }
 
+body.desktop-product-auth .command-focus-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 260px) auto auto;
+  gap: var(--bb-space-2);
+  align-items: center;
+  margin-bottom: var(--bb-space-3);
+  padding: var(--bb-space-2);
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-radius-md);
+  background: var(--bb-input);
+}
+
+body.desktop-product-auth .command-filter-group {
+  display: flex;
+  gap: var(--bb-space-1);
+  min-width: 0;
+  overflow-x: auto;
+}
+
+body.desktop-product-auth .command-filter-group button {
+  min-height: 34px;
+  flex: 0 0 auto;
+  padding-inline: 10px;
+  color: var(--bb-muted);
+  border-color: transparent;
+  background: transparent;
+  font-size: 0.68rem;
+}
+
+body.desktop-product-auth .command-filter-group button.is-active {
+  color: var(--bb-action-ink);
+  border-color: var(--bb-action);
+  background: var(--bb-action);
+}
+
+body.desktop-product-auth .command-queue-search input {
+  min-height: 36px;
+  padding: 7px 10px;
+  font-size: 0.74rem;
+}
+
+body.desktop-product-auth .command-visible-count,
+body.desktop-product-auth .command-shortcut-hint {
+  white-space: nowrap;
+  font-size: 0.68rem;
+}
+
+body.desktop-product-auth .command-shortcut-hint {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}
+
+body.desktop-product-auth .command-shortcut-hint kbd {
+  min-width: 20px;
+  padding: 2px 5px;
+  color: var(--bb-text-soft);
+  border: 1px solid var(--bb-line-strong);
+  border-radius: 5px;
+  background: var(--bb-surface-raised);
+  font: inherit;
+  text-align: center;
+}
+
 body.desktop-product-auth .command-queue-column,
 body.desktop-product-auth .command-composer-column {
   padding: 0;
@@ -1597,7 +1743,7 @@ body.desktop-product-auth .command-selected-signal {
 
 body.desktop-product-auth .command-selected-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--bb-space-2);
 }
 
@@ -1848,6 +1994,19 @@ body.desktop-product-auth #meetingsWatchlist {
   min-height: 84px;
 }
 
+body.desktop-product-auth #meetingsWatchlist,
+body.desktop-product-auth #meetingsShortlist {
+  display: grid;
+  gap: var(--bb-space-2);
+}
+
+body.desktop-product-auth #meetingsWatchlist {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  min-height: 0;
+  max-height: 310px;
+  overflow: auto;
+}
+
 body.desktop-product-auth .meetings-grid-top {
   gap: var(--bb-space-3);
 }
@@ -1859,6 +2018,223 @@ body.desktop-product-auth .meetings-grid-top > .panel {
 body.desktop-product-auth .meetings-queue-card,
 body.desktop-product-auth .compare-candidate-card {
   padding: var(--bb-space-3);
+}
+
+body.desktop-product-auth .meetings-queue-card {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: var(--bb-space-3);
+  align-items: start;
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-radius-md);
+  background: var(--bb-input);
+}
+
+body.desktop-product-auth .meetings-candidate-photo,
+body.desktop-product-auth .meetings-candidate-fallback {
+  display: grid;
+  width: 54px;
+  height: 62px;
+  place-items: center;
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-radius-sm);
+  background: var(--bb-surface-raised);
+  object-fit: cover;
+  color: var(--bb-text);
+  font-weight: 700;
+}
+
+body.desktop-product-auth .meetings-candidate-copy {
+  display: grid;
+  gap: 6px;
+}
+
+body.desktop-product-auth .meetings-card-title,
+body.desktop-product-auth .meeting-readiness-row {
+  display: flex;
+  gap: var(--bb-space-2);
+  align-items: center;
+  justify-content: space-between;
+}
+
+body.desktop-product-auth .meetings-card-title h3,
+body.desktop-product-auth .meetings-candidate-copy p,
+body.desktop-product-auth .meetings-pin-card p {
+  margin: 0;
+}
+
+body.desktop-product-auth .meetings-card-title h3 {
+  font-size: 0.92rem;
+}
+
+body.desktop-product-auth .meeting-readiness-row {
+  color: var(--bb-muted);
+  font-size: 0.66rem;
+}
+
+body.desktop-product-auth .meeting-readiness-row strong {
+  color: var(--bb-text-soft);
+}
+
+body.desktop-product-auth .meeting-readiness-track {
+  display: block;
+  width: 100%;
+  height: 5px;
+  overflow: hidden;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 999px;
+  border: 0;
+  background: var(--bb-surface-raised);
+}
+
+body.desktop-product-auth .meeting-readiness-track::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--bb-surface-raised);
+}
+
+body.desktop-product-auth .meeting-readiness-track::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--bb-action);
+}
+
+body.desktop-product-auth .meeting-readiness-track::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--bb-action);
+}
+
+body.desktop-product-auth .meetings-card-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--bb-space-2);
+}
+
+body.desktop-product-auth .meetings-card-actions > * {
+  width: 100%;
+  min-height: 36px;
+  padding-inline: 8px;
+  font-size: 0.68rem;
+}
+
+body.desktop-product-auth .meetings-pin-card {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: var(--bb-space-2);
+  align-items: center;
+  padding: var(--bb-space-2);
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-radius-sm);
+  background: var(--bb-input);
+}
+
+body.desktop-product-auth .meetings-pin-card .meetings-candidate-photo,
+body.desktop-product-auth .meetings-pin-card .meetings-candidate-fallback {
+  width: 42px;
+  height: 48px;
+}
+
+body.desktop-product-auth .meetings-pin-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--bb-space-1);
+}
+
+body.desktop-product-auth .meetings-pin-actions > * {
+  min-height: 34px;
+  padding-inline: 7px;
+  font-size: 0.64rem;
+}
+
+body.desktop-product-auth .compact-empty-state {
+  display: grid;
+  gap: 3px;
+  align-content: center;
+  min-height: 94px;
+  padding: var(--bb-space-4);
+  border: 1px dashed var(--bb-line-strong);
+  border-radius: var(--bb-radius-md);
+  background: var(--bb-input);
+}
+
+body.desktop-product-auth .compact-empty-state p {
+  margin: 0;
+}
+
+body.desktop-product-auth .compact-empty-state-inline {
+  grid-column: 1 / -1;
+  min-height: 74px;
+}
+
+body.desktop-product-auth #rushCalendarTable {
+  max-height: min(52dvh, 590px);
+  overflow: auto;
+}
+
+body.desktop-product-auth #memberTable {
+  max-height: min(58dvh, 650px);
+  overflow: auto;
+}
+
+body.desktop-product-auth #assignedRushTable {
+  max-height: min(52dvh, 560px);
+  overflow: auto;
+}
+
+body.desktop-product-auth .member-row-actions {
+  display: flex;
+  gap: var(--bb-space-1);
+  align-items: center;
+}
+
+body.desktop-product-auth .member-row-actions > button,
+body.desktop-product-auth .member-row-menu > summary {
+  min-height: 34px;
+  padding: 7px 10px;
+  font-size: 0.68rem;
+}
+
+body.desktop-product-auth .member-row-menu {
+  position: relative;
+}
+
+body.desktop-product-auth .member-row-menu > summary {
+  display: grid;
+  place-items: center;
+  color: var(--bb-text-soft);
+  border: 1px solid var(--bb-line);
+  border-radius: var(--bb-radius-sm);
+  background: var(--bb-surface-raised);
+  list-style: none;
+  cursor: pointer;
+}
+
+body.desktop-product-auth .member-row-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+body.desktop-product-auth .member-row-menu-popover {
+  display: grid;
+  gap: var(--bb-space-1);
+  min-width: 138px;
+  margin-top: var(--bb-space-1);
+  padding: var(--bb-space-1);
+  border: 1px solid var(--bb-line-strong);
+  border-radius: var(--bb-radius-sm);
+  background: var(--bb-surface-raised);
+}
+
+body.desktop-product-auth .member-row-menu-popover button {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 8px;
+  font-size: 0.66rem;
+}
+
+body.desktop-product-auth .member-row-menu-popover .danger-action {
+  color: #f0b4aa;
+  border-color: rgba(223, 133, 119, 0.34);
 }
 
 body.desktop-product-auth .compare-summary-grid {
@@ -2884,6 +3260,18 @@ body.member-portal-body .panel {
     grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
   }
 
+  body.desktop-product-auth .command-selected-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  body.desktop-product-auth .command-focus-bar {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 220px) auto;
+  }
+
+  body.desktop-product-auth .command-shortcut-hint {
+    display: none;
+  }
+
   body.desktop-product-auth .command-score-grid,
   body.desktop-product-auth .inline-grid.five-cols {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2916,6 +3304,10 @@ body.member-portal-body .panel {
   body.desktop-product-auth .rushee-inspector-grid,
   body.desktop-product-auth .officer-chat-layout {
     grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .command-focus-bar {
+    grid-template-columns: minmax(0, 1fr) minmax(170px, 240px) auto;
   }
 
   body.desktop-product-auth .command-selected-head {
@@ -2978,6 +3370,10 @@ body.member-portal-body .panel {
     display: none;
   }
 
+  body.desktop-product-auth .app-sidebar-recent {
+    display: none;
+  }
+
   body.desktop-product-auth .app-nav,
   body.meeting-route-body .app-nav {
     display: flex;
@@ -3005,6 +3401,14 @@ body.member-portal-body .panel {
   body.desktop-product-auth .rushee-identity-block,
   body.meeting-route-body .meeting-header {
     grid-template-columns: 1fr;
+  }
+
+  body.desktop-product-auth .command-focus-bar {
+    grid-template-columns: 1fr auto;
+  }
+
+  body.desktop-product-auth .command-filter-group {
+    grid-column: 1 / -1;
   }
 
   body.desktop-product-auth .command-selected-photo-wrap .meeting-photo,

@@ -5,7 +5,21 @@
               <h2>My Queue</h2>
               <p class="muted">Choose a rushee, take action, and move to the next priority.</p>
             </div>
-            <span class="muted">Most recent activity first</span>
+            <span class="muted">Actionable work, without losing context</span>
+          </div>
+          <div class="command-focus-bar" aria-label="Queue controls">
+            <div id="commandQueueFilters" class="command-filter-group" role="group" aria-label="Filter queue">
+              <button type="button" class="secondary is-active" data-command-queue-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="secondary" data-command-queue-filter="mine" aria-pressed="false">Assigned to me</button>
+              <button type="button" class="secondary" data-command-queue-filter="follow_up" aria-pressed="false">Needs follow-up</button>
+              <button type="button" class="secondary" data-command-queue-filter="unassigned" aria-pressed="false">Unassigned</button>
+            </div>
+            <label class="command-queue-search">
+              <span class="visually-hidden-field">Search your queue</span>
+              <input id="commandQueueSearch" type="search" placeholder="Find in queue" autocomplete="off" />
+            </label>
+            <span id="commandQueueVisibleCount" class="command-visible-count muted">0 rushees</span>
+            <span class="command-shortcut-hint muted"><kbd>J</kbd><kbd>K</kbd> move</span>
           </div>
           <div class="command-center-grid">
             <article class="list-column command-queue-column">

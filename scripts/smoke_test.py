@@ -787,7 +787,14 @@ def main() -> None:
             meetings_workspace = response.json()
             if "shortlist" not in meetings_workspace or "candidates" not in meetings_workspace or "pins" not in meetings_workspace:
                 raise AssertionError("Meetings workspace payload should include shortlist, candidates, and pins.")
+            for candidate in meetings_workspace.get("candidates", []):
+                readiness = int(candidate.get("meeting_ready_score") or 0)
+                if readiness < 0 or readiness > 100:
+                    raise AssertionError("Meeting readiness scores must stay between 0 and 100.")
+                if "photo_url" not in candidate:
+                    raise AssertionError("Meeting candidates should expose photo_url for workspace cards.")
             checks.append("Meetings workspace API works")
+            checks.append("Meetings readiness and photo fields are valid")
 
             response = client.get("/kappaalphaorder/api/meetings/pins")
             expect_status(response, 200, "Meetings pins list API")

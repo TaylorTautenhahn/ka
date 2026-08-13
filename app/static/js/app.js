@@ -268,6 +268,9 @@ const commandPendingCount = document.getElementById("commandPendingCount");
 const commandNeedsHelpCount = document.getElementById("commandNeedsHelpCount");
 const commandUnassignedCount = document.getElementById("commandUnassignedCount");
 const commandCenterQueue = document.getElementById("commandCenterQueue");
+const commandQueueFilters = document.getElementById("commandQueueFilters");
+const commandQueueSearch = document.getElementById("commandQueueSearch");
+const commandQueueVisibleCount = document.getElementById("commandQueueVisibleCount");
 const commandStaleList = document.getElementById("commandStaleList");
 const commandRecentChanges = document.getElementById("commandRecentChanges");
 const commandAttentionList = document.getElementById("commandAttentionList");
@@ -351,6 +354,8 @@ const officerChatQuickTags = document.getElementById("officerChatQuickTags");
 const desktopPageNav = document.getElementById("desktopPageNav");
 const desktopPages = Array.from(document.querySelectorAll(".desktop-page[data-page]"));
 const desktopPageLinks = Array.from(document.querySelectorAll(".desktop-page-link[data-page]"));
+const sidebarRecentPanel = document.getElementById("sidebarRecentPanel");
+const sidebarRecentRushees = document.getElementById("sidebarRecentRushees");
 const operationsUnreadBadge = document.getElementById("operationsUnreadBadge");
 const tutorialLayer = document.getElementById("tutorialLayer");
 const tutorialModeCard = document.getElementById("tutorialModeCard");
@@ -685,7 +690,10 @@ const state = {
     windowHours: 72,
     limit: 30,
     error: "",
+    filter: readStoredJson("command-queue-filter", "all"),
+    query: "",
   },
+  recentRushees: [],
   memberFilters: {
     role: "all",
     state: "",
@@ -2651,7 +2659,8 @@ function renderRushCalendar() {
     .map((item) => {
       const isEvent = item.item_type === "rush_event";
       const typeLabel = isEvent ? (item.event_type || "event") : "touchpoint";
-      const title = item.title || (item.pnm_name ? `Touchpoint with ${item.pnm_name}` : "Calendar Item");
+      const rawTitle = item.title || (item.pnm_name ? `Touchpoint with ${item.pnm_name}` : "Calendar Item");
+      const title = isEvent ? rawTitle : rawTitle.replace(/^Lunch with\s+/i, "Touchpoint with ");
       const creator = item.created_by_username || "-";
       const official = isEvent && item.is_official ? '<span class="pill">Official</span>' : "";
       const details = item.details || "-";
@@ -3367,7 +3376,13 @@ function renderMemberTable() {
         ? `<button type="button" class="secondary disapprove-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Disapprove</button>`
         : "";
       const deleteAction = canDelete
-        ? `<button type="button" class="secondary delete-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Delete</button>`
+        ? `<button type="button" class="secondary danger-action delete-user" data-user-id="${member.user_id}" data-username="${escapeHtml(member.username)}">Delete member</button>`
+        : "";
+      const managementActions = disapproveAction || deleteAction
+        ? `<details class="member-row-menu">
+            <summary>Manage</summary>
+            <div class="member-row-menu-popover">${disapproveAction}${deleteAction}</div>
+          </details>`
         : "";
       return `
         <tr class="${selectedClass}">
@@ -3379,10 +3394,9 @@ function renderMemberTable() {
           <td>${ratingCount}</td>
           <td>${avgRating}</td>
           <td>
-            <div class="action-row">
-              <button type="button" class="secondary select-member" data-user-id="${member.user_id}">Select</button>
-              ${disapproveAction}
-              ${deleteAction}
+            <div class="member-row-actions">
+              <button type="button" class="secondary select-member" data-user-id="${member.user_id}">Open</button>
+              ${managementActions}
             </div>
           </td>
         </tr>
@@ -3614,6 +3628,146 @@ function staleReasonLabel(value) {
   return "Needs Update";
 }
 
+const COMMAND_QUEUE_FILTER_OPTIONS = new Set(["all", "mine", "follow_up", "unassigned"]);
+
+function normalizedCommandQueueFilter(value) {
+  const token = String(value || "all").trim().toLowerCase();
+  return COMMAND_QUEUE_FILTER_OPTIONS.has(token) ? token : "all";
+}
+
+function commandQueueItemHasOwner(item) {
+  return Boolean(
+    String((item && item.assigned_officer_username) || "").trim() ||
+      (Array.isArray(item && item.assigned_officers) && item.assigned_officers.length)
+  );
+}
+
+function commandQueueNextAction(item) {
+  if (!item) {
+    return "Select a rushee to see the next best action.";
+  }
+  if (!commandQueueItemHasOwner(item)) {
+    return "Next: assign an owner before the next touchpoint.";
+  }
+  if (Number(item.rating_count || 0) <= 0 || item.stale_reason === "never_rated") {
+    return "Next: add the first rating and a short context note.";
+  }
+  if (item.stale_reason === "rating_older_than_recent_touchpoint") {
+    return "Next: update the rating after the latest touchpoint.";
+  }
+  if (item.stale_reason === "no_recent_rating" || item.needs_rating_update) {
+    return "Next: refresh the rating before meeting review.";
+  }
+  return "Ready for meeting review. Add context only if something changed.";
+}
+
+function filteredCommandQueue() {
+  const filter = normalizedCommandQueueFilter(state.commandCenter.filter);
+  const query = String(state.commandCenter.query || "").trim().toLowerCase();
+  return (state.commandCenter.queue || []).filter((item) => {
+    if (filter === "mine" && !item.is_assigned_to_me) {
+      return false;
+    }
+    if (filter === "follow_up" && !item.needs_rating_update) {
+      return false;
+    }
+    if (filter === "unassigned" && commandQueueItemHasOwner(item)) {
+      return false;
+    }
+    if (!query) {
+      return true;
+    }
+    const haystack = [item.pnm_code, item.name, item.assigned_officer_username]
+      .map((value) => String(value || "").toLowerCase())
+      .join(" ");
+    return haystack.includes(query);
+  });
+}
+
+function syncCommandQueueControls(visibleCount, totalCount) {
+  const activeFilter = normalizedCommandQueueFilter(state.commandCenter.filter);
+  if (commandQueueFilters) {
+    commandQueueFilters.querySelectorAll("[data-command-queue-filter]").forEach((button) => {
+      const isActive = button.dataset.commandQueueFilter === activeFilter;
+      button.classList.toggle("is-active", isActive);
+      button.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+  }
+  if (commandQueueSearch && commandQueueSearch.value !== state.commandCenter.query) {
+    commandQueueSearch.value = state.commandCenter.query || "";
+  }
+  if (commandQueueVisibleCount) {
+    commandQueueVisibleCount.textContent = visibleCount === totalCount
+      ? `${totalCount} rushee${totalCount === 1 ? "" : "s"}`
+      : `${visibleCount} of ${totalCount}`;
+  }
+}
+
+function recentRusheesStorageSuffix() {
+  const userId = Number(state.user && state.user.user_id ? state.user.user_id : 0);
+  return userId ? `recent-rushees:${userId}` : "";
+}
+
+function normalizedRecentRushee(item) {
+  const pnmId = Number(item && item.pnm_id ? item.pnm_id : 0);
+  if (!pnmId) {
+    return null;
+  }
+  const composedName = `${item.first_name || ""} ${item.last_name || ""}`.trim();
+  return {
+    pnm_id: pnmId,
+    pnm_code: String(item.pnm_code || ""),
+    name: String(item.name || composedName || "Rushee"),
+    photo_url: String(item.photo_url || ""),
+    weighted_total: Number(item.weighted_total || 0),
+    viewed_at: new Date().toISOString(),
+  };
+}
+
+function renderRecentRushees() {
+  if (!sidebarRecentPanel || !sidebarRecentRushees) {
+    return;
+  }
+  const rows = Array.isArray(state.recentRushees) ? state.recentRushees.slice(0, 4) : [];
+  sidebarRecentPanel.classList.toggle("hidden", !rows.length);
+  sidebarRecentRushees.innerHTML = rows
+    .map((item) => {
+      const photo = item.photo_url
+        ? `<img src="${escapeHtml(item.photo_url)}" alt="" loading="lazy" />`
+        : `<span class="app-sidebar-recent-avatar" aria-hidden="true">${escapeHtml(String(item.name || "R").charAt(0).toUpperCase())}</span>`;
+      return `
+        <button type="button" class="app-sidebar-recent-item" data-recent-pnm-id="${Number(item.pnm_id)}">
+          ${photo}
+          <span><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.pnm_code || formatWeightedScore(item.weighted_total))}</small></span>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function loadRecentRusheesForUser() {
+  const suffix = recentRusheesStorageSuffix();
+  const stored = suffix ? readStoredJson(suffix, []) : [];
+  state.recentRushees = Array.isArray(stored)
+    ? stored.map(normalizedRecentRushee).filter(Boolean).slice(0, 4)
+    : [];
+  renderRecentRushees();
+}
+
+function rememberRecentRushee(item) {
+  const normalized = normalizedRecentRushee(item);
+  const suffix = recentRusheesStorageSuffix();
+  if (!normalized || !suffix) {
+    return;
+  }
+  state.recentRushees = [
+    normalized,
+    ...(state.recentRushees || []).filter((row) => Number(row.pnm_id) !== normalized.pnm_id),
+  ].slice(0, 4);
+  writeStoredJson(suffix, state.recentRushees);
+  renderRecentRushees();
+}
+
 function commandQueueSelectedItem() {
   const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
   if (!selectedId) {
@@ -3769,8 +3923,7 @@ function applyCommandRatingFormForSelected() {
       `Score ${scoreLabel} (${tierLabel}) | Assigned: ${assignedLabel} | Touchpoint: ${touchpointLabel} | My Rating: ${mineLabel} | ${staleLabel}`;
   }
   if (commandSelectedSignal) {
-    commandSelectedSignal.textContent =
-      `${selected.needs_rating_update ? "Needs follow-up" : "Ready"} · ${assignedTeam.length ? `${assignedTeam.length} officer${assignedTeam.length === 1 ? "" : "s"} on coverage` : "No assignment team"} · Priority ${Number(selected.priority_score || 0).toFixed(0)}`;
+    commandSelectedSignal.textContent = commandQueueNextAction(selected);
   }
   if (commandSelectedStats) {
     commandSelectedStats.innerHTML = `
@@ -3848,15 +4001,17 @@ function renderCommandCenter() {
     commandWindowLabel.textContent = `Window: last ${Number(summary.window_hours || state.commandCenter.windowHours || 72)} hours`;
   }
 
-  const queue = Array.isArray(state.commandCenter.queue) ? state.commandCenter.queue : [];
-  if (!state.commandCenter.selectedQueuePnmId || !queue.some((item) => Number(item.pnm_id) === Number(state.commandCenter.selectedQueuePnmId))) {
-    state.commandCenter.selectedQueuePnmId = queue.length ? Number(queue[0].pnm_id) : null;
+  const allQueue = Array.isArray(state.commandCenter.queue) ? state.commandCenter.queue : [];
+  const queue = filteredCommandQueue();
+  if (!state.commandCenter.selectedQueuePnmId || !allQueue.some((item) => Number(item.pnm_id) === Number(state.commandCenter.selectedQueuePnmId))) {
+    state.commandCenter.selectedQueuePnmId = queue.length ? Number(queue[0].pnm_id) : (allQueue.length ? Number(allQueue[0].pnm_id) : null);
   }
+  syncCommandQueueControls(queue.length, allQueue.length);
 
   if (commandCenterQueue) {
     if (!queue.length) {
-      const detail = state.commandCenter.error || "No queue items available yet.";
-      commandCenterQueue.innerHTML = `<p class="muted">${escapeHtml(detail)}</p>`;
+      const detail = state.commandCenter.error || (allQueue.length ? "No rushees match this queue view." : "No queue items available yet.");
+      commandCenterQueue.innerHTML = `<div class="compact-empty-state"><strong>Nothing in this view</strong><p class="muted">${escapeHtml(detail)}</p></div>`;
     } else {
       commandCenterQueue.innerHTML = queue
         .map((item) => {
@@ -4439,7 +4594,7 @@ function renderMeetingCompareCard(payload, fallbackLabel) {
       <div class="compare-candidate-meta">Assigned: ${escapeHtml((pnm.assigned_officer && pnm.assigned_officer.username) || "Unassigned")}</div>
       <div class="compare-candidate-meta">Rank ${metrics.weighted_rank || "-"} of ${metrics.cohort_size || "-"}</div>
       <div class="action-row">
-        <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Meeting Packet</a>
+        <a class="quick-nav-link" data-remember-pnm-id="${Number(pnm.pnm_id)}" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(pnm.pnm_id)}`)}">Open Meeting Packet</a>
         <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(pnm.pnm_id)}">${isWatchedPnm(pnm.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
       </div>
     </article>
@@ -4475,26 +4630,60 @@ async function loadMeetingCompareSummary(slot) {
   renderMeetingsWorkspace();
 }
 
+function meetingReadinessLabel(score) {
+  const value = Math.max(0, Math.min(100, Number(score || 0)));
+  if (value >= 85) {
+    return { label: "Packet ready", className: "good" };
+  }
+  if (value >= 60) {
+    return { label: "Needs context", className: "warn" };
+  }
+  return { label: "Prep required", className: "bad" };
+}
+
+function meetingCandidatePhoto(item) {
+  if (item && item.photo_url) {
+    return `<img class="meetings-candidate-photo" src="${escapeHtml(item.photo_url)}" alt="" loading="lazy" />`;
+  }
+  return `<span class="meetings-candidate-photo meetings-candidate-fallback" aria-hidden="true">${escapeHtml(String((item && item.name) || "R").charAt(0).toUpperCase())}</span>`;
+}
+
+function meetingFlagChips(item) {
+  const flags = Array.isArray(item && item.flags) ? item.flags : [];
+  return flags.length
+    ? flags.slice(0, 3).map((flag) => `<span class="pill warn">${escapeHtml(flag)}</span>`).join("")
+    : '<span class="pill good">Context complete</span>';
+}
+
 function renderMeetingsWorkspace() {
   if (meetingsShortlist) {
     const rows = state.meetingsWorkspace.shortlist || [];
     meetingsShortlist.innerHTML = rows.length
       ? rows
           .map(
-            (item) => `
-              <div class="meetings-queue-card">
-                <h3>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</h3>
-                <div class="compare-candidate-meta">Ready ${Number(item.meeting_ready_score || 0)} | Weighted ${Number(item.weighted_total || 0).toFixed(2)} | Ratings ${Number(item.rating_count || 0)}</div>
-                <div class="compare-candidate-meta">${escapeHtml(item.flags.join(" • ") || "Meeting-ready context in place")}</div>
-                <div class="action-row">
-                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Meeting Packet</a>
+            (item) => {
+              const readiness = Math.max(0, Math.min(100, Number(item.meeting_ready_score || 0)));
+              const status = meetingReadinessLabel(readiness);
+              return `
+              <article class="meetings-queue-card">
+                ${meetingCandidatePhoto(item)}
+                <div class="meetings-candidate-copy">
+                  <div class="meetings-card-title"><h3>${escapeHtml(item.name)}</h3><span class="pill ${status.className}">${escapeHtml(status.label)}</span></div>
+                  <p class="muted">${escapeHtml(item.pnm_code)} · ${formatWeightedScore(item.weighted_total)} · ${Number(item.rating_count || 0)} rating${Number(item.rating_count || 0) === 1 ? "" : "s"}</p>
+                  <div class="meeting-readiness-row"><span>Readiness</span><strong>${readiness}%</strong></div>
+                  <progress class="meeting-readiness-track" max="100" value="${readiness}" aria-label="Meeting readiness ${readiness} percent">${readiness}%</progress>
+                  <div class="command-chip-row">${meetingFlagChips(item)}</div>
+                </div>
+                <div class="meetings-card-actions">
+                  <a class="quick-nav-link" data-remember-pnm-id="${Number(item.pnm_id)}" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Packet</a>
                   <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">${isWatchedPnm(item.pnm_id) ? "Pinned for Meetings" : "Pin for Meetings"}</button>
                 </div>
-              </div>
-            `
+              </article>
+            `;
+            }
           )
           .join("")
-      : '<p class="muted">No meeting shortlist yet.</p>';
+      : '<div class="compact-empty-state"><strong>No shortlist yet</strong><p class="muted">Rate or pin a rushee to begin meeting preparation.</p></div>';
   }
   if (meetingsAttentionList) {
     const rows = state.meetingsWorkspace.attention || [];
@@ -4509,7 +4698,7 @@ function renderMeetingsWorkspace() {
             `
           )
           .join("")
-      : '<p class="muted">No meeting prep exceptions right now.</p>';
+      : '<div class="compact-empty-state"><strong>Meeting prep is clear</strong><p class="muted">No missing context needs attention right now.</p></div>';
   }
   if (meetingsWatchlist) {
     const rows = Array.isArray(state.meetingPins) ? state.meetingPins : [];
@@ -4517,18 +4706,22 @@ function renderMeetingsWorkspace() {
       ? rows
           .map(
             (item) => `
-        <div class="entry">
-                <div class="entry-title"><strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name || `${item.first_name || ""} ${item.last_name || ""}`.trim())}</strong><span>${Number(item.weighted_total || 0).toFixed(2)}</span></div>
-                <div class="muted">Pinned by ${escapeHtml(item.pinned_by_username || "Rush team")} | ${escapeHtml(formatTrendTimestamp(item.pinned_at))}</div>
-                <div class="action-row">
-                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove from Meetings</button>
-                  <a class="quick-nav-link" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Meeting Packet</a>
+              <article class="meetings-pin-card">
+                ${meetingCandidatePhoto(item)}
+                <div>
+                  <strong>${escapeHtml(item.name || `${item.first_name || ""} ${item.last_name || ""}`.trim())}</strong>
+                  <p class="muted">${escapeHtml(item.pnm_code)} · ${formatWeightedScore(item.weighted_total)}</p>
+                  <small class="muted">Pinned by ${escapeHtml(item.pinned_by_username || "Rush team")}</small>
                 </div>
-              </div>
+                <div class="meetings-pin-actions">
+                  <button type="button" class="secondary watch-toggle-btn" data-watch-pnm-id="${Number(item.pnm_id)}">Remove from Meetings</button>
+                  <a class="quick-nav-link" data-remember-pnm-id="${Number(item.pnm_id)}" href="${escapeHtml(`${MEETING_BASE}?pnm_id=${Number(item.pnm_id)}`)}">Open Packet</a>
+                </div>
+              </article>
             `
           )
           .join("")
-      : '<p class="muted">No pinned rushees yet.</p>';
+      : '<div class="compact-empty-state compact-empty-state-inline"><strong>No one pinned</strong><p class="muted">Pin only the rushees your team needs for the next meeting.</p></div>';
   }
   if (meetingsCompareSelectA) {
     const options = '<option value=\"\">Select</option>' + (state.meetingsWorkspace.candidates || [])
@@ -5630,6 +5823,7 @@ async function focusRusheeComposerForPnm(pnmId, mode = "rate") {
   }
   state.selectedPnmId = targetId;
   state.headAssignmentPnmId = targetId;
+  rememberRecentRushee(state.pnms.find((pnm) => Number(pnm.pnm_id) === targetId));
   syncSelectedRusheeRoute("replace");
   renderPnmTable();
   applyRatingFormForSelected();
@@ -6342,6 +6536,7 @@ async function ensureSession() {
       return;
     }
     state.user = payload.user;
+    loadRecentRusheesForUser();
     if (shouldRedirectToMemberPortal(state.user)) {
       window.location.replace(APP_CONFIG.member_base);
       return;
@@ -6396,6 +6591,7 @@ async function handleLogin(event) {
     }
 
     state.user = payload.user;
+    loadRecentRusheesForUser();
     setAuthView(true);
     setSessionHeading();
     updateTopbarActions();
@@ -6454,6 +6650,8 @@ async function handleLogout() {
   closeTouchpointDrawer();
   closeAppMenus();
   state.user = null;
+  state.recentRushees = [];
+  renderRecentRushees();
   closeTutorialOverlay();
   state.selectedPnmId = null;
   state.pnms = [];
@@ -6470,6 +6668,8 @@ async function handleLogout() {
     windowHours: 72,
     limit: 30,
     error: "",
+    filter: normalizedCommandQueueFilter(readStoredJson("command-queue-filter", "all")),
+    query: "",
   };
   state.calendarShare = null;
   state.scheduledLunches = [];
@@ -7014,7 +7214,8 @@ async function handleRatingSave(event) {
 }
 
 function nextCommandQueuePnmId(previousId) {
-  const rows = Array.isArray(state.commandCenter.queue) ? state.commandCenter.queue : [];
+  const filteredRows = filteredCommandQueue();
+  const rows = filteredRows.length ? filteredRows : (Array.isArray(state.commandCenter.queue) ? state.commandCenter.queue : []);
   if (!rows.length) {
     return null;
   }
@@ -7102,6 +7303,7 @@ async function submitCommandRating(options = {}) {
         await refreshCommandCenterDependencies();
         if (advance) {
           state.commandCenter.selectedQueuePnmId = nextCommandQueuePnmId(currentId);
+          rememberRecentRushee(commandQueueSelectedItem());
           renderCommandCenter();
         }
 
@@ -7269,6 +7471,31 @@ async function handleTouchpointDrawerSubmit(event) {
   await submitTouchpointDrawer();
 }
 
+function selectCommandQueueItem(pnmId, options = {}) {
+  const targetId = Number(pnmId || 0);
+  if (!targetId) {
+    return false;
+  }
+  const currentId = Number(state.commandCenter.selectedQueuePnmId || 0);
+  if (currentId && currentId !== targetId && shouldPreserveRatingDraft("command", currentId)) {
+    showToast("Save or clear the current draft before changing rushees.");
+    return false;
+  }
+  const selected = (state.commandCenter.queue || []).find((item) => Number(item.pnm_id) === targetId) || null;
+  if (!selected) {
+    return false;
+  }
+  state.commandCenter.selectedQueuePnmId = targetId;
+  state.selectedPnmId = targetId;
+  if (options.remember !== false) {
+    rememberRecentRushee(selected);
+  }
+  renderPnmTable();
+  applyRatingFormForSelected();
+  renderCommandCenter();
+  return true;
+}
+
 function handleQueueSelect(event) {
   const button = event.target.closest("[data-command-queue-pnm-id]");
   if (!button) {
@@ -7278,11 +7505,76 @@ function handleQueueSelect(event) {
   if (!pnmId) {
     return;
   }
-  state.commandCenter.selectedQueuePnmId = pnmId;
-  state.selectedPnmId = pnmId;
-  renderPnmTable();
-  applyRatingFormForSelected();
+  selectCommandQueueItem(pnmId);
+}
+
+function handleCommandQueueFilterClick(event) {
+  const button = event.target.closest("[data-command-queue-filter]");
+  if (!button) {
+    return;
+  }
+  state.commandCenter.filter = normalizedCommandQueueFilter(button.dataset.commandQueueFilter);
+  writeStoredJson("command-queue-filter", state.commandCenter.filter);
   renderCommandCenter();
+}
+
+function handleCommandQueueSearchInput(event) {
+  state.commandCenter.query = String(event.target.value || "");
+  renderCommandCenter();
+}
+
+function handleCommandQueueKeyboard(event) {
+  if (state.activeDesktopPage !== "dashboard" || event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
+  const target = event.target;
+  if (target && (target.matches("input, textarea, select, button, a") || target.isContentEditable)) {
+    return;
+  }
+  const key = String(event.key || "").toLowerCase();
+  if (!['j', 'k'].includes(key)) {
+    return;
+  }
+  const queue = filteredCommandQueue();
+  if (!queue.length) {
+    return;
+  }
+  const currentIndex = queue.findIndex((item) => Number(item.pnm_id) === Number(state.commandCenter.selectedQueuePnmId));
+  const delta = key === "j" ? 1 : -1;
+  const nextIndex = currentIndex < 0
+    ? 0
+    : Math.max(0, Math.min(queue.length - 1, currentIndex + delta));
+  if (selectCommandQueueItem(queue[nextIndex].pnm_id)) {
+    event.preventDefault();
+    commandCenterQueue?.querySelector(`[data-command-queue-pnm-id="${Number(queue[nextIndex].pnm_id)}"]`)?.focus({ preventScroll: true });
+  }
+}
+
+async function handleRecentRusheeClick(event) {
+  const button = event.target.closest("[data-recent-pnm-id]");
+  if (!button) {
+    return;
+  }
+  const pnmId = Number(button.dataset.recentPnmId || 0);
+  if (!pnmId) {
+    return;
+  }
+  state.selectedPnmId = pnmId;
+  state.headAssignmentPnmId = pnmId;
+  pushDesktopRoute("rushees", { pnm_id: pnmId });
+  setActiveDesktopPage("rushees", false);
+  await loadRusheesWorkspace();
+}
+
+function handleRememberRusheeClick(event) {
+  const target = event.target.closest("[data-remember-pnm-id]");
+  if (!target) {
+    return;
+  }
+  const pnmId = Number(target.dataset.rememberPnmId || 0);
+  const item = (state.meetingsWorkspace.candidates || []).find((row) => Number(row.pnm_id) === pnmId)
+    || (state.meetingPins || []).find((row) => Number(row.pnm_id) === pnmId);
+  rememberRecentRushee(item);
 }
 
 async function handleHeadAssignmentSubmit(event) {
@@ -7608,6 +7900,7 @@ async function handlePnmTableClick(event) {
     }
     state.selectedPnmId = pnmId;
     state.headAssignmentPnmId = pnmId;
+    rememberRecentRushee(state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId));
     syncSelectedRusheeRoute("replace");
     renderPnmTable();
     applyRatingFormForSelected();
@@ -7628,6 +7921,7 @@ async function handlePnmTableClick(event) {
 
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
+  rememberRecentRushee(state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId));
   syncSelectedRusheeRoute("replace");
   renderPnmTable();
   applyRatingFormForSelected();
@@ -7662,6 +7956,7 @@ async function handleGlobalOpenPnmClick(event) {
   }
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
+  rememberRecentRushee(state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId));
   pushDesktopRoute("rushees", { pnm_id: pnmId });
   setActiveDesktopPage("rushees", false);
   await loadRusheesWorkspace();
@@ -7973,6 +8268,7 @@ async function handleSameStatePnmsClick(event) {
   syncFilterInputsFromState();
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
+  rememberRecentRushee(state.sameStatePnms.find((pnm) => Number(pnm.pnm_id) === pnmId));
   pushDesktopRoute("rushees", { pnm_id: pnmId });
   setActiveDesktopPage("rushees", false);
   await loadRusheesWorkspace();
@@ -8947,6 +9243,17 @@ function attachEvents() {
   if (commandCenterQueue) {
     commandCenterQueue.addEventListener("click", handleQueueSelect);
   }
+  if (commandQueueFilters) {
+    commandQueueFilters.addEventListener("click", handleCommandQueueFilterClick);
+  }
+  if (commandQueueSearch) {
+    commandQueueSearch.addEventListener("input", handleCommandQueueSearchInput);
+  }
+  if (sidebarRecentRushees) {
+    sidebarRecentRushees.addEventListener("click", (event) => {
+      handleRecentRusheeClick(event).catch((error) => showToast(error.message || "Unable to open this rushee."));
+    });
+  }
   if (commandWatchToggleBtn) {
     commandWatchToggleBtn.addEventListener("click", async () => {
       const selectedId = Number(state.commandCenter.selectedQueuePnmId || 0);
@@ -9277,6 +9584,7 @@ function attachEvents() {
     sameStatePnmsList.addEventListener("click", handleSameStatePnmsClick);
   }
   document.addEventListener("click", handleWatchToggleClick);
+  document.addEventListener("click", handleRememberRusheeClick);
   document.addEventListener("click", handleSeasonKickoffJumpClick);
   document.addEventListener("click", (event) => {
     handleGlobalOpenPnmClick(event).catch(() => {});
@@ -9361,6 +9669,7 @@ function attachEvents() {
     tutorialCloseBtn.addEventListener("click", () => closeTutorialOverlay());
   }
   document.addEventListener("keydown", handleTutorialKeydown);
+  document.addEventListener("keydown", handleCommandQueueKeyboard);
   document.addEventListener("visibilitychange", handleLiveRefreshAvailabilityChange);
   window.addEventListener("online", handleLiveRefreshAvailabilityChange);
   window.addEventListener("offline", handleLiveRefreshAvailabilityChange);

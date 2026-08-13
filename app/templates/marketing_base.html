@@ -3,78 +3,61 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#15120e" />
+    <meta name="theme-color" content="#f4f0e7" />
     <title>{% block title %}BidBoard{% endblock %}</title>
-    <meta name="description" content="{% block description %}BidBoard is the recruitment command layer for fraternities and sororities.{% endblock %}" />
+    <meta name="description" content="{% block description %}BidBoard is the recruitment operating system for fraternities and sororities.{% endblock %}" />
+    <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
     <link rel="stylesheet" href="{{ asset_url('css/landing.css') }}" />
     <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
     <script src="{{ asset_url('js/landing.js') }}" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
-  {% set marketing_tenant_count = tenant_count if tenant_count is defined else (tenants|length if tenants is defined else 0) %}
   <body class="bb-page {% block body_class %}{% endblock %}">
-    <div class="bb-noise" aria-hidden="true"></div>
-    <div class="bb-atmosphere bb-atmosphere-a" aria-hidden="true"></div>
-    <div class="bb-atmosphere bb-atmosphere-b" aria-hidden="true"></div>
-    <div class="bb-grid-field" aria-hidden="true"></div>
-
+    <div class="bb-page-texture" aria-hidden="true"></div>
     <main class="bb-shell">
       <header class="bb-topbar bb-reveal" data-delay="10">
         <a class="bb-brand" href="/" aria-label="BidBoard home">
-          <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="bb-brand-mark-image" />
+          <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="" class="bb-brand-mark-image" />
           <span class="bb-brand-lockup">
             <strong>BidBoard</strong>
-            <small>Recruitment Command Intelligence</small>
+            <small>Recruitment operations</small>
           </span>
         </a>
 
-        <button id="bbNavToggle" class="bb-nav-toggle" type="button" aria-label="Open site navigation" aria-expanded="false" aria-controls="bbPrimaryNav">
-          <span></span>
-          <span></span>
+        <button id="bbNavToggle" class="bb-nav-toggle" type="button" aria-controls="bbPrimaryNav" aria-expanded="false">
+          <span></span><span></span>
+          <span class="sr-only">Open navigation</span>
         </button>
 
-        <nav id="bbPrimaryNav" class="bb-topbar-actions" aria-label="Primary">
-          <a class="bb-link{% if nav_key == 'features' %} is-active{% endif %}" href="/features">Product</a>
-          <a class="bb-link{% if nav_key == 'demo' %} is-active{% endif %}" href="/demo">Demo</a>
-          <a class="bb-link{% if nav_key == 'faq' %} is-active{% endif %}" href="/faq">FAQ</a>
+        <nav id="bbPrimaryNav" class="bb-nav" aria-label="Primary">
+          <a href="/features"{% if nav_key == 'features' %} class="is-active"{% endif %}>Product</a>
+          <a href="/faq"{% if nav_key == 'faq' %} class="is-active"{% endif %}>FAQ</a>
+          <a href="/demo">Demo</a>
         </nav>
 
-        <div class="bb-topbar-utilities">
-          <a class="bb-login-btn{% if nav_key == 'organizations' %} is-active{% endif %}" href="/organizations">Organization Login</a>
-        </div>
+        <a class="bb-header-cta" href="/organizations">
+          <span>Open workspace</span>
+          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4" /></svg>
+        </a>
       </header>
 
       {% block page_content %}{% endblock %}
 
-      <footer class="bb-footer bb-reveal" data-delay="40">
+      <footer class="bb-footer bb-reveal" data-delay="30">
         <div class="bb-footer-branding">
-          <div class="bb-footer-brand-lockup">
-            <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="bb-footer-mark" />
-            <div>
-              <p class="bb-kicker">BidBoard</p>
-              <h2>The modern command surface for recruitment week.</h2>
-            </div>
-          </div>
-          <p>
-            Built for fraternities and sororities that need faster scoring, cleaner coordination, and meeting-ready decisions without spreadsheet drift.
-          </p>
-          <p class="bb-footer-trust">Private by organization. Role-aware by default. Built for the pace of recruitment week.</p>
-        </div>
-
-        <div class="bb-footer-links">
+          <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="" class="bb-footer-mark" />
           <div>
-            <p>Explore</p>
-            <a href="/">Home</a>
-            <a href="/features">Product</a>
-            <a href="/demo">Demo</a>
-            <a href="/faq">FAQ</a>
-          </div>
-          <div>
-            <p>Access</p>
-            <a href="/organizations">Organization Login</a>
-            <a href="/platform">Platform Admin</a>
+            <strong>BidBoard</strong>
+            <p>Clearer recruiting decisions, from first contact to final meeting.</p>
           </div>
         </div>
+        <nav class="bb-footer-links" aria-label="Footer">
+          <a href="/features">Product</a>
+          <a href="/faq">FAQ</a>
+          <a href="/organizations">Organization login</a>
+          <a href="/platform">Platform admin</a>
+        </nav>
+        <p class="bb-footer-note">Private by organization. Role-aware by default.</p>
       </footer>
     </main>
   </body>

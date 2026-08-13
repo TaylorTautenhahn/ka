@@ -16,20 +16,6 @@
 
           <div class="admin-overview-grid">
             <div id="headAdminSummary" class="cards"></div>
-            <div class="cards admin-signal-strip">
-              <article class="card">
-                <p>Leadership</p>
-                <strong>Approve, promote, and rebalance officer coverage</strong>
-              </article>
-              <article class="card">
-                <p>Season Control</p>
-                <strong>Archive safely before the next rush cycle</strong>
-              </article>
-              <article class="card">
-                <p>Data Health</p>
-                <strong>Keep imports, storage, and backups in one place</strong>
-              </article>
-            </div>
           </div>
         </section>
 
@@ -58,6 +44,7 @@
               <h3>Password Reset</h3>
               <p class="muted">Head Rush Officers can reset approved rush team passwords when someone gets locked out.</p>
               <form id="resetUserAccessCodeForm" class="stack">
+                <input id="resetUserAccessCodeUsername" class="visually-hidden-field" type="text" autocomplete="username" tabindex="-1" aria-hidden="true" />
                 <label>
                   Rush team member
                   <select id="resetUserAccessCodeSelect"></select>
@@ -256,8 +243,8 @@
                   <p class="muted">Choose one approved stereotype tag.</p>
                 </label>
                 <label>
-                  Lunch stats
-                  <input id="adminEditLunchStats" type="text" placeholder="3 lunches this week" />
+                  Touchpoint summary
+                  <input id="adminEditLunchStats" type="text" placeholder="3 touchpoints this week" />
                 </label>
                 <label>
                   Notes

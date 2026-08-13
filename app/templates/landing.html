@@ -1,123 +1,129 @@
 {% extends "marketing_base.html" %}
 {% set nav_key = 'home' %}
 
-{% block title %}BidBoard | Recruitment Intelligence{% endblock %}
-{% block description %}BidBoard keeps fraternity and sorority rush teams aligned from first contact through the final meeting.{% endblock %}
-{% block body_class %}bb-page-home bb-page-home-v5{% endblock %}
+{% block title %}BidBoard | Recruitment, Clearly Run{% endblock %}
+{% block description %}BidBoard gives fraternity and sorority recruitment teams one clear place for rushees, ratings, touchpoints, ownership, and meetings.{% endblock %}
+{% block body_class %}bb-page-home{% endblock %}
 
 {% block page_content %}
-<section class="bb-home-hero-v5 bb-reveal" data-delay="20">
-  <div class="bb-home-hero-copy-v5">
-    <p class="bb-kicker">Recruitment, Without The Sprawl</p>
-    <h1>Run rush from one clear place.</h1>
-    <p class="bb-home-lede-v5">
-      Keep rushees, ratings, comments, touchpoints, and meeting decisions in one shared workspace.
+<section class="bb-home-hero bb-reveal" data-delay="20">
+  <div class="bb-home-hero-copy">
+    <p class="bb-kicker"><span></span> Built for the pace of rush week</p>
+    <h1>Know who matters.<br /><em>Know what happens next.</em></h1>
+    <p class="bb-home-lede">
+      BidBoard turns scattered ratings, notes, touchpoints, and meeting prep into one calm operating view for the whole rush team.
     </p>
-    <div class="bb-home-action-deck" aria-label="Primary actions">
-      <a class="bb-cta bb-cta-strong" href="/demo">Explore The Live Demo</a>
-      <a class="bb-cta bb-cta-ghost" href="/organizations">Open Your Chapter</a>
+    <div class="bb-home-actions" aria-label="Primary actions">
+      <a class="bb-cta bb-cta-strong" href="/organizations">Open your chapter</a>
+      <a class="bb-cta bb-cta-ghost" href="/features">See how it works</a>
+    </div>
+    <div class="bb-hero-proof" aria-label="Product qualities">
+      <span>Private workspaces</span>
+      <span>Role-aware access</span>
+      <span>Mobile ready</span>
     </div>
   </div>
 
-  <div class="bb-live-board-v5" aria-label="BidBoard live command preview">
-    <div class="bb-live-board-top-v5">
+  <div class="bb-briefing-board" aria-label="BidBoard command workspace preview">
+    <header class="bb-briefing-head">
       <div>
-        <span>Tuesday, 8:42 PM</span>
-        <strong>Rush Command</strong>
+        <span class="bb-briefing-mark">B</span>
+        <div><small>Tuesday briefing</small><strong>Rush Command</strong></div>
       </div>
-      <em><i></i> Live</em>
+      <span class="bb-live-state"><i></i> Live</span>
+    </header>
+
+    <div class="bb-briefing-metrics">
+      <article><small>Needs action</small><strong>03</strong><span>2 rating updates</span></article>
+      <article><small>Meeting ready</small><strong>12</strong><span>4 pinned tonight</span></article>
+      <article><small>Team coverage</small><strong>86%</strong><span>2 owners needed</span></article>
     </div>
-    <div class="bb-live-board-body-v5">
-      <section class="bb-live-queue-v5">
-        <header><span>My Queue</span><small>3 need action</small></header>
-        <article class="is-active">
-          <b>MC</b>
-          <div><strong>Mason Carter</strong><small>Touchpoint logged, score stale</small></div>
-          <span>32.0</span>
-        </article>
-        <article>
-          <b>JP</b>
-          <div><strong>James Parker</strong><small>Packet ready for review</small></div>
-          <span>29.5</span>
-        </article>
-        <article>
-          <b>BW</b>
-          <div><strong>Ben Walker</strong><small>Owner needed</small></div>
-          <span>27.0</span>
-        </article>
+
+    <div class="bb-briefing-body">
+      <section class="bb-briefing-queue">
+        <div class="bb-briefing-section-title"><strong>My queue</strong><span>Priority order</span></div>
+        <article class="is-active"><b>MC</b><div><strong>Mason Carter</strong><small>Rating behind touchpoint</small></div><span>32.0</span></article>
+        <article><b>JP</b><div><strong>James Parker</strong><small>Packet ready</small></div><span>29.5</span></article>
+        <article><b>BW</b><div><strong>Ben Walker</strong><small>Owner needed</small></div><span>27.0</span></article>
       </section>
 
-      <section class="bb-live-profile-v5">
-        <div class="bb-live-profile-head-v5">
-          <div class="bb-live-avatar-v5">MC</div>
-          <div>
-            <span>Selected Rushee</span>
-            <strong>Mason Carter</strong>
-            <small>Austin, Texas · @masoncarter</small>
-          </div>
-          <em>B Tier</em>
+      <section class="bb-briefing-detail">
+        <div class="bb-briefing-person">
+          <div class="bb-briefing-avatar">MC</div>
+          <div><small>Selected rushee</small><strong>Mason Carter</strong><span>Austin, Texas · @masoncarter</span></div>
+          <em>B tier</em>
         </div>
-        <div class="bb-live-signal-v5">
-          <article><span>Weighted score</span><strong>32.0</strong><small>+3.2 this week</small></article>
-          <article><span>Touchpoints</span><strong>4</strong><small>Last: today</small></article>
-          <article><span>Owner</span><strong>Jack M.</strong><small>Available</small></article>
-        </div>
-        <div class="bb-live-note-v5">
-          <span>Latest context</span>
-          <p>Strong conversation at dinner. Follow up on leadership interest before Thursday.</p>
-        </div>
-        <div class="bb-live-actions-v5" aria-label="Common rushee actions">
-          <span>Rate</span>
-          <span>Add Comment</span>
-          <span>Schedule</span>
-          <span>Open Packet</span>
-        </div>
+        <div class="bb-briefing-note"><small>Latest context</small><p>Strong dinner conversation. Follow up on leadership interest before Thursday.</p></div>
+        <div class="bb-briefing-actions"><span>Rate</span><span>Add note</span><span>Schedule</span><span>Packet</span></div>
       </section>
     </div>
   </div>
 </section>
 
-<section class="bb-workspace-story-v5 bb-reveal" data-delay="45">
-  <div class="bb-workspace-copy-v5">
-    <p class="bb-kicker">A Clear Home For Every Job</p>
-    <h2>Less hunting. Fewer repeated controls. Faster handoffs.</h2>
-    <p>Each workspace has one clear job. The same rushee record moves with the team, so nobody has to rebuild the story.</p>
-    <a class="bb-link-inline" href="/features">See the complete product</a>
-  </div>
-  <div class="bb-workspace-grid-v5">
-    <article class="is-featured">
-      <span>Command</span>
-      <strong>Start with the work that needs you.</strong>
-      <p>Personal queue, exceptions, recent decisions, and weekly team momentum.</p>
-      <div class="bb-mini-queue-v5"><i></i><i></i><i></i></div>
+<section class="bb-proof-band bb-reveal" data-delay="35" aria-label="BidBoard operating promise">
+  <p>One shared record follows every rushee from introduction to decision.</p>
+  <div><span>01</span> Capture</div><i></i><div><span>02</span> Coordinate</div><i></i><div><span>03</span> Decide</div>
+</section>
+
+<section class="bb-operating-section bb-reveal" data-delay="45">
+  <header class="bb-section-heading">
+    <div>
+      <p class="bb-kicker"><span></span> A clearer operating rhythm</p>
+      <h2>Less screen hunting.<br />More confident handoffs.</h2>
+    </div>
+    <p>Every workspace has one job, and every action returns to the same rushee record. Your team always sees the latest owner, score, note, and next step.</p>
+  </header>
+
+  <div class="bb-operating-grid">
+    <article class="bb-operating-card is-command">
+      <span class="bb-card-index">01 / Command</span>
+      <h3>Start with what needs you.</h3>
+      <p>A personal queue combines fresh touchpoints, stale ratings, unassigned prospects, and decisions that changed.</p>
+      <div class="bb-card-visual bb-card-visual-queue"><i></i><i></i><i></i></div>
     </article>
-    <article><span>Rushees</span><strong>Roster and detail</strong><p>Search, edit, assign, comment, and keep profile context clean.</p></article>
-    <article><span>Meetings</span><strong>Decision room</strong><p>Shortlist, compare, packet history, and recent deltas.</p></article>
-    <article><span>Operations</span><strong>Shared timeline</strong><p>Events, touchpoints, goals, and officer coordination.</p></article>
-    <article><span>Team</span><strong>Visible ownership</strong><p>Approvals, load, assignments, and participation.</p></article>
+    <article class="bb-operating-card">
+      <span class="bb-card-index">02 / Rushees</span>
+      <h3>Keep every profile complete.</h3>
+      <p>Search, assign, edit, comment, and move directly into rating or meeting context.</p>
+      <div class="bb-card-tags"><span>Owner</span><span>Touchpoint</span><span>Packet</span></div>
+    </article>
+    <article class="bb-operating-card">
+      <span class="bb-card-index">03 / Meetings</span>
+      <h3>Walk in with the story assembled.</h3>
+      <p>Pinned prospects, trend history, touchpoint notes, and recent changes stay together.</p>
+      <div class="bb-card-score"><strong>32.0</strong><span>+3.2 this week</span></div>
+    </article>
+    <article class="bb-operating-card">
+      <span class="bb-card-index">04 / Team</span>
+      <h3>See ownership before it becomes a problem.</h3>
+      <p>Approvals, workload, assignments, and participation make coverage visible.</p>
+      <div class="bb-card-bars"><i class="is-high"></i><i class="is-medium"></i><i class="is-low"></i></div>
+    </article>
   </div>
 </section>
 
-<section class="bb-trust-story-v5 bb-reveal" data-delay="65">
-  <div>
-    <p class="bb-kicker">Built For Real Chapter Operations</p>
-    <h2>Private by chapter. Clear by role. Useful after leadership changes.</h2>
+<section class="bb-trust-section bb-reveal" data-delay="55">
+  <div class="bb-trust-copy">
+    <p class="bb-kicker"><span></span> Built for real chapter operations</p>
+    <h2>Private, accountable, and ready for the next leadership team.</h2>
+    <p>BidBoard protects chapter separation, gives each role the right view, and keeps season history exportable instead of trapped in somebody’s spreadsheet.</p>
+    <a class="bb-text-link" href="/faq">Read common questions <span>→</span></a>
   </div>
-  <div class="bb-trust-points-v5">
-    <article><span>01</span><strong>Isolated workspaces</strong><p>Chapter data, branding, access, and approvals stay scoped to one organization.</p></article>
-    <article><span>02</span><strong>Practical permissions</strong><p>Heads, officers, and members see the tools their role actually needs.</p></article>
-    <article><span>03</span><strong>Season continuity</strong><p>Exports, backups, ownership, and reset tools reduce knowledge loss.</p></article>
+  <div class="bb-trust-list">
+    <article><span>Isolated</span><div><strong>One private workspace per organization</strong><p>Independent people, ratings, approvals, branding, and exports.</p></div></article>
+    <article><span>Role-aware</span><div><strong>Useful access without unnecessary exposure</strong><p>Heads, officers, and members each get a focused operating view.</p></div></article>
+    <article><span>Durable</span><div><strong>Built to survive season turnover</strong><p>Backups, archives, ownership, and reset tools preserve continuity.</p></div></article>
   </div>
 </section>
 
-<section class="bb-final-cta-v5 bb-reveal" data-delay="75">
+<section class="bb-final-cta bb-reveal" data-delay="65">
   <div>
-    <p class="bb-kicker">See The Working Product</p>
-    <h2>Give the team one place to know what happens next.</h2>
+    <p class="bb-kicker"><span></span> Ready when the team is</p>
+    <h2>Give rush week one source of truth.</h2>
   </div>
-  <div class="bb-final-cta-actions-v5">
-    <a class="bb-cta bb-cta-strong" href="/demo">Explore The Demo</a>
-    <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+  <div class="bb-final-actions">
+    <a class="bb-cta bb-cta-strong" href="/organizations">Open your workspace</a>
+    <a class="bb-cta bb-cta-light" href="/demo">Explore the demo</a>
   </div>
 </section>
 {% endblock %}

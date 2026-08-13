@@ -229,6 +229,7 @@ const demoteExistingHeads = document.getElementById("demoteExistingHeads");
 const promoteOfficerBtn = document.getElementById("promoteOfficerBtn");
 const resetUserAccessCodeForm = document.getElementById("resetUserAccessCodeForm");
 const resetUserAccessCodeSelect = document.getElementById("resetUserAccessCodeSelect");
+const resetUserAccessCodeUsername = document.getElementById("resetUserAccessCodeUsername");
 const resetUserAccessCodeInput = document.getElementById("resetUserAccessCode");
 const resetUserAccessCodeConfirmInput = document.getElementById("resetUserAccessCodeConfirm");
 const resetUserAccessCodeBtn = document.getElementById("resetUserAccessCodeBtn");
@@ -1988,7 +1989,7 @@ function tutorialBaseStepsForRole(role) {
       body: "Use page-local filters for interest, stereotype, and state to quickly narrow active targets.",
       hint: "State filtering is best for hometown outreach and assignment balancing.",
       advanced:
-        "Advanced workflow: stack state + stereotype to find high-priority clusters before planning lunches.",
+        "Advanced workflow: stack state + stereotype to find high-priority clusters before planning touchpoints.",
     },
     {
       page: "rushees",
@@ -2024,7 +2025,7 @@ function tutorialBaseStepsForRole(role) {
       body: "Touchpoint scheduling updates member and rushee stats immediately and can open in Google Calendar.",
       hint: "Use the shared Schedule Touchpoint drawer so Command, Rushees, and Operations stay consistent.",
       advanced:
-        "Advanced workflow: schedule lunches by assignment owner so accountability is clear before key decisions.",
+        "Advanced workflow: schedule touchpoints by assignment owner so accountability is clear before key decisions.",
     },
     {
       page: "calendar",
@@ -2041,7 +2042,7 @@ function tutorialBaseStepsForRole(role) {
       operationsTab: "goals",
       target: "#weeklyGoalsList",
       title: "Use Weekly Goals For Accountability",
-      body: "Goals auto-track progress from real activity like ratings, lunches, and chat participation.",
+      body: "Goals auto-track progress from real activity like ratings, touchpoints, and chat participation.",
       hint: "Create one team goal and one owner-specific goal each week.",
       advanced:
         "Advanced workflow: align goals to funnel stage movement so progress reflects recruiting outcomes, not just activity.",
@@ -2649,8 +2650,8 @@ function renderRushCalendar() {
   const rows = items
     .map((item) => {
       const isEvent = item.item_type === "rush_event";
-      const typeLabel = isEvent ? (item.event_type || "event") : "lunch";
-      const title = item.title || (item.pnm_name ? `Lunch with ${item.pnm_name}` : "Calendar Item");
+      const typeLabel = isEvent ? (item.event_type || "event") : "touchpoint";
+      const title = item.title || (item.pnm_name ? `Touchpoint with ${item.pnm_name}` : "Calendar Item");
       const creator = item.created_by_username || "-";
       const official = isEvent && item.is_official ? '<span class="pill">Official</span>' : "";
       const details = item.details || "-";
@@ -3017,7 +3018,7 @@ function renderAssignedRushSection() {
       const assignedAtCell = isHead ? `<td>${escapeHtml(assignedAt)}</td>` : "";
       return `
         <tr>
-          <td><strong>${escapeHtml(entry.pnm_code || `PNM-${entry.pnm_id}`)}</strong></td>
+          <td><strong>${escapeHtml(entry.pnm_code || `Rushee-${entry.pnm_id}`)}</strong></td>
           <td>${escapeHtml(entry.first_name)} ${escapeHtml(entry.last_name)}</td>
           <td>${escapeHtml(linkedDisplay)}</td>
           <td>${escapeHtml(teamDisplay)}</td>
@@ -3236,8 +3237,8 @@ function renderPnmSelectOptions() {
           pnm.name ||
           [pnm.first_name, pnm.last_name].filter(Boolean).join(" ").trim() ||
           pnm.pnm_code ||
-          "Unknown PNM";
-        const label = `${pnm.pnm_code || "PNM"} | ${displayName}`;
+          "Unknown rushee";
+        const label = `${pnm.pnm_code || "Rushee"} | ${displayName}`;
         return `<option value="${pnm.pnm_id}">${escapeHtml(label)}</option>`;
       })
       .join("");
@@ -3672,7 +3673,7 @@ function openTouchpointDrawer(options = {}) {
   if (touchpointDrawerSubtitle) {
     touchpointDrawerSubtitle.textContent =
       source === "operations"
-        ? "Create a shared lunch or follow-up event without leaving operations."
+        ? "Create a shared touchpoint or follow-up without leaving Operations."
         : "Create one shared touchpoint from the selected rushee context.";
   }
   renderPnmSelectOptions();
@@ -3702,7 +3703,7 @@ function renderCommandSelectedPhoto(item) {
     return;
   }
   commandSelectedPhoto.src = item.photo_url;
-  commandSelectedPhoto.alt = item.name || "Selected PNM";
+  commandSelectedPhoto.alt = item.name || "Selected rushee";
   commandSelectedPhoto.classList.remove("hidden");
   commandSelectedPhotoPlaceholder.classList.add("hidden");
 }
@@ -4568,7 +4569,7 @@ function localCommandResults(query, existing = []) {
   const token = String(query || "").trim().toLowerCase();
   const base = [];
   if (roleCanApproveUsers()) {
-    base.push({ action: "add_rushee", label: "Add Rushee", command_id: "create new PNM record" });
+    base.push({ action: "add_rushee", label: "Add Rushee", command_id: "create new rushee record" });
   }
   if (state.user) {
     base.push({ action: "edit_profile", label: "Edit My Profile", command_id: "update your team profile" });
@@ -4608,6 +4609,11 @@ function performCommandAction(action, context = null) {
       return;
     }
     navigateDesktopPage("rushees");
+    const createDisclosure = document.querySelector(".rushee-inline-drawer");
+    if (createDisclosure) {
+      createDisclosure.open = true;
+      createDisclosure.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     focusSoon(document.getElementById("pnmFirstName"));
     return;
   }
@@ -4638,6 +4644,11 @@ function performCommandAction(action, context = null) {
     }
     navigateDesktopPage("calendar");
     setOperationsTab("timeline");
+    const eventDisclosure = rushEventTitle ? rushEventTitle.closest("details") : null;
+    if (eventDisclosure) {
+      eventDisclosure.open = true;
+      eventDisclosure.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     focusSoon(rushEventTitle);
     return;
   }
@@ -4684,11 +4695,11 @@ function renderCommandPaletteResults() {
           <div class="command-palette-result-main">
             ${
               item.photo_url
-                ? `<img src="${escapeHtml(item.photo_url)}" alt="${escapeHtml(item.name || item.pnm_code || "PNM")}" class="command-palette-avatar" loading="lazy" />`
+                ? `<img src="${escapeHtml(item.photo_url)}" alt="${escapeHtml(item.name || item.pnm_code || "Rushee")}" class="command-palette-avatar" loading="lazy" />`
                 : '<div class="command-palette-avatar command-palette-avatar-empty">PNM</div>'
             }
             <div class="command-palette-result-copy">
-              <strong>${escapeHtml(item.name || "Unknown PNM")}</strong>
+              <strong>${escapeHtml(item.name || "Unknown rushee")}</strong>
               <div class="muted">${escapeHtml(item.pnm_code || "")}${item.hometown ? ` | ${escapeHtml(item.hometown)}` : ""}</div>
               <div class="muted">Weighted ${Number(item.weighted_total || 0).toFixed(2)}</div>
             </div>
@@ -4978,6 +4989,9 @@ function renderPasswordResetControls() {
     resetUserAccessCodeSelect.innerHTML = '<option value="">No rush team members available</option>';
     resetUserAccessCodeSelect.disabled = true;
     resetUserAccessCodeBtn.disabled = true;
+    if (resetUserAccessCodeUsername) {
+      resetUserAccessCodeUsername.value = "";
+    }
     return;
   }
   const options = members
@@ -4989,6 +5003,18 @@ function renderPasswordResetControls() {
   resetUserAccessCodeSelect.innerHTML = `<option value="">Select a rush team member</option>${options}`;
   resetUserAccessCodeSelect.disabled = false;
   resetUserAccessCodeBtn.disabled = false;
+  if (resetUserAccessCodeUsername) {
+    resetUserAccessCodeUsername.value = "";
+  }
+}
+
+function syncPasswordResetUsername() {
+  if (!resetUserAccessCodeSelect || !resetUserAccessCodeUsername) {
+    return;
+  }
+  const selectedId = Number(resetUserAccessCodeSelect.value || 0);
+  const member = resettableRushTeamMembers().find((entry) => Number(entry.user_id) === selectedId);
+  resetUserAccessCodeUsername.value = member ? String(member.username || "") : "";
 }
 
 function renderOfficerMetrics() {
@@ -5801,7 +5827,7 @@ async function loadPnmDetail(pnmId) {
     renderAssignmentControls();
     syncOpenMeetingLink();
   } catch (error) {
-    showToast(error.message || "Unable to load selected PNM details.");
+    showToast(error.message || "Unable to load selected rushee details.");
   }
 }
 
@@ -5948,7 +5974,7 @@ async function loadCalendarShare() {
       rushCalendarFeedPreview.textContent = "Unable to load rush calendar link right now.";
     }
     if (lunchOnlyFeedPreview) {
-      lunchOnlyFeedPreview.textContent = "Unable to load lunch feed link right now.";
+      lunchOnlyFeedPreview.textContent = "Unable to load touchpoint feed link right now.";
     }
     if (openRushGoogleSubscribeBtn) {
       openRushGoogleSubscribeBtn.href = "#";
@@ -6475,7 +6501,7 @@ async function handleLogout() {
     rushCalendarFeedPreview.textContent = "Sign in to load rush calendar link.";
   }
   if (lunchOnlyFeedPreview) {
-    lunchOnlyFeedPreview.textContent = "Sign in to load lunch feed link.";
+    lunchOnlyFeedPreview.textContent = "Sign in to load the touchpoint feed link.";
   }
   if (scheduledLunchesList) {
     scheduledLunchesList.innerHTML = '<p class="muted">Sign in to view scheduled touchpoints.</p>';
@@ -6511,7 +6537,7 @@ async function handleLogout() {
     openLastLunchGoogleLink.href = "#";
   }
   if (sameStatePnmsHeader) {
-    sameStatePnmsHeader.textContent = "Select a member to view PNMs from the same state.";
+    sameStatePnmsHeader.textContent = "Select a member to view rushees from the same state.";
   }
   if (sameStatePnmsList) {
     sameStatePnmsList.innerHTML = '<p class="muted">No member selected.</p>';
@@ -6717,6 +6743,14 @@ async function handlePnmCreate(event) {
     state.selectedPnmId = payload.pnm.pnm_id;
     applyRatingFormForSelected();
     await loadPnmDetail(state.selectedPnmId);
+    const createDisclosure = pnmForm.closest("details");
+    if (createDisclosure) {
+      createDisclosure.open = false;
+    }
+    const rosterSection = document.getElementById("pnmSection");
+    if (rosterSection) {
+      rosterSection.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
   } catch (error) {
     showToast(error.message || "Unable to create rushee.");
   }
@@ -8041,7 +8075,7 @@ async function handleAdminPanelClick(event) {
   }
   const pnm = state.pnms.find((item) => item.pnm_id === pnmId);
   const name = pnm ? `${pnm.first_name} ${pnm.last_name}` : "this rushee";
-  const confirmed = window.confirm(`Remove ${name}? This will also remove associated ratings and lunches.`);
+  const confirmed = window.confirm(`Remove ${name}? This will also remove associated ratings and touchpoints.`);
   if (!confirmed) {
     return;
   }
@@ -8478,14 +8512,14 @@ async function handleCopyRushCalendarFeed() {
 async function handleCopyLunchOnlyFeed() {
   const value = state.calendarShare && state.calendarShare.lunch_feed_url;
   if (!value) {
-    showToast("Lunch-only feed link is not ready yet.");
+    showToast("Touchpoint feed link is not ready yet.");
     return;
   }
   try {
     await copyTextToClipboard(value);
-    showToast("Lunch-only calendar URL copied.");
+    showToast("Touchpoint calendar URL copied.");
   } catch {
-    showToast("Unable to copy lunch feed URL right now.");
+    showToast("Unable to copy the touchpoint feed URL right now.");
   }
 }
 
@@ -8886,7 +8920,7 @@ function attachEvents() {
     refreshScheduledLunchesBtn.addEventListener("click", async () => {
       try {
         await loadScheduledLunches();
-        showToast("Scheduled lunches refreshed.");
+        showToast("Scheduled touchpoints refreshed.");
       } catch (error) {
         showToast(error.message || "Unable to refresh scheduled touchpoints.");
       }
@@ -9188,6 +9222,9 @@ function attachEvents() {
   }
   if (resetUserAccessCodeForm) {
     resetUserAccessCodeForm.addEventListener("submit", handleResetUserAccessCodeSubmit);
+  }
+  if (resetUserAccessCodeSelect) {
+    resetUserAccessCodeSelect.addEventListener("change", syncPasswordResetUsername);
   }
   if (adminPnmEditorForm) {
     adminPnmEditorForm.addEventListener("submit", handleAdminPnmEditorSubmit);

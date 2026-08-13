@@ -312,18 +312,23 @@ function renderCategoryRankingBars(rankings) {
   const rows = rankings
     .map((row, index) => {
       const max = Math.max(1, Number(row.max || 0));
-      const value = Math.max(0, Number(row.value || 0));
+      const isRated = row.is_rated !== false && row.value !== null && row.value !== undefined;
+      const value = isRated ? Math.max(0, Number(row.value || 0)) : 0;
       const percent = Math.max(0, Math.min(100, (value / max) * 100));
       const rank = Number(row.rank || 0);
       const cohort = Number(row.cohort_size || 0);
-      const percentile = Number.isFinite(Number(row.percentile)) ? Number(row.percentile) : 0;
-      const pointsFromLeader = Number.isFinite(Number(row.points_from_leader)) ? Number(row.points_from_leader) : 0;
-      const leaderLabel = pointsFromLeader <= 0 ? "Leader" : `${pointsFromLeader.toFixed(2)} behind`;
+      const percentile = isRated && Number.isFinite(Number(row.percentile)) ? Number(row.percentile) : null;
+      const pointsFromLeader = isRated && Number.isFinite(Number(row.points_from_leader)) ? Number(row.points_from_leader) : null;
+      const leaderLabel = !isRated
+        ? "No submitted score"
+        : pointsFromLeader <= 0
+          ? "Leader"
+          : `${pointsFromLeader.toFixed(2)} behind`;
       return `
-        <div class="meeting-bar-row">
+        <div class="meeting-bar-row${isRated ? "" : " is-unrated"}">
           <div class="meeting-bar-head">
             <strong>${escapeHtml(row.label || row.field || "Category")}</strong>
-            <span>${value.toFixed(2)} / ${max}</span>
+            <span>${isRated ? `${value.toFixed(2)} / ${max}` : "Not rated"}</span>
           </div>
           <div class="meeting-bar-track">
             <svg class="meeting-bar-track-svg" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
@@ -332,8 +337,8 @@ function renderCategoryRankingBars(rankings) {
             </svg>
           </div>
           <div class="meeting-bar-meta">
-            <span>Rank #${rank || "-"}${cohort ? ` / ${cohort}` : ""}</span>
-            <span>${percentile.toFixed(1)} percentile</span>
+            <span>${isRated ? `Rank #${rank || "-"}${cohort ? ` / ${cohort}` : ""}` : "Excluded from ranking"}</span>
+            <span>${percentile === null ? "No percentile" : `${percentile.toFixed(1)} percentile`}</span>
             <span>${escapeHtml(leaderLabel)}</span>
           </div>
         </div>
@@ -357,7 +362,7 @@ function renderRushCommentTimeline(entries) {
             source = "Rating Update";
             chipClass = "rating";
           } else if (entry.source === "lunch_note") {
-            source = "Lunch Note";
+            source = "Touchpoint Note";
             chipClass = "lunch";
           }
           const actor = entry.role ? `${entry.username} (${entry.role})` : `${entry.username}`;

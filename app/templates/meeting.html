@@ -12,10 +12,6 @@
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
     <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/tokens.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/layout.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/components.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/pages.css') }}" />
     <link rel="stylesheet" href="{{ asset_url('css/product.css') }}" />
     <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
     <script src="{{ asset_url('js/meeting.js') }}" defer></script>
@@ -41,7 +37,7 @@
                 <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="app-shell-mark" />
                 <div>
                   <p class="eyebrow">BidBoard</p>
-                  <strong>Recruitment Command</strong>
+                  <strong>Rush workspace</strong>
                 </div>
               </div>
               <div class="app-sidebar-tenant-card">
@@ -51,7 +47,7 @@
                 <div>
                   <p class="eyebrow">{{ app_config.chapter_name }}</p>
                   <h2>Meeting Packet</h2>
-                  <p class="muted">Discussion-ready packet detail inside Meetings.</p>
+                  <p class="muted">Discussion-ready decision context.</p>
                 </div>
               </div>
             </div>
@@ -71,11 +67,11 @@
               <div class="app-topbar-copy">
                 <p class="eyebrow">Meetings</p>
                 <h2>Meeting Packet</h2>
-                <p class="muted">A packet drill-down inside Meetings with trend-backed review, touchpoint context, and PDF export.</p>
+                <p class="muted">Trend, touchpoint, and team context for one decision.</p>
               </div>
               <div class="app-topbar-actions">
                 <div class="app-session-card">
-                  <strong id="meetingSessionTitle">Meeting Packet</strong>
+                  <strong id="meetingSessionTitle">Packet tools</strong>
                   <span id="meetingSessionSubtitle" class="muted"></span>
                 </div>
                 <button id="meetingRefreshBtn" type="button" class="secondary">Refresh</button>
@@ -110,7 +106,7 @@
                   </article>
                   <article class="card">
                     <strong>Touchpoint Notes</strong>
-                    <p>Every lunch log, comment, and timeline event in one place.</p>
+                    <p>Every touchpoint log, comment, and timeline event in one place.</p>
                   </article>
                   <article class="card">
                     <strong>Decision Support</strong>

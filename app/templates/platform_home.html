@@ -1,55 +1,56 @@
 {% extends "marketing_base.html" %}
 {% set nav_key = 'organizations' %}
 
-{% block title %}BidBoard | Organization Login{% endblock %}
-{% block description %}Choose your BidBoard organization and open its private recruitment workspace.{% endblock %}
+{% block title %}BidBoard | Open Your Organization{% endblock %}
+{% block description %}Find your BidBoard organization and open its private recruitment workspace.{% endblock %}
 {% block body_class %}bb-page-organizations{% endblock %}
 
 {% block page_content %}
-<section class="bb-org-entry-v2 bb-reveal" data-delay="20">
-  <header class="bb-org-entry-head-v2">
-    <div>
-      <p class="bb-kicker">Organization Login</p>
-      <h1>Open your chapter workspace.</h1>
-      <p>Choose the organization tied to your approved account. Each workspace keeps its own people, ratings, meetings, and access.</p>
-    </div>
-    <div class="bb-org-entry-actions-v2">
-      <a class="bb-link-inline" href="/">Home</a>
-      <a class="bb-link-inline" href="/demo">Try Demo</a>
-    </div>
+<section class="bb-org-entry bb-reveal" data-delay="20">
+  <header class="bb-org-entry-head">
+    <p class="bb-kicker"><span></span> Organization access</p>
+    <h1>Find your chapter.</h1>
+    <p>Choose the organization connected to your approved account.</p>
   </header>
 
-  <div class="bb-org-search-shell-v2">
-    <label>
-      <span>Find your organization</span>
-      <input id="bbOrgSearchInput" type="search" placeholder="Search chapter or organization name" autocomplete="off" />
+  <div class="bb-org-directory">
+    <label class="bb-org-search">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"></circle><path d="m13 13 4 4"></path></svg>
+      <span class="sr-only">Find your organization</span>
+      <input id="bbOrgSearchInput" type="search" placeholder="Search by organization or chapter" autocomplete="off" />
+      <small id="bbOrgSearchCount">{{ tenants|length }} available</small>
     </label>
-    <p id="bbOrgSearchCount">Showing {{ tenants|length }} organization{{ '' if tenants|length == 1 else 's' }}</p>
+
+    <div class="bb-org-grid">
+      {% for tenant in tenants %}
+      <a class="bb-org-card" href="/{{ tenant.slug }}" data-org-search="{{ (tenant.display_name ~ ' ' ~ tenant.chapter_name ~ ' ' ~ tenant.slug ~ ' ' ~ tenant.org_type)|lower }}">
+        {% if tenant.logo_path %}
+        <img src="{{ tenant.logo_path }}" alt="" class="bb-org-logo" />
+        {% else %}
+        <span class="bb-org-logo bb-org-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</span>
+        {% endif %}
+        <span class="bb-org-card-copy">
+          <strong>{{ tenant.display_name }}</strong>
+          <small>{{ tenant.chapter_name }} · {{ tenant.org_type }}</small>
+        </span>
+        <span class="bb-org-card-open" aria-hidden="true">Open <b>→</b></span>
+      </a>
+      {% endfor %}
+
+      {% if not tenants %}
+      <article class="bb-org-empty">
+        <p class="bb-kicker"><span></span> No organizations configured</p>
+        <h2>Create the first workspace in Platform Admin.</h2>
+        <a class="bb-cta bb-cta-strong" href="/platform">Open Platform Admin</a>
+      </article>
+      {% endif %}
+    </div>
   </div>
 
-  <div class="bb-org-grid-v2">
-    {% for tenant in tenants %}
-    <a class="bb-org-card bb-org-card-v2" href="/{{ tenant.slug }}" data-org-search="{{ (tenant.display_name ~ ' ' ~ tenant.chapter_name ~ ' ' ~ tenant.slug ~ ' ' ~ tenant.org_type)|lower }}">
-      {% if tenant.logo_path %}
-      <img src="{{ tenant.logo_path }}" alt="" class="bb-org-logo" />
-      {% else %}
-      <span class="bb-org-logo bb-org-logo-placeholder">{{ tenant.chapter_name[:1] if tenant.chapter_name else tenant.display_name[:1] }}</span>
-      {% endif %}
-      <span class="bb-org-card-copy-v2">
-        <strong>{{ tenant.display_name }}</strong>
-        <small>{{ tenant.chapter_name }} · {{ tenant.org_type }}</small>
-      </span>
-      <span class="bb-org-card-open-v2" aria-hidden="true">Open</span>
-    </a>
-    {% endfor %}
-
-    {% if not tenants %}
-    <article class="bb-org-empty-v2">
-      <p class="bb-kicker">No Organizations Configured</p>
-      <h2>Create the first chapter workspace in Platform Admin.</h2>
-      <a class="bb-cta bb-cta-strong" href="/platform">Open Platform Admin</a>
-    </article>
-    {% endif %}
+  <div class="bb-org-assurance">
+    <div><strong>Private by organization</strong><span>Data and approvals remain isolated.</span></div>
+    <div><strong>Approved access only</strong><span>Your role controls what you can see.</span></div>
+    <a href="/">Back to BidBoard</a>
   </div>
 </section>
 {% endblock %}

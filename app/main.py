@@ -221,8 +221,8 @@ WEEKLY_GOAL_METRIC_TYPES = {
 WEEKLY_GOAL_METRIC_LABELS: dict[str, str] = {
     "manual": "Manual Progress",
     "ratings_submitted": "Ratings Submitted",
-    "lunches_logged": "Lunches Logged",
-    "pnms_created": "PNMs Added",
+    "lunches_logged": "Touchpoints Logged",
+    "pnms_created": "Rushees Added",
     "chat_messages": "Chat Messages",
     "rush_events_created": "Rush Events Created",
 }
@@ -1434,8 +1434,8 @@ def build_google_calendar_event_url(
     logged_by_username: str,
 ) -> str:
     event_date = date.fromisoformat(lunch_date)
-    title = f"Lunch with {pnm_name}"
-    details_parts = [f"PNM Code: {pnm_code}", f"Logged by: {logged_by_username}"]
+    title = f"Touchpoint with {pnm_name}"
+    details_parts = [f"Rushee Code: {pnm_code}", f"Logged by: {logged_by_username}"]
     if notes:
         details_parts.append(f"Notes: {notes}")
     details = "\n".join(details_parts)
@@ -3822,7 +3822,7 @@ def sync_engagement_event_from_lunch(conn: sqlite3.Connection, lunch_id: int) ->
         return
 
     status = default_engagement_status_for_date(row["lunch_date"])
-    title = f"Lunch with {row['first_name']} {row['last_name']}"
+    title = f"Touchpoint with {row['first_name']} {row['last_name']}"
     details = (row["notes"] or "").strip()
     location = (row["location"] or "").strip()
     updated_at = now_iso()
@@ -7910,7 +7910,7 @@ class LunchCreateRequest(BaseModel):
     @field_validator("lunch_date")
     @classmethod
     def validate_lunch_date(cls, value: str) -> str:
-        return verify_iso_date(value, "Lunch date")
+        return verify_iso_date(value, "Touchpoint date")
 
     @field_validator("start_time", "end_time")
     @classmethod
@@ -8081,13 +8081,13 @@ class PnmPackageLinkRequest(BaseModel):
         for raw_id in value:
             pnm_id = int(raw_id)
             if pnm_id <= 0:
-                raise ValueError("PNM IDs must be positive integers.")
+                raise ValueError("Rushee IDs must be positive integers.")
             if pnm_id in seen:
                 continue
             seen.add(pnm_id)
             unique_ids.append(pnm_id)
         if len(unique_ids) < 2:
-            raise ValueError("Select at least two unique PNMs for a package deal.")
+            raise ValueError("Select at least two unique rushees for a package deal.")
         return unique_ids
 
 
@@ -11440,7 +11440,7 @@ def get_pnm(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[str,
             (pnm_id,),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
         own = fetch_own_rating(conn, pnm_id, user["id"])
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
     return {"pnm": pnm_payload_with_assignment_links(conn, row, own, links_by_pnm, viewer=user)}
@@ -11466,12 +11466,12 @@ def update_pnm_details(
         and payload.lunch_stats is None
         and payload.notes is None
     ):
-        raise HTTPException(status_code=400, detail="No PNM changes provided.")
+        raise HTTPException(status_code=400, detail="No rushee changes provided.")
 
     with db_session() as conn:
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
         if not can_manage_pnm_profile(row, actor):
             raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
 
@@ -11590,7 +11590,7 @@ def update_pnm_details(
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     return {
-        "message": "PNM details updated.",
+        "message": "Rushee details updated.",
         "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm, viewer=actor),
     }
 
@@ -11604,7 +11604,7 @@ def assign_pnm_officer(
     with db_session() as conn:
         pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not pnm_row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         assigned_user_id: int | None = payload.officer_user_id
         if assigned_user_id is not None:
@@ -11620,7 +11620,7 @@ def assign_pnm_officer(
             package_group_id=package_group_id,
         )
         if not target_rows:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
         affected_pnm_ids: list[int] = []
         changed_assignment_count = 0
 
@@ -11759,7 +11759,7 @@ def add_pnm_assignee(
         officer = resolve_assignable_officer_or_400(conn, payload.officer_user_id)
         pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not pnm_row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
         target_rows = assignment_target_rows_for_pnm(
@@ -11768,7 +11768,7 @@ def add_pnm_assignee(
             package_group_id=package_group_id if payload.include_package else None,
         )
         if not target_rows:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         now = now_iso()
         affected_pnm_ids: list[int] = []
@@ -11926,7 +11926,7 @@ def remove_pnm_assignee(
         ensure_package_link_schema(conn)
         pnm_row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not pnm_row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
         target_rows = assignment_target_rows_for_pnm(
@@ -11935,7 +11935,7 @@ def remove_pnm_assignee(
             package_group_id=package_group_id if include_package else None,
         )
         if not target_rows:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         now = now_iso()
         affected_pnm_ids: list[int] = []
@@ -12131,7 +12131,7 @@ def link_pnms_package_deal(
         selected_by_id: dict[int, sqlite3.Row] = {int(row["id"]): row for row in selected_rows}
         missing_ids = [pnm_id for pnm_id in requested_pnm_ids if pnm_id not in selected_by_id]
         if missing_ids:
-            raise HTTPException(status_code=404, detail=f"PNM not found: {missing_ids[0]}")
+            raise HTTPException(status_code=404, detail=f"Rushee not found: {missing_ids[0]}")
 
         existing_group_ids = sorted(
             {
@@ -12351,12 +12351,12 @@ def unlink_pnm_package_deal(
             (pnm_id,),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         package_group_id = normalize_package_group_id(row["package_group_id"])
         if not package_group_id:
             return {
-                "message": "PNM is not currently linked in a package deal.",
+                "message": "Rushee is not currently linked in a package deal.",
                 "package_group_id": None,
                 "affected_pnm_ids": [pnm_id],
             }
@@ -12799,7 +12799,7 @@ def update_pnm_assignment(
             (pnm_id,),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         old_assigned_officer_id = int(row["assigned_officer_id"]) if row["assigned_officer_id"] is not None else None
         old_status = str(row["assignment_status"] or "").strip().lower()
@@ -12812,7 +12812,7 @@ def update_pnm_assignment(
             package_group_id=package_group_id,
         )
         if not target_rows:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         assigned_officer_id = old_assigned_officer_id
         if "officer_user_id" in requested_fields:
@@ -13042,7 +13042,7 @@ def update_pnm_funnel_stage(
             (pnm_id,),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         old_stage = str(row["funnel_stage"] or "").strip().lower() or "sourced"
         if old_stage not in PNM_FUNNEL_STAGES:
@@ -13117,7 +13117,7 @@ def update_pnm_funnel_stage(
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     return {
-        "message": "PNM funnel stage updated.",
+        "message": "Rushee stage updated.",
         "pnm": pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm),
         "change": {
             "from_stage": old_stage,
@@ -13140,7 +13140,7 @@ def pnm_funnel_stage_history(
     with db_session() as conn:
         exists = conn.execute("SELECT id, funnel_stage FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not exists:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
         rows = conn.execute(
             """
             SELECT
@@ -13323,7 +13323,7 @@ async def upload_pnm_photo(
         with db_session() as conn:
             row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
             if not row:
-                raise HTTPException(status_code=404, detail="PNM not found.")
+                raise HTTPException(status_code=404, detail="Rushee not found.")
             if not can_manage_pnm_profile(row, user):
                 raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
             old_photo_path = row["photo_path"]
@@ -13365,7 +13365,7 @@ async def upload_pnm_photo(
         remove_photo_if_present(old_photo_path)
 
     return {
-        "message": "PNM photo uploaded.",
+        "message": "Rushee photo uploaded.",
         "pnm": payload_pnm,
     }
 
@@ -13383,12 +13383,12 @@ def refresh_pnm_photo_from_instagram(
     with db_session() as conn:
         row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
         if not can_manage_pnm_profile(row, user):
             raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
         instagram_handle = row["instagram_handle"]
         if not instagram_handle:
-            raise HTTPException(status_code=400, detail="PNM does not have an Instagram handle.")
+            raise HTTPException(status_code=400, detail="Rushee does not have an Instagram handle.")
         old_photo_path = row["photo_path"]
 
     assert_rate_limit(
@@ -13418,7 +13418,7 @@ def refresh_pnm_photo_from_instagram(
         with db_session() as conn:
             row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
             if not row:
-                raise HTTPException(status_code=404, detail="PNM not found.")
+                raise HTTPException(status_code=404, detail="Rushee not found.")
             if not can_manage_pnm_profile(row, user):
                 raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
             old_photo_path = row["photo_path"]
@@ -13485,7 +13485,7 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             (pnm_id,),
         ).fetchone()
         if not pnm_row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         package_group_id = normalize_package_group_id(pnm_row["package_group_id"])
         linked_rows: list[sqlite3.Row] = []
@@ -13636,6 +13636,19 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             ORDER BY id ASC
             """
         ).fetchall()
+        rating_coverage_rows = conn.execute(
+            """
+            SELECT
+                pnm_id,
+                MAX(good_with_girls_rated) AS good_with_girls,
+                MAX(will_make_it_rated) AS will_make_it,
+                MAX(personable_rated) AS personable,
+                MAX(alcohol_control_rated) AS alcohol_control,
+                MAX(instagram_marketability_rated) AS instagram_marketability
+            FROM ratings
+            GROUP BY pnm_id
+            """
+        ).fetchall()
         links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
 
     can_view_identity = user["role"] in {ROLE_HEAD, ROLE_RUSH_OFFICER}
@@ -13714,15 +13727,28 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
     )
 
     category_rankings: list[dict[str, Any]] = []
+    coverage_by_pnm = {
+        int(row["pnm_id"]): {field: bool(row[field]) for field in RATING_FIELDS}
+        for row in rating_coverage_rows
+    }
     for field in RATING_FIELDS:
         column = PNM_AVERAGE_COLUMN_BY_FIELD[field]
-        values = [float(row[column]) for row in ranking_rows]
-        target_value = float(pnm_row[column])
-        rank = 1 + sum(1 for value in values if value > target_value + 1e-9) if values else 1
+        values = [
+            float(row[column])
+            for row in ranking_rows
+            if coverage_by_pnm.get(int(row["id"]), {}).get(field, False)
+        ]
+        is_rated = coverage_by_pnm.get(int(pnm_id), {}).get(field, False)
+        target_value = float(pnm_row[column]) if is_rated else None
+        rank = (
+            1 + sum(1 for value in values if value > target_value + 1e-9)
+            if is_rated and target_value is not None and values
+            else None
+        )
         percentile = (
             round((sum(1 for value in values if value <= target_value + 1e-9) / len(values)) * 100, 1)
-            if values
-            else 100.0
+            if is_rated and target_value is not None and values
+            else None
         )
         criteria_entry = criteria_by_field.get(field, {})
         configured_max_raw = criteria_entry.get("max", RATING_FIELD_LIMITS.get(field, 10))
@@ -13741,19 +13767,24 @@ def pnm_meeting_view(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) 
             label,
             max_length=20,
         )
-        leader_value = max(values) if values else target_value
+        leader_value = max(values) if values else None
         category_rankings.append(
             {
                 "field": field,
                 "label": label,
                 "short_label": short_label,
                 "max": configured_max,
-                "value": round(target_value, 2),
+                "value": round(target_value, 2) if target_value is not None else None,
+                "is_rated": is_rated,
                 "rank": rank,
                 "cohort_size": len(values),
                 "percentile": percentile,
-                "leader_value": round(float(leader_value), 2),
-                "points_from_leader": round(float(leader_value) - target_value, 2),
+                "leader_value": round(float(leader_value), 2) if leader_value is not None else None,
+                "points_from_leader": (
+                    round(float(leader_value) - target_value, 2)
+                    if leader_value is not None and target_value is not None
+                    else None
+                ),
             }
         )
 
@@ -13946,7 +13977,7 @@ def delete_pnm(pnm_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[s
             (pnm_id,),
         ).fetchone()
         if not row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         rating_users = conn.execute("SELECT DISTINCT user_id FROM ratings WHERE pnm_id = ?", (pnm_id,)).fetchall()
         lunch_users = conn.execute("SELECT DISTINCT user_id FROM lunches WHERE pnm_id = ?", (pnm_id,)).fetchall()
@@ -13981,7 +14012,7 @@ def delete_pnm(pnm_id: int, user: sqlite3.Row = Depends(require_head)) -> dict[s
             recalc_member_lunch_stats(conn, user_id)
 
     remove_photo_if_present(photo_path)
-    return {"message": f"Deleted PNM {display_name} ({row['pnm_code']})."}
+    return {"message": f"Deleted rushee {display_name} ({row['pnm_code']})."}
 
 
 @app.post("/api/ratings")
@@ -13999,7 +14030,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
     with db_session() as conn:
         pnm_row = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
         if not pnm_row:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         existing = conn.execute(
             "SELECT * FROM ratings WHERE pnm_id = ? AND user_id = ?",
@@ -14286,7 +14317,7 @@ def pnm_ratings(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> dict[
     with db_session() as conn:
         target = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not target:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         rows = conn.execute(
             """
@@ -14385,7 +14416,7 @@ def create_pnm_comment(
             (pnm_id,),
         ).fetchone()
         if not pnm:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         created_at = now_iso()
         cursor = conn.execute(
@@ -14448,7 +14479,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(requir
             (payload.pnm_id,),
         ).fetchone()
         if not pnm:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         try:
             now = now_iso()
@@ -14471,7 +14502,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(requir
         except sqlite3.IntegrityError as exc:
             raise HTTPException(
                 status_code=409,
-                detail="Duplicate lunch log for this member, PNM, and date is not allowed.",
+                detail="A touchpoint for this member, rushee, and date already exists.",
             ) from exc
 
         lunch_id = int(cursor.lastrowid or 0)
@@ -14525,7 +14556,7 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(requir
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return {
-        "message": "Lunch scheduled.",
+        "message": "Touchpoint scheduled.",
         "member": user_payload(refreshed_user, refreshed_user["role"], refreshed_user["id"]),
         "pnm": pnm_payload(
             refreshed_pnm,
@@ -14551,7 +14582,7 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(require_officer)) -> dict[
     with db_session() as conn:
         target = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
         if not target:
-            raise HTTPException(status_code=404, detail="PNM not found.")
+            raise HTTPException(status_code=404, detail="Rushee not found.")
 
         rows = conn.execute(
             """
@@ -15334,7 +15365,7 @@ def create_engagement_event(
     details = payload.details.strip()
     location = payload.location.strip()
     if payload.event_type == "lunch" and payload.pnm_id is None:
-        raise HTTPException(status_code=400, detail="Lunch events require a PNM.")
+        raise HTTPException(status_code=400, detail="Touchpoint events require a rushee.")
 
     with db_session() as conn:
         owner_user_id = payload.owner_user_id if payload.owner_user_id is not None else int(user["id"])
@@ -15348,7 +15379,7 @@ def create_engagement_event(
         if payload.pnm_id is not None:
             pnm = conn.execute("SELECT id FROM pnms WHERE id = ?", (payload.pnm_id,)).fetchone()
             if not pnm:
-                raise HTTPException(status_code=404, detail="PNM not found.")
+                raise HTTPException(status_code=404, detail="Rushee not found.")
 
         now = now_iso()
         cursor = conn.execute(
@@ -15455,7 +15486,7 @@ def update_engagement_event(
             if disallowed:
                 raise HTTPException(
                     status_code=400,
-                    detail="Linked events can only update status here. Edit lunches/rush events from their native APIs.",
+                    detail="Linked events can only update status here. Edit touchpoints or rush events from their native tools.",
                 )
 
         if int(user["id"]) != int(row["created_by"]) and user["role"] != ROLE_HEAD:
@@ -15501,12 +15532,12 @@ def update_engagement_event(
             if start_value and end_value and (end_value[0] * 60 + end_value[1]) <= (start_value[0] * 60 + start_value[1]):
                 raise HTTPException(status_code=400, detail="End time must be after start time.")
         if event_type_token == "lunch" and pnm_id is None:
-            raise HTTPException(status_code=400, detail="Lunch events require a PNM.")
+            raise HTTPException(status_code=400, detail="Touchpoint events require a rushee.")
 
         if pnm_id is not None:
             pnm_exists = conn.execute("SELECT id FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
             if not pnm_exists:
-                raise HTTPException(status_code=404, detail="PNM not found.")
+                raise HTTPException(status_code=404, detail="Rushee not found.")
         if owner_user_id is not None:
             owner_exists = conn.execute("SELECT id FROM users WHERE id = ? AND is_approved = 1", (owner_user_id,)).fetchone()
             if not owner_exists:
@@ -17471,7 +17502,7 @@ def workspace_meetings(
         if not pnm.get("assigned_officers") and not pnm.get("assigned_officer_id"):
             flags.append("No Owner")
         if int(pnm.get("total_lunches") or 0) <= 0:
-            flags.append("No Lunch Context")
+            flags.append("No Touchpoint Context")
         meeting_ready_score = max(0, 100 - len(flags) * 18 + min(int(pnm.get("rating_count") or 0), 5) * 4)
         candidates.append(
             {

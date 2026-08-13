@@ -13,10 +13,6 @@
     <link rel="manifest" href="{{ app_config.base_path if app_config else '' }}/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
     <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/tokens.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/layout.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/components.css') }}" />
-    <link rel="stylesheet" href="{{ asset_url('css/pages.css') }}" />
     <link rel="stylesheet" href="{{ asset_url('css/product.css') }}" />
     <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
     <script src="{{ asset_url('js/app.js') }}" defer></script>
@@ -35,163 +31,110 @@
 
     <main class="shell shell-app-shell">
       <section id="authShell" class="auth-shell{% if initial_authenticated %} hidden{% endif %}">
-        <header id="authHero" class="hero reveal">
-          <div class="hero-shell hero-shell-single">
-            <div class="hero-copy">
-              <div class="auth-brand-lockup">
-                <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard shield" class="auth-brand-mark" />
-                {% if app_config.logo_path %}
-                <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
-                {% endif %}
-              </div>
-              <p class="eyebrow">{{ app_config.chapter_name if app_config else 'Kappa Alpha Order' }}</p>
-              <h1>Continue Into Your Chapter Command Center</h1>
-              <p>
-                {{ app_config.setup_tagline if app_config and app_config.setup_tagline else 'BidBoard keeps rushees, touchpoints, meeting packets, assignments, and team coordination in one shared chapter workspace.' }}
-              </p>
-              <div class="auth-feature-strip">
-                <span>Command</span>
-                <span>Touchpoints</span>
-                <span>Meetings</span>
-                <span>Team Coordination</span>
-              </div>
-              <div class="auth-entry-meta">
-                <span>Chapter-specific branding</span>
-                <span>Approval-based officer access</span>
-                <span>Member portal linked</span>
-              </div>
-              <div id="heroStats" class="hero-stats hidden">
-                <article class="stat-card">
-                  <p>Rushees Tracked</p>
-                  <strong id="heroPnmCount">0</strong>
-                </article>
-                <article class="stat-card">
-                  <p>Member Ratings</p>
-                  <strong id="heroRatingCount">0</strong>
-                </article>
-                <article class="stat-card">
-                  <p>Touchpoints Logged</p>
-                  <strong id="heroLunchCount">0</strong>
-                </article>
-              </div>
-              <div class="auth-proof-grid auth-proof-grid-entry">
-                <article class="auth-proof-card">
-                  <strong>Isolated Chapter Data</strong>
-                  <span>Every organization keeps its own roster, approvals, and exports.</span>
-                </article>
-                <article class="auth-proof-card">
-                  <strong>Shared Rush System</strong>
-                  <span>Command, Rushees, Meetings, Operations, Team, and Admin stay aligned after login.</span>
-                </article>
-                <article class="auth-proof-card">
-                  <strong>Live Team Context</strong>
-                  <span>Assignments, scoring, and packets stay aligned in one workspace.</span>
-                </article>
-                <article class="auth-proof-card">
-                  <strong>Meeting-Ready Decisions</strong>
-                  <span>Open a packet with trend history, comments, and ownership already attached.</span>
-                </article>
-              </div>
-            </div>
+        <header id="authHero" class="auth-entry-brand reveal">
+          <div class="auth-brand-lockup">
+            <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard shield" class="auth-brand-mark" />
+            {% if app_config.logo_path %}
+            <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
+            {% endif %}
           </div>
+          <p class="eyebrow">{{ app_config.chapter_name if app_config else 'BidBoard' }} workspace</p>
+          <h1>Pick up where your team left off.</h1>
+          <p class="auth-entry-lede">
+            Ratings, touchpoints, owners, and meeting context stay together in one private chapter workspace.
+          </p>
+          <div class="auth-entry-list" aria-label="Workspace capabilities">
+            <span><b>01</b> Prioritized daily queue</span>
+            <span><b>02</b> Shared rushee context</span>
+            <span><b>03</b> Meeting-ready decisions</span>
+          </div>
+          <a class="auth-switch-link" href="/organizations">Switch organization <span>→</span></a>
         </header>
 
-        <section id="authSection" class="panel auth-grid reveal delay-1">
-          <article class="auth-panel auth-panel-login">
+        <section id="authSection" class="auth-entry-actions reveal delay-1">
+          <article class="auth-panel auth-panel-login panel">
             <div class="auth-panel-head">
-              <p class="eyebrow">Approved Access</p>
-              <h2>Login</h2>
-              <p class="muted">Sign in with your approved username and password.</p>
+              <p class="eyebrow">Approved access</p>
+              <h2>Sign in to {{ app_config.chapter_name if app_config else 'BidBoard' }}</h2>
+              <p class="muted">Use the credentials approved by your Head Rush Officer.</p>
             </div>
-            <div class="auth-panel-badges" aria-hidden="true">
-              <span>Remember this device</span>
-              <span>Scoped to this chapter</span>
-            </div>
-            <form id="loginForm" class="stack">
+            <form id="loginForm" class="stack auth-primary-form">
               <label>
                 Username
-                <input id="loginUsername" name="username" type="text" required placeholder="Your approved username" autocomplete="username" />
+                <input id="loginUsername" name="username" type="text" required placeholder="Your username" autocomplete="username" />
               </label>
               <label>
                 Password
-                <input id="loginAccessCode" name="password" type="password" required placeholder="Enter password" autocomplete="current-password" />
+                <input id="loginAccessCode" name="password" type="password" required placeholder="Your password" autocomplete="current-password" />
               </label>
-              <label class="checkbox-line">
+              <label class="checkbox-line auth-remember-line">
                 <input id="loginRememberMe" type="checkbox" />
                 Keep me signed in on this device
               </label>
-              <button type="submit">Sign In</button>
+              <button type="submit">Sign in</button>
             </form>
-            <div class="auth-inline-note">
-              <strong>Rush team access only</strong>
-              <span>Approved officers land in Command, Meetings, Operations, and Team with the same workspace context.</span>
+            <div class="auth-secondary-links">
+              <span>Chapter member?</span>
+              <a href="{{ app_config.member_base if app_config else '/member' }}">Open the Member Portal</a>
             </div>
-            <p class="muted">
-              Fraternity member and not on rush team?
-              <a href="{{ app_config.member_base if app_config else '/member' }}">Use the Member Portal</a>.
-            </p>
           </article>
 
-          <article class="auth-panel auth-panel-register">
-            <div class="auth-panel-head">
-              <p class="eyebrow">New Officer Setup</p>
-              <h2>Register New Rush Officer</h2>
-              <p class="muted">Register with username and password. Emoji is optional. Create, rate, and coordinate rushees after approval.</p>
-            </div>
-            <div class="auth-panel-badges" aria-hidden="true">
-              <span>Approval required</span>
-              <span>Emoji optional</span>
-              <span>Profile city + state</span>
-            </div>
-            <form id="registerForm" class="stack">
-              <label>
-                Username
-                <input id="regUsername" name="username" type="text" required placeholder="letters, numbers, dot, underscore, hyphen" autocomplete="username" />
-              </label>
-              <label>
-                Emoji (optional)
-                <input id="regEmoji" type="text" maxlength="8" placeholder="🔥" />
-              </label>
-              <label>
-                Password
-                <input id="regAccessCode" name="password" type="password" required placeholder="At least 8 characters with letters and numbers" autocomplete="new-password" />
-              </label>
-              <div class="inline-grid two-cols">
+          <details class="auth-register-disclosure panel">
+            <summary>
+              <span><strong>Need rush-team access?</strong><small>Request a new officer account</small></span>
+              <b>Open form</b>
+            </summary>
+            <article class="auth-panel auth-panel-register">
+              <div class="auth-panel-head">
+                <p class="eyebrow">New officer request</p>
+                <h2>Create your account</h2>
+                <p class="muted">Your Head Rush Officer must approve the request before you can enter the workspace.</p>
+              </div>
+              <form id="registerForm" class="stack">
+                <div class="inline-grid two-cols">
+                  <label>
+                    Username
+                    <input id="regUsername" name="username" type="text" required placeholder="Choose a username" autocomplete="username" />
+                  </label>
+                  <label>
+                    Emoji <span class="field-optional">Optional</span>
+                    <input id="regEmoji" type="text" maxlength="8" placeholder="KA" />
+                  </label>
+                </div>
                 <label>
-                  City (optional)
-                  <input id="regCity" type="text" maxlength="80" placeholder="Austin" />
+                  Password
+                  <input id="regAccessCode" name="password" type="password" required placeholder="At least 8 characters with letters and numbers" autocomplete="new-password" />
                 </label>
-                <label>
-                  State (optional)
-                  <input id="regState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
-                </label>
-              </div>
-              <button type="submit" class="secondary">Submit for Approval</button>
-            </form>
-            <div class="divider"></div>
-            <div class="auth-member-signup auth-qr-panel">
-              <div>
-                <p class="eyebrow">Member Portal</p>
-                <h3>Member Signup QR</h3>
-                <p class="muted">Share this with members so they can open the simplified member login and registration page.</p>
-              </div>
-              <div class="action-row">
-                <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Open Member Signup</a>
-              </div>
-              <div class="auth-qr-frame">
+                <div class="inline-grid two-cols">
+                  <label>
+                    City <span class="field-optional">Optional</span>
+                    <input id="regCity" type="text" maxlength="80" placeholder="Austin" />
+                  </label>
+                  <label>
+                    State <span class="field-optional">Optional</span>
+                    <input id="regState" list="stateFilterHints" type="text" maxlength="32" placeholder="TX or Texas" />
+                  </label>
+                </div>
+                <button type="submit" class="secondary">Submit for approval</button>
+              </form>
+              <div class="auth-member-signup">
+                <div>
+                  <strong>Registering as a chapter member instead?</strong>
+                  <p class="muted">Use the simpler Member Portal request.</p>
+                </div>
+                <a id="memberSignupLink" class="quick-nav-link" href="{{ app_config.member_base if app_config else '/member' }}">Member signup</a>
                 <img
                   id="memberSignupQrImage"
-                  class="signup-qr"
+                  class="signup-qr auth-hidden-qr"
                   src="{{ app_config.member_signup_qr_path if app_config else '/member-signup-qr.svg' }}"
                   alt="Member signup QR code"
                   loading="lazy"
                 />
               </div>
-            </div>
-          </article>
+            </article>
+          </details>
         </section>
       </section>
-
       <section id="appSection" class="{% if not initial_authenticated %}hidden {% endif %}app-shell">
         <div class="app-frame">
           <aside class="panel app-sidebar">
@@ -200,7 +143,7 @@
                 <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="app-shell-mark" />
                 <div>
                   <p class="eyebrow">BidBoard</p>
-                  <strong>Recruitment Command</strong>
+                  <strong>Rush workspace</strong>
                 </div>
               </div>
               <div class="app-sidebar-tenant-card">
@@ -209,8 +152,8 @@
                 {% endif %}
                 <div>
                   <p class="eyebrow">{{ app_config.chapter_name if app_config else 'BidBoard' }}</p>
-                  <h2>Recruitment OS</h2>
-                  <p class="muted">Daily operations for rush week.</p>
+                  <h2>Rush team</h2>
+                  <p class="muted">Live recruiting operations.</p>
                 </div>
               </div>
             </div>
@@ -313,9 +256,9 @@
                   <strong id="sessionTitle">Welcome</strong>
                   <span id="sessionSubtitle" class="muted"></span>
                 </div>
-                <button id="globalCommandBtn" type="button" class="secondary">Command Palette</button>
+                <button id="globalCommandBtn" type="button" class="secondary">Search</button>
                 <details id="globalAddMenu" class="app-menu">
-                  <summary class="secondary">+ Add</summary>
+                  <summary class="secondary">New</summary>
                   <div class="app-menu-card">
                     <button type="button" class="app-menu-item" data-command-action="add_rushee">Add Rushee</button>
                     <button type="button" class="app-menu-item" data-command-action="schedule_touchpoint">Schedule Touchpoint</button>

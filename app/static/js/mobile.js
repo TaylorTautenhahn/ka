@@ -1575,7 +1575,7 @@ function renderMobileCommandSelection() {
   const selected = mobileCommandSelectedItem();
   if (!selected) {
     if (metaEl) {
-      metaEl.textContent = "Select a rushee from search results or lunch follow-up to start rating.";
+      metaEl.textContent = "Select a rushee from the roster or recent touchpoints to start rating.";
     }
     if (meetingShortcut) {
       meetingShortcut.href = MOBILE_ROUTES.meeting;
@@ -2437,7 +2437,7 @@ function renderCalendarItems(items) {
   }
   listEl.innerHTML = items
     .map((item) => {
-      const typeLabel = item.item_type === "lunch" ? "Lunch" : "Rush Event";
+      const typeLabel = item.item_type === "lunch" ? "Touchpoint" : "Rush Event";
       const timeLabel =
         item.start_time && item.end_time
           ? `${item.start_time} - ${item.end_time}`
@@ -3138,7 +3138,7 @@ function attachPageEvents() {
       copyLunchFeedBtn.addEventListener("click", async () => {
         await copyTextToClipboard(
           mobileCalendarShare && mobileCalendarShare.lunch_feed_url,
-          "Lunch calendar feed copied."
+          "Touchpoint calendar feed copied."
         );
       });
     }

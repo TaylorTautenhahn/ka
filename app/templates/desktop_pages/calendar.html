@@ -25,14 +25,19 @@
                 <div class="section-head">
                   <div>
                     <h3>Shared Touchpoints</h3>
-                    <p class="muted">Use one shared drawer for lunches and one-on-one follow-up scheduling.</p>
+                    <p class="muted">Use one shared drawer for meals, events, and one-on-one follow-up.</p>
                   </div>
                   <button id="operationsScheduleTouchpointBtn" type="button" class="secondary">Schedule Touchpoint</button>
                 </div>
                 <div class="divider"></div>
-                <h3>Head Rush Event Controls</h3>
-                <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove non-lunch events. Use Schedule Touchpoint for lunches and one-on-one follow-up.</p>
-                <form id="rushEventForm" class="stack">
+                <details class="workspace-disclosure operations-event-disclosure">
+                  <summary>
+                    <span>Create rush event</span>
+                    <small>Head Rush Officer</small>
+                  </summary>
+                  <div class="workspace-disclosure-body">
+                    <p id="rushEventPermissionNotice" class="muted hidden">Only Head Rush Officers can add or remove chapter-wide events. Use Schedule Touchpoint for individual follow-up.</p>
+                    <form id="rushEventForm" class="stack">
                   <label>
                     Event title
                     <input id="rushEventTitle" type="text" required placeholder="Open House - Round 1" />
@@ -79,12 +84,14 @@
                     <input id="rushEventOfficial" type="checkbox" checked />
                     Mark as official rush event
                   </label>
-                  <button id="rushEventSubmitBtn" type="submit">Create Event</button>
-                </form>
+                      <button id="rushEventSubmitBtn" type="submit">Create Event</button>
+                    </form>
+                  </div>
+                </details>
               </article>
               <article class="list-column">
                 <h3>Shared Calendar Links</h3>
-                <p class="muted">Subscribe once to the chapter rush calendar (events + lunches).</p>
+                <p class="muted">Subscribe once to the chapter rush calendar for events and touchpoints.</p>
                 <div class="action-row">
                   <button id="copyRushCalendarFeedBtn" type="button" class="secondary">Copy Rush Feed URL</button>
                   <a id="openRushGoogleSubscribeBtn" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Subscribe</a>
@@ -151,7 +158,7 @@
               <article class="list-column">
                 <h3>Weekly Goal Metrics</h3>
                 <div id="weeklyGoalSummary" class="cards"></div>
-                <p class="muted">Auto metrics update from real actions: ratings, lunches, PNM adds, chat, and rush events.</p>
+                <p class="muted">Auto metrics update from real actions: ratings, touchpoints, rushee adds, chat, and rush events.</p>
                 <div id="weeklyGoalsList" class="list-box muted">Loading weekly goals...</div>
               </article>
             </div>

@@ -65,7 +65,7 @@
           <a id="mobileCalendarGoogleLunchSubscribeLink" class="quick-nav-link hidden" href="#" target="_blank" rel="noopener">Google Touchpoint Feed</a>
         </div>
         <p id="mobileCalendarFeedPreview" class="muted breakable">Loading calendar feed...</p>
-        <p id="mobileCalendarLunchFeedPreview" class="muted breakable">Loading lunch feed...</p>
+        <p id="mobileCalendarLunchFeedPreview" class="muted breakable">Loading touchpoint feed...</p>
       </details>
 
       <details id="mobileCalendarHeadTools" class="panel mobile-panel mobile-collapsible mobile-secondary-details hidden">
@@ -97,7 +97,7 @@
     </main>
 
     <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Command</a>
+      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Home</a>
       <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
       <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
       <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>

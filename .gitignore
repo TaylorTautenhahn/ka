@@ -22,6 +22,11 @@ output/playwright/
 *.swp
 tmp/
 
+# Block Blast is maintained as a separate sibling project in ../BlockBlast.
+docs/block_blast_*
+scripts/block_blast_*
+output/block_blast_*
+
 
 # App data
 app/recruitment.db

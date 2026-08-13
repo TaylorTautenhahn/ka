@@ -10,11 +10,11 @@
     <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
     <title>{{ app_config.tenant_name }} Rushees</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/product.css?v=20260730minimal13" />
-    <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/mobile.js?v=20260730minimal13" defer></script>
+    <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/product.css') }}" />
+    <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
+    <script src="{{ asset_url('js/mobile.js') }}" defer></script>
   </head>
   <body data-app-config='{{ app_config | tojson | forceescape }}' data-mobile-page="pnms">
     <div id="pwaSplash" class="pwa-splash hidden" aria-hidden="true">
@@ -27,7 +27,7 @@
     <main class="shell mobile-shell">
       <div class="mobile-appbar">
         <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
-          <img src="{{ app_config.logo_path if app_config.logo_path else '/static/icons/bidboard-shield.svg' }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
+          <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
           <div>
             <p>{{ app_config.chapter_name }}</p>
             <strong>BidBoard</strong>

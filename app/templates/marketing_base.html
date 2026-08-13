@@ -6,9 +6,9 @@
     <meta name="theme-color" content="#15120e" />
     <title>{% block title %}BidBoard{% endblock %}</title>
     <meta name="description" content="{% block description %}BidBoard is the recruitment command layer for fraternities and sororities.{% endblock %}" />
-    <link rel="stylesheet" href="/static/css/landing.css?v=20260730minimal13" />
-    <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/landing.js?v=20260730minimal13" defer></script>
+    <link rel="stylesheet" href="{{ asset_url('css/landing.css') }}" />
+    <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
+    <script src="{{ asset_url('js/landing.js') }}" defer></script>
     {% block extra_head %}{% endblock %}
   </head>
   {% set marketing_tenant_count = tenant_count if tenant_count is defined else (tenants|length if tenants is defined else 0) %}
@@ -21,7 +21,7 @@
     <main class="bb-shell">
       <header class="bb-topbar bb-reveal" data-delay="10">
         <a class="bb-brand" href="/" aria-label="BidBoard home">
-          <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="bb-brand-mark-image" />
+          <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="bb-brand-mark-image" />
           <span class="bb-brand-lockup">
             <strong>BidBoard</strong>
             <small>Recruitment Command Intelligence</small>
@@ -49,7 +49,7 @@
       <footer class="bb-footer bb-reveal" data-delay="40">
         <div class="bb-footer-branding">
           <div class="bb-footer-brand-lockup">
-            <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="bb-footer-mark" />
+            <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="bb-footer-mark" />
             <div>
               <p class="bb-kicker">BidBoard</p>
               <h2>The modern command surface for recruitment week.</h2>

@@ -26,6 +26,8 @@ const BASE_PATH = (APP_CONFIG.base_path || "").replace(/\/$/, "");
 const API_BASE = (APP_CONFIG.api_base || "/api").replace(/\/$/, "");
 const MEETING_BASE = (APP_CONFIG.meeting_base || `${BASE_PATH}/meeting`).replace(/\/$/, "");
 const TENANT_KEY = String(APP_CONFIG.tenant_slug || "default").trim() || "default";
+const GLOBAL_SEARCH_DEBOUNCE_MS = 180;
+const LIVE_REFRESH_INTERVAL_MS = 30000;
 
 function clampChannel(value) {
   return Math.max(0, Math.min(255, Math.round(value)));
@@ -698,6 +700,7 @@ const state = {
   activeDesktopPage: DEFAULT_DESKTOP_PAGE,
   liveRefreshTimer: null,
   liveRefreshInFlight: false,
+  lastLiveRefreshAt: 0,
   headAdmin: {
     summary: null,
     currentHeads: [],
@@ -775,6 +778,9 @@ const state = {
     pnms: [],
     members: [],
     commands: [],
+    timer: null,
+    controller: null,
+    requestId: 0,
   },
   tutorial: {
     active: false,
@@ -1369,8 +1375,12 @@ async function api(path, options = {}) {
       credentials: "same-origin",
       headers,
       body: options.body ? (isFormData ? options.body : JSON.stringify(options.body)) : undefined,
+      signal: options.signal,
     });
   } catch (networkError) {
+    if (networkError && networkError.name === "AbortError") {
+      throw networkError;
+    }
     const text = networkError instanceof Error ? networkError.message : "Network error";
     throw new Error(`Network error: ${text}`);
   }
@@ -1724,14 +1734,19 @@ function refreshLoadersForActivePage() {
 async function refreshByActivePage() {
   const loaders = refreshLoadersForActivePage();
   await Promise.all(loaders.map((loader) => loader()));
+  state.lastLiveRefreshAt = Date.now();
 }
 
 function startLiveRefresh() {
   if (state.liveRefreshTimer) {
     clearInterval(state.liveRefreshTimer);
   }
+  if (document.hidden || navigator.onLine === false) {
+    state.liveRefreshTimer = null;
+    return;
+  }
   state.liveRefreshTimer = setInterval(async () => {
-    if (!state.user) {
+    if (!state.user || document.hidden || navigator.onLine === false) {
       return;
     }
     if (state.liveRefreshInFlight) {
@@ -1745,7 +1760,7 @@ function startLiveRefresh() {
     } finally {
       state.liveRefreshInFlight = false;
     }
-  }, 18000);
+  }, LIVE_REFRESH_INTERVAL_MS);
 }
 
 function stopLiveRefresh() {
@@ -1754,6 +1769,30 @@ function stopLiveRefresh() {
     state.liveRefreshTimer = null;
   }
   state.liveRefreshInFlight = false;
+}
+
+async function handleLiveRefreshAvailabilityChange() {
+  if (document.hidden || navigator.onLine === false) {
+    if (state.liveRefreshTimer) {
+      clearInterval(state.liveRefreshTimer);
+      state.liveRefreshTimer = null;
+    }
+    return;
+  }
+  if (!state.user) {
+    return;
+  }
+  if (!state.liveRefreshInFlight && Date.now() - state.lastLiveRefreshAt >= LIVE_REFRESH_INTERVAL_MS / 2) {
+    state.liveRefreshInFlight = true;
+    try {
+      await refreshByActivePage();
+    } catch {
+      // The next scheduled refresh will retry after transient failures.
+    } finally {
+      state.liveRefreshInFlight = false;
+    }
+  }
+  startLiveRefresh();
 }
 
 function setSessionHeading() {
@@ -4696,6 +4735,12 @@ function renderCommandPaletteResults() {
 
 async function loadGlobalSearch(query) {
   const token = String(query || "").trim();
+  const requestId = state.searchResults.requestId + 1;
+  state.searchResults.requestId = requestId;
+  if (state.searchResults.controller) {
+    state.searchResults.controller.abort();
+  }
+  state.searchResults.controller = null;
   state.searchResults.query = token;
   if (!token) {
     state.searchResults.pnms = [];
@@ -4704,23 +4749,55 @@ async function loadGlobalSearch(query) {
     renderCommandPaletteResults();
     return;
   }
+  const controller = new AbortController();
+  state.searchResults.controller = controller;
   try {
-    const payload = await api(`/api/search/global${toQuery({ q: token })}`);
+    const payload = await api(`/api/search/global${toQuery({ q: token })}`, { signal: controller.signal });
+    if (requestId !== state.searchResults.requestId) {
+      return;
+    }
     state.searchResults = {
+      ...state.searchResults,
       query: token,
       pnms: payload.pnms || [],
       members: payload.members || [],
       commands: [...(payload.commands || []), ...localCommandResults(token, payload.commands || [])],
     };
-  } catch {
+  } catch (error) {
+    if (error && error.name === "AbortError") {
+      return;
+    }
+    if (requestId !== state.searchResults.requestId) {
+      return;
+    }
     state.searchResults = {
+      ...state.searchResults,
       query: token,
       pnms: [],
       members: [],
       commands: localCommandResults(token, []),
     };
+  } finally {
+    if (state.searchResults.controller === controller) {
+      state.searchResults.controller = null;
+    }
   }
   renderCommandPaletteResults();
+}
+
+function scheduleGlobalSearch(query, immediate = false) {
+  if (state.searchResults.timer) {
+    clearTimeout(state.searchResults.timer);
+    state.searchResults.timer = null;
+  }
+  if (immediate) {
+    loadGlobalSearch(query);
+    return;
+  }
+  state.searchResults.timer = setTimeout(() => {
+    state.searchResults.timer = null;
+    loadGlobalSearch(query);
+  }, GLOBAL_SEARCH_DEBOUNCE_MS);
 }
 
 function openCommandPalette(seed = "") {
@@ -4733,7 +4810,7 @@ function openCommandPalette(seed = "") {
     commandPaletteInput.value = seed;
     commandPaletteInput.focus();
   }
-  loadGlobalSearch(seed);
+  scheduleGlobalSearch(seed, true);
 }
 
 function closeCommandPalette() {
@@ -4742,6 +4819,14 @@ function closeCommandPalette() {
   }
   globalCommandPalette.classList.add("hidden");
   globalCommandPalette.setAttribute("aria-hidden", "true");
+  if (state.searchResults.timer) {
+    clearTimeout(state.searchResults.timer);
+    state.searchResults.timer = null;
+  }
+  if (state.searchResults.controller) {
+    state.searchResults.controller.abort();
+    state.searchResults.controller = null;
+  }
 }
 
 function renderPendingApprovals(data) {
@@ -8980,14 +9065,14 @@ function attachEvents() {
       if (commandPaletteInput) {
         commandPaletteInput.value = globalSearchInput.value || "";
       }
-      loadGlobalSearch(globalSearchInput.value || "");
+      scheduleGlobalSearch(globalSearchInput.value || "");
       if (globalCommandPalette && globalCommandPalette.classList.contains("hidden")) {
         openCommandPalette(globalSearchInput.value || "");
       }
     });
   }
   if (commandPaletteInput) {
-    commandPaletteInput.addEventListener("input", () => loadGlobalSearch(commandPaletteInput.value || ""));
+    commandPaletteInput.addEventListener("input", () => scheduleGlobalSearch(commandPaletteInput.value || ""));
   }
   if (commandPaletteCloseBtn) {
     commandPaletteCloseBtn.addEventListener("click", closeCommandPalette);
@@ -9239,6 +9324,9 @@ function attachEvents() {
     tutorialCloseBtn.addEventListener("click", () => closeTutorialOverlay());
   }
   document.addEventListener("keydown", handleTutorialKeydown);
+  document.addEventListener("visibilitychange", handleLiveRefreshAvailabilityChange);
+  window.addEventListener("online", handleLiveRefreshAvailabilityChange);
+  window.addEventListener("offline", handleLiveRefreshAvailabilityChange);
   document.addEventListener("keydown", (event) => {
     if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
       event.preventDefault();

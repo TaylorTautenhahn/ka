@@ -10,15 +10,15 @@
     <meta name="apple-mobile-web-app-title" content="{{ app_config.chapter_name }}" />
     <title>{{ app_config.tenant_name }} Meetings · Meeting Packet</title>
     <link rel="manifest" href="{{ app_config.base_path }}/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/tokens.css" />
-    <link rel="stylesheet" href="/static/css/layout.css" />
-    <link rel="stylesheet" href="/static/css/components.css" />
-    <link rel="stylesheet" href="/static/css/pages.css" />
-    <link rel="stylesheet" href="/static/css/product.css?v=20260730minimal13" />
-    <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/meeting.js?v=20260730minimal13" defer></script>
+    <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/tokens.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/layout.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/components.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/pages.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/product.css') }}" />
+    <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
+    <script src="{{ asset_url('js/meeting.js') }}" defer></script>
   </head>
   <body class="desktop-backend-body desktop-product-auth meeting-route-body meeting-packet-page" data-app-config='{{ app_config | tojson | forceescape }}'>
     <div class="aura aura-one"></div>
@@ -38,7 +38,7 @@
           <aside class="panel app-sidebar">
             <div class="app-sidebar-brand">
               <div class="app-sidebar-brand-top">
-                <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="app-shell-mark" />
+                <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="app-shell-mark" />
                 <div>
                   <p class="eyebrow">BidBoard</p>
                   <strong>Recruitment Command</strong>

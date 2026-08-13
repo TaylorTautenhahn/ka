@@ -250,12 +250,34 @@ def main() -> None:
             response = client.get("/service-worker.js")
             expect_status(response, 200, "Service worker")
             if (
-                "kao-rush-shell-v8" not in response.text
-                or 'event.request.mode === "navigate"' not in response.text
+                "bidboard-offline-v9" not in response.text
+                or 'event.request.mode !== "navigate"' not in response.text
                 or 'cached || caches.match("/")' in response.text
+                or "cache.addAll" in response.text
+                or "/static/js/app.js" in response.text
             ):
-                raise AssertionError("Service worker must not cache authenticated page navigations.")
-            checks.append("Service worker avoids authenticated navigation caching")
+                raise AssertionError("Service worker must avoid authenticated navigation caching and eager bundle downloads.")
+            if "no-cache" not in response.headers.get("cache-control", ""):
+                raise AssertionError("Service worker must revalidate so browser clients receive updates promptly.")
+            checks.append("Service worker avoids authenticated navigation caching and eager bundle downloads")
+
+            versioned_static = client.get(
+                f"/static/js/app.js?v={main_module.STATIC_ASSET_VERSION}",
+                headers={"Cookie": f"{main_module.SESSION_COOKIE}=invalid-static-test"},
+            )
+            expect_status(versioned_static, 200, "Versioned static asset")
+            if "max-age=31536000" not in versioned_static.headers.get("cache-control", ""):
+                raise AssertionError("Versioned static assets should receive long-lived immutable caching.")
+            unversioned_static = client.get("/static/js/app.js")
+            expect_status(unversioned_static, 200, "Unversioned static asset")
+            unversioned_cache = unversioned_static.headers.get("cache-control", "")
+            if "max-age=86400" not in unversioned_cache or "immutable" in unversioned_cache:
+                raise AssertionError("Unversioned static assets should use bounded revalidation caching.")
+            landing_with_assets = client.get("/")
+            expected_asset_token = f"?v={main_module.STATIC_ASSET_VERSION}"
+            if expected_asset_token not in landing_with_assets.text or "20260730minimal13" in landing_with_assets.text:
+                raise AssertionError("Rendered pages should use generated static asset fingerprints.")
+            checks.append("Static assets use generated fingerprints and cache-safe delivery")
 
             response = client.post(
                 "/kappaalphaorder/api/auth/register",
@@ -789,8 +811,14 @@ def main() -> None:
             response = client.get("/kappaalphaorder/api/mobile/home")
             expect_status(response, 200, "Officer mobile home API")
             mobile_home_payload = response.json()
-            if "pnms" not in mobile_home_payload or "recent_lunches" not in mobile_home_payload:
-                raise AssertionError("Mobile home payload should include pnms and recent_lunches.")
+            if (
+                "pnms" not in mobile_home_payload
+                or "recent_lunches" not in mobile_home_payload
+                or "command_center" not in mobile_home_payload
+            ):
+                raise AssertionError("Mobile home payload should include PNMs, recent touchpoints, and command context.")
+            if not isinstance(mobile_home_payload["command_center"].get("queue"), list):
+                raise AssertionError("Mobile home command context should include a queue.")
             checks.append("Officer mobile home API works")
 
             response = client.get("/kappaalphaorder/api/mobile/pnms")

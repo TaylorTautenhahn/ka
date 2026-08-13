@@ -113,6 +113,17 @@ Run an end-to-end API + route smoke test against an isolated temporary database:
 
 This validates core auth, approvals, PNMs, ratings, lunches, rush events, chat, exports, platform admin APIs, and health checks.
 
+## Pre-Update Code Backups
+Create a tagged, restorable bundle and a normal browsable snapshot before a release or refactor:
+
+```bash
+./scripts/create_version_backup.sh pre-update
+```
+
+Backups are written outside the repository to `../Backups/BidBoard` by default. Override that location with `BIDBOARD_BACKUP_ROOT`. The command requires a clean worktree and pushes the generated backup tag to `origin` when that remote is configured.
+
+This protects application code and Git history. Continue using the Admin `Data & Storage` exports for live tenant databases and uploads.
+
 ## Seed Account Behavior
 Head seed account is environment-driven and production-safe:
 - No personal credentials are displayed in UI.
@@ -161,6 +172,7 @@ docker run -p 8000:8000 \
 - `CSRF_TRUSTED_ORIGINS` (default empty)
 - `TRUST_X_FORWARDED_FOR` (default `0`)
 - `PUBLIC_BASE_URL` (default empty; set in production to pin generated absolute URLs)
+- `STATIC_ASSET_VERSION` (optional deployment-specific override for static cache busting)
 - `PASSWORD_ITERATIONS` (default `260000`)
 - `LOGIN_WINDOW_SECONDS` (default `300`)
 - `LOGIN_MAX_FAILURES` (default `8`)

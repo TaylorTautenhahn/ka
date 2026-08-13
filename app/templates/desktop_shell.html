@@ -11,15 +11,15 @@
     {% set desktop_title_map = {'dashboard': 'Command', 'rushees': 'Rushees', 'meetings': 'Meetings', 'team': 'Team', 'calendar': 'Operations', 'admin': 'Admin'} %}
     <title>{{ app_config.tenant_name if app_config else 'BidBoard' }} · {{ desktop_title_map.get(app_config.desktop_route if app_config else 'dashboard', 'Command') }}</title>
     <link rel="manifest" href="{{ app_config.base_path if app_config else '' }}/manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="/static/icons/icon-192.png" />
-    <link rel="stylesheet" href="/static/css/styles.css" />
-    <link rel="stylesheet" href="/static/css/tokens.css" />
-    <link rel="stylesheet" href="/static/css/layout.css" />
-    <link rel="stylesheet" href="/static/css/components.css" />
-    <link rel="stylesheet" href="/static/css/pages.css" />
-    <link rel="stylesheet" href="/static/css/product.css?v=20260730minimal13" />
-    <script src="/static/js/pwa_shell.js" defer></script>
-    <script src="/static/js/app.js?v=20260730minimal13" defer></script>
+    <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/styles.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/tokens.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/layout.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/components.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/pages.css') }}" />
+    <link rel="stylesheet" href="{{ asset_url('css/product.css') }}" />
+    <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
+    <script src="{{ asset_url('js/app.js') }}" defer></script>
   </head>
   <body class="desktop-backend-body{% if initial_authenticated %} desktop-product-auth{% endif %}"{% if app_config %} data-app-config='{{ app_config | tojson | forceescape }}'{% endif %}>
     <div class="aura aura-one"></div>
@@ -39,7 +39,7 @@
           <div class="hero-shell hero-shell-single">
             <div class="hero-copy">
               <div class="auth-brand-lockup">
-                <img src="/static/icons/bidboard-shield.svg" alt="BidBoard shield" class="auth-brand-mark" />
+                <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard shield" class="auth-brand-mark" />
                 {% if app_config.logo_path %}
                 <img src="{{ app_config.logo_path }}" alt="{{ app_config.tenant_name }} logo" class="brand-logo" />
                 {% endif %}
@@ -197,7 +197,7 @@
           <aside class="panel app-sidebar">
             <div class="app-sidebar-brand">
               <div class="app-sidebar-brand-top">
-                <img src="/static/icons/bidboard-shield.svg" alt="BidBoard" class="app-shell-mark" />
+                <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="BidBoard" class="app-shell-mark" />
                 <div>
                   <p class="eyebrow">BidBoard</p>
                   <strong>Recruitment Command</strong>

@@ -26,12 +26,13 @@ import csv
 from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from urllib.error import HTTPError, URLError
 from urllib.request import Request as URLRequest, urlopen
+
+from app.services.web_assets import CacheControlStaticFiles, build_static_asset_version, versioned_static_url
 
 try:
     import segno
@@ -45,6 +46,12 @@ except Exception:  # pragma: no cover - optional dependency
 
 
 BASE_DIR = Path(__file__).resolve().parent
+STATIC_DIR = BASE_DIR / "static"
+STATIC_ASSET_VERSION = build_static_asset_version(STATIC_DIR, os.getenv("STATIC_ASSET_VERSION", ""))
+
+
+def asset_url(path: str) -> str:
+    return versioned_static_url(path, STATIC_ASSET_VERSION)
 
 
 def resolve_data_root() -> Path:
@@ -524,10 +531,12 @@ app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 app.add_middleware(GZipMiddleware, minimum_size=512)
 if ALLOWED_HOSTS != ["*"]:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
-app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+app.mount("/static", CacheControlStaticFiles(directory=STATIC_DIR), name="static")
 LEGACY_PNM_UPLOADS_DIR = UPLOADS_DIR / "pnms"
 LEGACY_PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
+templates.env.globals["asset_url"] = asset_url
+templates.env.globals["static_asset_version"] = STATIC_ASSET_VERSION
 
 _LOGIN_GUARD = Lock()
 _LOGIN_ATTEMPTS: dict[str, list[float]] = {}
@@ -1317,12 +1326,12 @@ def manifest_payload_for_tenant(tenant: TenantContext | None) -> dict[str, Any]:
             "theme_color": tenant.theme_primary,
             "icons": [
                 {
-                    "src": "/static/icons/icon-192.png",
+                    "src": asset_url("icons/icon-192.png"),
                     "sizes": "192x192",
                     "type": "image/png",
                 },
                 {
-                    "src": "/static/icons/icon-512.png",
+                    "src": asset_url("icons/icon-512.png"),
                     "sizes": "512x512",
                     "type": "image/png",
                     "purpose": "any maskable",
@@ -1341,12 +1350,12 @@ def manifest_payload_for_tenant(tenant: TenantContext | None) -> dict[str, Any]:
         "theme_color": DEFAULT_THEME_PRIMARY,
         "icons": [
             {
-                "src": "/static/icons/icon-192.png",
+                "src": asset_url("icons/icon-192.png"),
                 "sizes": "192x192",
                 "type": "image/png",
             },
             {
-                "src": "/static/icons/icon-512.png",
+                "src": asset_url("icons/icon-512.png"),
                 "sizes": "512x512",
                 "type": "image/png",
                 "purpose": "any maskable",
@@ -1972,7 +1981,7 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
     if request_forwarded_proto(request) == "https":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
     request_path = str(request.scope.get("path", request.url.path))
-    if (
+    if not request_path.startswith("/static/") and (
         "/api/" in request_path
         or request_path.startswith("/api")
         or request.cookies.get(SESSION_COOKIE)
@@ -2655,7 +2664,7 @@ def instagram_avatar_fallback_url(instagram_handle: str | None) -> str | None:
 
 
 def demo_pnm_placeholder_url() -> str:
-    return "/static/images/demo-pnm-placeholder.svg"
+    return asset_url("images/demo-pnm-placeholder.svg")
 
 
 def photo_fs_path(photo_path: str | None) -> Path | None:
@@ -9121,12 +9130,20 @@ def platform_disable_tenant(slug: str, _: sqlite3.Row = Depends(current_platform
 
 @app.get("/service-worker.js", include_in_schema=False)
 async def service_worker() -> FileResponse:
-    return FileResponse(BASE_DIR / "static" / "service-worker.js", media_type="application/javascript")
+    return FileResponse(
+        STATIC_DIR / "service-worker.js",
+        media_type="application/javascript",
+        headers={"Cache-Control": "no-cache"},
+    )
 
 
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> FileResponse:
-    return FileResponse(BASE_DIR / "static" / "icons" / "icon-192.png", media_type="image/png")
+    return FileResponse(
+        STATIC_DIR / "icons" / "icon-192.png",
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400, stale-while-revalidate=604800"},
+    )
 
 
 def authenticated_upload_user(request: Request, tenant: TenantContext) -> sqlite3.Row:
@@ -14660,6 +14677,7 @@ def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str,
 @app.get("/api/mobile/home")
 def mobile_home_payload(request: Request, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     tenant = current_tenant()
+    command_center = dashboard_command_center(window_hours=72, limit=30, user=user)
     with db_session() as conn:
         totals = conn.execute(
             """
@@ -14795,6 +14813,7 @@ def mobile_home_payload(request: Request, user: sqlite3.Row = Depends(require_of
         "leaderboard": leaderboard,
         "pnms": pnms,
         "recent_lunches": recent_lunches,
+        "command_center": command_center,
         "calendar_share": calendar_share_payload(request, tenant),
     }
 

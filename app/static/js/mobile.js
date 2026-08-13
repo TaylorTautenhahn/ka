@@ -1768,8 +1768,7 @@ function renderMobileCommandCenter() {
   renderMobileCommandSelection();
 }
 
-async function loadMobileCommandCenter(options = {}) {
-  const surfaceErrors = Boolean(options.surfaceErrors);
+function applyMobileCommandCenterPayload(payload) {
   if (!mobileCanUseCommandCenter()) {
     mobileCommandCenter.queue = [];
     mobileCommandCenter.staleAlerts = [];
@@ -1777,44 +1776,15 @@ async function loadMobileCommandCenter(options = {}) {
     mobileCommandCenter.summary = null;
     mobileCommandCenter.selectedPnmId = null;
     mobileCommandCenter.error = "";
-    renderMobileCommandCenter();
     return;
   }
 
-  const query = buildQueryString({
-    window_hours: mobileCommandCenter.windowHours || 72,
-    limit: mobileCommandCenter.limit || 30,
-  });
-  try {
-    const payload = await api(`/api/dashboard/command-center${query}`);
-    mobileCommandCenter.queue = Array.isArray(payload.queue) ? payload.queue : [];
-    mobileCommandCenter.staleAlerts = Array.isArray(payload.stale_alerts) ? payload.stale_alerts : [];
-    mobileCommandCenter.recentChanges = Array.isArray(payload.recent_rating_changes) ? payload.recent_rating_changes : [];
-    mobileCommandCenter.summary = payload.summary || null;
-    mobileCommandCenter.error = "";
-  } catch (error) {
-    mobileCommandCenter.queue = [];
-    mobileCommandCenter.staleAlerts = [];
-    mobileCommandCenter.recentChanges = [];
-    mobileCommandCenter.summary = {
-      window_hours: mobileCommandCenter.windowHours || 72,
-      queue_count: 0,
-      stale_count: 0,
-      recent_change_count: 0,
-    };
-    mobileCommandCenter.selectedPnmId = null;
-    mobileCommandCenter.error = error.message || "Unable to load command center.";
-    if (surfaceErrors) {
-      throw error;
-    }
-  }
-
-  if (!mobileCommandCenter.selectedPnmId) {
-    mobileCommandCenter.selectedPnmId = mobileCommandCenter.queue.length
-      ? Number(mobileCommandCenter.queue[0].pnm_id)
-      : null;
-  }
-  renderMobileCommandCenter();
+  const source = payload && typeof payload === "object" ? payload : {};
+  mobileCommandCenter.queue = Array.isArray(source.queue) ? source.queue : [];
+  mobileCommandCenter.staleAlerts = Array.isArray(source.stale_alerts) ? source.stale_alerts : [];
+  mobileCommandCenter.recentChanges = Array.isArray(source.recent_rating_changes) ? source.recent_rating_changes : [];
+  mobileCommandCenter.summary = source.summary || null;
+  mobileCommandCenter.error = "";
 }
 
 async function loadHomeSnapshot() {
@@ -1861,16 +1831,19 @@ async function loadHomeSnapshot() {
       last_lunch_with_me_notes: lunch.notes || "",
     };
   });
-  if (!mobileHomeSelectedPnmId) {
+  const availablePnmIds = new Set(mobileHomePnmRows.map((pnm) => Number(pnm.pnm_id)));
+  if (!mobileHomeSelectedPnmId || !availablePnmIds.has(Number(mobileHomeSelectedPnmId))) {
     mobileHomeSelectedPnmId = mobileHomeRecentLunchRows.length
       ? Number(mobileHomeRecentLunchRows[0].pnm_id)
       : mobileHomePnmRows.length
         ? Number(mobileHomePnmRows[0].pnm_id)
         : null;
   }
+  applyMobileCommandCenterPayload(payload.command_center);
+  mobileCommandCenter.selectedPnmId = mobileHomeSelectedPnmId;
   renderMobileHomeSearchResults();
   renderMobileHomeRecentLunches();
-  renderMobileCommandSelection();
+  renderMobileCommandCenter();
   if (payload.calendar_share) {
     renderMobileCalendarShare(payload.calendar_share);
   }
@@ -2021,7 +1994,6 @@ function renderSameStatePnms(member, pnms, errorMessage = "") {
 
 async function loadHomePage() {
   await loadHomeSnapshot();
-  await loadMobileCommandCenter();
 }
 
 function handleMobileCommandQueueSelect(event) {
@@ -2081,7 +2053,7 @@ async function handleMobileCommandSaveRating() {
             comment: String(commentInput.value || "").trim(),
           },
         });
-        await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+        await loadHomeSnapshot();
         if (payload.change && Number(payload.change.delta_total) > 0) {
           showToast(`Rating up +${payload.change.delta_total}.`);
         } else {
@@ -2142,7 +2114,7 @@ async function handleMobileCommandAddComment() {
           method: "POST",
           body: { comment },
         });
-        await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+        await loadHomeSnapshot();
         showToast("Comment added to the meeting packet.");
       } catch (error) {
         showToast(error.message || "Unable to add the comment.");
@@ -2205,7 +2177,7 @@ async function handleMobileCommandScheduleLunch() {
     startInput.value = "";
     locationInput.value = "";
     notesInput.value = "";
-    await Promise.all([loadMobileCommandCenter(), loadHomeSnapshot()]);
+    await loadHomeSnapshot();
     toggleMobileTouchpointComposer(false);
     showToast("Touchpoint scheduled.");
   } catch (error) {

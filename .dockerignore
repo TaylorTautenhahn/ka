@@ -9,5 +9,14 @@ __pycache__
 .mypy_cache
 .ruff_cache
 .DS_Store
-app/recruitment.db
+**/*.db
+**/*.db-*
+**/*.sqlite
+**/*.sqlite-*
+**/*.sqlite3
+app/tenants
+app/backups
 app/uploads
+.env
+.env.*
+!.env.example

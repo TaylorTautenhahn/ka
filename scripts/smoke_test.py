@@ -5,7 +5,7 @@ import base64
 import os
 import sys
 import tempfile
-from datetime import date
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -51,6 +51,40 @@ def main() -> None:
         from app.main import app
 
         checks: list[str] = []
+
+        with main_module.sqlite3.connect(":memory:") as seed_conn:
+            seed_conn.row_factory = main_module.sqlite3.Row
+            seed_conn.execute("PRAGMA foreign_keys = ON")
+            main_module.setup_schema(seed_conn)
+            main_module.ensure_schema_upgrades(seed_conn)
+            main_module.ensure_seed_data(
+                seed_conn,
+                seed_username="isolatedhead",
+                seed_access_code="OriginalHead123!",
+            )
+            original = seed_conn.execute(
+                "SELECT id, access_code_hash FROM users WHERE username = 'isolatedhead'"
+            ).fetchone()
+            seed_conn.execute(
+                "UPDATE users SET role = ?, is_approved = 0 WHERE id = ?",
+                (main_module.ROLE_RUSHER, int(original["id"])),
+            )
+            main_module.ensure_seed_data(
+                seed_conn,
+                seed_username="isolatedhead",
+                seed_access_code="ReplacementHead123!",
+            )
+            preserved = seed_conn.execute(
+                "SELECT role, is_approved, access_code_hash FROM users WHERE id = ?",
+                (int(original["id"]),),
+            ).fetchone()
+            if (
+                preserved["role"] != main_module.ROLE_RUSHER
+                or bool(preserved["is_approved"])
+                or preserved["access_code_hash"] != original["access_code_hash"]
+            ):
+                raise AssertionError("Startup seed reconciliation must not mutate an existing account.")
+        checks.append("Bootstrap credentials are create-only")
 
         if main_module.normalize_state_code("Texas") != "TX":
             raise AssertionError("State normalization should map full state names.")
@@ -109,9 +143,11 @@ def main() -> None:
             expect_status(response, 200, "FAQ page")
             checks.append("FAQ route responds")
 
-            response = client.get("/demo")
-            expect_status(response, 200, "Demo page")
-            checks.append("Demo route responds")
+            response = client.get("/demo", follow_redirects=False)
+            expect_status(response, 307, "Disabled demo route")
+            if response.headers.get("location") != "/organizations":
+                raise AssertionError("Disabled demo route should redirect to organization selection.")
+            checks.append("Demo access is disabled by default")
 
             response = client.head("/")
             expect_status(response, 200, "HEAD root")
@@ -150,6 +186,15 @@ def main() -> None:
 
             response = client.get("/kappaalphaorder/dashboard")
             expect_status(response, 200, "Dashboard route")
+            tenant_row = main_module.fetch_tenant_row("kappaalphaorder")
+            if tenant_row is None:
+                raise AssertionError("Missing tenant row for calendar-token check.")
+            calendar_token = str(tenant_row["calendar_share_token"] or "")
+            if not calendar_token or calendar_token in response.text:
+                raise AssertionError("Anonymous tenant HTML must not expose the calendar bearer token.")
+            if int(tenant_row["calendar_token_version"] or 0) != 2:
+                raise AssertionError("Calendar bearer tokens should be upgraded to version 2.")
+            checks.append("Anonymous HTML does not expose calendar credentials")
             response = client.get("/kappaalphaorder/rushees")
             expect_status(response, 200, "Rushees route")
             response = client.get("/kappaalphaorder/meetings")
@@ -184,6 +229,41 @@ def main() -> None:
             response = client.get("/platform")
             expect_status(response, 200, "Platform admin page")
             checks.append("Platform route responds")
+
+            dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+            dockerignore = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8")
+            if "COPY app ./app" in dockerfile or "COPY . ." in dockerfile:
+                raise AssertionError("Dockerfile should copy an explicit source allowlist, not the runtime data tree.")
+            required_docker_excludes = {
+                "**/*.db",
+                "**/*.sqlite",
+                "**/*.sqlite3",
+                "app/tenants",
+                "app/backups",
+                "app/uploads",
+                ".env",
+            }
+            if not required_docker_excludes.issubset(set(dockerignore.splitlines())):
+                raise AssertionError("Docker context is missing required runtime data exclusions.")
+            checks.append("Container build uses source allowlisting and runtime-data exclusions")
+
+            response = client.get("/service-worker.js")
+            expect_status(response, 200, "Service worker")
+            if (
+                "kao-rush-shell-v8" not in response.text
+                or 'event.request.mode === "navigate"' not in response.text
+                or 'cached || caches.match("/")' in response.text
+            ):
+                raise AssertionError("Service worker must not cache authenticated page navigations.")
+            checks.append("Service worker avoids authenticated navigation caching")
+
+            response = client.post(
+                "/kappaalphaorder/api/auth/register",
+                content=b"{" + (b"x" * (main_module.MAX_REQUEST_BODY_BYTES + 1)),
+                headers={"Content-Type": "application/json"},
+            )
+            expect_status(response, 413, "Oversized request body blocked")
+            checks.append("Outer request body limit blocks oversized payloads")
 
             response = client.get("/kappaalphaorder/api/auth/me")
             expect_status(response, 200, "Anonymous tenant auth check")
@@ -256,6 +336,16 @@ def main() -> None:
             response = client.get("/kappaalphaorder/admin")
             expect_status(response, 200, "Head can open admin route")
             checks.append("Head can access admin route")
+
+            oversized_import = "First Name,Last Name,Instagram Handle\n" + "\n".join(
+                f"Import{i},Tester,@import{i}" for i in range(main_module.MAX_GOOGLE_FORM_IMPORT_ROWS + 1)
+            )
+            response = client.post(
+                "/kappaalphaorder/api/admin/import/google-form",
+                files={"file": ("too-many.csv", oversized_import.encode("utf-8"), "text/csv")},
+            )
+            expect_status(response, 413, "Google Form import row limit")
+            checks.append("Google Form imports enforce a bounded row count")
 
             response = client.get("/kappaalphaorder/api/auth/capabilities")
             expect_status(response, 200, "Head capabilities API")
@@ -404,6 +494,9 @@ def main() -> None:
             photo_payload = response.json().get("pnm", {})
             if not str(photo_payload.get("photo_url") or "").startswith("/uploads/"):
                 raise AssertionError("Uploaded PNM photo should return a local uploads URL.")
+            photo_url = str(photo_payload["photo_url"])
+            response = client.get(photo_url)
+            expect_status(response, 200, "Authenticated PNM photo")
             checks.append("PNM photo upload works")
 
             response = client.post(
@@ -479,6 +572,22 @@ def main() -> None:
             expect_status(response, 200, "Approved officer login")
             sync_csrf_header()
             checks.append("Approved officer login works")
+
+            with main_module.db_session(tenant_ctx.db_path) as conn:
+                conn.execute("UPDATE users SET is_approved = 0 WHERE id = ?", (officer_user_id,))
+            response = client.get("/kappaalphaorder/api/auth/me")
+            expect_status(response, 200, "Revoked officer session probe")
+            if response.json().get("authenticated") is not False:
+                raise AssertionError("Revoked approval should invalidate an existing tenant session.")
+            with main_module.db_session(tenant_ctx.db_path) as conn:
+                conn.execute("UPDATE users SET is_approved = 1 WHERE id = ?", (officer_user_id,))
+            response = client.post(
+                "/kappaalphaorder/api/auth/login",
+                json={"username": officer_username, "access_code": officer_password},
+            )
+            expect_status(response, 200, "Officer re-login after approval restore")
+            sync_csrf_header()
+            checks.append("Approval revocation invalidates active sessions")
 
             response = client.get("/kappaalphaorder/admin", follow_redirects=False)
             expect_status(response, 307, "Officer blocked from admin route")
@@ -766,11 +875,18 @@ def main() -> None:
                 "/kappaalphaorder/api/pnms/package/link",
                 json={
                     "pnm_ids": [pnm_id, pnm_two_id],
-                    "sync_assignment": True,
+                    "sync_assignment": False,
                 },
             )
             expect_status(response, 200, "Officer package link endpoint")
             checks.append("Rush team users can link package deals")
+
+            response = client.post(
+                "/kappaalphaorder/api/pnms/package/link",
+                json={"pnm_ids": [pnm_id, pnm_two_id], "sync_assignment": True},
+            )
+            expect_status(response, 403, "Officer package assignment sync blocked")
+            checks.append("Package assignment sync remains Head-only")
 
             response = client.post(
                 "/kappaalphaorder/api/ratings",
@@ -888,7 +1004,10 @@ def main() -> None:
 
             response = client.post(
                 "/kappaalphaorder/api/chat/officer",
-                json={"message": "Reminder @headseed to review Alex before chapter tonight.", "tags": "priority,events"},
+                json={
+                    "message": f"Reminder @headseed and @{member_username} to review Alex before chapter tonight.",
+                    "tags": "priority,events",
+                },
             )
             expect_status(response, 200, "Officer chat message create")
             checks.append("Officer chat write works")
@@ -940,12 +1059,66 @@ def main() -> None:
             expect_status(response, 200, "Officer logout")
             sync_csrf_header()
 
+            response = client.get(photo_url)
+            expect_status(response, 401, "Anonymous PNM photo blocked")
+            checks.append("PNM photos require tenant authentication")
+
             response = client.post(
                 "/kappaalphaorder/api/auth/login",
                 json={"username": member_username, "access_code": member_password},
             )
             expect_status(response, 200, "Approved member login")
             sync_csrf_header()
+
+            response = client.get(photo_url)
+            expect_status(response, 200, "Authenticated member PNM photo")
+
+            response = client.get("/kappaalphaorder/api/notifications?limit=50")
+            expect_status(response, 200, "Rusher notifications")
+            if any(
+                item.get("notif_type") == "chat_mention"
+                for item in response.json().get("notifications", [])
+            ):
+                raise AssertionError("Officer-chat text must not be copied into Rusher notifications.")
+            checks.append("Officer-chat mentions never disclose messages to Rushers")
+
+            response = client.get("/kappaalphaorder/api/pnms")
+            expect_status(response, 200, "Rusher PNM roster")
+            rusher_pnms = response.json().get("pnms", [])
+            if not rusher_pnms:
+                raise AssertionError("Rusher roster should include PNMs.")
+            sensitive_pnm_fields = {
+                "notes",
+                "lunch_stats",
+                "assigned_officer_id",
+                "assigned_officers",
+                "assignment_status",
+                "assignment_notes",
+                "package_group_id",
+                "funnel_stage",
+                "funnel_stage_reason",
+                "created_by",
+            }
+            if sensitive_pnm_fields & set(rusher_pnms[0]):
+                raise AssertionError("Rusher PNM payload exposes officer-only operational fields.")
+            checks.append("Rusher PNM payload is server-side redacted")
+
+            response = client.post(
+                "/kappaalphaorder/api/lunches",
+                json={"pnm_id": pnm_id, "lunch_date": today, "notes": "Blocked member touchpoint."},
+            )
+            expect_status(response, 403, "Rusher lunch creation blocked")
+            response = client.get("/kappaalphaorder/api/lunches/scheduled")
+            expect_status(response, 403, "Rusher scheduled lunch list blocked")
+            response = client.get(f"/kappaalphaorder/api/pnms/{pnm_id}/stage-history")
+            expect_status(response, 403, "Rusher stage history blocked")
+            response = client.get("/kappaalphaorder/api/funnel/summary")
+            expect_status(response, 403, "Rusher funnel summary blocked")
+            response = client.get("/kappaalphaorder/api/export/contacts.vcf")
+            expect_status(response, 403, "Rusher bulk contact export blocked")
+            response = client.get(f"/kappaalphaorder/api/export/contacts/{pnm_id}.vcf")
+            expect_status(response, 403, "Rusher single contact export blocked")
+            checks.append("Rusher operational and contact endpoints are denied")
 
             response = client.get("/kappaalphaorder/api/dashboard/command-center")
             expect_status(response, 403, "Rusher blocked from command center API")
@@ -1432,6 +1605,20 @@ def main() -> None:
             expect_status(response, 401, "Reset-deleted member login blocked")
             checks.append("Season reset deleted accounts cannot sign in")
 
+            tenant_cookie = client.cookies.get(main_module.SESSION_COOKIE)
+            if tenant_cookie:
+                expired_at = (
+                    datetime.now(timezone.utc)
+                    - timedelta(seconds=main_module.SESSION_REMEMBER_TTL_SECONDS + 60)
+                ).isoformat()
+                with main_module.db_session(tenant_ctx.db_path) as conn:
+                    conn.execute("UPDATE sessions SET created_at = ? WHERE token = ?", (expired_at, tenant_cookie))
+                response = client.get("/kappaalphaorder/api/auth/me")
+                expect_status(response, 200, "Expired tenant session probe")
+                if response.json().get("authenticated") is not False:
+                    raise AssertionError("Tenant session should expire based on absolute creation age.")
+                checks.append("Tenant sessions enforce absolute lifetime")
+
             response = client.post(
                 "/platform/api/auth/login",
                 json={"username": "platformadmin", "access_code": "Platform123!", "remember_me": True},
@@ -1459,6 +1646,21 @@ def main() -> None:
             if "kappaalphaorder" not in tenant_slugs:
                 raise AssertionError("Default tenant missing from platform tenant list.")
             checks.append("Platform tenant registry API works")
+
+            expired_platform_at = (
+                datetime.now(timezone.utc)
+                - timedelta(seconds=main_module.PLATFORM_SESSION_REMEMBER_TTL_SECONDS + 60)
+            ).isoformat()
+            with main_module.platform_db_session() as conn:
+                conn.execute(
+                    "UPDATE platform_sessions SET created_at = ? WHERE token = ?",
+                    (expired_platform_at, platform_cookie),
+                )
+            response = client.get("/platform/api/auth/me")
+            expect_status(response, 200, "Expired platform session probe")
+            if response.json().get("authenticated") is not False:
+                raise AssertionError("Platform session should expire based on absolute creation age.")
+            checks.append("Platform sessions enforce absolute lifetime")
 
             response = client.get("/health")
             expect_status(response, 200, "Health endpoint")

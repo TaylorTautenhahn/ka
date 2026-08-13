@@ -1,4 +1,4 @@
-const CACHE_NAME = "kao-rush-shell-v7";
+const CACHE_NAME = "kao-rush-shell-v8";
 const APP_SHELL = [
   "/static/css/styles.css",
   "/static/css/tokens.css",
@@ -39,20 +39,19 @@ self.addEventListener("fetch", (event) => {
     return;
   }
   const url = new URL(event.request.url);
-  if (url.pathname.startsWith("/api/")) {
+  const pathSegments = url.pathname.split("/").filter(Boolean);
+  if (pathSegments.includes("api")) {
     event.respondWith(fetch(event.request));
     return;
   }
-  // Always prefer network for HTML navigations so new deployments appear immediately.
+  // Never persist authenticated HTML or tenant-prefixed API navigations.
   if (event.request.mode === "navigate") {
     event.respondWith(
       fetch(event.request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/")))
+        .catch(() => new Response("BidBoard is offline. Reconnect to continue.", {
+          status: 503,
+          headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }
+        }))
     );
     return;
   }
@@ -71,5 +70,5 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
+  event.respondWith(fetch(event.request));
 });

@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from threading import Lock
+from threading import BoundedSemaphore, Lock
 from typing import Any
 import csv
 
@@ -95,8 +95,7 @@ REQUIRE_PERSISTENT_DATA = os.getenv("REQUIRE_PERSISTENT_DATA", "0").strip().lowe
 PLATFORM_DB_PATH = Path(os.getenv("PLATFORM_DB_PATH", str(DATA_ROOT / "platform.db")))
 DEFAULT_TENANT_SLUG = os.getenv("DEFAULT_TENANT_SLUG", "kappaalphaorder").strip().lower() or "kappaalphaorder"
 DEFAULT_TENANT_NAME = os.getenv("DEFAULT_TENANT_NAME", "Kappa Alpha Order").strip() or "Kappa Alpha Order"
-DEMO_ENABLED = os.getenv("DEMO_ENABLED", "1").strip().lower() in {"1", "true", "yes"}
-DEMO_AUTO_LOGIN = os.getenv("DEMO_AUTO_LOGIN", "1").strip().lower() in {"1", "true", "yes"}
+DEMO_ENABLED = os.getenv("DEMO_ENABLED", "0").strip().lower() in {"1", "true", "yes"}
 DEMO_TENANT_SLUG_RAW = os.getenv("DEMO_TENANT_SLUG", "bidboarddemo").strip().lower() or "bidboarddemo"
 DEMO_TENANT_NAME = os.getenv("DEMO_TENANT_NAME", "BidBoard Demo").strip() or "BidBoard Demo"
 DEMO_TENANT_CHAPTER_NAME = os.getenv("DEMO_TENANT_CHAPTER_NAME", "Demo").strip() or "Demo"
@@ -104,7 +103,7 @@ DEMO_HEAD_USERNAME = os.getenv("DEMO_HEAD_USERNAME", "demohead").strip() or "dem
 DEMO_HEAD_FIRST_NAME = os.getenv("DEMO_HEAD_FIRST_NAME", "Demo").strip() or "Demo"
 DEMO_HEAD_LAST_NAME = os.getenv("DEMO_HEAD_LAST_NAME", "Head").strip() or "Head"
 DEMO_HEAD_PLEDGE_CLASS = os.getenv("DEMO_HEAD_PLEDGE_CLASS", "Demo").strip() or "Demo"
-DEMO_HEAD_ACCESS_CODE = os.getenv("DEMO_HEAD_ACCESS_CODE", "DemoHead123!").strip() or "DemoHead123!"
+DEMO_HEAD_ACCESS_CODE = os.getenv("DEMO_HEAD_ACCESS_CODE", "").strip()
 PLATFORM_ADMIN_USERNAME = os.getenv("PLATFORM_ADMIN_USERNAME", "taylortaut").strip() or "taylortaut"
 PLATFORM_ADMIN_ACCESS_CODE = os.getenv("PLATFORM_ADMIN_ACCESS_CODE", "").strip()
 HEAD_SEED_ACCESS_CODE = os.getenv("HEAD_SEED_ACCESS_CODE", "").strip()
@@ -115,6 +114,17 @@ HEAD_SEED_PLEDGE_CLASS = os.getenv("HEAD_SEED_PLEDGE_CLASS", "Admin").strip() or
 AUTO_CREATE_HEAD_SEED = os.getenv("AUTO_CREATE_HEAD_SEED", "1").strip().lower() in {"1", "true", "yes"}
 CALENDAR_TIMEZONE = os.getenv("CALENDAR_TIMEZONE", "America/Chicago").strip() or "America/Chicago"
 MAX_GOOGLE_FORM_IMPORT_BYTES = int(os.getenv("MAX_GOOGLE_FORM_IMPORT_BYTES", str(3 * 1024 * 1024)))
+MAX_GOOGLE_FORM_IMPORT_ROWS = int(os.getenv("MAX_GOOGLE_FORM_IMPORT_ROWS", "250"))
+MAX_REQUEST_BODY_BYTES = int(os.getenv("MAX_REQUEST_BODY_BYTES", str(6 * 1024 * 1024)))
+MAX_PENDING_REGISTRATIONS = int(os.getenv("MAX_PENDING_REGISTRATIONS", "250"))
+REGISTRATION_WINDOW_SECONDS = int(os.getenv("REGISTRATION_WINDOW_SECONDS", "3600"))
+REGISTRATION_MAX_ATTEMPTS = int(os.getenv("REGISTRATION_MAX_ATTEMPTS", "12"))
+REGISTRATION_GLOBAL_MAX_ATTEMPTS = int(os.getenv("REGISTRATION_GLOBAL_MAX_ATTEMPTS", "500"))
+LOGIN_IP_MAX_ATTEMPTS = int(os.getenv("LOGIN_IP_MAX_ATTEMPTS", "40"))
+RATE_LIMIT_MAX_KEYS = int(os.getenv("RATE_LIMIT_MAX_KEYS", "10000"))
+INSTAGRAM_REFRESH_WINDOW_SECONDS = int(os.getenv("INSTAGRAM_REFRESH_WINDOW_SECONDS", "600"))
+INSTAGRAM_REFRESH_MAX_ATTEMPTS = int(os.getenv("INSTAGRAM_REFRESH_MAX_ATTEMPTS", "3"))
+INSTAGRAM_REFRESH_MAX_CONCURRENCY = int(os.getenv("INSTAGRAM_REFRESH_MAX_CONCURRENCY", "4"))
 INSTAGRAM_AVATAR_TIMEOUT_SECONDS = float(os.getenv("INSTAGRAM_AVATAR_TIMEOUT_SECONDS", "4.0"))
 INSTAGRAM_PROFILE_HTML_MAX_BYTES = int(os.getenv("INSTAGRAM_PROFILE_HTML_MAX_BYTES", "1200000"))
 INSTAGRAM_API_RESPONSE_MAX_BYTES = int(os.getenv("INSTAGRAM_API_RESPONSE_MAX_BYTES", "1200000"))
@@ -443,6 +453,65 @@ US_STATE_NAMES_DESC: tuple[str, ...] = tuple(
     sorted(US_STATE_NAME_TO_CODE.keys(), key=lambda item: (-len(item), item))
 )
 
+class RequestBodyTooLarge(Exception):
+    pass
+
+
+class RequestBodyLimitMiddleware:
+    def __init__(self, app: Any, max_bytes: int) -> None:
+        self.app = app
+        self.max_bytes = max(1024, int(max_bytes))
+
+    async def __call__(self, scope: dict[str, Any], receive: Any, send: Any) -> None:
+        if scope.get("type") != "http" or str(scope.get("method", "GET")).upper() not in UNSAFE_HTTP_METHODS:
+            await self.app(scope, receive, send)
+            return
+
+        headers = {key.lower(): value for key, value in scope.get("headers", [])}
+        content_length_raw = headers.get(b"content-length", b"").decode("ascii", errors="ignore").strip()
+        if content_length_raw:
+            try:
+                content_length = int(content_length_raw)
+            except ValueError:
+                response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header."})
+                await response(scope, receive, send)
+                return
+            if content_length < 0:
+                response = JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header."})
+                await response(scope, receive, send)
+                return
+            if content_length > self.max_bytes:
+                response = JSONResponse(status_code=413, content={"detail": "Request body is too large."})
+                await response(scope, receive, send)
+                return
+
+        received_bytes = 0
+        response_started = False
+
+        async def limited_receive() -> dict[str, Any]:
+            nonlocal received_bytes
+            message = await receive()
+            if message.get("type") == "http.request":
+                received_bytes += len(message.get("body", b""))
+                if received_bytes > self.max_bytes:
+                    raise RequestBodyTooLarge
+            return message
+
+        async def tracked_send(message: dict[str, Any]) -> None:
+            nonlocal response_started
+            if message.get("type") == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, tracked_send)
+        except RequestBodyTooLarge:
+            if response_started:
+                raise
+            response = JSONResponse(status_code=413, content={"detail": "Request body is too large."})
+            await response(scope, receive, send)
+
+
 app = FastAPI(
     title="KA Recruitment Evaluation",
     description="Connected, role-aware recruitment evaluation platform.",
@@ -451,19 +520,21 @@ app = FastAPI(
     redoc_url="/redoc" if ENABLE_API_DOCS else None,
     openapi_url="/openapi.json" if ENABLE_API_DOCS else None,
 )
+app.add_middleware(RequestBodyLimitMiddleware, max_bytes=MAX_REQUEST_BODY_BYTES)
 app.add_middleware(GZipMiddleware, minimum_size=512)
 if ALLOWED_HOSTS != ["*"]:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-app.mount("/uploads/tenants", StaticFiles(directory=TENANT_UPLOADS_ROOT), name="tenant_uploads")
 LEGACY_PNM_UPLOADS_DIR = UPLOADS_DIR / "pnms"
 LEGACY_PNM_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/uploads/pnms", StaticFiles(directory=LEGACY_PNM_UPLOADS_DIR), name="legacy_pnm_uploads")
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 _LOGIN_GUARD = Lock()
 _LOGIN_ATTEMPTS: dict[str, list[float]] = {}
 _LOGIN_BLOCKED_UNTIL: dict[str, float] = {}
+_RATE_LIMIT_GUARD = Lock()
+_RATE_LIMIT_EVENTS: dict[str, list[float]] = {}
+_INSTAGRAM_FETCH_SLOTS = BoundedSemaphore(max(1, INSTAGRAM_REFRESH_MAX_CONCURRENCY))
 GENERATED_HEAD_ACCESS_CODE: str | None = None
 GENERATED_PLATFORM_ADMIN_ACCESS_CODE: str | None = None
 
@@ -1111,8 +1182,6 @@ def app_config_for_tenant(tenant: TenantContext) -> dict[str, Any]:
         "member_signup_path": member_base,
         "member_signup_qr_path": member_signup_qr_path,
         "calendar_timezone": CALENDAR_TIMEZONE,
-        "calendar_feed_path": f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}",
-        "calendar_lunch_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
         "is_demo_tenant": is_demo_tenant_slug(tenant.slug),
     }
 
@@ -1211,6 +1280,7 @@ def render_desktop_page(
         return RedirectResponse(url=f"/{tenant.slug}/dashboard?notice=admin-access-denied", status_code=307)
 
     return templates.TemplateResponse(
+        request,
         "desktop_shell.html",
         desktop_context(
             request,
@@ -1804,6 +1874,28 @@ def request_prefers_mobile(request: Request) -> bool:
     return any(marker in user_agent for marker in mobile_markers)
 
 
+def parse_session_timestamp(raw_value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(raw_value))
+    except (TypeError, ValueError):
+        return None
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def session_row_is_expired(row: sqlite3.Row, default_ttl_seconds: int) -> bool:
+    keys = set(row.keys())
+    created_key = "session_created_at" if "session_created_at" in keys else "created_at"
+    created_at = parse_session_timestamp(row[created_key])
+    last_seen_at = parse_session_timestamp(row["last_seen_at"])
+    if created_at is None or last_seen_at is None:
+        return True
+    ttl_seconds = normalized_idle_ttl_seconds(row["max_idle_seconds"], default_ttl_seconds)
+    now = datetime.now(timezone.utc)
+    return (now - last_seen_at).total_seconds() > ttl_seconds or (now - created_at).total_seconds() > ttl_seconds
+
+
 def current_platform_admin(request: Request) -> sqlite3.Row:
     token = request.cookies.get(PLATFORM_SESSION_COOKIE)
     if not token:
@@ -1812,7 +1904,7 @@ def current_platform_admin(request: Request) -> sqlite3.Row:
     with platform_db_session() as conn:
         row = conn.execute(
             """
-            SELECT pa.*, ps.last_seen_at, ps.max_idle_seconds
+            SELECT pa.*, ps.last_seen_at, ps.created_at AS session_created_at, ps.max_idle_seconds
             FROM platform_sessions ps
             JOIN platform_admins pa ON pa.id = ps.admin_id
             WHERE ps.token = ?
@@ -1822,13 +1914,7 @@ def current_platform_admin(request: Request) -> sqlite3.Row:
         if not row:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], PLATFORM_SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, PLATFORM_SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
@@ -1844,7 +1930,7 @@ def current_platform_admin_optional(request: Request) -> sqlite3.Row | None:
     with platform_db_session() as conn:
         row = conn.execute(
             """
-            SELECT pa.*, ps.last_seen_at, ps.max_idle_seconds
+            SELECT pa.*, ps.last_seen_at, ps.created_at AS session_created_at, ps.max_idle_seconds
             FROM platform_sessions ps
             JOIN platform_admins pa ON pa.id = ps.admin_id
             WHERE ps.token = ?
@@ -1854,13 +1940,7 @@ def current_platform_admin_optional(request: Request) -> sqlite3.Row | None:
         if not row:
             return None
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
-            return None
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], PLATFORM_SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, PLATFORM_SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
             return None
 
@@ -1891,6 +1971,14 @@ async def security_headers(request: Request, call_next):  # type: ignore[no-unty
     )
     if request_forwarded_proto(request) == "https":
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains; preload"
+    request_path = str(request.scope.get("path", request.url.path))
+    if (
+        "/api/" in request_path
+        or request_path.startswith("/api")
+        or request.cookies.get(SESSION_COOKIE)
+        or request.cookies.get(PLATFORM_SESSION_COOKIE)
+    ):
+        response.headers["Cache-Control"] = "private, no-store"
     return response
 
 
@@ -2053,12 +2141,94 @@ def client_ip(request: Request) -> str:
 
 def login_throttle_key(request: Request, username: str, *, scope: str) -> str:
     username_token = username.strip().lower() or "unknown-user"
-    return f"{scope}:{client_ip(request)}:{username_token}"
+    tenant = getattr(request.state, "tenant", None)
+    tenant_scope = tenant.slug if isinstance(tenant, TenantContext) else "platform"
+    return f"{scope}:{tenant_scope}:{client_ip(request)}:{username_token}"
+
+
+def prune_rate_limit_events_locked(now: float) -> None:
+    oldest_allowed = now - max(LOGIN_WINDOW_SECONDS, REGISTRATION_WINDOW_SECONDS, INSTAGRAM_REFRESH_WINDOW_SECONDS)
+    for key in list(_RATE_LIMIT_EVENTS):
+        recent = [stamp for stamp in _RATE_LIMIT_EVENTS[key] if stamp >= oldest_allowed]
+        if recent:
+            _RATE_LIMIT_EVENTS[key] = recent
+        else:
+            _RATE_LIMIT_EVENTS.pop(key, None)
+    if len(_RATE_LIMIT_EVENTS) > RATE_LIMIT_MAX_KEYS:
+        ordered = sorted(_RATE_LIMIT_EVENTS, key=lambda item: _RATE_LIMIT_EVENTS[item][-1])
+        for key in ordered[: len(_RATE_LIMIT_EVENTS) - RATE_LIMIT_MAX_KEYS]:
+            _RATE_LIMIT_EVENTS.pop(key, None)
+
+
+def assert_rate_limit(key: str, *, max_attempts: int, window_seconds: int) -> None:
+    now = now_epoch()
+    with _RATE_LIMIT_GUARD:
+        prune_rate_limit_events_locked(now)
+        attempts = [stamp for stamp in _RATE_LIMIT_EVENTS.get(key, []) if now - stamp <= window_seconds]
+        if len(attempts) >= max(1, max_attempts):
+            retry_after = max(1, int(window_seconds - (now - attempts[0])))
+            raise HTTPException(
+                status_code=429,
+                detail="Too many requests. Try again later.",
+                headers={"Retry-After": str(retry_after)},
+            )
+        attempts.append(now)
+        _RATE_LIMIT_EVENTS[key] = attempts
+
+
+def request_tenant_scope(request: Request) -> str:
+    tenant = getattr(request.state, "tenant", None)
+    return tenant.slug if isinstance(tenant, TenantContext) else "platform"
+
+
+def assert_login_request_allowed(request: Request, *, scope: str) -> None:
+    assert_rate_limit(
+        f"login-ip:{scope}:{request_tenant_scope(request)}:{client_ip(request)}",
+        max_attempts=LOGIN_IP_MAX_ATTEMPTS,
+        window_seconds=LOGIN_WINDOW_SECONDS,
+    )
+
+
+def assert_registration_allowed(request: Request) -> None:
+    tenant_scope = request_tenant_scope(request)
+    ip_address = client_ip(request)
+    assert_rate_limit(
+        f"register:{tenant_scope}:{ip_address}",
+        max_attempts=REGISTRATION_MAX_ATTEMPTS,
+        window_seconds=REGISTRATION_WINDOW_SECONDS,
+    )
+    assert_rate_limit(
+        "register-global",
+        max_attempts=REGISTRATION_GLOBAL_MAX_ATTEMPTS,
+        window_seconds=REGISTRATION_WINDOW_SECONDS,
+    )
+
+
+def prune_login_state_locked(now: float) -> None:
+    for key in list(_LOGIN_ATTEMPTS):
+        recent = [stamp for stamp in _LOGIN_ATTEMPTS[key] if now - stamp <= LOGIN_WINDOW_SECONDS]
+        if recent:
+            _LOGIN_ATTEMPTS[key] = recent
+        else:
+            _LOGIN_ATTEMPTS.pop(key, None)
+    for key in list(_LOGIN_BLOCKED_UNTIL):
+        if _LOGIN_BLOCKED_UNTIL[key] <= now:
+            _LOGIN_BLOCKED_UNTIL.pop(key, None)
+    all_keys = set(_LOGIN_ATTEMPTS) | set(_LOGIN_BLOCKED_UNTIL)
+    if len(all_keys) > RATE_LIMIT_MAX_KEYS:
+        def newest_stamp(key: str) -> float:
+            attempts = _LOGIN_ATTEMPTS.get(key, [])
+            return max(_LOGIN_BLOCKED_UNTIL.get(key, 0), attempts[-1] if attempts else 0)
+
+        for key in sorted(all_keys, key=newest_stamp)[: len(all_keys) - RATE_LIMIT_MAX_KEYS]:
+            _LOGIN_ATTEMPTS.pop(key, None)
+            _LOGIN_BLOCKED_UNTIL.pop(key, None)
 
 
 def assert_login_allowed(throttle_key: str) -> None:
     now = now_epoch()
     with _LOGIN_GUARD:
+        prune_login_state_locked(now)
         blocked_until = _LOGIN_BLOCKED_UNTIL.get(throttle_key, 0)
         if blocked_until > now:
             retry_after = max(1, int(blocked_until - now))
@@ -2071,6 +2241,7 @@ def assert_login_allowed(throttle_key: str) -> None:
 def record_login_failure(throttle_key: str) -> None:
     now = now_epoch()
     with _LOGIN_GUARD:
+        prune_login_state_locked(now)
         attempts = [ts for ts in _LOGIN_ATTEMPTS.get(throttle_key, []) if now - ts <= LOGIN_WINDOW_SECONDS]
         attempts.append(now)
         _LOGIN_ATTEMPTS[throttle_key] = attempts
@@ -2529,16 +2700,19 @@ def remove_photo_if_present(photo_path: str | None) -> None:
 
 def detect_image_extension(content_type: str | None, content: bytes) -> str | None:
     normalized = (content_type or "").split(";")[0].strip().lower()
-    extension = ALLOWED_PHOTO_TYPES.get(normalized)
-    if extension:
-        return extension
+    extension: str | None = None
     if content.startswith(b"\xff\xd8\xff"):
-        return ".jpg"
-    if content.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png"
-    if content[:4] == b"RIFF" and content[8:12] == b"WEBP":
-        return ".webp"
-    return None
+        extension = ".jpg"
+    elif content.startswith(b"\x89PNG\r\n\x1a\n"):
+        extension = ".png"
+    elif content[:4] == b"RIFF" and content[8:12] == b"WEBP":
+        extension = ".webp"
+    if extension is None:
+        return None
+    declared_extension = ALLOWED_PHOTO_TYPES.get(normalized)
+    if declared_extension is not None and declared_extension != extension:
+        return None
+    return extension
 
 
 def write_pnm_photo_bytes(pnm_id: int, content: bytes, extension: str) -> tuple[str, Path]:
@@ -5380,42 +5554,26 @@ def ensure_seed_data(
     first_name = (seed_first_name or HEAD_SEED_FIRST_NAME).strip() or HEAD_SEED_FIRST_NAME
     last_name = (seed_last_name or HEAD_SEED_LAST_NAME).strip() or HEAD_SEED_LAST_NAME
     pledge_class = (seed_pledge_class or HEAD_SEED_PLEDGE_CLASS).strip() or HEAD_SEED_PLEDGE_CLASS
-    access_code = seed_access_code if seed_access_code is not None else HEAD_SEED_ACCESS_CODE
-
-    interests, interests_norm = encode_interests(["Leadership", "Recruitment"])
-    created_at = now_iso()
     existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
     if existing:
-        conn.execute(
-            """
-            UPDATE users
-            SET
-                role = ?,
-                is_approved = 1,
-                approved_at = COALESCE(approved_at, ?),
-                updated_at = ?
-            WHERE id = ?
-            """,
-            (
-                ROLE_HEAD,
-                created_at,
-                created_at,
-                existing["id"],
-            ),
-        )
-        if access_code:
-            conn.execute(
-                "UPDATE users SET access_code_hash = ?, updated_at = ? WHERE id = ?",
-                (hash_access_code(access_code), now_iso(), existing["id"]),
-            )
+        # Bootstrap credentials are create-only. Runtime startup must never
+        # re-promote, re-approve, or re-key an existing account.
         return
+
+    if seed_access_code is None:
+        print(f"[startup] skipped missing bootstrap user {username!r}: no tenant-specific secret is available.")
+        return
+
+    access_code = seed_access_code.strip()
+    interests, interests_norm = encode_interests(["Leadership", "Recruitment"])
+    created_at = now_iso()
 
     require_bootstrap_secret_configured(
         access_code,
         env_name="HEAD_SEED_ACCESS_CODE",
         principal_label="Head rush officer",
     )
-    seed_access_code = access_code if access_code else resolve_seed_access_code()
+    resolved_access_code = access_code if access_code else resolve_seed_access_code()
     conn.execute(
         """
         INSERT INTO users (
@@ -5445,7 +5603,7 @@ def ensure_seed_data(
             "Strategist",
             interests,
             interests_norm,
-            hash_access_code(seed_access_code),
+            hash_access_code(resolved_access_code),
             created_at,
             created_at,
             created_at,
@@ -5504,6 +5662,7 @@ def setup_platform_schema(conn: sqlite3.Connection) -> None:
             default_interest_tags TEXT NOT NULL DEFAULT '',
             default_stereotype_tags TEXT NOT NULL DEFAULT '',
             calendar_share_token TEXT NOT NULL DEFAULT '',
+            calendar_token_version INTEGER NOT NULL DEFAULT 2,
             db_path TEXT NOT NULL,
             head_seed_username TEXT NOT NULL,
             head_seed_first_name TEXT NOT NULL,
@@ -5533,6 +5692,8 @@ def ensure_platform_schema_upgrades(conn: sqlite3.Connection) -> None:
     tenant_columns = {row["name"] for row in conn.execute("PRAGMA table_info(tenants)").fetchall()}
     if "calendar_share_token" not in tenant_columns:
         conn.execute("ALTER TABLE tenants ADD COLUMN calendar_share_token TEXT NOT NULL DEFAULT ''")
+    if "calendar_token_version" not in tenant_columns:
+        conn.execute("ALTER TABLE tenants ADD COLUMN calendar_token_version INTEGER NOT NULL DEFAULT 1")
     if "org_type" not in tenant_columns:
         conn.execute(f"ALTER TABLE tenants ADD COLUMN org_type TEXT NOT NULL DEFAULT '{DEFAULT_ORG_TYPE}'")
     if "setup_tagline" not in tenant_columns:
@@ -5579,13 +5740,15 @@ def ensure_platform_schema_upgrades(conn: sqlite3.Connection) -> None:
         ),
     )
 
-    rows = conn.execute("SELECT id, calendar_share_token FROM tenants").fetchall()
+    rows = conn.execute("SELECT id, calendar_share_token, calendar_token_version FROM tenants").fetchall()
     for row in rows:
-        if (row["calendar_share_token"] or "").strip():
+        current_token = (row["calendar_share_token"] or "").strip()
+        token_version = int(row["calendar_token_version"] or 0)
+        if current_token and token_version >= 2:
             continue
         conn.execute(
-            "UPDATE tenants SET calendar_share_token = ?, updated_at = ? WHERE id = ?",
-            (secrets.token_urlsafe(24), now_iso(), row["id"]),
+            "UPDATE tenants SET calendar_share_token = ?, calendar_token_version = 2, updated_at = ? WHERE id = ?",
+            (secrets.token_urlsafe(32), now_iso(), row["id"]),
         )
 
 
@@ -5593,12 +5756,8 @@ def ensure_platform_admin_seed(conn: sqlite3.Connection) -> None:
     created_at = now_iso()
     existing = conn.execute("SELECT id FROM platform_admins WHERE username = ?", (PLATFORM_ADMIN_USERNAME,)).fetchone()
     if existing:
-        if PLATFORM_ADMIN_ACCESS_CODE:
-            seed_access_code = resolve_platform_admin_access_code()
-            conn.execute(
-                "UPDATE platform_admins SET access_code_hash = ?, updated_at = ? WHERE id = ?",
-                (hash_access_code(seed_access_code), created_at, existing["id"]),
-            )
+        # Platform bootstrap is also create-only; password changes belong to
+        # an explicit recovery flow rather than every process restart.
         return
 
     require_bootstrap_secret_configured(
@@ -5717,6 +5876,10 @@ def ensure_default_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row:
 
 def ensure_demo_tenant_record(conn: sqlite3.Connection) -> sqlite3.Row | None:
     if not DEMO_ENABLED:
+        conn.execute(
+            "UPDATE tenants SET is_active = 0, updated_at = ? WHERE slug = ?",
+            (now_iso(), demo_tenant_slug()),
+        )
         return None
 
     slug = demo_tenant_slug()
@@ -6097,7 +6260,7 @@ def ensure_demo_seed_dataset(conn: sqlite3.Connection) -> None:
         )
         return int(cursor.lastrowid or 0)
 
-    fallback_access_code = "DemoPass123!"
+    fallback_access_code = secrets.token_urlsafe(24)
     head_id = upsert_demo_user(
         username=DEMO_HEAD_USERNAME,
         first_name=DEMO_HEAD_FIRST_NAME,
@@ -7040,6 +7203,12 @@ def bootstrap_platform_and_tenants() -> None:
         ensure_platform_schema_upgrades(conn)
         ensure_platform_admin_seed(conn)
         ensure_default_tenant_record(conn)
+        if DEMO_ENABLED:
+            require_bootstrap_secret_configured(
+                DEMO_HEAD_ACCESS_CODE,
+                env_name="DEMO_HEAD_ACCESS_CODE",
+                principal_label="Demo Head",
+            )
         ensure_demo_tenant_record(conn)
         tenant_rows = conn.execute("SELECT * FROM tenants WHERE is_active = 1").fetchall()
 
@@ -7047,7 +7216,7 @@ def bootstrap_platform_and_tenants() -> None:
         if row["slug"] == DEFAULT_TENANT_SLUG:
             seed_access = HEAD_SEED_ACCESS_CODE
         elif is_demo_tenant_slug(row["slug"]):
-            seed_access = DEMO_HEAD_ACCESS_CODE
+            seed_access = DEMO_HEAD_ACCESS_CODE or None
         else:
             seed_access = None
         initialize_tenant_datastore(row, seed_access_code=seed_access)
@@ -7157,7 +7326,7 @@ def pnm_payload(
         funnel_stage = "sourced"
     package_group_id = normalize_package_group_id(row["package_group_id"]) if "package_group_id" in keys else ""
     assignment_team = merge_assigned_officers_for_pnm_row(row, assigned_officers)
-    return {
+    payload = {
         "pnm_id": row["id"],
         "pnm_code": row["pnm_code"],
         "first_name": row["first_name"],
@@ -7207,6 +7376,35 @@ def pnm_payload(
         "created_by_username": row["created_by_username"] if "created_by_username" in keys else None,
         "can_manage_profile": can_manage_pnm_profile(row, viewer),
     }
+    viewer_role = str(viewer["role"] or "").strip() if viewer else ""
+    if viewer_role == ROLE_RUSHER:
+        member_fields = {
+            "pnm_id",
+            "pnm_code",
+            "first_name",
+            "last_name",
+            "class_year",
+            "hometown",
+            "hometown_city",
+            "hometown_state_code",
+            "phone_number",
+            "instagram_handle",
+            "first_event_date",
+            "days_since_first_event",
+            "interests",
+            "stereotype",
+            "photo_url",
+            "rating_count",
+            "avg_good_with_girls",
+            "avg_will_make_it",
+            "avg_personable",
+            "avg_alcohol_control",
+            "avg_instagram_marketability",
+            "weighted_total",
+            "own_rating",
+        }
+        return {key: value for key, value in payload.items() if key in member_fields}
+    return payload
 
 
 def rating_payload(row: sqlite3.Row) -> dict[str, Any]:
@@ -7267,16 +7465,12 @@ def current_user(request: Request) -> sqlite3.Row:
             """,
             (token,),
         ).fetchone()
-        if not row:
+        if not row or not bool(row["is_approved"]):
+            if row:
+                conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session expired.")
 
@@ -7299,16 +7493,12 @@ def current_user_optional(request: Request) -> sqlite3.Row | None:
             """,
             (token,),
         ).fetchone()
-        if not row:
+        if not row or not bool(row["is_approved"]):
+            if row:
+                conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return None
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
-            return None
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return None
 
@@ -7322,17 +7512,21 @@ def request_has_active_session(request: Request) -> bool:
         return False
 
     with db_session() as conn:
-        row = conn.execute("SELECT last_seen_at, max_idle_seconds FROM sessions WHERE token = ?", (token,)).fetchone()
-        if not row:
+        row = conn.execute(
+            """
+            SELECT u.is_approved, s.last_seen_at, s.created_at AS session_created_at, s.max_idle_seconds
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row or not bool(row["is_approved"]):
+            if row:
+                conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return False
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
-            return False
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return False
     return True
@@ -7344,17 +7538,14 @@ def request_has_active_platform_session(request: Request) -> bool:
         return False
 
     with platform_db_session() as conn:
-        row = conn.execute("SELECT last_seen_at, max_idle_seconds FROM platform_sessions WHERE token = ?", (token,)).fetchone()
+        row = conn.execute(
+            "SELECT last_seen_at, created_at AS session_created_at, max_idle_seconds FROM platform_sessions WHERE token = ?",
+            (token,),
+        ).fetchone()
         if not row:
             return False
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
-            return False
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], PLATFORM_SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, PLATFORM_SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM platform_sessions WHERE token = ?", (token,))
             return False
     return True
@@ -7368,23 +7559,19 @@ def request_session_role(request: Request) -> str | None:
     with db_session() as conn:
         row = conn.execute(
             """
-            SELECT u.role, s.last_seen_at, s.max_idle_seconds
+            SELECT u.role, u.is_approved, s.last_seen_at, s.created_at AS session_created_at, s.max_idle_seconds
             FROM sessions s
             JOIN users u ON u.id = s.user_id
             WHERE s.token = ?
             """,
             (token,),
         ).fetchone()
-        if not row:
+        if not row or not bool(row["is_approved"]):
+            if row:
+                conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return None
 
-        try:
-            last_seen_dt = datetime.fromisoformat(row["last_seen_at"])
-        except (TypeError, ValueError):
-            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
-            return None
-        idle_limit = normalized_idle_ttl_seconds(row["max_idle_seconds"], SESSION_TTL_SECONDS)
-        if (datetime.now(timezone.utc) - last_seen_dt).total_seconds() > idle_limit:
+        if session_row_is_expired(row, SESSION_TTL_SECONDS):
             conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
             return None
     return str(row["role"])
@@ -7404,7 +7591,7 @@ def require_officer(user: sqlite3.Row = Depends(current_user)) -> sqlite3.Row:
 
 class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=64)
-    emoji: str | None = None
+    emoji: str | None = Field(default=None, max_length=16)
     access_code: str = Field(..., min_length=8, max_length=128)
     city: str | None = Field(default=None, max_length=80)
     state: str | None = Field(default=None, max_length=64)
@@ -7544,7 +7731,7 @@ class SelfUpdateRequest(BaseModel):
     username: str | None = Field(default=None, min_length=3, max_length=64)
     stereotype: str | None = Field(default=None, min_length=1, max_length=48)
     interests: str | list[str] | None = None
-    emoji: str | None = None
+    emoji: str | None = Field(default=None, max_length=16)
     city: str | None = Field(default=None, max_length=80)
     state: str | None = Field(default=None, max_length=64)
 
@@ -7617,7 +7804,7 @@ class PNMCreateRequest(BaseModel):
     stereotype: str = Field(..., min_length=1, max_length=48)
     lunch_stats: str = Field(default="", max_length=256)
     notes: str = Field(default="", max_length=2000)
-    auto_photo_from_instagram: bool = True
+    auto_photo_from_instagram: bool = False
 
     @field_validator("class_year")
     @classmethod
@@ -7875,7 +8062,7 @@ class PnmAssignmentUpdateRequest(BaseModel):
 
 class PnmPackageLinkRequest(BaseModel):
     pnm_ids: list[int] = Field(..., min_length=2, max_length=48)
-    sync_assignment: bool = True
+    sync_assignment: bool = False
 
     @field_validator("pnm_ids")
     @classmethod
@@ -8169,6 +8356,7 @@ async def home(request: Request) -> HTMLResponse:
 
     tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
     return templates.TemplateResponse(
+        request,
         "landing.html",
         {
             "request": request,
@@ -8182,6 +8370,7 @@ async def home(request: Request) -> HTMLResponse:
 async def organizations_page(request: Request) -> HTMLResponse:
     tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
     return templates.TemplateResponse(
+        request,
         "platform_home.html",
         {
             "request": request,
@@ -8195,6 +8384,7 @@ async def organizations_page(request: Request) -> HTMLResponse:
 async def features_page(request: Request) -> HTMLResponse:
     tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
     return templates.TemplateResponse(
+        request,
         "landing_features.html",
         {
             "request": request,
@@ -8208,6 +8398,7 @@ async def features_page(request: Request) -> HTMLResponse:
 async def faq_page(request: Request) -> HTMLResponse:
     tenants = [tenant_context_from_row(row) for row in list_tenants_rows()]
     return templates.TemplateResponse(
+        request,
         "landing_faq.html",
         {
             "request": request,
@@ -8226,111 +8417,17 @@ def resolved_demo_tenant() -> TenantContext | None:
     return tenant_context_from_row(row)
 
 
-def ensure_demo_head_session(request: Request, response: Response, tenant: TenantContext) -> None:
-    head_username = DEMO_HEAD_USERNAME.strip()
-    if not head_username:
-        return
-
-    existing_token = request.cookies.get(SESSION_COOKIE)
-    issued_token: str | None = None
-    max_idle_seconds = user_session_idle_seconds(True)
-    now = now_iso()
-
-    def _valid_idle_window(last_seen_raw: Any, idle_seconds_raw: Any) -> bool:
-        try:
-            last_seen_dt = datetime.fromisoformat(str(last_seen_raw))
-        except (TypeError, ValueError):
-            return False
-        idle_limit = normalized_idle_ttl_seconds(idle_seconds_raw, SESSION_TTL_SECONDS)
-        return (datetime.now(timezone.utc) - last_seen_dt).total_seconds() <= idle_limit
-
-    with db_session(tenant.db_path) as conn:
-        head_user = conn.execute(
-            "SELECT id, role, is_approved FROM users WHERE username = ?",
-            (head_username,),
-        ).fetchone()
-        if not head_user or head_user["role"] != ROLE_HEAD:
-            return
-
-        if not bool(head_user["is_approved"]):
-            conn.execute(
-                """
-                UPDATE users
-                SET is_approved = 1, approved_at = COALESCE(approved_at, ?), updated_at = ?
-                WHERE id = ?
-                """,
-                (now, now, int(head_user["id"])),
-            )
-
-        if existing_token:
-            session_row = conn.execute(
-                "SELECT user_id, last_seen_at, max_idle_seconds FROM sessions WHERE token = ?",
-                (existing_token,),
-            ).fetchone()
-            if session_row and int(session_row["user_id"]) == int(head_user["id"]):
-                if _valid_idle_window(session_row["last_seen_at"], session_row["max_idle_seconds"]):
-                    issued_token = existing_token
-                    max_idle_seconds = normalized_idle_ttl_seconds(session_row["max_idle_seconds"], SESSION_TTL_SECONDS)
-                else:
-                    conn.execute("DELETE FROM sessions WHERE token = ?", (existing_token,))
-
-        if not issued_token:
-            latest_row = conn.execute(
-                """
-                SELECT token, last_seen_at, max_idle_seconds
-                FROM sessions
-                WHERE user_id = ?
-                ORDER BY last_seen_at DESC
-                LIMIT 1
-                """,
-                (int(head_user["id"]),),
-            ).fetchone()
-            if latest_row and _valid_idle_window(latest_row["last_seen_at"], latest_row["max_idle_seconds"]):
-                issued_token = str(latest_row["token"])
-                max_idle_seconds = normalized_idle_ttl_seconds(latest_row["max_idle_seconds"], SESSION_TTL_SECONDS)
-            elif latest_row:
-                conn.execute("DELETE FROM sessions WHERE token = ?", (latest_row["token"],))
-
-        if not issued_token:
-            issued_token = secrets.token_urlsafe(32)
-            conn.execute(
-                "INSERT INTO sessions (token, user_id, created_at, last_seen_at, max_idle_seconds) VALUES (?, ?, ?, ?, ?)",
-                (issued_token, int(head_user["id"]), now, now, max_idle_seconds),
-            )
-
-        conn.execute("UPDATE sessions SET last_seen_at = ? WHERE token = ?", (now, issued_token))
-        conn.execute(
-            "UPDATE users SET last_login_at = ?, updated_at = ? WHERE id = ?",
-            (now, now, int(head_user["id"])),
-        )
-
-    if not issued_token:
-        return
-
-    secure_cookie = should_use_secure_cookie(request)
-    response.set_cookie(
-        key=SESSION_COOKIE,
-        value=issued_token,
-        httponly=True,
-        samesite=normalize_samesite(SESSION_COOKIE_SAMESITE),
-        max_age=max_idle_seconds,
-        secure=secure_cookie,
-        path="/",
-    )
-    set_csrf_cookie(response, request)
-    mark_response_private(response)
-
-
 @app.get("/demo", response_class=HTMLResponse)
 async def demo_page(request: Request) -> HTMLResponse:
     tenant = resolved_demo_tenant()
     if not tenant:
-        raise HTTPException(status_code=404, detail="Demo is currently unavailable.")
+        return RedirectResponse(url="/organizations", status_code=307)
 
-    response = templates.TemplateResponse("desktop_shell.html", desktop_context(request, tenant, DEFAULT_DESKTOP_ROUTE, is_demo_mode=True))
-    if DEMO_AUTO_LOGIN and request.query_params.get("autologin", "1") != "0":
-        ensure_demo_head_session(request, response, tenant)
-    return response
+    return templates.TemplateResponse(
+        request,
+        "desktop_shell.html",
+        desktop_context(request, tenant, DEFAULT_DESKTOP_ROUTE, is_demo_mode=True),
+    )
 
 
 @app.head("/", include_in_schema=False)
@@ -8360,6 +8457,7 @@ async def meeting_page(request: Request) -> HTMLResponse:
     if request_prefers_mobile(request) and request_has_active_session(request):
         return RedirectResponse(url=f"/{tenant.slug}/mobile/meeting", status_code=307)
     return templates.TemplateResponse(
+        request,
         "meeting.html",
         {
             "request": request,
@@ -8405,6 +8503,7 @@ async def member_portal_page(request: Request) -> HTMLResponse:
     if not tenant:
         raise HTTPException(status_code=404, detail="Organization context required.")
     return templates.TemplateResponse(
+        request,
         "member_portal.html",
         {
             "request": request,
@@ -8423,6 +8522,7 @@ async def mobile_home_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_home.html",
         {
             "request": request,
@@ -8442,6 +8542,7 @@ async def mobile_pnms_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_pnms.html",
         {
             "request": request,
@@ -8461,6 +8562,7 @@ async def mobile_create_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_create.html",
         {
             "request": request,
@@ -8480,6 +8582,7 @@ async def mobile_members_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_members.html",
         {
             "request": request,
@@ -8499,6 +8602,7 @@ async def mobile_meetings_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_meeting.html",
         {
             "request": request,
@@ -8518,6 +8622,7 @@ async def mobile_calendar_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_calendar.html",
         {
             "request": request,
@@ -8540,6 +8645,7 @@ async def mobile_admin_page(request: Request) -> HTMLResponse:
     if session_role and session_role != ROLE_HEAD:
         return RedirectResponse(url=f"/{tenant.slug}/mobile?notice=admin-access-denied", status_code=307)
     return templates.TemplateResponse(
+        request,
         "mobile_admin.html",
         {
             "request": request,
@@ -8559,6 +8665,7 @@ async def mobile_meeting_page(request: Request) -> HTMLResponse:
     if rusher_redirect:
         return rusher_redirect
     return templates.TemplateResponse(
+        request,
         "mobile_meeting.html",
         {
             "request": request,
@@ -8598,7 +8705,7 @@ async def member_signup_qr(request: Request) -> Response:
 
 @app.get("/platform", response_class=HTMLResponse)
 async def platform_page(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse("platform_admin.html", {"request": request})
+    return templates.TemplateResponse(request, "platform_admin.html", {"request": request})
 
 
 def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
@@ -8638,6 +8745,7 @@ def tenant_admin_payload(row: sqlite3.Row) -> dict[str, Any]:
 
 @app.post("/platform/api/auth/login")
 def platform_login(payload: PlatformLoginRequest, request: Request, response: Response) -> dict[str, Any]:
+    assert_login_request_allowed(request, scope="platform")
     throttle_key = login_throttle_key(request, payload.username, scope="platform")
     assert_login_allowed(throttle_key)
 
@@ -8975,16 +9083,14 @@ async def platform_upload_tenant_logo(
     normalized_slug = normalize_slug(slug)
     row = require_tenant_exists(normalized_slug)
 
-    content_type = (logo.content_type or "").lower().strip()
-    extension = ALLOWED_PHOTO_TYPES.get(content_type)
-    if extension is None:
-        raise HTTPException(status_code=400, detail="Unsupported logo type. Use JPG, PNG, or WEBP.")
-
     content = await logo.read(MAX_PNM_PHOTO_BYTES + 1)
     if not content:
         raise HTTPException(status_code=400, detail="Logo file cannot be empty.")
     if len(content) > MAX_PNM_PHOTO_BYTES:
         raise HTTPException(status_code=413, detail=f"Logo too large. Max size is {MAX_PNM_PHOTO_BYTES // (1024 * 1024)} MB.")
+    extension = detect_image_extension(logo.content_type, content)
+    if extension is None:
+        raise HTTPException(status_code=400, detail="Unsupported logo type. Use JPG, PNG, or WEBP.")
 
     logo_dir = tenant_logo_fs_dir(normalized_slug)
     logo_dir.mkdir(parents=True, exist_ok=True)
@@ -9021,6 +9127,74 @@ async def service_worker() -> FileResponse:
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> FileResponse:
     return FileResponse(BASE_DIR / "static" / "icons" / "icon-192.png", media_type="image/png")
+
+
+def authenticated_upload_user(request: Request, tenant: TenantContext) -> sqlite3.Row:
+    token = request.cookies.get(SESSION_COOKIE)
+    if not token:
+        raise HTTPException(status_code=401, detail="Not authenticated.")
+    with db_session(tenant.db_path) as conn:
+        row = conn.execute(
+            """
+            SELECT u.id, u.role, u.is_approved, s.last_seen_at,
+                   s.created_at AS session_created_at, s.max_idle_seconds
+            FROM sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ?
+            """,
+            (token,),
+        ).fetchone()
+        if not row or not bool(row["is_approved"]):
+            raise HTTPException(status_code=401, detail="Session expired.")
+        if session_row_is_expired(row, SESSION_TTL_SECONDS):
+            conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+            raise HTTPException(status_code=401, detail="Session expired.")
+        return row
+
+
+def safe_upload_file(root: Path, filename: str, *, pattern: str) -> Path:
+    if not re.fullmatch(pattern, filename, flags=re.IGNORECASE):
+        raise HTTPException(status_code=404, detail="File not found.")
+    resolved_root = root.resolve()
+    target = (resolved_root / filename).resolve()
+    if target.parent != resolved_root or not target.is_file():
+        raise HTTPException(status_code=404, detail="File not found.")
+    return target
+
+
+@app.get("/uploads/tenants/{slug}/branding/{filename}", include_in_schema=False)
+def tenant_branding_asset(slug: str, filename: str) -> FileResponse:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}", slug):
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    require_tenant_exists(slug)
+    target = safe_upload_file(tenant_logo_fs_dir(slug), filename, pattern=r"logo\.(?:jpg|jpeg|png|webp)")
+    return FileResponse(target, headers={"Cache-Control": "public, max-age=300"})
+
+
+@app.get("/uploads/tenants/{slug}/pnms/{filename}", include_in_schema=False)
+def tenant_pnm_photo(request: Request, slug: str, filename: str) -> FileResponse:
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{1,62}", slug):
+        raise HTTPException(status_code=404, detail="Organization not found.")
+    tenant = tenant_context_from_row(require_tenant_exists(slug))
+    authenticated_upload_user(request, tenant)
+    target = safe_upload_file(
+        tenant.pnm_uploads_dir,
+        filename,
+        pattern=r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(?:jpg|jpeg|png|webp)",
+    )
+    return FileResponse(target, headers={"Cache-Control": "private, no-store"})
+
+
+@app.get("/uploads/pnms/{filename}", include_in_schema=False)
+def legacy_pnm_photo(request: Request, filename: str) -> FileResponse:
+    tenant = tenant_context_from_row(require_tenant_exists(DEFAULT_TENANT_SLUG))
+    authenticated_upload_user(request, tenant)
+    target = safe_upload_file(
+        LEGACY_PNM_UPLOADS_DIR,
+        filename,
+        pattern=r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\.(?:jpg|jpeg|png|webp)",
+    )
+    return FileResponse(target, headers={"Cache-Control": "private, no-store"})
 
 
 @app.get("/health")
@@ -9877,6 +10051,13 @@ async def import_google_form_csv(
             detail=f"CSV missing required column(s): {', '.join(missing)}.",
         )
 
+    import_rows = list(reader)
+    if len(import_rows) > MAX_GOOGLE_FORM_IMPORT_ROWS:
+        raise HTTPException(
+            status_code=413,
+            detail=f"CSV has too many rows. Import at most {MAX_GOOGLE_FORM_IMPORT_ROWS} rushees at a time.",
+        )
+
     created_count = 0
     skipped_duplicates = 0
     total_errors = 0
@@ -9891,7 +10072,7 @@ async def import_google_form_csv(
             if row["instagram_norm"]
         }
 
-        for row_number, row in enumerate(reader, start=2):
+        for row_number, row in enumerate(import_rows, start=2):
             row_count += 1
             first_raw = csv_row_value(row, column_map["first_name"])
             last_raw = csv_row_value(row, column_map["last_name"])
@@ -9981,28 +10162,6 @@ async def import_google_form_csv(
             pnm_id = int(cursor.lastrowid)
             code = ensure_unique_pnm_code(conn, pnm_id, pnm_code_base(first_name, last_name, first_event_date))
             conn.execute("UPDATE pnms SET pnm_code = ?, updated_at = ? WHERE id = ?", (code, now_iso(), pnm_id))
-            fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
-            if fetched_photo:
-                photo_bytes, extension = fetched_photo
-                try:
-                    public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
-                except OSError:
-                    public_path = None
-                    target_path = None
-                if public_path and target_path:
-                    try:
-                        now = now_iso()
-                        conn.execute(
-                            """
-                            UPDATE pnms
-                            SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
-                            WHERE id = ?
-                            """,
-                            (public_path, now, head_user["id"], now, pnm_id),
-                        )
-                    except Exception:
-                        target_path.unlink(missing_ok=True)
-                        raise
             existing_instagrams.add(instagram_norm)
             created_count += 1
 
@@ -10053,7 +10212,7 @@ async def import_google_form_csv(
 
 
 @app.get("/api/export/contacts/status")
-def export_contacts_download_status(user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def export_contacts_download_status(user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         downloads = contact_download_status_records(conn, user_id=int(user["id"]))
     return {
@@ -10063,7 +10222,7 @@ def export_contacts_download_status(user: sqlite3.Row = Depends(current_user)) -
 
 
 @app.get("/api/export/contacts/{pnm_id}.vcf")
-def export_single_contact_vcf(pnm_id: int, user: sqlite3.Row = Depends(current_user)) -> Response:
+def export_single_contact_vcf(pnm_id: int, user: sqlite3.Row = Depends(require_officer)) -> Response:
     tenant = CURRENT_TENANT.get()
     if tenant is None:
         default_row = require_tenant_exists(DEFAULT_TENANT_SLUG)
@@ -10100,7 +10259,7 @@ def export_single_contact_vcf(pnm_id: int, user: sqlite3.Row = Depends(current_u
 
 
 @app.get("/api/export/contacts.vcf")
-def export_contacts_vcf(user: sqlite3.Row = Depends(current_user)) -> Response:
+def export_contacts_vcf(user: sqlite3.Row = Depends(require_officer)) -> Response:
     tenant = CURRENT_TENANT.get()
     if tenant is None:
         default_row = require_tenant_exists(DEFAULT_TENANT_SLUG)
@@ -10209,7 +10368,8 @@ def export_assigned_contacts_vcf(user: sqlite3.Row = Depends(require_officer)) -
 
 
 @app.post("/api/auth/register")
-def register(payload: RegisterRequest) -> dict[str, str]:
+def register(payload: RegisterRequest, request: Request) -> dict[str, str]:
+    assert_registration_allowed(request)
     try:
         validate_access_code_strength(payload.access_code)
     except ValueError as exc:
@@ -10230,6 +10390,9 @@ def register(payload: RegisterRequest) -> dict[str, str]:
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
             raise HTTPException(status_code=409, detail="Username already exists.")
+        pending_count = int(conn.execute("SELECT COUNT(*) AS count FROM users WHERE is_approved = 0").fetchone()["count"])
+        if pending_count >= MAX_PENDING_REGISTRATIONS:
+            raise HTTPException(status_code=429, detail="Registration queue is full. Contact a Head Rush Officer.")
 
         created_at = now_iso()
         try:
@@ -10281,7 +10444,8 @@ def register(payload: RegisterRequest) -> dict[str, str]:
 
 
 @app.post("/api/auth/register-member")
-def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
+def register_member(payload: MemberRegisterRequest, request: Request) -> dict[str, str]:
+    assert_registration_allowed(request)
     try:
         validate_access_code_strength(payload.access_code)
     except ValueError as exc:
@@ -10301,6 +10465,9 @@ def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
         existing = conn.execute("SELECT id FROM users WHERE username = ?", (username,)).fetchone()
         if existing:
             raise HTTPException(status_code=409, detail="Username already exists.")
+        pending_count = int(conn.execute("SELECT COUNT(*) AS count FROM users WHERE is_approved = 0").fetchone()["count"])
+        if pending_count >= MAX_PENDING_REGISTRATIONS:
+            raise HTTPException(status_code=429, detail="Registration queue is full. Contact a Head Rush Officer.")
 
         created_at = now_iso()
         try:
@@ -10353,6 +10520,7 @@ def register_member(payload: MemberRegisterRequest) -> dict[str, str]:
 
 @app.post("/api/auth/login")
 def login(payload: LoginRequest, request: Request, response: Response) -> dict[str, Any]:
+    assert_login_request_allowed(request, scope="tenant")
     throttle_key = login_throttle_key(request, payload.username, scope="tenant")
     assert_login_allowed(throttle_key)
 
@@ -10368,6 +10536,7 @@ def login(payload: LoginRequest, request: Request, response: Response) -> dict[s
             raise HTTPException(status_code=401, detail="Invalid username or password.")
 
         if not bool(row["is_approved"]):
+            record_login_failure(throttle_key)
             raise HTTPException(status_code=403, detail="Username pending rush team approval.")
 
         token = secrets.token_urlsafe(32)
@@ -11145,29 +11314,8 @@ def create_pnm(payload: PNMCreateRequest, user: sqlite3.Row = Depends(require_of
             clear_all_if_unassigned=True,
         )
 
-        if payload.auto_photo_from_instagram:
-            fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
-            if fetched_photo:
-                photo_bytes, extension = fetched_photo
-                try:
-                    public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
-                except OSError:
-                    public_path = None
-                    target_path = None
-                if public_path and target_path:
-                    try:
-                        now = now_iso()
-                        conn.execute(
-                            """
-                            UPDATE pnms
-                            SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
-                            WHERE id = ?
-                            """,
-                            (public_path, now, user["id"], now, pnm_id),
-                        )
-                    except Exception:
-                        target_path.unlink(missing_ok=True)
-                        raise
+        # Remote photo enrichment is intentionally decoupled from PNM creation.
+        # The explicit refresh endpoint is rate and concurrency limited.
 
         evaluate_weekly_goal_completions(conn)
         row = conn.execute(
@@ -11405,30 +11553,6 @@ def update_pnm_details(
                 pnm_id,
             ),
         )
-        existing_photo_path = row["photo_path"] if "photo_path" in row.keys() else None
-        if not has_local_photo_file(existing_photo_path):
-            fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
-            if fetched_photo:
-                photo_bytes, extension = fetched_photo
-                try:
-                    public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
-                except OSError:
-                    public_path = None
-                    target_path = None
-                if public_path and target_path:
-                    try:
-                        now = now_iso()
-                        conn.execute(
-                            """
-                            UPDATE pnms
-                            SET photo_path = ?, photo_uploaded_at = ?, photo_uploaded_by = ?, updated_at = ?
-                            WHERE id = ?
-                            """,
-                            (public_path, now, actor["id"], now, pnm_id),
-                        )
-                    except Exception:
-                        target_path.unlink(missing_ok=True)
-                        raise
         refreshed = conn.execute(
             """
             SELECT
@@ -11972,8 +12096,10 @@ def remove_pnm_assignee(
 @app.post("/api/pnms/package/link")
 def link_pnms_package_deal(
     payload: PnmPackageLinkRequest,
-    user: sqlite3.Row = Depends(current_user),
+    user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
+    if payload.sync_assignment and user["role"] != ROLE_HEAD:
+        raise HTTPException(status_code=403, detail="Only Head Rush Officers can sync package assignments.")
     requested_pnm_ids = sorted({int(item) for item in payload.pnm_ids if int(item) > 0})
     if len(requested_pnm_ids) < 2:
         raise HTTPException(status_code=400, detail="Select at least two rushees to link.")
@@ -12199,7 +12325,7 @@ def link_pnms_package_deal(
 @app.post("/api/pnms/{pnm_id}/package/unlink")
 def unlink_pnm_package_deal(
     pnm_id: int,
-    user: sqlite3.Row = Depends(current_user),
+    user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     with db_session() as conn:
         ensure_package_link_schema(conn)
@@ -12991,7 +13117,7 @@ def update_pnm_funnel_stage(
 def pnm_funnel_stage_history(
     pnm_id: int,
     limit: int = 120,
-    _: sqlite3.Row = Depends(current_user),
+    _: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     max_limit = max(1, min(400, int(limit)))
     with db_session() as conn:
@@ -13035,7 +13161,7 @@ def pnm_funnel_stage_history(
 
 
 @app.get("/api/funnel/summary")
-def funnel_summary(_: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
+def funnel_summary(_: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     with db_session() as conn:
         totals = conn.execute(
             """
@@ -13230,6 +13356,7 @@ async def upload_pnm_photo(
 @app.post("/api/pnms/{pnm_id}/photo/refresh-instagram")
 def refresh_pnm_photo_from_instagram(
     pnm_id: int,
+    request: Request,
     user: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
     old_photo_path: str | None = None
@@ -13247,20 +13374,37 @@ def refresh_pnm_photo_from_instagram(
             raise HTTPException(status_code=400, detail="PNM does not have an Instagram handle.")
         old_photo_path = row["photo_path"]
 
+    assert_rate_limit(
+        f"instagram-refresh:{request_tenant_scope(request)}:{int(user['id'])}:{pnm_id}",
+        max_attempts=INSTAGRAM_REFRESH_MAX_ATTEMPTS,
+        window_seconds=INSTAGRAM_REFRESH_WINDOW_SECONDS,
+    )
+    if not _INSTAGRAM_FETCH_SLOTS.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Photo refresh capacity is busy. Try again shortly.")
+    try:
         fetched_photo = try_fetch_instagram_profile_photo(instagram_handle)
-        if not fetched_photo:
-            raise HTTPException(
-                status_code=502,
-                detail="Could not fetch Instagram profile image right now. Try again in a minute.",
-            )
+    finally:
+        _INSTAGRAM_FETCH_SLOTS.release()
+    if not fetched_photo:
+        raise HTTPException(
+            status_code=502,
+            detail="Could not fetch Instagram profile image right now. Try again in a minute.",
+        )
 
-        photo_bytes, extension = fetched_photo
-        try:
-            public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
-        except OSError as exc:
-            raise HTTPException(status_code=500, detail=f"Unable to save image: {exc}") from exc
+    photo_bytes, extension = fetched_photo
+    try:
+        public_path, target_path = write_pnm_photo_bytes(pnm_id, photo_bytes, extension)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Unable to save image: {exc}") from exc
 
-        try:
+    try:
+        with db_session() as conn:
+            row = conn.execute("SELECT * FROM pnms WHERE id = ?", (pnm_id,)).fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="PNM not found.")
+            if not can_manage_pnm_profile(row, user):
+                raise HTTPException(status_code=403, detail="Only the creator or Head Rush Officer can edit this rushee.")
+            old_photo_path = row["photo_path"]
             now = now_iso()
             conn.execute(
                 """
@@ -13290,9 +13434,9 @@ def refresh_pnm_photo_from_instagram(
             links_by_pnm = fetch_assignment_links_for_pnms(conn, pnm_ids=[pnm_id])
             refreshed_photo_path = refreshed["photo_path"]
             payload_pnm = pnm_payload_with_assignment_links(conn, refreshed, own, links_by_pnm, viewer=user)
-        except Exception:
-            target_path.unlink(missing_ok=True)
-            raise
+    except Exception:
+        target_path.unlink(missing_ok=True)
+        raise
 
     if old_photo_path and old_photo_path != refreshed_photo_path:
         remove_photo_if_present(old_photo_path)
@@ -14114,6 +14258,7 @@ def upsert_rating(payload: RatingUpsertRequest, user: sqlite3.Row = Depends(curr
             rating_payload(updated_rating),
             assigned_officer=assigned_officer_payload_from_row(updated_pnm),
             assigned_officers=links_by_pnm.get(int(updated_pnm["id"]), []),
+            viewer=user,
         ),
         "member": user_payload(updated_user, updated_user["role"], updated_user["id"]),
     }
@@ -14271,8 +14416,7 @@ def create_pnm_comment(
 
 
 @app.post("/api/lunches")
-def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(current_user)) -> dict[str, Any]:
-    tenant = current_tenant()
+def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(require_officer)) -> dict[str, Any]:
     if payload.end_time and not payload.start_time:
         raise HTTPException(status_code=400, detail="End time requires a start time.")
     if payload.start_time and payload.end_time:
@@ -14381,8 +14525,6 @@ def create_lunch(payload: LunchCreateRequest, user: sqlite3.Row = Depends(curren
             "location": payload.location.strip(),
             "notes": payload.notes.strip(),
             "google_calendar_url": google_calendar_url,
-            "calendar_feed_path": f"/{tenant.slug}/calendar/rush.ics?token={tenant.calendar_share_token}",
-            "calendar_lunch_feed_path": f"/{tenant.slug}/calendar/lunches.ics?token={tenant.calendar_share_token}",
         },
     }
 
@@ -14426,9 +14568,8 @@ def pnm_lunches(pnm_id: int, _: sqlite3.Row = Depends(require_officer)) -> dict[
 def scheduled_lunches(
     request: Request,
     limit: int = 120,
-    _: sqlite3.Row = Depends(current_user),
+    _: sqlite3.Row = Depends(require_officer),
 ) -> dict[str, Any]:
-    tenant = current_tenant()
     capped_limit = max(10, min(int(limit), 400))
     with db_session() as conn:
         rows = conn.execute(
@@ -14495,10 +14636,7 @@ def scheduled_lunches(
             }
         )
 
-    return {
-        "lunches": items,
-        "calendar_share": calendar_share_payload(request, tenant),
-    }
+    return {"lunches": items}
 
 
 def calendar_share_payload(request: Request, tenant: TenantContext) -> dict[str, Any]:
@@ -14833,7 +14971,7 @@ def public_lunch_calendar_feed(token: str | None = None) -> Response:
     return Response(
         content=payload,
         media_type="text/calendar; charset=utf-8",
-        headers={"Cache-Control": "public, max-age=300"},
+        headers={"Cache-Control": "private, no-store"},
     )
 
 
@@ -14994,7 +15132,7 @@ def public_rush_calendar_feed(token: str | None = None) -> Response:
     return Response(
         content=payload,
         media_type="text/calendar; charset=utf-8",
-        headers={"Cache-Control": "public, max-age=300"},
+        headers={"Cache-Control": "private, no-store"},
     )
 
 
@@ -16616,9 +16754,10 @@ def create_officer_chat_message(
                 SELECT id, username
                 FROM users
                 WHERE is_approved = 1
+                  AND role IN (?, ?)
                   AND lower(username) IN (SELECT CAST(value AS TEXT) FROM json_each(?))
                 """,
-                (json.dumps(mention_usernames),),
+                (ROLE_HEAD, ROLE_RUSH_OFFICER, json.dumps(mention_usernames)),
             ).fetchall()
             for mentioned in mentioned_rows:
                 conn.execute(

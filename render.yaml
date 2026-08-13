@@ -18,7 +18,11 @@ services:
       - key: REQUIRE_PERSISTENT_DATA
         value: "1"
       - key: ALLOWED_HOSTS
-        value: ka-d6di.onrender.com,localhost,127.0.0.1
+        value: bidboard.tech,www.bidboard.tech,ka-d6di.onrender.com,localhost,127.0.0.1
+      - key: PUBLIC_BASE_URL
+        value: https://bidboard.tech
+      - key: DEMO_ENABLED
+        value: "0"
       - key: DB_PATH
         value: /data/recruitment.db
       - key: PLATFORM_DB_PATH

@@ -1633,27 +1633,27 @@ td strong {
 
 .pill.score-tier.score-tier-a {
   background: rgba(31, 112, 62, 0.18);
-  color: #0d6a34;
+  color: var(--bb-success, #0d6a34);
 }
 
 .pill.score-tier.score-tier-b {
   background: rgba(52, 132, 211, 0.18);
-  color: #175d9e;
+  color: var(--bb-info, #175d9e);
 }
 
 .pill.score-tier.score-tier-c {
   background: rgba(196, 142, 36, 0.18);
-  color: #8a5d08;
+  color: var(--bb-warning, #8a5d08);
 }
 
 .pill.score-tier.score-tier-d {
   background: rgba(191, 111, 34, 0.18);
-  color: #94520f;
+  color: var(--bb-warning, #94520f);
 }
 
 .pill.score-tier.score-tier-f {
   background: rgba(176, 54, 68, 0.16);
-  color: #9a2433;
+  color: var(--bb-danger, #9a2433);
 }
 
 .inline-confirm-bar {

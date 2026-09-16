@@ -25,18 +25,7 @@
       </div>
     </div>
     <main class="shell mobile-shell">
-      <div class="mobile-appbar">
-        <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
-          <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
-          <div>
-            <p>{{ app_config.chapter_name }}</p>
-            <strong>BidBoard</strong>
-          </div>
-        </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-appbar-link">Roster</a>
-        </div>
-      </div>
+      {% include "partials/mobile_appbar.html" %}
       <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Add Rushee</h1>
@@ -64,7 +53,7 @@
             <label>Hometown<input id="mobilePnmHometown" type="text" required /></label>
             <label>State<input id="mobilePnmState" list="mobileStateHints" type="text" maxlength="64" placeholder="TX or Texas" required /></label>
           </div>
-          <label>Phone number<input id="mobilePnmPhone" type="text" placeholder="+1 555 123 4567" /></label>
+          <label>Phone number<input id="mobilePnmPhone" type="tel" autocomplete="tel" placeholder="+1 555 123 4567" /></label>
           <label>Instagram handle<input id="mobilePnmInstagram" type="text" required placeholder="@username" /></label>
           <label>
             Interests
@@ -78,9 +67,12 @@
             <input id="mobilePnmStereotype" type="hidden" value="" />
             <p class="muted">Choose one approved stereotype tag.</p>
           </label>
-          <label>Touchpoint stats (optional)<input id="mobilePnmLunchStats" type="text" /></label>
-          <label>Notes (optional)<textarea id="mobilePnmNotes" rows="3" placeholder="Talking points, strengths, concerns"></textarea></label>
-          <label>Photo (optional)<input id="mobilePnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+          <details class="mobile-subsection-details">
+            <summary>Notes and photo (optional)</summary>
+            <label>Touchpoint stats<input id="mobilePnmLunchStats" type="text" /></label>
+            <label>Notes<textarea id="mobilePnmNotes" rows="3" placeholder="Talking points, strengths, concerns"></textarea></label>
+            <label>Photo<input id="mobilePnmPhoto" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+          </details>
           <button type="submit">Create Rushee</button>
         </form>
       </section>
@@ -88,14 +80,8 @@
 
     <datalist id="mobileStateHints"></datalist>
 
-    <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Home</a>
-      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab is-active">Rushees</a>
-      <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
-      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
-    </nav>
+    {% include "partials/mobile_nav.html" %}
 
-    <div id="mobileToast" class="toast hidden"></div>
+    <div id="mobileToast" class="toast hidden" role="status" aria-live="polite"></div>
   </body>
 </html>

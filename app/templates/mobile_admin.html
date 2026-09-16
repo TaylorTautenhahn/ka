@@ -25,22 +25,11 @@
       </div>
     </div>
     <main class="shell mobile-shell">
-      <div class="mobile-appbar">
-        <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
-          <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
-          <div>
-            <p>{{ app_config.chapter_name }}</p>
-            <strong>BidBoard</strong>
-          </div>
-        </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-appbar-link">Team</a>
-        </div>
-      </div>
+      {% include "partials/mobile_appbar.html" %}
       <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Admin</h1>
-        <p>Keep the essentials visible first. Put maintenance tools one tap lower.</p>
+        <p>Approve members and manage your chapter.</p>
       </header>
 
       <section id="mobileAdminDeniedPanel" class="panel mobile-panel hidden">
@@ -69,10 +58,10 @@
           <div id="mobileAdminPendingList" class="mobile-list"></div>
         </section>
 
-        <section class="panel mobile-panel">
-          <h2>Officer Metrics</h2>
+        <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+          <summary>Officer metrics</summary>
           <div id="mobileAdminOfficerList" class="mobile-list"></div>
-        </section>
+        </details>
 
         <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
           <summary>Backups</summary>
@@ -90,14 +79,8 @@
       </section>
     </main>
 
-    <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Home</a>
-      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
-      <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
-      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
-    </nav>
+    {% include "partials/mobile_nav.html" %}
 
-    <div id="mobileToast" class="toast hidden"></div>
+    <div id="mobileToast" class="toast hidden" role="status" aria-live="polite"></div>
   </body>
 </html>

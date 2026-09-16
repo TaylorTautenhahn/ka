@@ -4,6 +4,11 @@ uvicorn[standard]==0.40.0
 jinja2==3.1.6
 python-multipart==0.0.32
 requests==2.34.2
-httpx2==2.10.0
+httpx2==2.12.0
 
 segno==1.6.6
+
+# Pin patched transitive dependencies of requests and uvicorn[standard].
+urllib3==2.7.0
+click==8.3.3
+python-dotenv==1.2.2

@@ -1,0 +1,11 @@
+<nav class="mobile-tabs" aria-label="Mobile Navigation">
+  {% for key, label, fallback, pages in [
+    ('dashboard', 'Home', '', ['home']),
+    ('rushees', 'Rushees', '/pnms', ['pnms', 'create']),
+    ('meetings', 'Meetings', '/meetings', ['meeting', 'meetings']),
+    ('team', 'Team', '/members', ['members']),
+    ('calendar', 'Operations', '/calendar', ['calendar'])
+  ] %}
+  <a href="{{ app_config.mobile_routes[key] if app_config.mobile_routes and app_config.mobile_routes[key] else app_config.mobile_base ~ fallback }}" class="mobile-tab{% if mobile_page in pages %} is-active{% endif %}"{% if mobile_page in pages %} aria-current="page"{% endif %}>{{ label }}</a>
+  {% endfor %}
+</nav>

@@ -25,36 +25,30 @@
       </div>
     </div>
     <main class="shell mobile-shell">
-      <div class="mobile-appbar">
-        <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
-          <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
-          <div>
-            <p>{{ app_config.chapter_name }}</p>
-            <strong>BidBoard</strong>
-          </div>
-        </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-        </div>
-      </div>
+      {% include "partials/mobile_appbar.html" %}
 
-      <section id="mobileOfficerCommandCenter" class="hidden mobile-command-stack">
+      <section id="mobileOfficerCommandCenter" class="hidden mobile-command-stack mobile-home-flow" data-home-view="roster">
+        <div id="mobileHomeDraftStatus" class="mobile-draft-status hidden">
+          <p id="mobileHomeDraftMessage" class="muted" role="status" aria-live="polite"></p>
+          <button id="mobileHomeDiscardDraftsBtn" type="button" class="secondary">Discard all drafts</button>
+        </div>
         <section id="mobileHomeSearchPanel" class="panel mobile-panel mobile-command-well mobile-roster-panel">
           <div class="section-head section-head-compact">
             <div>
-              <h2>Rushee Roster</h2>
-              <p class="muted">Search, select, and update.</p>
+              <h1>Find a rushee</h1>
+              <p class="muted">Choose someone to score, add a note, or schedule a touchpoint.</p>
             </div>
           </div>
           <div class="mobile-search-shell">
             <label class="mobile-search-label">
               <span>Search</span>
-              <input id="mobileHomeSearchInput" type="search" placeholder="Jimmy, JJO02112026, Austin, @jimmy" autocomplete="off" />
+              <input id="mobileHomeSearchInput" type="search" placeholder="Name or Instagram" autocomplete="off" aria-controls="mobileHomeSearchResults" />
             </label>
             <button id="mobileHomeClearSearchBtn" type="button" class="secondary mobile-clear-btn">Clear</button>
           </div>
-          <p id="mobileHomeSearchMeta" class="muted mobile-search-meta">Loading rushees...</p>
+          <p id="mobileHomeSearchMeta" class="muted mobile-search-meta" role="status" aria-live="polite">Loading rushees...</p>
           <div id="mobileHomeSearchResults" class="mobile-list mobile-command-results"></div>
+          <button id="mobileHomeShowMoreBtn" type="button" class="secondary hidden">Show more rushees</button>
           <details id="mobileHomeRecentLunchesPanel" class="mobile-subsection-details">
             <summary>
               <span>Touchpoint Follow-Up</span>
@@ -65,27 +59,26 @@
           </details>
         </section>
 
-        <section id="mobileHomeQuickRatePanel" class="panel mobile-panel mobile-rating-panel">
-          <div class="section-head section-head-compact">
-            <div>
-              <h2>Selected Rushee</h2>
-              <p id="mobileCommandSelectedMeta" class="muted">Select a rushee from the roster to rate, note, or schedule a touchpoint.</p>
-            </div>
+        <section id="mobileHomeQuickRatePanel" class="panel mobile-panel mobile-rating-panel hidden" aria-labelledby="mobileHomeSelectedHeading">
+          <div class="mobile-back-row">
+            <button id="mobileHomeBackBtn" type="button" class="secondary">Back to roster</button>
           </div>
+          <h2 id="mobileHomeSelectedHeading" class="visually-hidden-field" tabindex="-1">Selected rushee</h2>
+          <p id="mobileCommandSelectedMeta" class="visually-hidden-field">Select a rushee from the roster to rate, note, or schedule a touchpoint.</p>
           <div id="mobileCommandSelectedCard" class="mobile-command-selected-card">
             <p class="muted">Choose a rushee above to load their photo, score, and rating details here.</p>
           </div>
           <div class="mobile-rushee-action-strip">
-            <button id="mobileCommandRateFocusBtn" type="button" class="secondary">Rate</button>
-            <button id="mobileCommandCommentFocusBtn" type="button" class="secondary">Add Comment</button>
-            <button id="mobileCommandTouchpointToggleBtn" type="button" class="secondary">Schedule Touchpoint</button>
-            <a id="mobileCommandMeetingShortcut" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Open Meeting Packet</a>
+            <button id="mobileCommandRateFocusBtn" type="button" class="secondary">Score</button>
+            <button id="mobileCommandCommentFocusBtn" type="button" class="secondary">Note</button>
+            <button id="mobileCommandTouchpointToggleBtn" type="button" class="secondary" aria-expanded="false" aria-controls="mobileCommandTouchpointComposer">Schedule</button>
+            <a id="mobileCommandMeetingShortcut" href="{{ app_config.mobile_routes.meeting if app_config.mobile_routes else app_config.mobile_base ~ '/meeting' }}" class="quick-nav-link">Meeting packet</a>
           </div>
           <div id="mobileCommandTouchpointComposer" class="mobile-touchpoint-composer hidden">
             <div class="section-head section-head-compact">
               <div>
                 <h3>Schedule Touchpoint</h3>
-                <p class="muted">Keep this lightweight so it fits the mobile flow.</p>
+                <p class="muted">Add the date and any details your team needs.</p>
               </div>
             </div>
             <form id="mobileCommandTouchpointForm" class="stack">
@@ -109,13 +102,13 @@
               </label>
               <div class="action-row">
                 <button id="mobileCommandTouchpointSaveBtn" type="submit">Schedule Touchpoint</button>
+                <button id="mobileCommandTouchpointCancelBtn" type="button" class="secondary">Cancel and discard touchpoint</button>
               </div>
             </form>
           </div>
           <details id="mobileCommandRatingDisclosure" class="mobile-subsection-details mobile-rating-disclosure">
             <summary>
               <span>Quick rating or comment</span>
-              <strong>Open</strong>
             </summary>
             <form id="mobileCommandRatingForm" class="stack">
               <div class="inline-grid compact-inputs mobile-command-score-grid">
@@ -127,11 +120,12 @@
               </div>
               <label>
                 Comment or quick note
-                <textarea id="mobileCommandRateComment" rows="3" placeholder="Add context for Meetings."></textarea>
+                <textarea id="mobileCommandRateComment" rows="3" placeholder="Write a new note for the meeting packet."></textarea>
               </label>
               <div class="mobile-command-inline-actions">
                 <button id="mobileCommandSaveBtn" type="submit">Save Rating</button>
                 <button id="mobileCommandCommentBtn" type="button" class="secondary mobile-comment-only-btn">Add Comment</button>
+                <button id="mobileCommandRatingCancelBtn" type="button" class="secondary">Cancel and discard edits</button>
               </div>
             </form>
           </details>
@@ -148,14 +142,8 @@
     <datalist id="mobileStateHints"></datalist>
     <datalist id="mobileCommandStateHints"></datalist>
 
-    <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab is-active">Home</a>
-      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
-      <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
-      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
-    </nav>
+    {% include "partials/mobile_nav.html" %}
 
-    <div id="mobileToast" class="toast hidden"></div>
+    <div id="mobileToast" class="toast hidden" role="status" aria-live="polite"></div>
   </body>
 </html>

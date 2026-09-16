@@ -18,6 +18,7 @@ from urllib.parse import quote, urlencode, urlsplit, urlunsplit
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
+from itertools import islice
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
 from typing import Any
@@ -30,7 +31,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field, field_validator, model_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from urllib.error import HTTPError, URLError
-from urllib.request import Request as URLRequest, urlopen
+from urllib.request import HTTPRedirectHandler, Request as URLRequest, build_opener
 
 from app.services.web_assets import CacheControlStaticFiles, build_static_asset_version, versioned_static_url
 
@@ -1365,7 +1366,8 @@ def manifest_payload_for_tenant(tenant: TenantContext | None) -> dict[str, Any]:
 
 
 def vcard_escape(value: str) -> str:
-    escaped = value.replace("\\", "\\\\").replace("\n", "\\n")
+    escaped = value.replace("\\", "\\\\")
+    escaped = escaped.replace("\r\n", "\\n").replace("\n", "\\n").replace("\r", "\\n")
     escaped = escaped.replace(";", "\\;").replace(",", "\\,")
     return escaped
 
@@ -2743,8 +2745,12 @@ def instagram_username_from_handle(handle: str) -> str:
 
 
 def is_allowed_remote_fetch_url(url: str) -> bool:
+    if not url or any(ord(char) <= 32 or ord(char) == 127 for char in url):
+        return False
     try:
         parsed = urlsplit(url)
+        if parsed.port not in {None, 443} or parsed.username is not None or parsed.password is not None:
+            return False
     except ValueError:
         return False
     if parsed.scheme != "https":
@@ -2755,6 +2761,20 @@ def is_allowed_remote_fetch_url(url: str) -> bool:
     if host in ALLOWED_REMOTE_FETCH_HOSTS:
         return True
     return any(host.endswith(suffix) for suffix in ALLOWED_REMOTE_FETCH_HOST_SUFFIXES)
+
+
+class AllowedRemoteRedirectHandler(HTTPRedirectHandler):
+    def redirect_request(self, req: URLRequest, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> URLRequest | None:
+        # Validate before following each hop, not after the destination has been contacted.
+        if not is_allowed_remote_fetch_url(newurl):
+            raise HTTPError(req.full_url, code, "Remote redirect destination is not allowed.", headers, fp)
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
+
+
+def open_remote_request(request: URLRequest) -> Any:
+    if not is_allowed_remote_fetch_url(request.full_url):
+        raise ValueError("Remote request destination is not allowed.")
+    return build_opener(AllowedRemoteRedirectHandler()).open(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS)
 
 
 def fetch_image_from_url(request_url: str, referer: str | None = None) -> tuple[bytes, str] | None:
@@ -2774,7 +2794,7 @@ def fetch_image_from_url(request_url: str, referer: str | None = None) -> tuple[
         headers=headers,
     )
     try:
-        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:  # nosec B310
+        with open_remote_request(request) as response:
             content = response.read(MAX_PNM_PHOTO_BYTES + 1)
             if not content:
                 return None
@@ -2802,7 +2822,7 @@ def fetch_instagram_og_image_url(username: str) -> str | None:
         },
     )
     try:
-        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:  # nosec B310
+        with open_remote_request(request) as response:
             content = response.read(INSTAGRAM_PROFILE_HTML_MAX_BYTES + 1)
     except (HTTPError, URLError, TimeoutError, ValueError, OSError):
         return None
@@ -2856,7 +2876,7 @@ def fetch_instagram_api_image_url(username: str) -> str | None:
         },
     )
     try:
-        with urlopen(request, timeout=INSTAGRAM_AVATAR_TIMEOUT_SECONDS) as response:  # nosec B310
+        with open_remote_request(request) as response:
             payload = response.read(INSTAGRAM_API_RESPONSE_MAX_BYTES + 1)
     except (HTTPError, URLError, TimeoutError, ValueError, OSError):
         return None
@@ -10050,7 +10070,10 @@ async def import_google_form_csv(
         decoded = raw.decode("latin-1")
 
     reader = csv.DictReader(io.StringIO(decoded))
-    headers = [header.strip() for header in (reader.fieldnames or []) if header and header.strip()]
+    try:
+        headers = [header.strip() for header in (reader.fieldnames or []) if header and header.strip()]
+    except csv.Error as exc:
+        raise HTTPException(status_code=400, detail="CSV is malformed or contains an oversized field.") from exc
     if not headers:
         raise HTTPException(status_code=400, detail="CSV is missing a header row.")
 
@@ -10068,7 +10091,10 @@ async def import_google_form_csv(
             detail=f"CSV missing required column(s): {', '.join(missing)}.",
         )
 
-    import_rows = list(reader)
+    try:
+        import_rows = list(islice(reader, MAX_GOOGLE_FORM_IMPORT_ROWS + 1))
+    except csv.Error as exc:
+        raise HTTPException(status_code=400, detail="CSV is malformed or contains an oversized field.") from exc
     if len(import_rows) > MAX_GOOGLE_FORM_IMPORT_ROWS:
         raise HTTPException(
             status_code=413,

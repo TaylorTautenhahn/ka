@@ -1,104 +1,50 @@
 {% extends "marketing_base.html" %}
 {% set nav_key = 'faq' %}
 
-{% block title %}BidBoard | FAQ{% endblock %}
-{% block description %}Answers for chapters evaluating BidBoard for recruitment operations, data durability, and rollout.{% endblock %}
+{% block title %}BidBoard | Questions & Answers{% endblock %}
+{% block description %}A few practical answers about getting started, chapter access, mobile use, and keeping your recruitment history in BidBoard.{% endblock %}
 {% block body_class %}bb-page-faq{% endblock %}
 
 {% block page_content %}
-<section class="bb-page-hero bb-reveal" data-delay="20">
-  <p class="bb-kicker">FAQ</p>
-  <h1 class="bb-page-title">Answers for teams deciding whether BidBoard can actually hold up during rush week.</h1>
-  <p class="bb-page-subtitle">
-    These are the questions chapter leadership usually asks before moving off spreadsheets: fit, access control, mobile execution, rollout, and whether the data stays durable in production.
-  </p>
-  <nav class="bb-faq-shortcuts" aria-label="FAQ categories">
-    <a href="#faq-fit">Fit + Setup</a>
-    <a href="#faq-security">Security + Access</a>
-    <a href="#faq-mobile">Mobile + Workflow</a>
-    <a href="#faq-data">Data Durability</a>
-  </nav>
+<section class="bb-page-hero bb-reveal" aria-labelledby="faq-title">
+  <div><p class="bb-kicker">Questions &amp; answers</p><h1 id="faq-title">A little clarity<br /><em>before you begin.</em></h1></div>
+  <div class="bb-page-intro"><p>The practical things to know about your chapter's workspace.</p><nav class="bb-faq-shortcuts" aria-label="FAQ categories"><a href="#faq-fit">Getting started</a><a href="#faq-security">Chapter access</a><a href="#faq-mobile">Day to day</a><a href="#faq-data">Between seasons</a></nav></div>
 </section>
 
-<section class="bb-section bb-reveal" data-delay="35">
-  <div class="bb-faq-grid">
-    <article id="faq-fit" class="bb-faq-group">
-      <p class="bb-bento-label">Fit + Setup</p>
-      <details class="bb-faq-item" open>
-        <summary>Who is BidBoard built for?</summary>
-        <p>BidBoard is built for fraternity and sorority recruitment teams that need structured, collaborative decision-making across heads, officers, and members.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Can multiple organizations use one deployment?</summary>
-        <p>Yes. Each organization has a separate tenant path, isolated database, custom branding, and independent approvals.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>How hard is rollout?</summary>
-        <p>Most teams start with the interactive demo, configure one organization workspace, then move rush officers into live use once branding and storage are set.</p>
-      </details>
-    </article>
-
-    <article id="faq-security" class="bb-faq-group">
-      <p class="bb-bento-label">Security + Access</p>
-      <details class="bb-faq-item" open>
-        <summary>How does access control work?</summary>
-        <p>Role-based visibility is enforced at the API layer. Head roles, officers, and members see different scopes, and users cannot edit or delete other users’ ratings.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Can organizations customize branding?</summary>
-        <p>Yes. Logos, colors, organization titles, and workspace identity can be customized independently per tenant.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Is accountability preserved?</summary>
-        <p>Yes. Leadership can see rating changes, deltas, and comments where allowed, while member-facing views remain intentionally limited.</p>
-      </details>
-    </article>
-
-    <article id="faq-mobile" class="bb-faq-group">
-      <p class="bb-bento-label">Mobile + Workflow</p>
-      <details class="bb-faq-item" open>
-        <summary>Does BidBoard work on mobile during events?</summary>
-        <p>Yes. Mobile-specific pages are optimized for small screens so officers can search, rate, assign, and follow up from iPhone or Android.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Can we import rushees from forms?</summary>
-        <p>Yes. You can collect submissions through Google Forms, export CSV responses, and import them into BidBoard with validation and duplicate handling.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Can the team coordinate in one place?</summary>
-        <p>Yes. Calendar events, touchpoints, goals, notifications, assignments, and officer chat are part of the product workflow rather than side systems.</p>
-      </details>
-    </article>
-
-    <article id="faq-data" class="bb-faq-group">
-      <p class="bb-bento-label">Data Durability</p>
-      <details class="bb-faq-item" open>
-        <summary>How are backups handled?</summary>
-        <p>BidBoard supports CSV export bundles, SQLite snapshots, and season archive/reset tools for cyclical recruitment operations.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Will data disappear when we deploy new code?</summary>
-        <p>Not when persistent storage is configured correctly. BidBoard includes startup checks and admin diagnostics to verify that the configured paths are durable.</p>
-      </details>
-      <details class="bb-faq-item">
-        <summary>Can we keep historical context between seasons?</summary>
-        <p>Yes. Archived season data can be preserved while the live board resets for the next rush cycle.</p>
-      </details>
-    </article>
-  </div>
-</section>
-
-<section class="bb-section bb-reveal" data-delay="50">
-  <div class="bb-cta-banner">
+<div class="bb-faq-content">
+  <section id="faq-fit" class="bb-faq-group bb-reveal" aria-labelledby="faq-fit-title">
+    <h2 id="faq-fit-title">Getting started</h2>
     <div>
-      <p class="bb-kicker">Still Evaluating?</p>
-      <h3>Start with the demo, then move into a real workspace when your chapter is ready.</h3>
-      <p>BidBoard is designed so leadership can feel the operating flow before any production rollout begins.</p>
+      <details class="bb-faq-item" open><summary>Who is BidBoard for?</summary><p>Fraternity and sorority recruitment teams. Members, officers, and chapter heads can keep profiles, notes, ratings, and follow-ups in one shared place.</p></details>
+      <details class="bb-faq-item"><summary>How do I find my chapter?</summary><p>Open the <a href="/organizations">chapter directory</a>, search for your organization, and choose its workspace. Use the account approved for that chapter. If it isn't listed, check with your chapter leadership or platform administrator.</p></details>
+      <details class="bb-faq-item"><summary>Where can I see how it works?</summary><p>Read the <a href="/features">product tour</a> for a closer look at profiles, coordination, and meeting prep.</p></details>
     </div>
-    <div class="bb-hero-actions">
-      <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
-      <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
+  </section>
+  <section id="faq-security" class="bb-faq-group bb-reveal" aria-labelledby="faq-security-title">
+    <h2 id="faq-security-title">Chapter access</h2>
+    <div>
+      <details class="bb-faq-item"><summary>Is our workspace separate from other chapters?</summary><p>Each organization has a separate workspace, database, branding, and account approvals.</p></details>
+      <details class="bb-faq-item"><summary>Does everyone have the same access?</summary><p>No. Head, officer, and member roles have different permissions. What you can view or change depends on your role in that organization.</p></details>
+      <details class="bb-faq-item"><summary>Can we use our chapter's branding?</summary><p>Yes. Organization names, logos, and colors can be configured independently for each workspace.</p></details>
     </div>
-  </div>
-</section>
+  </section>
+  <section id="faq-mobile" class="bb-faq-group bb-reveal" aria-labelledby="faq-mobile-title">
+    <h2 id="faq-mobile-title">Day to day</h2>
+    <div>
+      <details class="bb-faq-item"><summary>Can I use BidBoard on my phone?</summary><p>Yes. Mobile views support searching profiles, adding ratings, and following up during recruitment events.</p></details>
+      <details class="bb-faq-item"><summary>Can we bring in an existing recruitment list?</summary><p>Yes. Import a CSV, including responses exported from Google Forms. The import flow includes validation and duplicate handling.</p></details>
+      <details class="bb-faq-item"><summary>What can we prepare for a chapter meeting?</summary><p>Build a shortlist and review meeting packets with profile details, conversation notes, and rating history.</p></details>
+    </div>
+  </section>
+  <section id="faq-data" class="bb-faq-group bb-reveal" aria-labelledby="faq-data-title">
+    <h2 id="faq-data-title">Between seasons</h2>
+    <div>
+      <details class="bb-faq-item"><summary>Can we export and back up our data?</summary><p>BidBoard includes CSV export bundles and database snapshots. Your administrator manages backups and storage through the admin tools.</p></details>
+      <details class="bb-faq-item"><summary>What happens at the end of a season?</summary><p>Season archive and reset tools let leadership preserve historical context and prepare the live board for the next recruitment cycle.</p></details>
+      <details class="bb-faq-item"><summary>What keeps data available after an update?</summary><p>The deployment needs correctly configured persistent storage. Startup checks and admin diagnostics help your administrator verify those settings; backups should be maintained separately.</p></details>
+    </div>
+  </section>
+</div>
+
+<section class="bb-closing bb-reveal" aria-labelledby="faq-closing-title"><div><p class="bb-kicker">Ready to find your people?</p><h2 id="faq-closing-title">Your chapter<br /><em>is the place to start.</em></h2></div><a class="bb-button" href="/organizations">Find your chapter <span aria-hidden="true">&nearr;</span></a></section>
 {% endblock %}

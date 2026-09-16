@@ -1,0 +1,19 @@
+<div class="mobile-appbar">
+  <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
+    <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
+    <div><p>{{ app_config.chapter_name }}</p><strong>BidBoard</strong></div>
+  </a>
+  <div class="mobile-appbar-actions">
+    {% if mobile_page in ['home', 'pnms'] %}
+    <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add rushee</a>
+    {% endif %}
+    <details class="mobile-account-menu">
+      <summary>Account</summary>
+      <div class="stack">
+        <a data-head-only-nav href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="quick-nav-link hidden">Administration</a>
+        <a href="{{ app_config.desktop_routes.dashboard if app_config.desktop_routes else app_config.base_path ~ '/dashboard' }}?desktop=1" class="quick-nav-link">Full workspace</a>
+        <button id="mobileLogoutBtn" type="button" class="secondary">Sign out</button>
+      </div>
+    </details>
+  </div>
+</div>

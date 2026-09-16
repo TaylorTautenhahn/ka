@@ -1,114 +1,22 @@
 {% extends "marketing_base.html" %}
 {% set nav_key = 'features' %}
 
-{% block title %}BidBoard | Product Overview{% endblock %}
-{% block description %}Explore how BidBoard helps chapters evaluate, coordinate, decide, and preserve recruitment operations.{% endblock %}
+{% block title %}BidBoard | The Product{% endblock %}
+{% block description %}Profiles, follow-ups, meeting packets, and season archives. See how BidBoard helps your chapter keep recruitment organized.{% endblock %}
 {% block body_class %}bb-page-features{% endblock %}
 
 {% block page_content %}
-<section class="bb-page-hero bb-reveal" data-delay="20">
-  <div class="bb-feature-hero-copy">
-    <p class="bb-kicker">Product Overview</p>
-    <h1 class="bb-page-title">One system for evaluating, coordinating, deciding, and preserving recruitment operations.</h1>
-    <p class="bb-page-subtitle">
-      BidBoard is structured around the real work of rush week: capture better signal, coordinate ownership, walk into meetings prepared, and protect the season after the vote.
-    </p>
-    <div class="bb-chip-row bb-chip-row-hero">
-      <span>Evaluate live</span>
-      <span>Coordinate next steps</span>
-      <span>Decide with context</span>
-      <span>Preserve the season</span>
-    </div>
-  </div>
-  <ol class="bb-operating-loop" aria-label="BidBoard operating loop">
-    <li><span>01</span><div><strong>Capture</strong><p>Profiles, notes, ratings, and event context.</p></div></li>
-    <li><span>02</span><div><strong>Coordinate</strong><p>Ownership, touchpoints, goals, and follow-up.</p></div></li>
-    <li><span>03</span><div><strong>Decide</strong><p>Shortlists and packets built from the same record.</p></div></li>
-    <li><span>04</span><div><strong>Preserve</strong><p>Exports, archives, and season-ready continuity.</p></div></li>
-  </ol>
+<section class="bb-page-hero bb-reveal" aria-labelledby="product-title">
+  <div><p class="bb-kicker">Meet BidBoard</p><h1 id="product-title">A place for the details.<br /><em>Time for the people.</em></h1></div>
+  <div class="bb-page-intro"><p>From a first conversation to a chapter meeting, keep the work of recruitment in one shared workspace.</p><a class="bb-text-link" href="/organizations">Find your chapter <span aria-hidden="true">&rarr;</span></a></div>
 </section>
 
-<section class="bb-section bb-reveal" data-delay="35">
-  <div class="bb-section-head">
-    <p class="bb-kicker">Outcome Modules</p>
-    <h2>Organized around the outcomes leadership actually needs.</h2>
-  </div>
-  <div class="bb-outcome-grid">
-    <article class="bb-outcome-card">
-      <p class="bb-bento-label">Evaluate</p>
-      <h3>Collect better signal without slowing the room down.</h3>
-      <ul class="bb-feature-list">
-        <li>Per-rushee profiles with photos, contact details, notes, and tags</li>
-        <li>Weighted rating engine with update comments and stored deltas</li>
-        <li>Role-aware visibility for heads, officers, and members</li>
-      </ul>
-    </article>
-    <article class="bb-outcome-card">
-      <p class="bb-bento-label">Coordinate</p>
-      <h3>Make ownership obvious across touchpoints, events, and follow-up.</h3>
-      <ul class="bb-feature-list">
-        <li>Assignments, package links, and shared touchpoint ownership</li>
-        <li>Unified rush calendar plus touchpoint scheduling and export links</li>
-        <li>Officer chat, goals, and task tracking in one workspace</li>
-      </ul>
-    </article>
-    <article class="bb-outcome-card">
-      <p class="bb-bento-label">Decide</p>
-      <h3>Walk into meetings with the context already assembled.</h3>
-      <ul class="bb-feature-list">
-        <li>Meeting packets with rating trends and linked recent activity</li>
-        <li>Package partner context, touchpoint notes, and quick comparison flow</li>
-        <li>Decision-ready summaries instead of memory-driven debate</li>
-      </ul>
-    </article>
-    <article class="bb-outcome-card">
-      <p class="bb-bento-label">Preserve</p>
-      <h3>Keep the season durable before, during, and after deployment.</h3>
-      <ul class="bb-feature-list">
-        <li>Persistent storage validation and admin diagnostics</li>
-        <li>CSV exports, DB backups, and season archive/reset</li>
-        <li>Multi-organization separation with independent branding</li>
-      </ul>
-    </article>
-  </div>
+<section class="bb-feature-ledger" aria-label="Product features">
+  <article class="bb-feature-row bb-reveal"><span class="bb-step-number" aria-hidden="true">01 / People</span><div><h2>More than a name<br /><em>on a list.</em></h2><p>Build a shared picture of each person, one conversation at a time.</p></div><ul class="bb-feature-list"><li>Profiles with photos, contact details, and tags</li><li>Conversation notes and weighted ratings</li><li>Rating history for context over time</li></ul></article>
+  <article class="bb-feature-row bb-reveal"><span class="bb-step-number" aria-hidden="true">02 / Coordination</span><div><h2>A clear next step.<br /><em>A teammate to own it.</em></h2><p>Turn a good introduction into a thoughtful follow-up.</p></div><ul class="bb-feature-list"><li>Assignments and touchpoint scheduling</li><li>A shared calendar for recruitment events</li><li>Officer chat, goals, and task tracking</li></ul></article>
+  <article class="bb-feature-row bb-reveal"><span class="bb-step-number" aria-hidden="true">03 / Meetings</span><div><h2>Less catching up.<br /><em>Better conversations.</em></h2><p>Come to the meeting with the same information in front of you.</p></div><ul class="bb-feature-list"><li>Shortlists and pinned profiles</li><li>Meeting packets with notes and rating trends</li><li>Recent activity alongside the person it belongs to</li></ul></article>
+  <article class="bb-feature-row bb-reveal"><span class="bb-step-number" aria-hidden="true">04 / Continuity</span><div><h2>A season ends.<br /><em>The context stays.</em></h2><p>Give future leadership something useful to build on.</p></div><ul class="bb-feature-list"><li>CSV exports and database backups</li><li>Season archives and reset tools</li><li>Separate organization workspaces and role-based access</li></ul></article>
 </section>
 
-<section class="bb-section bb-reveal" data-delay="50">
-  <div class="bb-section-head">
-    <p class="bb-kicker">Operating Surfaces</p>
-    <h2>Each workspace has a clear job in the rush workflow.</h2>
-  </div>
-  <div class="bb-surface-grid">
-    <article class="bb-surface-card">
-      <h3>Command</h3>
-      <p>Priority queue, rating-first execution, recent changes, and live follow-up in one daily operating surface.</p>
-    </article>
-    <article class="bb-surface-card">
-      <h3>Rushees</h3>
-      <p>Roster management, filters, package linking, photos, assignments, and contact export from one detailed view.</p>
-    </article>
-    <article class="bb-surface-card">
-      <h3>Operations</h3>
-      <p>Calendar, touchpoints, goals, notifications, and officer coordination without switching tools.</p>
-    </article>
-    <article class="bb-surface-card">
-      <h3>Meetings</h3>
-      <p>Packet queue, shortlist review, trend context, and PDF-ready detail when chapter discussion begins.</p>
-    </article>
-  </div>
-</section>
-
-<section class="bb-section bb-reveal" data-delay="65">
-  <div class="bb-cta-banner">
-    <div>
-      <p class="bb-kicker">See The System Live</p>
-      <h3>Use the demo to walk officers through the full workflow before production rollout.</h3>
-      <p>Show the weighted model, meeting packet flow, and mobile command surface without touching live organization data.</p>
-    </div>
-    <div class="bb-hero-actions">
-      <a class="bb-cta bb-cta-strong" href="/demo">Try Demo</a>
-      <a class="bb-cta bb-cta-ghost" href="/organizations">Organization Login</a>
-    </div>
-  </div>
-</section>
+<section class="bb-closing bb-reveal" aria-labelledby="product-closing-title"><div><p class="bb-kicker">Make it your own</p><h2 id="product-closing-title">Less to organize.<br /><em>More to look forward to.</em></h2></div><div class="bb-closing-action"><p>Already on BidBoard? Open your chapter's workspace to get started.</p><a class="bb-button" href="/organizations">Find your chapter <span aria-hidden="true">&nearr;</span></a></div></section>
 {% endblock %}

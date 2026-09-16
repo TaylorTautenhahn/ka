@@ -604,6 +604,45 @@ function shouldPreserveRatingDraft(kind, pnmId) {
   return Boolean(draft && draft.dirty && Number(draft.pnmId) === Number(pnmId || 0));
 }
 
+function canChangeRushee(targetId) {
+  if (inlineConfirmPending.has(ratingForm) || inlineConfirmPending.has(commandRatingForm)) {
+    showToast("Wait for the current save to finish.");
+    return false;
+  }
+  const pending = Object.entries(state.formDrafts).find(([, draft]) =>
+    draft.dirty && Number(draft.pnmId) !== Number(targetId)
+  );
+  if (!pending) return true;
+  const [kind] = pending;
+  showToast(`You have an unsaved draft in ${kind === "command" ? "Command" : "Rushees"}. Save it or choose Discard draft before switching.`);
+  return false;
+}
+
+function handleDiscardRating(event) {
+  const button = event.target.closest("[data-discard-rating]");
+  if (!button) return;
+  const kind = button.dataset.discardRating;
+  const form = kind === "command" ? commandRatingForm : ratingForm;
+  if (inlineConfirmPending.has(form)) {
+    showToast("Wait for the current save to finish.");
+    return;
+  }
+  if (!ratingDraftFor(kind)?.dirty) {
+    showToast("There are no unsaved changes.");
+    return;
+  }
+  promptInlineConfirm(form, `${kind}-discard`, {
+    message: "Discard the unsaved scores and note? Your saved rating will not change.",
+    confirmLabel: "Discard draft",
+    onConfirm: async () => {
+      clearRatingDraft(kind);
+      if (kind === "command") renderCommandCenter();
+      else applyRatingFormForSelected();
+      showToast("Draft discarded. Saved rating restored.");
+    },
+  });
+}
+
 function bindRatingDraftInputs(kind, inputIds, resolvePnmId) {
   inputIds.forEach((id) => {
     const input = document.getElementById(id);
@@ -1181,6 +1220,7 @@ function showToast(message) {
 }
 
 const inlineConfirmActions = new WeakMap();
+const inlineConfirmPending = new WeakSet();
 
 function ensureInlineConfirmBar(form, key) {
   if (!form) {
@@ -1210,11 +1250,23 @@ function ensureInlineConfirmBar(form, key) {
       bar.classList.add("hidden");
     });
     confirmBtn?.addEventListener("click", async () => {
+      if (inlineConfirmPending.has(form)) return;
       const action = inlineConfirmActions.get(form);
       inlineConfirmActions.delete(form);
       bar.classList.add("hidden");
       if (typeof action === "function") {
-        await action();
+        inlineConfirmPending.add(form);
+        const controls = Array.from(form.querySelectorAll("input, select, textarea, button"));
+        const disabled = controls.map((control) => control.disabled);
+        controls.forEach((control) => { control.disabled = true; });
+        form.setAttribute("aria-busy", "true");
+        try {
+          await action();
+        } finally {
+          controls.forEach((control, index) => { control.disabled = disabled[index]; });
+          form.removeAttribute("aria-busy");
+          inlineConfirmPending.delete(form);
+        }
       }
     });
   }
@@ -1233,11 +1285,18 @@ function clearInlineConfirmBar(form, key) {
 }
 
 function promptInlineConfirm(form, key, { message, confirmLabel, onConfirm }) {
+  if (inlineConfirmPending.has(form)) {
+    showToast("Wait for the current save to finish.");
+    return;
+  }
+  form?.parentElement?.querySelectorAll(".inline-confirm-bar").forEach((item) => item.classList.add("hidden"));
   const bar = ensureInlineConfirmBar(form, key);
   if (!bar) {
     return;
   }
   const copy = bar.querySelector(".inline-confirm-copy p");
+  const title = bar.querySelector(".inline-confirm-copy strong");
+  if (title) title.textContent = key.endsWith("discard") ? "Discard unsaved changes?" : key.includes("comment") ? "Confirm comment" : "Confirm rating";
   const confirmBtn = bar.querySelector(".inline-confirm-accept");
   if (copy) {
     copy.textContent = message;
@@ -3292,7 +3351,7 @@ function renderPnmTable() {
       const selectedClass = state.selectedPnmId === pnm.pnm_id ? "selected-row" : "";
       const creator = String(pnm.created_by_username || "").trim();
       const creatorBadge = creator
-        ? `<div class="table-owner-badge"><span class="pill">Created by ${escapeHtml(creator)}</span></div>`
+        ? `<div class="table-owner-badge">Created by ${escapeHtml(creator)}</div>`
         : "";
       return `
         <tr class="${selectedClass}">
@@ -3650,7 +3709,7 @@ function commandQueueNextAction(item) {
     return "Next: assign an owner before the next touchpoint.";
   }
   if (Number(item.rating_count || 0) <= 0 || item.stale_reason === "never_rated") {
-    return "Next: add the first rating and a short context note.";
+    return "Next: add your rating and a short context note.";
   }
   if (item.stale_reason === "rating_older_than_recent_touchpoint") {
     return "Next: update the rating after the latest touchpoint.";
@@ -3910,17 +3969,14 @@ function applyCommandRatingFormForSelected() {
         })
         .join(", ")
     : selected.assigned_officer_username || "Unassigned";
-  const touchpointLabel = selected.last_touchpoint_at ? formatTrendTimestamp(selected.last_touchpoint_at) : "None";
   const mineLabel = selected.last_rating_by_me_at ? formatTrendTimestamp(selected.last_rating_by_me_at) : "Never";
-  const staleLabel = selected.needs_rating_update ? staleReasonLabel(selected.stale_reason) : "Fresh";
   const scoreLabel = formatWeightedScore(selected.weighted_total);
-  const tierLabel = ratingTierMeta(selected.weighted_total).label;
   if (commandSelectedName) {
-    commandSelectedName.textContent = `${selected.pnm_code} | ${selected.name}`;
+    commandSelectedName.textContent = selected.name;
   }
   if (commandSelectedMeta) {
     commandSelectedMeta.textContent =
-      `Score ${scoreLabel} (${tierLabel}) | Assigned: ${assignedLabel} | Touchpoint: ${touchpointLabel} | My Rating: ${mineLabel} | ${staleLabel}`;
+      `${selected.pnm_code} · Owner: ${assignedLabel}`;
   }
   if (commandSelectedSignal) {
     commandSelectedSignal.textContent = commandQueueNextAction(selected);
@@ -4026,7 +4082,7 @@ function renderCommandCenter() {
             <div class="entry${selectedClass}">
               <button type="button" class="command-queue-btn" data-command-queue-pnm-id="${Number(item.pnm_id)}">
                 <div class="entry-title">
-                  <strong>${escapeHtml(item.pnm_code)} | ${escapeHtml(item.name)}</strong>
+                  <strong>${escapeHtml(item.name)}</strong>
                   <span>${formatWeightedScore(item.weighted_total)}</span>
                 </div>
                 <div class="muted">Touchpoint: ${escapeHtml(touchpoint)}</div>
@@ -5821,6 +5877,7 @@ async function focusRusheeComposerForPnm(pnmId, mode = "rate") {
     showToast("Select a rushee first.");
     return;
   }
+  if (!canChangeRushee(targetId)) return;
   state.selectedPnmId = targetId;
   state.headAssignmentPnmId = targetId;
   rememberRecentRushee(state.pnms.find((pnm) => Number(pnm.pnm_id) === targetId));
@@ -7149,8 +7206,22 @@ async function submitStandalonePnmComment(options = {}) {
   showToast("Confirm the note below so we don't post it by accident.");
 }
 
+function finishCommentOnlyDraft(kind, selected, commentInput) {
+  const prefix = kind === "command" ? "commandRate" : "rate";
+  const fields = [["Girls", "good_with_girls"], ["Process", "will_make_it"], ["Personable", "personable"], ["Alcohol", "alcohol_control"], ["Ig", "instagram_marketability"]];
+  const own = selected?.own_rating || {};
+  const hasUnsavedScores = fields.some(([suffix, field]) =>
+    readOptionalRatingValue(document.getElementById(`${prefix}${suffix}`)) !== (own[field] ?? null)
+  );
+  commentInput.value = "";
+  // A standalone comment saves only the note, never the edited score fields.
+  if (hasUnsavedScores) markRatingDraftDirty(kind, selected?.pnm_id);
+  else clearRatingDraft(kind, selected?.pnm_id);
+}
+
 async function handleRusheeCommentOnly() {
   const selectedId = Number(ratingPnm.value || state.selectedPnmId || 0);
+  const selected = state.pnms.find((pnm) => Number(pnm.pnm_id) === selectedId);
   const commentInput = document.getElementById("rateComment");
   await submitStandalonePnmComment({
     pnmId: selectedId,
@@ -7159,7 +7230,7 @@ async function handleRusheeCommentOnly() {
     commentInput,
     actionButton: rusheeCommentOnlyBtn,
     afterSuccess: async () => {
-      clearRatingDraft("rushee", selectedId);
+      finishCommentOnlyDraft("rushee", selected, commentInput);
       state.selectedPnmId = selectedId;
       await refreshAll();
       await loadPnmDetail(selectedId);
@@ -7355,7 +7426,7 @@ async function handleCommandCommentOnly() {
     commentInput,
     actionButton: commandCommentOnlyBtn,
     afterSuccess: async () => {
-      clearRatingDraft("command", Number(selected && selected.pnm_id ? selected.pnm_id : 0));
+      finishCommentOnlyDraft("command", selected, commentInput);
       await refreshCommandCenterDependencies();
       renderCommandCenter();
     },
@@ -7476,11 +7547,7 @@ function selectCommandQueueItem(pnmId, options = {}) {
   if (!targetId) {
     return false;
   }
-  const currentId = Number(state.commandCenter.selectedQueuePnmId || 0);
-  if (currentId && currentId !== targetId && shouldPreserveRatingDraft("command", currentId)) {
-    showToast("Save or clear the current draft before changing rushees.");
-    return false;
-  }
+  if (!canChangeRushee(targetId)) return false;
   const selected = (state.commandCenter.queue || []).find((item) => Number(item.pnm_id) === targetId) || null;
   if (!selected) {
     return false;
@@ -7528,7 +7595,7 @@ function handleCommandQueueKeyboard(event) {
     return;
   }
   const target = event.target;
-  if (target && (target.matches("input, textarea, select, button, a") || target.isContentEditable)) {
+  if (target && ((target.matches("input, textarea, select, button, a") && !target.closest("[data-command-queue-pnm-id]")) || target.isContentEditable)) {
     return;
   }
   const key = String(event.key || "").toLowerCase();
@@ -7559,6 +7626,7 @@ async function handleRecentRusheeClick(event) {
   if (!pnmId) {
     return;
   }
+  if (!canChangeRushee(pnmId)) return;
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
   pushDesktopRoute("rushees", { pnm_id: pnmId });
@@ -7872,6 +7940,11 @@ async function handlePackageDealUnlink() {
 }
 
 async function handlePnmTableClick(event) {
+  const target = event.target.closest("[data-pnm-id], [data-rate-pnm-id], [data-comment-pnm-id], [data-schedule-touchpoint-pnm-id]");
+  if (target) {
+    const data = target.dataset;
+    if (!canChangeRushee(data.pnmId || data.ratePnmId || data.commentPnmId || data.scheduleTouchpointPnmId)) return;
+  }
   const rateButton = event.target.closest("[data-rate-pnm-id]");
   if (rateButton) {
     const pnmId = Number(rateButton.dataset.ratePnmId || 0);
@@ -7934,14 +8007,17 @@ async function handleWatchToggleClick(event) {
     return;
   }
   const pnmId = Number(button.dataset.watchPnmId || 0);
-  if (!pnmId) {
+  if (!pnmId || button.disabled) {
     return;
   }
+  button.disabled = true;
   try {
     const watching = await toggleWatchlistPnm(pnmId);
     showToast(watching ? "Pinned for Meetings." : "Removed from Meetings pins.");
   } catch (error) {
     showToast(error.message || "Unable to update Meetings pin.");
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -7954,6 +8030,7 @@ async function handleGlobalOpenPnmClick(event) {
   if (!pnmId) {
     return;
   }
+  if (!canChangeRushee(pnmId)) return;
   state.selectedPnmId = pnmId;
   state.headAssignmentPnmId = pnmId;
   rememberRecentRushee(state.pnms.find((pnm) => Number(pnm.pnm_id) === pnmId));
@@ -8000,6 +8077,7 @@ function handleCommandPaletteResultsClick(event) {
   if (openPnm) {
     const pnmId = Number(openPnm.dataset.commandOpenPnm || 0);
     if (pnmId) {
+      if (!canChangeRushee(pnmId)) return;
       closeCommandPalette();
       state.selectedPnmId = pnmId;
       state.headAssignmentPnmId = pnmId;
@@ -9516,7 +9594,6 @@ function attachEvents() {
   pnmTable.addEventListener("click", handlePnmTableClick);
   if (pnmBoard) {
     pnmBoard.addEventListener("click", handlePnmTableClick);
-    pnmBoard.addEventListener("click", handleWatchToggleClick);
   }
   pendingList.addEventListener("click", handlePendingClick);
   memberTable.addEventListener("click", handleMemberTableClick);
@@ -9584,6 +9661,13 @@ function attachEvents() {
     sameStatePnmsList.addEventListener("click", handleSameStatePnmsClick);
   }
   document.addEventListener("click", handleWatchToggleClick);
+  document.addEventListener("click", handleDiscardRating);
+  window.addEventListener("beforeunload", (event) => {
+    if (Object.values(state.formDrafts).some((draft) => draft.dirty) || inlineConfirmPending.has(ratingForm) || inlineConfirmPending.has(commandRatingForm)) {
+      event.preventDefault();
+      event.returnValue = "";
+    }
+  });
   document.addEventListener("click", handleRememberRusheeClick);
   document.addEventListener("click", handleSeasonKickoffJumpClick);
   document.addEventListener("click", (event) => {
@@ -9605,6 +9689,10 @@ function attachEvents() {
   ratingPnm.addEventListener("change", async (event) => {
     const selectedId = Number(event.target.value || 0);
     if (!selectedId) {
+      return;
+    }
+    if (!canChangeRushee(selectedId)) {
+      event.target.value = String(state.selectedPnmId || "");
       return;
     }
     state.selectedPnmId = selectedId;

@@ -25,25 +25,15 @@
       </div>
     </div>
     <main class="shell mobile-shell">
-      <div class="mobile-appbar">
-        <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
-          <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
-          <div>
-            <p>{{ app_config.chapter_name }}</p>
-            <strong>BidBoard</strong>
-          </div>
-        </a>
-        <div class="mobile-appbar-actions">
-          <a data-head-only-nav href="{{ app_config.mobile_routes.admin if app_config.mobile_routes else app_config.mobile_base ~ '/admin' }}" class="mobile-appbar-link hidden">Admin</a>
-        </div>
-      </div>
+      {% include "partials/mobile_appbar.html" %}
       <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Team</h1>
         <p>Participation first. Same-state matching appears after you pick a member.</p>
       </header>
 
-      <section class="panel mobile-panel">
+      <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
+        <summary>Filter team</summary>
         <div class="section-head section-head-compact">
           <div>
             <h2>Team Filters</h2>
@@ -80,7 +70,7 @@
             </select>
           </label>
         </div>
-      </section>
+      </details>
 
       <section class="panel mobile-panel">
         <div class="section-head section-head-compact">
@@ -92,7 +82,7 @@
         <div id="mobileMemberList" class="mobile-list"></div>
       </section>
 
-      <section class="panel mobile-panel mobile-secondary-panel">
+      <section id="mobileSameStatePanel" class="panel mobile-panel mobile-secondary-panel hidden">
         <h2 id="mobileSameStateHeader">Same-State Rushees</h2>
         <p id="mobileSameStateHint" class="muted">Select a member card to load same-state rushees.</p>
         <div id="mobileSameStateList" class="mobile-list"></div>
@@ -101,14 +91,8 @@
 
     <datalist id="mobileMemberStateHints"></datalist>
 
-    <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Home</a>
-      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab">Rushees</a>
-      <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
-      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab is-active">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
-    </nav>
+    {% include "partials/mobile_nav.html" %}
 
-    <div id="mobileToast" class="toast hidden"></div>
+    <div id="mobileToast" class="toast hidden" role="status" aria-live="polite"></div>
   </body>
 </html>

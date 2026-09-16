@@ -3,9 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#f4f0e7" />
+    <meta name="theme-color" content="#f7f5ef" />
     <title>{% block title %}BidBoard{% endblock %}</title>
-    <meta name="description" content="{% block description %}BidBoard is the recruitment operating system for fraternities and sororities.{% endblock %}" />
+    <meta name="description" content="{% block description %}A shared place for your chapter's recruitment. Keep people, conversations, and next steps together with BidBoard.{% endblock %}" />
     <link rel="apple-touch-icon" href="{{ asset_url('icons/icon-192.png') }}" />
     <link rel="stylesheet" href="{{ asset_url('css/landing.css') }}" />
     <script src="{{ asset_url('js/pwa_shell.js') }}" defer></script>
@@ -13,52 +13,39 @@
     {% block extra_head %}{% endblock %}
   </head>
   <body class="bb-page {% block body_class %}{% endblock %}">
-    <div class="bb-page-texture" aria-hidden="true"></div>
-    <main class="bb-shell">
-      <header class="bb-topbar bb-reveal" data-delay="10">
+    <a class="bb-skip-link" href="#main-content">Skip to content</a>
+    <div class="bb-shell">
+      <header class="bb-topbar">
         <a class="bb-brand" href="/" aria-label="BidBoard home">
-          <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="" class="bb-brand-mark-image" />
-          <span class="bb-brand-lockup">
-            <strong>BidBoard</strong>
-            <small>Recruitment operations</small>
-          </span>
+          <span class="bb-brand-mark" aria-hidden="true">b.</span>
+          <span>BidBoard</span>
         </a>
-
-        <button id="bbNavToggle" class="bb-nav-toggle" type="button" aria-controls="bbPrimaryNav" aria-expanded="false">
-          <span></span><span></span>
-          <span class="sr-only">Open navigation</span>
+        <button id="bbNavToggle" class="bb-nav-toggle" type="button" aria-controls="bbPrimaryNav" aria-expanded="false" hidden>
+          <span class="bb-nav-toggle-lines" aria-hidden="true"></span>
+          <span class="sr-only" data-nav-label>Open navigation</span>
         </button>
-
         <nav id="bbPrimaryNav" class="bb-nav" aria-label="Primary">
-          <a href="/features"{% if nav_key == 'features' %} class="is-active"{% endif %}>Product</a>
-          <a href="/faq"{% if nav_key == 'faq' %} class="is-active"{% endif %}>FAQ</a>
-          <a href="/demo">Demo</a>
+          <a href="/features"{% if nav_key == 'features' %} aria-current="page"{% endif %}>Product</a>
+          <a href="/faq"{% if nav_key == 'faq' %} aria-current="page"{% endif %}>FAQ</a>
         </nav>
-
-        <a class="bb-header-cta" href="/organizations">
-          <span>Open workspace</span>
-          <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h11M11 6l4 4-4 4" /></svg>
-        </a>
+        <a class="bb-button bb-header-cta" href="/organizations"{% if nav_key == 'organizations' %} aria-current="page"{% endif %}>Find your chapter <span aria-hidden="true">&nearr;</span></a>
       </header>
-
-      {% block page_content %}{% endblock %}
-
-      <footer class="bb-footer bb-reveal" data-delay="30">
+      <main id="main-content" tabindex="-1">
+        {% block page_content %}{% endblock %}
+      </main>
+      <footer class="bb-footer">
         <div class="bb-footer-branding">
-          <img src="{{ asset_url('icons/bidboard-shield.svg') }}" alt="" class="bb-footer-mark" />
-          <div>
-            <strong>BidBoard</strong>
-            <p>Clearer recruiting decisions, from first contact to final meeting.</p>
-          </div>
+          <a class="bb-brand" href="/">BidBoard<span class="bb-brand-dot" aria-hidden="true">.</span></a>
+          <p>For the people who make a chapter.</p>
         </div>
         <nav class="bb-footer-links" aria-label="Footer">
           <a href="/features">Product</a>
           <a href="/faq">FAQ</a>
-          <a href="/organizations">Organization login</a>
+          <a href="/organizations">Chapter login</a>
           <a href="/platform">Platform admin</a>
         </nav>
-        <p class="bb-footer-note">Private by organization. Role-aware by default.</p>
+        <p class="bb-footer-note">Recruitment, with room for the human part.</p>
       </footer>
-    </main>
+    </div>
   </body>
 </html>

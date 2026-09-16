@@ -25,18 +25,7 @@
       </div>
     </div>
     <main class="shell mobile-shell">
-      <div class="mobile-appbar">
-        <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-appbar-brand">
-          <img src="{{ app_config.logo_path if app_config.logo_path else asset_url('icons/bidboard-shield.svg') }}" alt="{{ app_config.tenant_name }} mark" class="mobile-appbar-mark" />
-          <div>
-            <p>{{ app_config.chapter_name }}</p>
-            <strong>BidBoard</strong>
-          </div>
-        </a>
-        <div class="mobile-appbar-actions">
-          <a href="{{ app_config.mobile_routes.create if app_config.mobile_routes else app_config.mobile_base ~ '/create' }}" class="mobile-appbar-link">Add</a>
-        </div>
-      </div>
+      {% include "partials/mobile_appbar.html" %}
       <header class="hero mobile-hero mobile-hero-compact">
         <p class="eyebrow">{{ app_config.chapter_name }}</p>
         <h1>Rushees</h1>
@@ -67,10 +56,10 @@
         <div id="mobilePnmList" class="mobile-list"></div>
       </section>
 
-      <section class="panel mobile-panel">
+      <details id="mobilePnmManagePanel" class="panel mobile-panel mobile-collapsible mobile-secondary-details hidden">
+        <summary>Edit selected rushee</summary>
         <div class="section-head section-head-compact">
           <div>
-            <h2>Edit Rushee</h2>
             <p id="mobilePnmManageHint" class="muted">Select a rushee above to edit their profile.</p>
           </div>
         </div>
@@ -118,9 +107,10 @@
           </details>
           <div class="action-row">
             <button id="mobilePnmManageSaveBtn" type="submit">Save Rushee Details</button>
+            <button id="mobilePnmManageCancelBtn" type="button" class="secondary">Cancel and discard edits</button>
           </div>
         </form>
-      </section>
+      </details>
 
       <details class="panel mobile-panel mobile-collapsible mobile-secondary-details">
         <summary>Package Deals</summary>
@@ -165,14 +155,8 @@
 
     <datalist id="mobilePnmStateHints"></datalist>
 
-    <nav class="mobile-tabs" aria-label="Mobile Navigation">
-      <a href="{{ app_config.mobile_routes.dashboard if app_config.mobile_routes else app_config.mobile_base }}" class="mobile-tab">Home</a>
-      <a href="{{ app_config.mobile_routes.rushees if app_config.mobile_routes else app_config.mobile_base ~ '/pnms' }}" class="mobile-tab is-active">Rushees</a>
-      <a href="{{ app_config.mobile_routes.meetings if app_config.mobile_routes else app_config.mobile_base ~ '/meetings' }}" class="mobile-tab">Meetings</a>
-      <a href="{{ app_config.mobile_routes.team if app_config.mobile_routes else app_config.mobile_base ~ '/members' }}" class="mobile-tab">Team</a>
-      <a href="{{ app_config.mobile_routes.calendar if app_config.mobile_routes else app_config.mobile_base ~ '/calendar' }}" class="mobile-tab">Operations</a>
-    </nav>
+    {% include "partials/mobile_nav.html" %}
 
-    <div id="mobileToast" class="toast hidden"></div>
+    <div id="mobileToast" class="toast hidden" role="status" aria-live="polite"></div>
   </body>
 </html>

@@ -1,129 +1,61 @@
 {% extends "marketing_base.html" %}
 {% set nav_key = 'home' %}
 
-{% block title %}BidBoard | Recruitment, Clearly Run{% endblock %}
-{% block description %}BidBoard gives fraternity and sorority recruitment teams one clear place for rushees, ratings, touchpoints, ownership, and meetings.{% endblock %}
+{% block title %}BidBoard | Good people. Better chapters.{% endblock %}
+{% block description %}Keep recruitment personal and your chapter organized. Bring profiles, notes, ratings, and follow-ups together in BidBoard.{% endblock %}
 {% block body_class %}bb-page-home{% endblock %}
 
 {% block page_content %}
-<section class="bb-home-hero bb-reveal" data-delay="20">
-  <div class="bb-home-hero-copy">
-    <p class="bb-kicker"><span></span> Built for the pace of rush week</p>
-    <h1>Know who matters.<br /><em>Know what happens next.</em></h1>
-    <p class="bb-home-lede">
-      BidBoard turns scattered ratings, notes, touchpoints, and meeting prep into one calm operating view for the whole rush team.
-    </p>
-    <div class="bb-home-actions" aria-label="Primary actions">
-      <a class="bb-cta bb-cta-strong" href="/organizations">Open your chapter</a>
-      <a class="bb-cta bb-cta-ghost" href="/features">See how it works</a>
+<section class="bb-home-hero" aria-labelledby="hero-title">
+  <div class="bb-hero-copy bb-reveal">
+    <p class="bb-kicker">A little more connected</p>
+    <h1 id="hero-title">Good people.<br /><em>Better chapters.</em></h1>
+    <p class="bb-lede">Meet the people. Remember the conversations. Keep your chapter's recruitment moving, together.</p>
+    <div class="bb-actions">
+      <a class="bb-button" href="/organizations">Find your chapter <span aria-hidden="true">&nearr;</span></a>
+      <a class="bb-text-link" href="/features">See how it works <span aria-hidden="true">&rarr;</span></a>
     </div>
-    <div class="bb-hero-proof" aria-label="Product qualities">
-      <span>Private workspaces</span>
-      <span>Role-aware access</span>
-      <span>Mobile ready</span>
-    </div>
+    <p class="bb-hero-note">Your chapter's people, notes, and next steps. One shared place.</p>
   </div>
-
-  <div class="bb-briefing-board" aria-label="BidBoard command workspace preview">
-    <header class="bb-briefing-head">
-      <div>
-        <span class="bb-briefing-mark">B</span>
-        <div><small>Tuesday briefing</small><strong>Rush Command</strong></div>
-      </div>
-      <span class="bb-live-state"><i></i> Live</span>
-    </header>
-
-    <div class="bb-briefing-metrics">
-      <article><small>Needs action</small><strong>03</strong><span>2 rating updates</span></article>
-      <article><small>Meeting ready</small><strong>12</strong><span>4 pinned tonight</span></article>
-      <article><small>Team coverage</small><strong>86%</strong><span>2 owners needed</span></article>
-    </div>
-
-    <div class="bb-briefing-body">
-      <section class="bb-briefing-queue">
-        <div class="bb-briefing-section-title"><strong>My queue</strong><span>Priority order</span></div>
-        <article class="is-active"><b>MC</b><div><strong>Mason Carter</strong><small>Rating behind touchpoint</small></div><span>32.0</span></article>
-        <article><b>JP</b><div><strong>James Parker</strong><small>Packet ready</small></div><span>29.5</span></article>
-        <article><b>BW</b><div><strong>Ben Walker</strong><small>Owner needed</small></div><span>27.0</span></article>
-      </section>
-
-      <section class="bb-briefing-detail">
-        <div class="bb-briefing-person">
-          <div class="bb-briefing-avatar">MC</div>
-          <div><small>Selected rushee</small><strong>Mason Carter</strong><span>Austin, Texas · @masoncarter</span></div>
-          <em>B tier</em>
-        </div>
-        <div class="bb-briefing-note"><small>Latest context</small><p>Strong dinner conversation. Follow up on leadership interest before Thursday.</p></div>
-        <div class="bb-briefing-actions"><span>Rate</span><span>Add note</span><span>Schedule</span><span>Packet</span></div>
-      </section>
-    </div>
+  <div class="bb-hero-editorial bb-reveal">
+    <figure class="bb-campus-photo">
+      <div class="bb-campus-image"><img src="{{ asset_url('images/campus-editorial.webp') }}" alt="Students walking together through a sunlit, tree-lined campus courtyard" width="1800" height="1008" fetchpriority="high" decoding="async" /></div>
+      <figcaption><span>Made for chapter life</span><span aria-hidden="true">01 / A new beginning</span></figcaption>
+    </figure>
+    <aside class="bb-workspace-example" aria-labelledby="example-label">
+      <div class="bb-example-header"><span id="example-label">Example workspace</span><span class="bb-example-symbol" aria-hidden="true">b.</span></div>
+      <div class="bb-example-person"><span class="bb-example-avatar" aria-hidden="true">JE</span><div><strong>Jordan Ellis</strong><span>Recruitment profile</span></div><span class="bb-example-tag">Follow-up</span></div>
+      <div class="bb-example-note"><span class="bb-small-label">After the chapter dinner</span><p>Interested in service projects. Invite to the next chapter event.</p></div>
+      <div class="bb-example-next"><span class="bb-small-label">Next step</span><strong>Send an invitation <span aria-hidden="true">&rarr;</span></strong></div>
+      <p class="bb-example-disclaimer">Illustrative content, not member data.</p>
+    </aside>
   </div>
 </section>
 
-<section class="bb-proof-band bb-reveal" data-delay="35" aria-label="BidBoard operating promise">
-  <p>One shared record follows every rushee from introduction to decision.</p>
-  <div><span>01</span> Capture</div><i></i><div><span>02</span> Coordinate</div><i></i><div><span>03</span> Decide</div>
-</section>
-
-<section class="bb-operating-section bb-reveal" data-delay="45">
-  <header class="bb-section-heading">
-    <div>
-      <p class="bb-kicker"><span></span> A clearer operating rhythm</p>
-      <h2>Less screen hunting.<br />More confident handoffs.</h2>
-    </div>
-    <p>Every workspace has one job, and every action returns to the same rushee record. Your team always sees the latest owner, score, note, and next step.</p>
+<section class="bb-section bb-workflow" aria-labelledby="workflow-title">
+  <header class="bb-section-heading bb-reveal">
+    <div><p class="bb-kicker">From first hello to the next step</p><h2 id="workflow-title">More connection.<br /><em>Less keeping track.</em></h2></div>
+    <p>Rush week moves fast. Give the details a place to live, so your team can be present for the people.</p>
   </header>
+  <ol class="bb-step-list">
+    <li class="bb-reveal"><span class="bb-step-number" aria-hidden="true">01</span><div><h3>Remember the person.</h3><p>Keep profiles, conversation notes, and ratings together. Pick up where the last conversation left off.</p></div></li>
+    <li class="bb-reveal"><span class="bb-step-number" aria-hidden="true">02</span><div><h3>Know who's following up.</h3><p>Assign a teammate and plan the next touchpoint. Make the handoff clear without another group chat.</p></div></li>
+    <li class="bb-reveal"><span class="bb-step-number" aria-hidden="true">03</span><div><h3>Bring context to the room.</h3><p>Review notes and rating history in meeting packets. Spend your time talking, not gathering updates.</p></div></li>
+  </ol>
+  <a class="bb-text-link" href="/features">Meet the product <span aria-hidden="true">&rarr;</span></a>
+</section>
 
-  <div class="bb-operating-grid">
-    <article class="bb-operating-card is-command">
-      <span class="bb-card-index">01 / Command</span>
-      <h3>Start with what needs you.</h3>
-      <p>A personal queue combines fresh touchpoints, stale ratings, unassigned prospects, and decisions that changed.</p>
-      <div class="bb-card-visual bb-card-visual-queue"><i></i><i></i><i></i></div>
-    </article>
-    <article class="bb-operating-card">
-      <span class="bb-card-index">02 / Rushees</span>
-      <h3>Keep every profile complete.</h3>
-      <p>Search, assign, edit, comment, and move directly into rating or meeting context.</p>
-      <div class="bb-card-tags"><span>Owner</span><span>Touchpoint</span><span>Packet</span></div>
-    </article>
-    <article class="bb-operating-card">
-      <span class="bb-card-index">03 / Meetings</span>
-      <h3>Walk in with the story assembled.</h3>
-      <p>Pinned prospects, trend history, touchpoint notes, and recent changes stay together.</p>
-      <div class="bb-card-score"><strong>32.0</strong><span>+3.2 this week</span></div>
-    </article>
-    <article class="bb-operating-card">
-      <span class="bb-card-index">04 / Team</span>
-      <h3>See ownership before it becomes a problem.</h3>
-      <p>Approvals, workload, assignments, and participation make coverage visible.</p>
-      <div class="bb-card-bars"><i class="is-high"></i><i class="is-medium"></i><i class="is-low"></i></div>
-    </article>
+<section class="bb-chapter-section bb-reveal" aria-labelledby="chapter-title">
+  <div class="bb-chapter-heading"><p class="bb-kicker">Your chapter. Your space.</p><h2 id="chapter-title">Built for this class.<br /><em>And the next.</em></h2></div>
+  <div class="bb-chapter-details">
+    <article><h3>Keep chapter life in the chapter.</h3><p>Each organization has its own workspace. Member, officer, and head roles determine access.</p></article>
+    <article><h3>Leave a useful handoff.</h3><p>Exports and season archives help the next leadership team start with context, not an empty spreadsheet.</p></article>
+    <a class="bb-text-link" href="/faq">A few good questions, answered <span aria-hidden="true">&rarr;</span></a>
   </div>
 </section>
 
-<section class="bb-trust-section bb-reveal" data-delay="55">
-  <div class="bb-trust-copy">
-    <p class="bb-kicker"><span></span> Built for real chapter operations</p>
-    <h2>Private, accountable, and ready for the next leadership team.</h2>
-    <p>BidBoard protects chapter separation, gives each role the right view, and keeps season history exportable instead of trapped in somebody’s spreadsheet.</p>
-    <a class="bb-text-link" href="/faq">Read common questions <span>→</span></a>
-  </div>
-  <div class="bb-trust-list">
-    <article><span>Isolated</span><div><strong>One private workspace per organization</strong><p>Independent people, ratings, approvals, branding, and exports.</p></div></article>
-    <article><span>Role-aware</span><div><strong>Useful access without unnecessary exposure</strong><p>Heads, officers, and members each get a focused operating view.</p></div></article>
-    <article><span>Durable</span><div><strong>Built to survive season turnover</strong><p>Backups, archives, ownership, and reset tools preserve continuity.</p></div></article>
-  </div>
-</section>
-
-<section class="bb-final-cta bb-reveal" data-delay="65">
-  <div>
-    <p class="bb-kicker"><span></span> Ready when the team is</p>
-    <h2>Give rush week one source of truth.</h2>
-  </div>
-  <div class="bb-final-actions">
-    <a class="bb-cta bb-cta-strong" href="/organizations">Open your workspace</a>
-    <a class="bb-cta bb-cta-light" href="/demo">Explore the demo</a>
-  </div>
+<section class="bb-closing bb-reveal" aria-labelledby="closing-title">
+  <div><p class="bb-kicker">The next chapter starts here</p><h2 id="closing-title">Make room for<br /><em>good people.</em></h2></div>
+  <div class="bb-closing-action"><p>Already part of a chapter on BidBoard?<br />Find your workspace and pick up from there.</p><a class="bb-button" href="/organizations">Find your chapter <span aria-hidden="true">&nearr;</span></a></div>
 </section>
 {% endblock %}

@@ -3,9 +3,8 @@
           <div class="section-head">
             <div>
               <h2>My Queue</h2>
-              <p class="muted">Choose a rushee, take action, and move to the next priority.</p>
+              <p class="muted">Choose a rushee. Add a score, a note, or the next touchpoint.</p>
             </div>
-            <span class="muted">Actionable work, without losing context</span>
           </div>
           <div class="command-focus-bar" aria-label="Queue controls">
             <div id="commandQueueFilters" class="command-filter-group" role="group" aria-label="Filter queue">
@@ -34,7 +33,7 @@
                     <div id="commandSelectedPhotoPlaceholder" class="photo-placeholder">Select a queue item to begin.</div>
                   </div>
                   <div class="command-selected-copy">
-                    <p class="eyebrow">Selected Rushee</p>
+                    <p class="eyebrow">In focus</p>
                     <h3 id="commandSelectedName">Select a rushee from queue</h3>
                     <p id="commandSelectedMeta" class="muted">Assignment, rating freshness, and touchpoint context appear here.</p>
                     <div id="commandSelectedSignal" class="command-selected-signal muted">Pick a rushee to load their current context.</div>
@@ -48,7 +47,7 @@
                   </div>
                 </div>
 
-                <details id="commandRatingDisclosure" class="workspace-disclosure command-rating-disclosure">
+                <details id="commandRatingDisclosure" class="workspace-disclosure command-rating-disclosure" open>
                   <summary>
                     <span>Quick rating or comment</span>
                     <small>Open editor</small>
@@ -56,8 +55,7 @@
                   <div class="workspace-disclosure-body">
                     <div class="command-form-head">
                       <div>
-                        <p class="eyebrow">Quick Update</p>
-                        <h3>Record only what you know</h3>
+                        <h3>Record what you know</h3>
                       </div>
                       <span class="muted">Leave unknown categories blank.</span>
                     </div>
@@ -77,6 +75,7 @@
                         <button id="commandSaveBtn" type="submit">Save Rating</button>
                         <button id="commandSaveNextBtn" type="button" class="secondary">Save &amp; Next</button>
                         <button id="commandCommentOnlyBtn" type="button" class="secondary">Add Comment Only</button>
+                        <button type="button" class="secondary" data-discard-rating="command">Discard draft</button>
                       </div>
                     </form>
                   </div>
@@ -87,10 +86,8 @@
         </section>
 
         <section class="panel reveal delay-3 command-summary-shell command-summary-shell-primary">
-          <div class="section-head">
-            <h2>At a glance</h2>
-            <p id="commandWindowLabel" class="muted">Last 72 hours</p>
-          </div>
+          <h2 class="visually-hidden-field">At a glance</h2>
+          <p id="commandWindowLabel" class="visually-hidden-field">Last 72 hours</p>
           <div class="command-summary-row">
             <article class="card"><p>Queue</p><strong id="commandQueueCount">0</strong></article>
             <article class="card"><p>Stale Alerts</p><strong id="commandStaleCount">0</strong></article>

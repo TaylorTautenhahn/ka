@@ -1,14 +1,4 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'team' %} is-active{% endif %}" data-page="team">
-        <details class="panel workspace-disclosure reveal delay-2">
-          <summary>
-            <span>Team overview</span>
-            <small>Approvals, coverage, and participation</small>
-          </summary>
-          <div class="workspace-disclosure-body">
-            <div id="teamPulseCards" class="cards"></div>
-          </div>
-        </details>
-
         <details id="memberFiltersSection" class="panel filters reveal delay-3 workspace-disclosure workspace-filter-disclosure">
           <summary>
             <span>Member filters</span>
@@ -42,6 +32,58 @@
                 </select>
               </label>
             </div>
+          </div>
+        </details>
+
+        <div class="reveal delay-4 team-primary-stack">
+          <section id="membersSection" class="panel">
+            <div class="section-head">
+              <h2>Members</h2>
+              <p class="muted">Select a member to inspect same-state opportunities and assignment ownership.</p>
+            </div>
+            <div id="memberTable" class="table-wrap"></div>
+          </section>
+
+          <section class="panel team-officer-load-panel">
+            <div class="section-head">
+              <h2>Officer Load</h2>
+              <p class="muted">Capacity and pressure across the rush team.</p>
+            </div>
+            <div id="teamOfficerLoads" class="list-box muted">Loading officer workload...</div>
+          </section>
+        </div>
+
+        <div class="grid-two reveal delay-5 team-workspace-grid">
+          <section id="sameStatePnmsSection" class="panel">
+            <h2>Same-State Rushees</h2>
+            <p id="sameStatePnmsHeader" class="muted">Select a member to view rushees from the same state.</p>
+            <div id="sameStatePnmsList" class="list-box muted">No member selected.</div>
+          </section>
+
+          <section id="assignedRushPanel" class="panel hidden">
+            <h2 id="assignedRushTitle">Assigned Rushees</h2>
+            <p id="assignedRushSubtitle" class="muted">Assignment visibility appears here for Rush Officers and Heads.</p>
+            <div class="action-row">
+              <button id="assignedRushDownloadBtn" type="button" class="secondary">Download Assigned Contacts (.vcf)</button>
+            </div>
+            <div id="assignedRushTable" class="table-wrap"></div>
+          </section>
+        </div>
+
+        <section id="approvalsPanel" class="panel hidden reveal delay-5">
+          <div class="section-head">
+            <h2>Pending Account Approvals</h2>
+            <p class="muted">Keep team onboarding moving without leaving the Team workspace.</p>
+          </div>
+          <div id="pendingList" class="table-wrap"></div>
+        </section>
+        <details class="panel workspace-disclosure reveal delay-2">
+          <summary>
+            <span>Team overview</span>
+            <small>Approvals, coverage, and participation</small>
+          </summary>
+          <div class="workspace-disclosure-body">
+            <div id="teamPulseCards" class="cards"></div>
           </div>
         </details>
 
@@ -90,46 +132,4 @@
           </form>
         </details>
 
-        <div class="reveal delay-4 team-primary-stack">
-          <section id="membersSection" class="panel">
-            <div class="section-head">
-              <h2>Members</h2>
-              <p class="muted">Select a member to inspect same-state opportunities and assignment ownership.</p>
-            </div>
-            <div id="memberTable" class="table-wrap"></div>
-          </section>
-
-          <section class="panel team-officer-load-panel">
-            <div class="section-head">
-              <h2>Officer Load</h2>
-              <p class="muted">Capacity and pressure across the rush team.</p>
-            </div>
-            <div id="teamOfficerLoads" class="list-box muted">Loading officer workload...</div>
-          </section>
-        </div>
-
-        <div class="grid-two reveal delay-5 team-workspace-grid">
-          <section id="sameStatePnmsSection" class="panel">
-            <h2>Same-State Rushees</h2>
-            <p id="sameStatePnmsHeader" class="muted">Select a member to view rushees from the same state.</p>
-            <div id="sameStatePnmsList" class="list-box muted">No member selected.</div>
-          </section>
-
-          <section id="assignedRushPanel" class="panel hidden">
-            <h2 id="assignedRushTitle">Assigned Rushees</h2>
-            <p id="assignedRushSubtitle" class="muted">Assignment visibility appears here for Rush Officers and Heads.</p>
-            <div class="action-row">
-              <button id="assignedRushDownloadBtn" type="button" class="secondary">Download Assigned Contacts (.vcf)</button>
-            </div>
-            <div id="assignedRushTable" class="table-wrap"></div>
-          </section>
-        </div>
-
-        <section id="approvalsPanel" class="panel hidden reveal delay-5">
-          <div class="section-head">
-            <h2>Pending Account Approvals</h2>
-            <p class="muted">Keep team onboarding moving without leaving the Team workspace.</p>
-          </div>
-          <div id="pendingList" class="table-wrap"></div>
-        </section>
       </div>

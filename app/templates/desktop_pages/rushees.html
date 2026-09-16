@@ -1,10 +1,10 @@
           <div class="desktop-page{% if app_config and app_config.desktop_page == 'rushees' %} is-active{% endif %}" data-page="rushees">
 	        <section class="panel reveal delay-2 rushee-action-shell">
 	          <div class="section-head">
-	            <h2>Roster tools</h2>
+	            <h2>Your roster</h2>
 	            <div class="action-row">
-	              <button id="pnmViewToggleTable" type="button" class="secondary">Table View</button>
-	              <button id="pnmViewToggleBoard" type="button" class="secondary">Board View</button>
+	              <button id="pnmViewToggleTable" type="button" class="secondary">Table</button>
+	              <button id="pnmViewToggleBoard" type="button" class="secondary">Cards</button>
             </div>
           </div>
           <div class="rushee-quick-actions-grid">
@@ -12,7 +12,6 @@
 	              <summary class="rushee-create-summary">
 	                <div>
 	                  <h3>Add a rushee</h3>
-	                  <p class="muted">Create a record and assign it to yourself.</p>
 	                </div>
 	                <span class="rushee-inline-drawer-hint">Open</span>
               </summary>
@@ -192,6 +191,7 @@
 	                      </label>
 	                      <div class="action-row">
 	                        <button type="submit">Save Rating</button>
+                            <button type="button" class="secondary" data-discard-rating="rushee">Discard draft</button>
 	                        <button id="rusheeCommentOnlyBtn" type="button" class="secondary">Add Comment Only</button>
 	                      </div>
 	                    </form>

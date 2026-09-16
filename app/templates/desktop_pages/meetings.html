@@ -1,51 +1,38 @@
-          <div class="desktop-page{% if app_config and app_config.desktop_page == 'meetings' %} is-active{% endif %}" data-page="meetings">
-	        <section class="panel reveal delay-2 meetings-overview-panel">
-	          <div class="meetings-overview-grid">
-	            <section class="meetings-pinned-panel">
-	              <div class="section-head section-head-compact">
-	                <div>
-	                  <h2>Pinned for Meetings</h2>
-	                  <p class="muted">Your focused shortlist for packet prep.</p>
-	                </div>
-	              </div>
+      <div class="desktop-page{% if app_config and app_config.desktop_page == 'meetings' %} is-active{% endif %}" data-page="meetings">
+        <div class="grid-two meetings-grid-top">
+          <section class="panel meetings-shortlist-panel">
+            <div class="section-head">
+              <div>
+                <h2>Ready for the conversation</h2>
+                <p class="muted">Review the queue, pin a candidate, or open their full packet.</p>
+              </div>
+            </div>
+            <div id="meetingsShortlist" class="list-box muted">Loading candidates...</div>
+          </section>
+          <div class="stack">
+            <section class="panel meetings-overview-panel">
+              <div class="section-head">
+                <div>
+                  <h2>Pinned for Meetings</h2>
+                  <p class="muted">Your shared shortlist.</p>
+                </div>
+              </div>
               <div id="meetingsWatchlist" class="list-box muted">No pinned rushees yet.</div>
             </section>
+            <details class="panel workspace-disclosure meetings-attention-panel">
+              <summary><span>Needs meeting prep</span><small>Missing or stale context</small></summary>
+              <div class="workspace-disclosure-body">
+                <div id="meetingsAttentionList" class="list-box muted">Loading attention items...</div>
+              </div>
+            </details>
           </div>
-        </section>
-
-        <div class="grid-two reveal delay-3 meetings-grid-top">
-          <section class="panel meetings-shortlist-panel">
-              <div class="section-head">
-                <h2>Shortlist Queue</h2>
-                <span class="muted">Highest meeting-readiness first</span>
-              </div>
-              <div id="meetingsShortlist" class="list-box muted">Loading shortlist...</div>
-            </section>
-
-          <section class="panel meetings-attention-panel">
-              <div class="section-head">
-                <h2>Needs Meeting Prep</h2>
-                <span class="muted">Thin context, stale updates, and at-risk candidates</span>
-              </div>
-              <div id="meetingsAttentionList" class="list-box muted">Loading attention items...</div>
-            </section>
         </div>
-
-        <details class="panel workspace-disclosure reveal delay-4 meetings-compare-panel">
-          <summary>
-            <span>Compare candidates</span>
-            <small>Open side-by-side review</small>
-          </summary>
+        <details class="panel workspace-disclosure meetings-compare-panel">
+          <summary><span>Compare candidates</span><small>Review two packets together</small></summary>
           <div class="workspace-disclosure-body">
             <div class="inline-grid two-cols meetings-compare-selectors">
-              <label>
-                Candidate A
-                <select id="meetingsCompareSelectA"></select>
-              </label>
-              <label>
-                Candidate B
-                <select id="meetingsCompareSelectB"></select>
-              </label>
+              <label>First candidate<select id="meetingsCompareSelectA"></select></label>
+              <label>Second candidate<select id="meetingsCompareSelectB"></select></label>
             </div>
             <div id="meetingsCompareSummary" class="grid-two compare-summary-grid"></div>
           </div>

@@ -253,12 +253,14 @@ const mobileStateHints = document.getElementById("mobileStateHints");
 const mobilePnmStateHints = document.getElementById("mobilePnmStateHints");
 const mobileMemberStateHints = document.getElementById("mobileMemberStateHints");
 
-const toastEl = document.getElementById("mobileToast");
+const toastEl = document.getElementById("mobileToast") || document.getElementById("meetingToast");
 let mobileCalendarShare = null;
 let mobilePnmRows = [];
 let mobileMemberRows = [];
 let mobileCurrentUser = null;
 let mobileSelectedManagePnmId = null;
+let mobileManageBaseline = null;
+let mobileManageSaving = false;
 const mobileContactDownloads = new Map();
 let mobileSelectedContactPnmId = null;
 let mobilePackagePrimaryPnmId = null;
@@ -277,6 +279,13 @@ const mobileCommandCenter = {
 let mobileHomePnmRows = [];
 let mobileHomeRecentLunchRows = [];
 let mobileHomeSelectedPnmId = null;
+let mobileHomeVisibleCount = 12;
+let mobileHomeSnapshotRequest = 0;
+let mobileHomeSaving = false;
+const mobileHomeDraftGroups = {
+  rating: { formId: "mobileCommandRatingForm", pnmId: null, baseline: {}, drafts: new Map() },
+  touchpoint: { formId: "mobileCommandTouchpointForm", pnmId: null, baseline: {}, drafts: new Map() },
+};
 const mobileFilters = {
   pnms: {
     state: "",
@@ -322,7 +331,7 @@ function ensureInlineConfirmBar(form, key) {
     bar.dataset.confirmKey = key;
     bar.innerHTML = `
       <div class="inline-confirm-copy">
-        <strong>Confirm Rating Submission</strong>
+        <strong>Confirm update</strong>
         <p class="muted">Double-check this rushee profile before saving.</p>
       </div>
       <div class="action-row inline-confirm-actions">
@@ -1307,11 +1316,12 @@ function mobileHomeSearchRows() {
   const input = document.getElementById("mobileHomeSearchInput");
   const query = String(input && input.value ? input.value : "").trim().toLowerCase();
   if (!query) {
-    return mobileHomePnmRows.slice(0, 12);
+    return mobileHomePnmRows;
   }
   return mobileHomePnmRows.filter((pnm) => {
     const haystack = [
       pnm.pnm_code,
+      pnm.name,
       pnm.first_name,
       pnm.last_name,
       pnm.hometown,
@@ -1336,28 +1346,28 @@ function renderMobileHomeSearchResults() {
   const input = document.getElementById("mobileHomeSearchInput");
   const query = String(input && input.value ? input.value : "").trim();
   const rows = mobileHomeSearchRows();
+  const visibleRows = rows.slice(0, mobileHomeVisibleCount);
   metaEl.textContent = query
-    ? `${rows.length} match${rows.length === 1 ? "" : "es"} for "${query}"`
-    : `Showing ${rows.length} quick results`;
+    ? `${rows.length} match${rows.length === 1 ? "" : "es"} for "${query}". Showing ${visibleRows.length}.`
+    : `Showing ${visibleRows.length} of ${rows.length} rushees`;
+  document.getElementById("mobileHomeShowMoreBtn")?.classList.toggle("hidden", visibleRows.length >= rows.length);
   if (!rows.length) {
     listEl.innerHTML = '<p class="muted">No rushees match that search yet.</p>';
     return;
   }
-  listEl.innerHTML = rows
+  listEl.innerHTML = visibleRows
     .map((pnm) => {
       const selectedClass = Number(mobileHomeSelectedPnmId) === Number(pnm.pnm_id) ? " is-selected" : "";
       const ownRating = pnm.own_rating && Number.isFinite(Number(pnm.own_rating.total_score))
         ? `Mine ${Number(pnm.own_rating.total_score).toFixed(0)}/${RATING_TOTAL_MAX}`
         : "Not rated";
-      const touchpointCount = Number(pnm.total_lunches || 0);
-      const touchpointLabel = touchpointCount === 1 ? "1 touchpoint" : `${touchpointCount} touchpoints`;
       return `
-        <article class="entry mobile-card${selectedClass}">
+        <article class="entry mobile-card mobile-roster-row${selectedClass}">
           <button type="button" class="mobile-home-pnm-btn" data-mobile-home-pnm-id="${Number(pnm.pnm_id)}">
             ${mobileHomePhotoMarkup(pnm)}
             <div class="mobile-home-pnm-copy">
               <strong class="mobile-home-pnm-name">${escapeHtml(mobileHomeDisplayName(pnm))}</strong>
-              <div class="mobile-home-pnm-meta">${escapeHtml(pnm.pnm_code)} • ${escapeHtml(ownRating)} • ${escapeHtml(touchpointLabel)}</div>
+              <div class="mobile-home-pnm-meta">${escapeHtml(pnm.pnm_code)} • ${escapeHtml(ownRating)}${mobileHasHomeDraft(pnm.pnm_id) ? " • Unsaved draft" : ""}</div>
             </div>
             <div class="mobile-home-pnm-score">
               <strong>${formatWeightedScore(pnm.weighted_total)}</strong>
@@ -1406,20 +1416,127 @@ function renderMobileHomeRecentLunches() {
 
 function selectMobileHomePnm(pnmId, options = {}) {
   const targetId = Number(pnmId || 0);
-  if (!targetId) {
+  if (!targetId || !mobileHomePnmRows.concat(mobileCommandCenter.queue).some((row) => Number(row.pnm_id) === targetId)) {
     return;
   }
+  if (mobileHomeSaving) {
+    showToast("Wait for the current save to finish.");
+    return;
+  }
+  captureMobileHomeDrafts();
+  clearMobileHomeConfirmations();
   mobileHomeSelectedPnmId = targetId;
   mobileCommandCenter.selectedPnmId = targetId;
   toggleMobileTouchpointComposer(false);
+  const disclosure = document.getElementById("mobileCommandRatingDisclosure");
+  if (disclosure) disclosure.open = false;
   renderMobileHomeSearchResults();
   renderMobileHomeRecentLunches();
   renderMobileCommandSelection();
   if (options.scrollToForm) {
-    const panel = document.getElementById("mobileHomeQuickRatePanel");
-    if (panel) {
-      panel.scrollIntoView({ behavior: "auto", block: "start" });
+    focusElementSoon(document.getElementById("mobileHomeSelectedHeading"), document.getElementById("mobileHomeQuickRatePanel"));
+  }
+}
+
+function mobileLocalDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
+function mobileHomeFormValues(group) {
+  const form = document.getElementById(group.formId);
+  return Object.fromEntries(Array.from(form?.querySelectorAll("input[id], textarea[id]") || []).map((el) => [el.id, el.value]));
+}
+
+function writeMobileHomeValues(values) {
+  Object.entries(values).forEach(([id, value]) => {
+    const input = document.getElementById(id);
+    if (input && input.value !== value) input.value = value;
+  });
+}
+
+function captureMobileHomeDrafts() {
+  Object.values(mobileHomeDraftGroups).forEach((group) => {
+    if (!group.pnmId) return;
+    const values = mobileHomeFormValues(group);
+    if (Object.keys(values).some((key) => values[key] !== group.baseline[key])) {
+      group.drafts.set(group.pnmId, { values, baseline: group.baseline });
+    } else {
+      group.drafts.delete(group.pnmId);
     }
+  });
+  renderMobileHomeDraftStatus();
+}
+
+function mobileHasHomeDraft(pnmId) {
+  return Object.values(mobileHomeDraftGroups).some((group) => group.drafts.has(Number(pnmId)));
+}
+
+function renderMobileHomeDraftStatus() {
+  const ids = new Set(Object.values(mobileHomeDraftGroups).flatMap((group) => [...group.drafts.keys()]));
+  document.getElementById("mobileHomeDraftStatus")?.classList.toggle("hidden", ids.size === 0);
+  const message = document.getElementById("mobileHomeDraftMessage");
+  if (message) message.textContent = `${ids.size} rushee${ids.size === 1 ? " has" : "s have"} unsaved edits. Drafts stay here while you switch rushees; save before leaving this page.`;
+}
+
+function clearMobileHomeConfirmations() {
+  const form = document.getElementById("mobileCommandRatingForm");
+  clearInlineConfirmBar(form, "mobile-rating");
+  clearInlineConfirmBar(form, "mobile-comment");
+}
+
+function hydrateMobileHomeGroup(name, pnmId, defaults) {
+  const group = mobileHomeDraftGroups[name];
+  const draft = group.drafts.get(pnmId);
+  group.pnmId = pnmId;
+  group.baseline = draft ? draft.baseline : defaults;
+  writeMobileHomeValues(draft ? draft.values : defaults);
+}
+
+function mobileTouchpointDefaults() {
+  return { mobileCommandLunchDate: mobileLocalDate(), mobileCommandLunchStartTime: "", mobileCommandLunchLocation: "", mobileCommandLunchNotes: "" };
+}
+
+function discardMobileHomeGroup(name) {
+  if (mobileHomeSaving) return;
+  const group = mobileHomeDraftGroups[name];
+  group.drafts.delete(group.pnmId);
+  writeMobileHomeValues(group.baseline);
+  clearMobileHomeConfirmations();
+  renderMobileCommandSelection();
+  if (name === "rating") document.getElementById("mobileCommandRatingDisclosure").open = false;
+  if (name === "touchpoint") toggleMobileTouchpointComposer(false);
+  focusElementSoon(document.getElementById(name === "rating" ? "mobileCommandRateFocusBtn" : "mobileCommandTouchpointToggleBtn"));
+}
+
+function backToMobileHomeRoster() {
+  if (mobileHomeSaving) {
+    showToast("Wait for the current save to finish.");
+    return;
+  }
+  captureMobileHomeDrafts();
+  clearMobileHomeConfirmations();
+  mobileHomeSelectedPnmId = null;
+  mobileCommandCenter.selectedPnmId = null;
+  renderMobileCommandSelection();
+  renderMobileHomeSearchResults();
+  focusElementSoon(document.getElementById("mobileHomeSearchInput"), document.getElementById("mobileHomeSearchPanel"));
+}
+
+function setMobileHomeSaving(saving) {
+  mobileHomeSaving = saving;
+  Object.values(mobileHomeDraftGroups).forEach((group) => {
+    document.getElementById(group.formId)?.querySelectorAll("input, textarea, button").forEach((el) => { el.disabled = saving; });
+  });
+  document.getElementById("mobileHomeQuickRatePanel")?.setAttribute("aria-busy", String(saving));
+}
+
+async function refreshMobileHomeAfterSave(message) {
+  try {
+    await loadHomeSnapshot();
+    showToast(message);
+  } catch {
+    showToast(`${message} Latest totals could not refresh; do not submit again.`);
   }
 }
 
@@ -1445,7 +1562,7 @@ function toggleMobileTouchpointComposer(forceOpen) {
   const next = forceOpen !== undefined ? Boolean(forceOpen) : composer.classList.contains("hidden");
   composer.classList.toggle("hidden", !next);
   if (toggleBtn) {
-    toggleBtn.textContent = next ? "Hide Touchpoint" : "Schedule Touchpoint";
+    toggleBtn.setAttribute("aria-expanded", String(next));
   }
 }
 
@@ -1457,6 +1574,7 @@ function focusMobileCommandComposer(mode = "rate", options = {}) {
   }
   if (Number(mobileHomeSelectedPnmId || 0) !== targetId) {
     selectMobileHomePnm(targetId, { scrollToForm: false });
+    if (Number(mobileHomeSelectedPnmId || 0) !== targetId) return;
   }
   const panel = document.getElementById("mobileHomeQuickRatePanel");
   const ratingDisclosure = document.getElementById("mobileCommandRatingDisclosure");
@@ -1566,6 +1684,7 @@ function renderMobileCommandCenterVisibility() {
 }
 
 function renderMobileCommandSelection() {
+  captureMobileHomeDrafts();
   const metaEl = document.getElementById("mobileCommandSelectedMeta");
   const meetingShortcut = document.getElementById("mobileCommandMeetingShortcut");
   const selectedCard = document.getElementById("mobileCommandSelectedCard");
@@ -1573,7 +1692,12 @@ function renderMobileCommandSelection() {
   const commentFocusBtn = document.getElementById("mobileCommandCommentFocusBtn");
   const touchpointBtn = document.getElementById("mobileCommandTouchpointToggleBtn");
   const selected = mobileCommandSelectedItem();
+  document.getElementById("mobileHomeSearchPanel")?.classList.toggle("hidden", Boolean(selected));
+  document.getElementById("mobileHomeQuickRatePanel")?.classList.toggle("hidden", !selected);
+  const commandCenter = document.getElementById("mobileOfficerCommandCenter");
+  if (commandCenter) commandCenter.dataset.homeView = selected ? "selected" : "roster";
   if (!selected) {
+    Object.values(mobileHomeDraftGroups).forEach((group) => { group.pnmId = null; });
     if (metaEl) {
       metaEl.textContent = "Select a rushee from the roster or recent touchpoints to start rating.";
     }
@@ -1599,10 +1723,6 @@ function renderMobileCommandSelection() {
     }
     return;
   }
-  const ratingForm = document.getElementById("mobileCommandRatingForm");
-  clearInlineConfirmBar(ratingForm, "mobile-rating");
-  clearInlineConfirmBar(ratingForm, "mobile-comment");
-
   const assigned = mobileHomeAssignedLabel(selected);
   const touchpoint = selected.last_lunch_with_me_at
     ? formatDownloadStamp(selected.last_lunch_with_me_at)
@@ -1618,8 +1738,10 @@ function renderMobileCommandSelection() {
     .filter(Boolean)
     .join(" | ");
   if (metaEl) {
-    metaEl.textContent = `${selected.pnm_code} • Assigned: ${assigned} • ${stale}`;
+    metaEl.textContent = `${selected.pnm_code} • Assigned: ${assigned}`;
   }
+  const heading = document.getElementById("mobileHomeSelectedHeading");
+  if (heading) heading.textContent = mobileHomeDisplayName(selected);
   if (meetingShortcut) {
     meetingShortcut.href = `${MOBILE_ROUTES.meeting}?pnm_id=${Number(selected.pnm_id)}`;
     meetingShortcut.classList.remove("disabled");
@@ -1646,36 +1768,15 @@ function renderMobileCommandSelection() {
     `;
   }
 
-  const own = selected.own_rating || null;
-  const girlsMax = ratingCriteriaForField("good_with_girls")?.max || 10;
-  const processMax = ratingCriteriaForField("will_make_it")?.max || 10;
-  const personableMax = ratingCriteriaForField("personable")?.max || 10;
-  const alcoholMax = ratingCriteriaForField("alcohol_control")?.max || 10;
-  const igMax = ratingCriteriaForField("instagram_marketability")?.max || 5;
-  const girlsInput = document.getElementById("mobileCommandRateGirls");
-  const processInput = document.getElementById("mobileCommandRateProcess");
-  const personableInput = document.getElementById("mobileCommandRatePersonable");
-  const alcoholInput = document.getElementById("mobileCommandRateAlcohol");
-  const igInput = document.getElementById("mobileCommandRateIg");
-  const commentInput = document.getElementById("mobileCommandRateComment");
-  if (girlsInput) {
-    writeOptionalRatingValue(girlsInput, own ? own.good_with_girls : null, girlsMax);
-  }
-  if (processInput) {
-    writeOptionalRatingValue(processInput, own ? own.will_make_it : null, processMax);
-  }
-  if (personableInput) {
-    writeOptionalRatingValue(personableInput, own ? own.personable : null, personableMax);
-  }
-  if (alcoholInput) {
-    writeOptionalRatingValue(alcoholInput, own ? own.alcohol_control : null, alcoholMax);
-  }
-  if (igInput) {
-    writeOptionalRatingValue(igInput, own ? own.instagram_marketability : null, igMax);
-  }
-  if (commentInput) {
-    commentInput.value = selected.last_lunch_with_me_notes ? selected.last_lunch_with_me_notes : own && own.comment ? own.comment : "";
-  }
+  // Historical comments belong in the packet, never in a new-note composer.
+  const ratingDefaults = { mobileCommandRateComment: "" };
+  const ratingIds = ["mobileCommandRateGirls", "mobileCommandRateProcess", "mobileCommandRatePersonable", "mobileCommandRateAlcohol", "mobileCommandRateIg"];
+  RATING_CRITERIA.forEach((criterion, index) => {
+    const value = selected.own_rating?.[criterion.field];
+    ratingDefaults[ratingIds[index]] = value == null || value === "" ? "" : String(Math.max(0, Math.min(criterion.max, Number(value) || 0)));
+  });
+  hydrateMobileHomeGroup("rating", Number(selected.pnm_id), ratingDefaults);
+  hydrateMobileHomeGroup("touchpoint", Number(selected.pnm_id), mobileTouchpointDefaults());
 }
 
 function renderMobileCommandCenter() {
@@ -1704,9 +1805,6 @@ function renderMobileCommandCenter() {
 
   const queueEl = document.getElementById("mobileCommandQueueList");
   const queueRows = Array.isArray(mobileCommandCenter.queue) ? mobileCommandCenter.queue : [];
-  if (!mobileCommandCenter.selectedPnmId || !queueRows.some((item) => Number(item.pnm_id) === Number(mobileCommandCenter.selectedPnmId))) {
-    mobileCommandCenter.selectedPnmId = queueRows.length ? Number(queueRows[0].pnm_id) : null;
-  }
   if (queueEl) {
     if (!queueRows.length) {
       const detail = mobileCommandCenter.error || "No queue items available yet.";
@@ -1788,7 +1886,10 @@ function applyMobileCommandCenterPayload(payload) {
 }
 
 async function loadHomeSnapshot() {
+  const requestId = ++mobileHomeSnapshotRequest;
   const payload = await api("/api/mobile/home");
+  if (requestId !== mobileHomeSnapshotRequest) return;
+  captureMobileHomeDrafts();
   renderHomeStats(payload.stats || {});
   renderHomeLeaderboard(payload.leaderboard || []);
   mobileHomePnmRows = Array.isArray(payload.pnms) ? payload.pnms : [];
@@ -1832,12 +1933,10 @@ async function loadHomeSnapshot() {
     };
   });
   const availablePnmIds = new Set(mobileHomePnmRows.map((pnm) => Number(pnm.pnm_id)));
-  if (!mobileHomeSelectedPnmId || !availablePnmIds.has(Number(mobileHomeSelectedPnmId))) {
-    mobileHomeSelectedPnmId = mobileHomeRecentLunchRows.length
-      ? Number(mobileHomeRecentLunchRows[0].pnm_id)
-      : mobileHomePnmRows.length
-        ? Number(mobileHomePnmRows[0].pnm_id)
-        : null;
+  if (mobileHomeSelectedPnmId && !availablePnmIds.has(Number(mobileHomeSelectedPnmId))) {
+    mobileHomeSelectedPnmId = null;
+    clearMobileHomeConfirmations();
+    showToast("That rushee is no longer in this roster. Unsaved drafts have been kept.");
   }
   applyMobileCommandCenterPayload(payload.command_center);
   mobileCommandCenter.selectedPnmId = mobileHomeSelectedPnmId;
@@ -1941,6 +2040,7 @@ function renderMembers(members) {
 }
 
 function renderSameStatePnms(member, pnms, errorMessage = "") {
+  document.getElementById("mobileSameStatePanel")?.classList.toggle("hidden", !member && !errorMessage);
   const header = document.getElementById("mobileSameStateHeader");
   const hint = document.getElementById("mobileSameStateHint");
   const listEl = document.getElementById("mobileSameStateList");
@@ -2010,6 +2110,7 @@ function handleMobileCommandQueueSelect(event) {
 }
 
 async function handleMobileCommandSaveRating() {
+  if (mobileHomeSaving) return;
   if (!mobileCanUseCommandCenter()) {
     showToast("Rush Officer access required.");
     return;
@@ -2030,7 +2131,17 @@ async function handleMobileCommandSaveRating() {
     showToast("Rating controls are unavailable.");
     return;
   }
-
+  if (!ratingForm.reportValidity()) return;
+  const body = {
+    pnm_id: Number(selected.pnm_id),
+    good_with_girls: readOptionalRatingValue(girlsInput),
+    will_make_it: readOptionalRatingValue(processInput),
+    personable: readOptionalRatingValue(personableInput),
+    alcohol_control: readOptionalRatingValue(alcoholInput),
+    instagram_marketability: readOptionalRatingValue(igInput),
+    comment: String(commentInput.value || "").trim(),
+  };
+  clearMobileHomeConfirmations();
   const saveBtn = document.getElementById("mobileCommandSaveBtn");
   if (saveBtn) {
     saveBtn.disabled = true;
@@ -2040,28 +2151,24 @@ async function handleMobileCommandSaveRating() {
     message: confirmRusheeRatingSubmission(),
     confirmLabel: "Yes, Save Rating",
     onConfirm: async () => {
+      if (mobileHomeSaving || Number(mobileHomeSelectedPnmId) !== body.pnm_id) return;
+      setMobileHomeSaving(true);
       try {
         const payload = await api("/api/ratings", {
           method: "POST",
-          body: {
-            pnm_id: Number(selected.pnm_id),
-            good_with_girls: readOptionalRatingValue(girlsInput),
-            will_make_it: readOptionalRatingValue(processInput),
-            personable: readOptionalRatingValue(personableInput),
-            alcohol_control: readOptionalRatingValue(alcoholInput),
-            instagram_marketability: readOptionalRatingValue(igInput),
-            comment: String(commentInput.value || "").trim(),
-          },
+          body,
         });
-        await loadHomeSnapshot();
-        if (payload.change && Number(payload.change.delta_total) > 0) {
-          showToast(`Rating up +${payload.change.delta_total}.`);
-        } else {
-          showToast("Rating saved.");
-        }
+        selected.own_rating = { ...selected.own_rating, ...body };
+        commentInput.value = "";
+        const group = mobileHomeDraftGroups.rating;
+        group.baseline = mobileHomeFormValues(group);
+        group.drafts.delete(body.pnm_id);
+        captureMobileHomeDrafts();
+        await refreshMobileHomeAfterSave(payload.change && Number(payload.change.delta_total) > 0 ? `Rating up +${payload.change.delta_total}.` : "Rating saved.");
       } catch (error) {
         showToast(error.message || "Unable to save rating.");
       } finally {
+        setMobileHomeSaving(false);
         if (saveBtn) {
           saveBtn.disabled = false;
           saveBtn.textContent = "Save Rating";
@@ -2077,6 +2184,7 @@ async function handleMobileCommandSaveRating() {
 }
 
 async function handleMobileCommandAddComment() {
+  if (mobileHomeSaving) return;
   if (!mobileCanUseCommandCenter()) {
     showToast("Rush Officer access required.");
     return;
@@ -2099,6 +2207,7 @@ async function handleMobileCommandAddComment() {
     commentInput.focus();
     return;
   }
+  clearMobileHomeConfirmations();
 
   if (commentBtn) {
     commentBtn.disabled = true;
@@ -2109,16 +2218,22 @@ async function handleMobileCommandAddComment() {
     message: "Add this note without changing the rating?",
     confirmLabel: "Yes, Add Comment",
     onConfirm: async () => {
+      if (mobileHomeSaving || Number(mobileHomeSelectedPnmId) !== Number(selected.pnm_id)) return;
+      setMobileHomeSaving(true);
       try {
         await api(`/api/pnms/${Number(selected.pnm_id)}/comments`, {
           method: "POST",
           body: { comment },
         });
-        await loadHomeSnapshot();
-        showToast("Comment added to the meeting packet.");
+        commentInput.value = "";
+        // Posting just a note must not mark edited scores as saved.
+        mobileHomeDraftGroups.rating.baseline.mobileCommandRateComment = "";
+        captureMobileHomeDrafts();
+        await refreshMobileHomeAfterSave("Comment added to the meeting packet.");
       } catch (error) {
         showToast(error.message || "Unable to add the comment.");
       } finally {
+        setMobileHomeSaving(false);
         if (commentBtn) {
           commentBtn.disabled = false;
           commentBtn.textContent = "Add Comment";
@@ -2135,6 +2250,7 @@ async function handleMobileCommandAddComment() {
 }
 
 async function handleMobileCommandScheduleLunch() {
+  if (mobileHomeSaving) return;
   if (!mobileCanUseCommandCenter()) {
     showToast("Rush Officer access required.");
     return;
@@ -2162,6 +2278,8 @@ async function handleMobileCommandScheduleLunch() {
     lunchBtn.disabled = true;
     lunchBtn.textContent = "Scheduling...";
   }
+  clearMobileHomeConfirmations();
+  setMobileHomeSaving(true);
   try {
     await api("/api/lunches", {
       method: "POST",
@@ -2174,15 +2292,17 @@ async function handleMobileCommandScheduleLunch() {
         notes: notesInput.value.trim(),
       },
     });
-    startInput.value = "";
-    locationInput.value = "";
-    notesInput.value = "";
-    await loadHomeSnapshot();
+    const group = mobileHomeDraftGroups.touchpoint;
+    group.baseline = mobileTouchpointDefaults();
+    writeMobileHomeValues(group.baseline);
+    group.drafts.delete(Number(selected.pnm_id));
+    captureMobileHomeDrafts();
+    await refreshMobileHomeAfterSave("Touchpoint scheduled.");
     toggleMobileTouchpointComposer(false);
-    showToast("Touchpoint scheduled.");
   } catch (error) {
     showToast(error.message || "Unable to schedule touchpoint.");
   } finally {
+    setMobileHomeSaving(false);
     if (lunchBtn) {
       lunchBtn.disabled = false;
       lunchBtn.textContent = "Schedule Touchpoint";
@@ -2194,7 +2314,12 @@ async function loadPnmsPage() {
   const stateFilter = normalizeStateFilterInput(mobileFilters.pnms.state);
   const query = buildQueryString({ state: stateFilter });
   const [pnmPayload] = await Promise.all([api(`/api/pnms${query}`), loadContactDownloadStatuses()]);
-  mobilePnmRows = Array.isArray(pnmPayload.pnms) ? pnmPayload.pnms : [];
+  const nextRows = Array.isArray(pnmPayload.pnms) ? pnmPayload.pnms : [];
+  if (mobileManageHasEdits() && !nextRows.some((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId))) {
+    showToast("Save or cancel profile edits before filtering this rushee out of the roster.");
+    return;
+  }
+  mobilePnmRows = nextRows;
   if (!mobilePnmRows.some((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId))) {
     mobileSelectedManagePnmId = null;
   }
@@ -2207,7 +2332,18 @@ function mobileSelectedManagePnm() {
   return mobilePnmRows.find((pnm) => Number(pnm.pnm_id) === Number(mobileSelectedManagePnmId)) || null;
 }
 
+function mobileManageValues() {
+  return Object.fromEntries(Array.from(document.getElementById("mobilePnmManageForm")?.querySelectorAll("input[id], select[id], textarea[id]") || []).map((el) => [el.id, el.value]));
+}
+
+function mobileManageHasEdits() {
+  const values = mobileManageValues();
+  return mobileManageBaseline && Object.keys(values).some((id) => values[id] !== mobileManageBaseline[id]);
+}
+
 function resetMobilePnmManagement(message = "Select a rushee above to edit their profile.") {
+  mobileManageBaseline = null;
+  document.getElementById("mobilePnmManagePanel")?.classList.add("hidden");
   const hint = document.getElementById("mobilePnmManageHint");
   const selectedCard = document.getElementById("mobilePnmManageSelectedCard");
   const locked = document.getElementById("mobilePnmManageLocked");
@@ -2240,6 +2376,7 @@ function resetMobilePnmManagement(message = "Select a rushee above to edit their
 }
 
 function renderMobilePnmManagement() {
+  const draft = mobileManageHasEdits() ? mobileManageValues() : null;
   const selected = mobileSelectedManagePnm();
   const hint = document.getElementById("mobilePnmManageHint");
   const selectedCard = document.getElementById("mobilePnmManageSelectedCard");
@@ -2252,6 +2389,7 @@ function renderMobilePnmManagement() {
     resetMobilePnmManagement();
     return;
   }
+  document.getElementById("mobilePnmManagePanel")?.classList.remove("hidden");
   const creator = String(selected.created_by_username || "").trim() || "another rush team member";
   if (selectedCard) {
     selectedCard.classList.remove("hidden");
@@ -2309,6 +2447,11 @@ function renderMobilePnmManagement() {
   setValue("mobileManageStereotype", selected.stereotype);
   setValue("mobileManageLunchStats", selected.lunch_stats);
   setValue("mobileManageNotes", selected.notes);
+  if (draft) {
+    Object.entries(draft).forEach(([id, value]) => setValue(id, value));
+  } else {
+    mobileManageBaseline = mobileManageValues();
+  }
   syncInterestPickerFromInput("mobileManageInterests", "mobileManageInterestTags");
   syncStereotypePickerFromInput("mobileManageStereotype", "mobileManageStereotypeTags");
 }
@@ -2318,9 +2461,19 @@ function selectMobileManagePnm(pnmId, { scroll = true } = {}) {
   if (!numericId) {
     return;
   }
+  if (mobileManageSaving) {
+    showToast("Wait for the profile save to finish.");
+    return;
+  }
+  if (numericId !== mobileSelectedManagePnmId) {
+    if (mobileManageHasEdits() && !window.confirm("Discard this rushee's unsaved profile edits and switch? Choose Cancel to keep editing.")) return;
+    mobileManageBaseline = null;
+  }
   mobileSelectedManagePnmId = numericId;
   renderPnmCards(mobilePnmRows);
   renderMobilePnmManagement();
+  const panel = document.getElementById("mobilePnmManagePanel");
+  if (panel) panel.open = true;
   if (scroll) {
     document.getElementById("mobilePnmManageSelectedCard")?.scrollIntoView({ behavior: "auto", block: "start" });
   }
@@ -2754,6 +2907,7 @@ async function handleCreateSubmit(event) {
 
 async function handleMobilePnmManageSubmit(event) {
   event.preventDefault();
+  if (mobileManageSaving) return;
   const selected = mobileSelectedManagePnm();
   if (!selected) {
     showToast("Select a rushee first.");
@@ -2797,19 +2951,27 @@ async function handleMobilePnmManageSubmit(event) {
     submitButton.disabled = true;
     submitButton.textContent = "Saving...";
   }
+  mobileManageSaving = true;
+  const submittedValues = mobileManageValues();
   try {
     await api(`/api/pnms/${Number(selected.pnm_id)}`, {
       method: "PATCH",
       body,
     });
-    showToast("Rushee details updated.");
-    await loadPnmsPage();
-    mobileSelectedManagePnmId = Number(selected.pnm_id);
-    renderPnmCards(mobilePnmRows);
-    renderMobilePnmManagement();
+    mobileManageBaseline = submittedValues;
+    try {
+      await loadPnmsPage();
+      mobileSelectedManagePnmId = Number(selected.pnm_id);
+      renderPnmCards(mobilePnmRows);
+      renderMobilePnmManagement();
+      showToast("Rushee details updated.");
+    } catch {
+      showToast("Rushee details saved, but the roster could not refresh.");
+    }
   } catch (error) {
     showToast(error.message || "Unable to update rushee.");
   } finally {
+    mobileManageSaving = false;
     if (submitButton) {
       submitButton.disabled = false;
       submitButton.textContent = originalLabel;
@@ -2818,7 +2980,72 @@ async function handleMobilePnmManageSubmit(event) {
 }
 
 function attachPageEvents() {
+  const accountMenu = document.querySelector(".mobile-account-menu");
+  document.addEventListener("pointerdown", (event) => {
+    if (accountMenu && !accountMenu.contains(event.target)) accountMenu.open = false;
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && accountMenu?.open) {
+      accountMenu.open = false;
+      accountMenu.querySelector("summary")?.focus();
+    }
+  });
+  accountMenu?.addEventListener("click", (event) => {
+    if (event.target.closest("a[href]")) accountMenu.open = false;
+  });
+  document.getElementById("mobileLogoutBtn")?.addEventListener("click", async (event) => {
+    if (mobileHomeSaving || mobileManageSaving) {
+      showToast("Wait for the current save to finish before signing out.");
+      return;
+    }
+    captureMobileHomeDrafts();
+    const hasDrafts = Object.values(mobileHomeDraftGroups).some((group) => group.drafts.size) || mobileManageHasEdits();
+    if (hasDrafts && !window.confirm("Discard unsaved edits and sign out? Choose Cancel to keep editing.")) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    try {
+      await api("/api/auth/logout", { method: "POST" });
+      Object.values(mobileHomeDraftGroups).forEach((group) => { group.pnmId = null; group.drafts.clear(); });
+      mobileManageBaseline = null;
+      window.location.href = BASE_PATH || "/";
+    } catch (error) {
+      showToast(error.message || "Unable to sign out. Please try again.");
+      button.disabled = false;
+    }
+  });
   if (MOBILE_PAGE === "home") {
+    document.getElementById("mobileHomeBackBtn")?.addEventListener("click", backToMobileHomeRoster);
+    document.getElementById("mobileHomeShowMoreBtn")?.addEventListener("click", () => {
+      mobileHomeVisibleCount += 12;
+      renderMobileHomeSearchResults();
+    });
+    document.getElementById("mobileCommandRatingCancelBtn")?.addEventListener("click", () => discardMobileHomeGroup("rating"));
+    document.getElementById("mobileCommandTouchpointCancelBtn")?.addEventListener("click", () => discardMobileHomeGroup("touchpoint"));
+    document.getElementById("mobileHomeDiscardDraftsBtn")?.addEventListener("click", () => {
+      if (mobileHomeSaving || !window.confirm("Discard all unsaved scores, notes, and touchpoints? This cannot be undone.")) return;
+      Object.values(mobileHomeDraftGroups).forEach((group) => {
+        writeMobileHomeValues(group.baseline);
+        group.drafts.clear();
+        group.pnmId = null;
+      });
+      clearMobileHomeConfirmations();
+      renderMobileCommandSelection();
+      renderMobileHomeSearchResults();
+      renderMobileHomeDraftStatus();
+    });
+    Object.values(mobileHomeDraftGroups).forEach((group) => {
+      ["input", "change"].forEach((eventName) => document.getElementById(group.formId)?.addEventListener(eventName, () => {
+        clearMobileHomeConfirmations();
+        captureMobileHomeDrafts();
+      }));
+    });
+    window.addEventListener("beforeunload", (event) => {
+      captureMobileHomeDrafts();
+      if (mobileHomeSaving || Object.values(mobileHomeDraftGroups).some((group) => group.drafts.size)) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    });
     const copyBtn = document.getElementById("mobileCopyCalendarBtn");
     const searchInput = document.getElementById("mobileHomeSearchInput");
     const clearSearchBtn = document.getElementById("mobileHomeClearSearchBtn");
@@ -2831,6 +3058,7 @@ function attachPageEvents() {
     }
     if (searchInput) {
       searchInput.addEventListener("input", () => {
+        mobileHomeVisibleCount = 12;
         renderMobileHomeSearchResults();
       });
     }
@@ -2838,7 +3066,9 @@ function attachPageEvents() {
       clearSearchBtn.addEventListener("click", () => {
         if (searchInput) {
           searchInput.value = "";
+          searchInput.focus();
         }
+        mobileHomeVisibleCount = 12;
         renderMobileHomeSearchResults();
       });
     }
@@ -2883,7 +3113,7 @@ function attachPageEvents() {
     if (touchpointForm) {
       const touchpointDate = document.getElementById("mobileCommandLunchDate");
       if (touchpointDate && !touchpointDate.value) {
-        touchpointDate.value = new Date().toISOString().slice(0, 10);
+        touchpointDate.value = mobileLocalDate();
       }
       touchpointForm.addEventListener("submit", async (event) => {
         event.preventDefault();
@@ -2893,6 +3123,22 @@ function attachPageEvents() {
   }
 
   if (MOBILE_PAGE === "pnms") {
+    document.getElementById("mobilePnmManageCancelBtn")?.addEventListener("click", () => {
+      if (mobileManageSaving) return;
+      mobileManageBaseline = null;
+      renderMobilePnmManagement();
+      const panel = document.getElementById("mobilePnmManagePanel");
+      if (panel) {
+        panel.open = false;
+        panel.querySelector("summary")?.focus();
+      }
+    });
+    window.addEventListener("beforeunload", (event) => {
+      if (mobileManageSaving || mobileManageHasEdits()) {
+        event.preventDefault();
+        event.returnValue = "";
+      }
+    });
     const refreshBtn = document.getElementById("mobileRefreshPnmsBtn");
     const applyFiltersBtn = document.getElementById("mobileApplyPnmFiltersBtn");
     const stateInput = document.getElementById("mobilePnmStateFilter");
@@ -3258,9 +3504,13 @@ async function init() {
   attachPageEvents();
   const commandLunchDateInput = document.getElementById("mobileCommandLunchDate");
   if (commandLunchDateInput && !commandLunchDateInput.value) {
-    commandLunchDateInput.value = new Date().toISOString().slice(0, 10);
+    commandLunchDateInput.value = mobileLocalDate();
   }
   await loadPageData();
 }
 
-init();
+init().catch((error) => {
+  showToast(error.message || "Unable to load this page.");
+  const meta = document.getElementById("mobileHomeSearchMeta");
+  if (meta) meta.textContent = "Unable to load the roster. Reload this page to try again.";
+});
